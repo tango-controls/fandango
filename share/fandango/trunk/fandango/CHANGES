@@ -1,0 +1,89 @@
+PyTango_utils 10 December 2010
+-------------------------------------------
+dicts: added CaselessList
+dynamic: dependencies checked using regexps
+functional: added str casting in regular expression conversion; bug solved in isString method
+qt: added a 'thinking' cursor behaviour, added a .wait(sleep) to main thread in the run() method
+objects: added namedtuple
+
+
+PyTango_utils 1st December 2010
+-------------------------------------------
+dynamic: WATTR added for writing external attributes
+dynamic: Added XDEV=getXDevice to access DeviceProxies from dynamic attributes
+dynamic: evalAttr replaced by evalState inside evaluateFormula (no dependencies check, no Write access)
+dynamic: DynamicStatus property parsing added
+dynamic: Tango states added as eval variables
+
+device: Dev4Tango update_attributes changed to be more efficient checking attributes from same server
+device: Added/improved methods to access Tango database
+
+objects: Added Pool ; a class for managing queued-threaded tasks
+
+
+PyTango_utils 9th November 2010
+-------------------------------------------
+device: Added methods to access device info/host
+dynamic: Added property to disable dependencies check between attributes.
+functional: added isGenerator method
+ThreadDict improved
+
+PyTango_utils bliss-8.15, 3rd november 2010
+-------------------------------------------
+ * timeout added to check_attribute
+ * DevChild kept as Dev4Tango alias
+ * poll period added as ThreadDict.append
+
+PyTango_utils bliss-8.14, 18th october 2010
+-------------------------------------------
+device:
+ * Dev4Tango modified to be able to manage internal polling
+ * Fake attribute/event objects improved
+ * Added event-like access to internal device objects within a server and its attributes and commands
+ * DevChild class commented from the module as it will be replaced by Dev4Tango
+dicts/objects:
+ * self_locked decorator moved from dicts to objects module
+dynamic:
+ * self_locked decorator added to always_executed_hoot, read_dyn_attr and write_dyn_attr methods
+servers:
+ * bug solved in get_device_list method
+
+
+PyTango_utils bliss-8.13, 13th october 2010
+-----------------------------
+servers:
+ * Start/Stop of servers improved, checking running status to ignore/kill processes if needed.
+dynamic:
+* Added tau event subscription for XAttr
+* polling_report moved to its own method
+log:
+* bug solved in level aliases
+qt:
+* TauEmitter.next is now public
+* if self.method is None, methods are taken from queue
+
+PyTango_utils bliss-8.12, 16 Sept 2010
+-------------------------------------
+
+arrays.py: Added offset argument to CSVArray creator
+device.py: Better parsing of get_matching_devices/get_all_devices arguments
+dynamic.py: Added DevState type to dynamic attributes
+dynamic.py: Added default argument to getXAttr to manage return types for exceptions and empty arrays
+functional.py: isSequence, toList, and join methods prepared to work with arrays and generators.
+linos.py: whole file refactored, added methods for getting PID and memory usage of processes using /proc/
+servers.py: Now start/stop_servers w/out argument will start/stop all servers
+
+PyTango_utils bliss-8.11, 7 Sept 2010
+-------------------------------------
+
+Changes on fandango modules:
+
+ * device: ProxiesDict and attribute search methods added to device
+ * dicts: SortedDict added in dicts
+ * dynamic: PYMEMCHECK var added to enable heapy debugging in DynamicDS classes
+ * except: trial(...) added for lambdable try...except
+ * linos: timeout added to ping commands
+ * log: filtering  '\r' characters in logs
+ * objects: tuple lists added as Struct argument
+ * servers: methods for attribute/device matching moved to device module.
+ * web: added color tags
