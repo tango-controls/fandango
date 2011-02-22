@@ -1,0 +1,39 @@
+<h2>Attribute table</h2>
+
+The attribute table consists of a table with attributes. The
+attributes come in three formats, scalars, spectrums, and images. The
+value of the attributes are shown in separate tabs for the spectrums
+and the images, whereas the scalar-values are shown directly in the
+table.
+<br>
+The device field is used to indicate the state of the corresponding
+device with predefined colours and the state of the device is also
+available as a tool-tip.
+The quality of the attributes are available as colours on the
+name-field, and the name of the quality is available as a tool-tip.
+<br>
+The rows in the table can be selected and when selected and right-clicked a
+popup-menu will appear with the following items:
+<ul>
+<li>Remove - removes the current attribute. This item is only
+available in <a href="MainHelp.html#administrator-mode">administrator-mode</a>
+<li>Remove all - removes all attributes from the table. This item is
+only available in <a href="MainHelp.html#administrator-mode">administrator-mode</a>
+<li>View - which lets you choose which fields to view.
+<li>Status - which opens a window with the status of the corresponding device
+<li>Run Jive - which lets you start Jive, a program used to configure
+devices. This item is only enabled if jive is available to the Device Tree
+<li>Run ATKpanel - which lets you start ATKPanel on the device of this
+attribute. This item is only enabled if ATKPanel is available to the
+Device Tree.
+<li>Refresh - which lets you refresh this attribute.
+<li>Set - which lets you set the value of the attribute. This item is
+only enabled if the attribute is of type write.
+<li>Trend - which lets you open a trend window to see the values of
+the attribute plotted against time. This item is only enabled if the
+attribute is of type numberscalar.
+<a name="globaltrend"></a>
+<li>Add to trend - which let you add this attribute to a trendwindow
+with other attributes, so that they can be plotted against each others.
+<li>Help - shows this help
+</ul>

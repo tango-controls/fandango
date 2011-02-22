@@ -1,0 +1,131 @@
+#------------------------------------------------------------------------------
+#--  rule: ./*.cpp 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: %.cpp
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------
+#--  rule: ./*.cpp 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.so.o: %.cpp
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+		
+#------------------------------------------------------------------------------
+#--  rule: ./*.cpp 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.a.o: %.cpp
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------
+#--  rule: $(CPPDIRUSER)/*.cpp 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: $(CPPDIRUSER)/%.cpp
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------
+#--  rule: ./*.cxx 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: %.cxx
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------ 
+#--  rule: $(CPPDIRUSER)/*.cxx 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: $(CPPDIRUSER)/%.cxx
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+#------------------------------------------------------------------------------
+#--  rule: ./*.cc 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: %.cc
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------ 
+#--  rule: $(CPPDIRUSER)/*.cc 
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: $(CPPDIRUSER)/%.cxx
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+		
+#------------------------------------------------------------------------------
+#--  rule: ./*.c
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: %.c
+	echo "Compiling $< ..."
+	$(CC) $(CFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------ 
+#--  rule: $(CPPDIRUSER)/*.c
+#------------------------------------------------------------------------------
+$(OBJ_DIR)/%.o: $(CPPDIRUSER)/%.c
+	echo "Compiling $< ..."
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+	
+#------------------------------------------------------------------------------
+#-- all:
+#------------------------------------------------------------------------------
+all: $(SPECIFIC_ALL_TARGET) $(PROJECT_NAME)  
+
+#------------------------------------------------------------------------------
+#-- $(PROJECT_NAME) for STATIC_LIB:
+#------------------------------------------------------------------------------
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+$(PROJECT_NAME): diretories $(SVC_OBJS)
+	echo "Creating static library: "$(OUTPUT_DIR)/lib$(PROJECT_NAME).a
+ifdef EXTERNAL_LIBS
+	mkdir -p $(OBJ_DIR)/external_libs
+	cd $(OBJ_DIR)/external_libs && \
+	for EXTERNAL_LIB in $(EXTERNAL_LIBS); do ar x $$EXTERNAL_LIB; done && \
+	cd -
+	ar rcs $(OUTPUT_DIR)/lib$(PROJECT_NAME).a $(SVC_OBJS) $(OBJ_DIR)/external_libs/*.o
+	rm -f $(OBJ_DIR)/external_libs/*
+else
+	ar rcs $(OUTPUT_DIR)/lib$(PROJECT_NAME).a $(SVC_OBJS)
+endif
+endif
+
+#------------------------------------------------------------------------------
+#-- $(PROJECT_NAME) for SHARED_LIB:
+#------------------------------------------------------------------------------
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+$(PROJECT_NAME):    diretories	$(SVC_OBJS)
+	echo "Linking shared library: "$(OUTPUT_DIR)/lib$(PROJECT_NAME).dylib
+	$(CXX) $(SVC_OBJS) $(LDFLAGS) -o $(OUTPUT_DIR)/lib$(PROJECT_NAME).dylib
+	echo "Link successfull"
+endif
+
+#------------------------------------------------------------------------------
+#-- diretories:
+#------------------------------------------------------------------------------
+diretories:
+	echo "Creating directory: "$(OUTPUT_DIR)
+	mkdir -p $(OUTPUT_DIR)
+	for FILE in $(SVC_OBJS); do mkdir -p `dirname $$FILE`; done
+
+#------------------------------------------------------------------------------
+#-- clean:
+#------------------------------------------------------------------------------
+clean: $(SPECIFIC_CLEAN_TARGET)
+	echo "Cleaning "$(PROJECT_NAME)
+ifdef OBJ_DIR
+ifneq ($(OBJ_DIR),/tmp)
+	echo " Deleting objs directory: "$(OBJ_DIR)
+	rm -rf $(OBJ_DIR)
+endif
+endif
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+	echo " Deleting "$(OUTPUT_DIR)/lib$(PROJECT_NAME).a
+	rm -f $(OUTPUT_DIR)/lib$(PROJECT_NAME).a
+endif
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+	echo " Deleting "$(OUTPUT_DIR)/lib$(PROJECT_NAME).dylib
+	rm -f $(OUTPUT_DIR)/lib$(PROJECT_NAME).dylib
+endif
+

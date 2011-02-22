@@ -1,0 +1,1379 @@
+JDFile v11 {
+  Global {
+background:255,255,255  }
+  JDGroup {
+    summit:21,57,89,105
+    origin:-316,-104
+    fillStyle:1
+    name:"JDGroup"
+    children: {
+      JDRectangle {
+        summit:85,69,89,93
+        origin:87,81
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:25,57,85,105
+        origin:55,81
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:21,69,25,93
+        origin:23,81
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+    }
+  }
+  JDGroup {
+    summit:107,69,170,93
+    origin:-69,-315
+    background:190,190,190
+    lineWidth:2
+    shadowThickness:1
+    name:""
+    children: {
+      JDRectangle {
+        summit:107,69,112.25,93
+        origin:109.625,81
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:112.25,73,164.75,89
+        origin:138.5,81
+        background:255,165,0
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:164.75,69,170,93
+        origin:167.375,81
+        background:255,165,0
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+    }
+  }
+  JDGroup {
+    summit:74,36,124,134
+    origin:-206,34
+    name:"test/sim/beam"
+    children: {
+      JDLabel {
+        summit:74,36,124,68
+        origin:99.5,52.5
+        background:255,165,0
+        lineWidth:0
+        shadowThickness:1
+        name:""
+        font:"courier",1,12
+        text:"Remote",
+             "Valve"
+        hAlignment:1
+        vAlignment:1
+      }
+      JDGroup {
+        summit:90,67,106,134
+        origin:-291,-165.5
+        fillStyle:1
+        name:"JDGroup"
+        children: {
+          JDRectangle {
+            summit:94,97,102.4,117.8
+            origin:98.2,107.4
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:90,67,106,97
+            origin:98,82
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:90,67,106,97
+            origin:98,82
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:90,97,106,67
+            origin:98,97
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:90,118,106,134
+            origin:98,126
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+    }
+  }
+  JDGroup {
+    summit:219,35,269,133
+    origin:-61,33
+    name:"test/sim/ground"
+    children: {
+      JDLabel {
+        summit:219,35,269,67
+        origin:244.5,51.5
+        background:255,165,0
+        lineWidth:0
+        shadowThickness:1
+        name:""
+        font:"courier",1,12
+        text:"Remote",
+             "Valve"
+        hAlignment:1
+        vAlignment:1
+      }
+      JDGroup {
+        summit:235,66,251,133
+        origin:-146,-166.5
+        fillStyle:1
+        name:"JDGroup"
+        children: {
+          JDRectangle {
+            summit:239,96,247.4,116.8
+            origin:243.2,106.4
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:235,66,251,96
+            origin:243,81
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:235,66,251,96
+            origin:243,81
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:235,96,251,66
+            origin:243,96
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:235,117,251,133
+            origin:243,125
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+    }
+  }
+  JDEllipse {
+    summit:298,41,378,121
+    origin:338,81
+    fillStyle:1
+    lineWidth:2
+    shadowThickness:1
+    name:"workshop/plcs/brautomation"
+  }
+  JDRectangle {
+    summit:295,69,299,93
+    origin:297,81
+    lineWidth:2
+    shadowThickness:1
+    name:""
+  }
+  JDLine {
+    summit:338,28,338,168
+    origin:338,98
+    lineStyle:1
+    shadowThickness:1
+    name:""
+  }
+  JDGroup {
+    summit:342,21,358,37
+    origin:-51,-7
+    fillStyle:1
+    lineWidth:2
+    shadowThickness:1
+    maxvalue:5
+    name:""
+    extensions:{
+      UserClass:"1"
+    }
+    children: {
+      JDGroup {
+        summit:342,21,358,37
+        origin:350,29
+        background:47,79,79
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"4"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:4,4,true
+        }
+        children: {
+          JDRectangle {
+            summit:346,33,354,37
+            origin:350,35
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:342,25,358,33
+            origin:350,29
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:346,21,354,25
+            origin:350,23
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:342,21,358,37
+        origin:350,29
+        background:0,255,0
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"1"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:1,1,true
+        }
+        children: {
+          JDRectangle {
+            summit:346,33,354,37
+            origin:350,35
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:342,25,358,33
+            origin:350,29
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:346,21,354,25
+            origin:350,23
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:342,21,358,37
+        origin:350,29
+        background:255,0,0
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"3"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:3,3,true
+        }
+        children: {
+          JDRectangle {
+            summit:346,33,354,37
+            origin:350,35
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:342,25,358,33
+            origin:350,29
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:346,21,354,25
+            origin:350,23
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:342,21,358,37
+        origin:350,29
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"2"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:2,2,true
+        }
+        children: {
+          JDRectangle {
+            summit:346,33,354,37
+            origin:350,35
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:342,25,358,33
+            origin:350,29
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:346,21,354,25
+            origin:350,23
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:342,21,358,37
+        origin:350,29
+        background:255,165,0
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"5"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:5,5,true
+        }
+        children: {
+          JDRectangle {
+            summit:346,33,354,37
+            origin:350,35
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:342,25,358,33
+            origin:350,29
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:346,21,354,25
+            origin:350,23
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:342,21,358,37
+        origin:350,29
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:"0"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:0,0,true
+        }
+        children: {
+          JDRectangle {
+            summit:346,33,354,37
+            origin:350,35
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:342,25,358,33
+            origin:350,29
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:346,21,354,25
+            origin:350,23
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+    }
+  }
+  JDGroup {
+    summit:326,13,334,37
+    origin:-55,-3
+    background:47,79,79
+    lineWidth:2
+    shadowThickness:1
+    maxvalue:5
+    name:""
+    extensions:{
+      UserClass:"2"
+    }
+    children: {
+      JDGroup {
+        summit:326,13,334,37
+        origin:330,25
+        background:255,158,0
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:"0"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:0,0,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,13,334,37
+            origin:330,25
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:326,29,334,29
+            origin:330,37
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:326,13,334,37
+        origin:330,25
+        background:0,255,0
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"1"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:1,1,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,13,334,37
+            origin:330,25
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:326,29,334,29
+            origin:330,37
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:326,13,334,37
+        origin:330,25
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"2"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:2,2,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,13,334,37
+            origin:330,25
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:326,29,334,29
+            origin:330,37
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:326,13,334,37
+        origin:330,25
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"3"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:3,3,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,13,334,37
+            origin:330,25
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            visible:false
+            maxvalue:5
+            name:"3"
+          }
+          JDLine {
+            summit:326,29,334,29
+            origin:330,37
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:326,13,334,37
+        origin:330,25
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"5"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:5,5,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,13,334,37
+            origin:330,25
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            visible:false
+            maxvalue:5
+            name:"5"
+          }
+          JDLine {
+            summit:326,29,334,29
+            origin:330,37
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:326,13,334,37
+        origin:330,25
+        background:47,79,79
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"4"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:4,4,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,13,334,37
+            origin:330,25
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDLine {
+            summit:326,29,334,29
+            origin:330,37
+            background:47,79,79
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+    }
+  }
+  JDRectangle {
+    summit:326,37,354,41
+    origin:340,39
+    lineWidth:2
+    shadowThickness:1
+    name:""
+  }
+  JDLabel {
+    summit:313,60,368,84
+    origin:341,72.5
+    lineWidth:0
+    shadowThickness:1
+    name:""
+    font:"helvetica",1,17
+    text:"Mono"
+    hAlignment:1
+    vAlignment:1
+  }
+  JDRectangle {
+    summit:378,69,382,93
+    origin:380,81
+    lineWidth:2
+    shadowThickness:1
+    name:""
+  }
+  JDRectangle {
+    summit:330,121,346,125
+    origin:338,123
+    lineWidth:2
+    shadowThickness:1
+    name:""
+  }
+  JDGroup {
+    summit:318,125,358,157
+    origin:-39,1
+    background:47,79,79
+    fillStyle:1
+    lineWidth:2
+    shadowThickness:1
+    maxvalue:5
+    name:"test/sim/pump"
+    extensions:{
+      UserClass:"4"
+    }
+    children: {
+      JDGroup {
+        summit:318,125,358,157
+        origin:338,141
+        background:255,158,0
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:"0"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:0,0,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,125,350,129
+            origin:338,127
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:330,129,346,157
+            origin:338,143
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:318,137,358,157
+            origin:338,147
+            background:255,158,0
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:318,125,358,157
+        origin:338,141
+        background:0,255,0
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"1"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:1,1,true
+        }
+        children: {
+          JDRectangle {
+            summit:318,137,358,157
+            origin:338,147
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:326,125,350,129
+            origin:338,127
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:330,129,346,157
+            origin:338,143
+            background:0,255,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:318,125,358,157
+        origin:338,141
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"2"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:2,2,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,125,350,129
+            origin:338,127
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:318,137,358,157
+            origin:338,147
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:330,129,346,157
+            origin:338,143
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:318,125,358,157
+        origin:338,141
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"3"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:3,3,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,125,350,129
+            origin:338,127
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:318,137,358,157
+            origin:338,147
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:330,129,346,157
+            origin:338,143
+            background:255,0,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            visible:false
+            maxvalue:5
+            name:"3"
+          }
+        }
+      }
+      JDGroup {
+        summit:318,125,358,157
+        origin:338,141
+        background:47,79,79
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"4"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:4,4,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,125,350,129
+            origin:338,127
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:318,137,358,157
+            origin:338,147
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:330,129,346,157
+            origin:338,143
+            background:47,79,79
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+      JDGroup {
+        summit:318,125,358,157
+        origin:338,141
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        visible:false
+        maxvalue:5
+        name:"5"
+        visibilitymapper:{
+          mapping_type:3
+          mode:0
+          default:false
+          map:5,5,true
+        }
+        children: {
+          JDRectangle {
+            summit:326,125,350,129
+            origin:338,127
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:318,137,358,157
+            origin:338,147
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+          JDRectangle {
+            summit:330,129,346,157
+            origin:338,143
+            background:255,165,0
+            fillStyle:1
+            lineWidth:2
+            shadowThickness:1
+            maxvalue:5
+            name:""
+          }
+        }
+      }
+    }
+  }
+  JDRectangle {
+    summit:382,21,390,141
+    origin:386,81
+    background:0,0,0
+    fillStyle:3
+    lineWidth:2
+    shadowThickness:1
+    name:""
+  }
+  JDGroup {
+    summit:251,69,299,93
+    origin:75,-315
+    background:190,190,190
+    lineWidth:2
+    shadowThickness:1
+    name:""
+    children: {
+      JDRectangle {
+        summit:251,69,255,93
+        origin:253,81
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:255,73,295,89
+        origin:275,81
+        background:255,165,0
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:295,69,299,93
+        origin:297,81
+        background:255,165,0
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+    }
+  }
+  JDGroup {
+    summit:8,23,65,57
+    origin:-489.5,10
+    name:"test/sim/noisypsu"
+    children: {
+      JDLabel {
+        summit:8,23,65,41
+        origin:37,32.5
+        background:255,165,0
+        lineWidth:0
+        shadowThickness:1
+        name:""
+        font:"courier",1,12
+        text:"Penning"
+        hAlignment:1
+        vAlignment:1
+      }
+      JDRectangle {
+        summit:31,53,39,57
+        origin:35,55
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:""
+      }
+      JDRectangle {
+        summit:27,45,43,53
+        origin:35,49
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:""
+      }
+      JDRectangle {
+        summit:31,41,39,45
+        origin:35,43
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:""
+      }
+    }
+  }
+  JDGroup {
+    summit:48,14,98,57
+    origin:-397,-38.5
+    name:"test/sim/noisypsu2"
+    children: {
+      JDLabel {
+        summit:48,14,98,32
+        origin:73.5,23.5
+        background:255,165,0
+        lineWidth:0
+        shadowThickness:1
+        name:""
+        font:"courier",1,12
+        text:"Pirani"
+        hAlignment:1
+        vAlignment:1
+      }
+      JDRectangle {
+        summit:67,33,75,57
+        origin:71,45
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:""
+      }
+      JDLine {
+        summit:67,50,75,50
+        origin:71,58
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        maxvalue:5
+        name:""
+      }
+    }
+  }
+  JDLine {
+    summit:409,81,8,83
+    origin:288,81
+    background:0,255,0
+    fillStyle:1
+    lineStyle:1
+    shadowThickness:1
+    name:""
+  }
+  JDGroup {
+    summit:170,8,234,57
+    origin:35,-285.5
+    name:"test/sim/pump"
+    children: {
+      JDGroup {
+        summit:193,25,209,57
+        origin:-4,-466
+        lineWidth:2
+        shadowThickness:1
+        name:""
+        children: {
+          JDRectangle {
+            summit:197,53,205,57
+            origin:201,55
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDRectangle {
+            summit:193,25,209,53
+            origin:201,39
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:193,29,209,29
+            origin:201,31
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:193,33,209,33
+            origin:201,37
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:193,37,209,37
+            origin:201,43
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:193,41,209,41
+            origin:201,49
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:193,45,209,45
+            origin:201,55
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:193,49,209,49
+            origin:201,61
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:197,25,197,53
+            origin:199,39
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:205,25,205,53
+            origin:211,39
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+          JDLine {
+            summit:201,25,201,53
+            origin:205,39
+            lineWidth:2
+            shadowThickness:1
+            name:""
+          }
+        }
+      }
+      JDLabel {
+        summit:170,8,234,26
+        origin:202.5,17.5
+        lineWidth:0
+        shadowThickness:1
+        name:""
+        font:"courier",1,12
+        text:"RGA Head"
+        hAlignment:1
+        vAlignment:1
+      }
+    }
+  }
+  JDGroup {
+    summit:167,57,235,105
+    origin:-170,-104
+    fillStyle:1
+    name:"workshop/plcs/beckhoff"
+    children: {
+      JDRectangle {
+        summit:231,69,235,93
+        origin:233,81
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:171,57,231,105
+        origin:201,81
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+      JDRectangle {
+        summit:167,69,171,93
+        origin:169,81
+        fillStyle:1
+        lineWidth:2
+        shadowThickness:1
+        name:""
+      }
+    }
+  }
+  JDRectangle {
+    summit:3,3,418,173
+    origin:262,101
+    name:"Rectangle"
+  }
+}

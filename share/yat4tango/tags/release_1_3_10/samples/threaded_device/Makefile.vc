@@ -1,0 +1,25 @@
+device_server = ThreadedDevice
+
+INCUSER= -I. -I../../../YAT/include -I../../include
+
+LIBUSER= ../../../YAT/lib/static/msvc-8.0/libYAT.lib ../../lib/static/msvc-8.0/libYAT4Tango.lib
+
+make_dir=$(SOLEIL_ROOT)\env
+
+!include $(make_dir)\tango.opt
+
+exe_device_server= $(EXEDIR)\ds_$(device_server).exe
+
+pdb_name= $(TEMPLIBDIR)\$(device_server).pdb
+
+LISTEOBJ = \
+	 $(OBJDIR)\MyDeviceTask.OBJ\
+	 $(OBJDIR)\ClassFactory.OBJ\
+	 $(OBJDIR)\main.OBJ\
+	 $(OBJDIR)\$(device_server).OBJ\
+	 $(OBJDIR)\$(device_server)Class.OBJ\
+	 $(OBJDIR)\$(device_server)StateMachine.OBJ
+
+
+!include $(make_dir)\common_target.opt
+

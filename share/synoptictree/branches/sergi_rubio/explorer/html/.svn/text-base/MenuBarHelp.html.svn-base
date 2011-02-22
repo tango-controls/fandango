@@ -1,0 +1,52 @@
+<h2>The menu bar</h2>
+
+The menu bar contains six menus, which all have shortcuts. The most
+frequently used menu-items also have shortcuts.
+
+<a name="FileMenu"><h3>The file menu</h3></a>
+
+The file menu contains menu-items for opening and closing files when
+the application is in <a
+href="MainHelp.html#administrator-mode">administrator-mode</a> and a
+quit item which is always available.
+<p>
+When in administrator mode the <tt>"Save"</tt> item will not be available
+before the user has chosen a file-name, either by selecting
+<tt>"Open"</tt> or by selecting <tt>"Save as"</tt>
+
+<h3>The edit menu</h3>
+
+The edit menu contains one item, <tt>"Preferences"</tt> which lets the
+user edit the customizable properties of this application.
+
+<h3>The view menu</h3>
+
+The view menu contains two items,
+<ul>
+<li>Error history - which shows the user all errors reported by the
+attributes and commands.
+<li>Global trend - which shows the user the global trend window, which
+can be filled up from the <a
+href="AttributeTableHelp.html#globaltrend">Add to trend</a> item in
+the <a href="AttributeTableHelp.html">attribute table</a>
+</ul>
+
+<a name="RefreshMenu"><h3>The Refresh menu</h3></a>
+
+The refresh menu contains items to start and stop the refreshing of
+attributes and devices, as well as the possibility to adjust the
+refresh-interval of the refreshers.
+
+<h3>The run menu</h3>
+
+The run-menu contains two items,
+<ul>
+<li>Run jive - lets the user start jive if available.
+<li>Run ATKpanel - lets the user start ATKPanel if available.
+</ul>
+Available means that the Device Tree can find the start classes of jive
+or ATKPanel, that is if the jar-files for ATKPanel or Jive are in the
+CLASSPATH.
+
+<h3>The help menu</h3>
+Shows this help window.

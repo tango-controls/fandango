@@ -1,0 +1,145 @@
+Sergi Rubio Manrique, srubio@cells.es, 
+ALBA Control System group
+
+
+
+June, 2008
+------------------------------------------------------
+
+Objects inside Groups are now managed by TangoSynopticHandler.
+	To do that parseJDrawComponent has been modified and mouseifyGroup and groupMoused functions has been added.
+
+groupHook,eventReceivers,ignoreMouse extensions allow to setup a button to control the visibility of a group of objects.
+	To do that mouseifyHook, hookMoused, getMatchingObjects has been added to TangoSynopticHandler
+	Several private methods of JDObject,JDrawEditor has been turned into public or protected
+	mouseDraggedPlayer, mouseReleasedPlayer, mousePressedPlayerB1 has been modified in JDrawEditor class
+
+There's some new features of ATK.JDraw missing, e.g : Load file from inputStream, changeJDGroupColor4Quality
+
+New extensions:
+	eventReceivers: regexp1,regexp2,...
+		- Propagates a mouse event through all those elements which names match any of the regular expressions provided.
+	ignoreMouse
+		- Allows to create an "interactive" object that ignores any mouse event, reacting only to those propagated by the previous extension.
+	isContainer
+		- Forces TangoSynopticHandler to parse all the JDrawComponents inside a group as if they were independent objects.
+
+
+March, 2008
+------------------------------------------------------
+
+Many variables inside fr.esrf.tangoatk.widget.attribute.Trend were changed to private to public/protected to allow JDraw to change Trend background colours. Additionally, SwingObjects now doesn't override the properties set by extensions.
+
+Many changes in right-button menus of JDraw, now view panels for properties or transform are available. Groups are now convertible to polyline, and become rotable objects. It needed the modification of several widget/util/jdraw classes
+
+Loading of the jdraw file is done in a background thread ... to avoid several problems with populated synoptics.
+
+TangoColors and other extensions actively used.
+
+
+/** ******************************************************************************************************
+13th November 2007: The SynopticTree is more or less up 
+to date in the SVN repository (cells)
+
+  Note: The Synoptic Tree is an application still under 
+  development and it cannot be still considered as 1.0 
+  release. There's some alternative codes still present 
+  in this files that I will remove as soon as I 
+  continue with the development.
+
+------------------------------------------------------------
+ Summary of changes from original device tree
+------------------------------------------------------------
+
+  Class explorer.ViewerMain
+------------------------------------------------------------
+Modified graph background (now is white instead of 
+grey). It has been done by replacing the 
+graph_background property while reading the file ... 
+probably it's not the best way to do it.
+
+  Class explorer.AdminMain
+------------------------------------------------------------
+The Synoptic parsing was initially added to this class 
+... but finally all of it has been moved to a different class.
+
+  Class explorer.SynopticMain (modified from explorer.AdminMain)
+------------------------------------------------------------
+SynopticMain is created to separate DeviceTree and 
+SynopticTree code.
+
+* Background of graphs changed.
+
+* It was added capability of configuring composer servers.
+
+* The methods setSynoptic amd loadJDObjects were added.
+
+* TreeInitialization varies if a Synoptic has been loaded
+
+* PopUp Menu for new Node types (HierarchyNode) has 
+  been aded
+
+* add2Table modified, now commands and attributes share 
+  the same TabPanel
+
+* The new Node types for the ATK Tree has been added in 
+  an ATK patch (ATKmod.jar).
+
+* Now SynopticMain overrides the framework 
+  initialization (initComponents(...))
+
+* It allows to open a device tree xml file linked to a 
+  Synoptic (called AttributesProfile); it can be done 
+  at startup or from a PopUp Menu.
+
+* Problems with JDraw synoptic resizing solved.
+
+  Package explorer.ui
+------------------------------------------------------------
+* Class RunUi modified to be able to launch JDraw and Mambo.
+
+* Class FileUi, now it can close a file and also open 
+  jdraw files instead of devtree xml.
+
+* Class FileHandler, now it's able to close files.
+
+
+/** ******************************************************************************************************
+srubio@cells.es, oktober 2006.
+The TangoSynopticHandler Class has been modified to:
+	- Add a stopRefresher command to stop the allAttributes AttributeList refresher thread 
+	- Now there's 5 extensions parsed by default:
+		className: 
+			java panel to be launched when the object is double-clicked
+		className=noPanel(*):
+			If this extension is present no default panel (atkpanel.MainPanel) is launched for this object
+		classParam: 
+			first argument to be passed to the java panel
+			e.g, if className is a synopticAppli classParam="asynopticfile.jdw"
+		valueList: 
+			used by *ScalarComboEditor swing objects to acquire the values list
+			used also by atkpanel to read the rest of MainPanel arguments (standAlone, keepStateRrep efresh, propertiesButton, readOnly = "0 1 0 0")
+			The readOnly parameter of the atkpanel is used to show/hide the 
+			for a Combo editor could be "jive xterm mambo" if it asking for an application to launch
+		shellCommand(*):
+			It allows to launch any shell command or application (dir, xterm, jive, firefox, etc ...) from the synoptic
+			If a JDObject is interactive and has the shellCommand extension its content will be executed at each valueExceedBounds event
+			The command is always executed in background
+			Streams redirection is not allowed (should be done inside an script)
+			Arguments can be passed to the shell command
+		tangoColors(*):
+			Actual JDraw deprecates standard Tango-State Colors if something is enabled in the interactive panel
+			This extension has been added to force JDraw to apply the original TangoColors to this object
+		noPrompt(*):
+			If this extension is present external applications are executed w/out prompt
+		standAlone(*):
+			If this extension is present external applications are not killed when Synoptic exits
+
+	EXTENSIONS USED BY SYNOPTIC TREE:
+
+	- isSynoptic: file.jdw	; Allows to setup a jdraw file linked to the actual object, it will be added to the Tree hierarchy
+
+	- xmlFile: file.xml ; Allows to setup an xml file to be added to the actual attributes being shown in the attribute/trends panel
+
+	- addToTrend, addToTable ; Automatically add this attribute to the attributes table/trend panels
+

@@ -1,0 +1,17 @@
+<h2>The toolbar</h2>
+
+The toolbar contains floatable shortcuts into the menus-system. The
+short-cuts available are:
+From the <a href="MenuBarHelp.html#RefreshMenu">Refresh menu:</a>
+<ul>
+<li>Stop refreshing
+<li>Start refreshing
+<li>Refresh
+</ul>
+From the <a href="MenuBarHelp.html#FileMenu">File menu:</a>
+<ul>
+<li>Open
+<li>New
+<li>Save
+<li>Save as
+</ul>

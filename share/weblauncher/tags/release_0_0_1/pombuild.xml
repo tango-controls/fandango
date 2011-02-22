@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<project name="Create TANGO WEB DEMO" default="prepareSource" basedir=".">
+<target name="prepareResource">
+		<delete dir="./target/classes"/>
+		<mkdir dir="./target/classes"/>
+		<copy todir="./target/classes">
+			<fileset dir="./src">
+				<include name="**/*.*"/>
+				<exclude name="**/*.java"/>
+			</fileset> 
+		</copy>
+	</target>	
+</project>

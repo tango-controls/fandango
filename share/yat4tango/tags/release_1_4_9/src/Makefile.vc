@@ -1,0 +1,42 @@
+#
+device_server= YAT4tango
+#
+#  Les PATHS des includes propres à ce DServer
+#  Mettre /IC:\monchemin\include /ID:\monautrechemininclude
+INCUSER=/I..\..\YAT\include
+
+#
+#  Si vous voulez compiler en mode DEBUG decommenter la ligne suivante
+#DEBUG=
+#
+#
+!ifdef DEBUG
+!message "Compiling library in Debug..."
+LIBRARY_NAME=..\lib\static\msvc-8.0\libYAT4Tangod.lib
+!else
+!message "Compiling library in Release..."
+LIBRARY_NAME=..\lib\static\msvc-8.0\libYAT4Tango.lib
+!endif
+#
+# ------------------Fin des modifications pour le end user -------------------------------------
+#
+make_dir=$(SOLEIL_ROOT)\env
+
+!include $(make_dir)\tango.opt
+
+exe_device_server=dummy
+
+LISTEOBJ = \
+   $(OBJDIR)\DeviceTask.obj\
+   $(OBJDIR)\DynamicAttr.obj\
+   $(OBJDIR)\DynamicAttrHelper.obj\
+   $(OBJDIR)\ExceptionHelper.obj\
+   $(OBJDIR)\PlugInAttr.obj\
+   $(OBJDIR)\PlugInHelper.obj\
+   $(OBJDIR)\ThreadSafeDeviceProxy.obj\
+   $(OBJDIR)\MonitoredAttribute.obj\
+   $(OBJDIR)\MonitoredDevice.obj\
+   $(OBJDIR)\MonitoredDeviceTask.obj
+
+!include $(make_dir)\common_target.opt
+

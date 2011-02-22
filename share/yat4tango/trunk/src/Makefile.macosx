@@ -1,0 +1,195 @@
+#------------------------------------------------------------------------------
+# This file is part of the YAT4Tango library
+#------------------------------------------------------------------------------
+#
+# Copyright (C) 2006-2010  Nicolas Leclercq, Synchrotron SOLEIL.
+# Copyright (C) 2006-2010  Julien Malik, Synchrotron SOLEIL.
+#
+# The Libera Tango Device is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# The Libera Tango Device is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
+# Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+#
+# Contact:
+#      Nicolas Leclercq
+#      Synchrotron SOLEIL
+#------------------------------------------------------------------------------
+
+#=============================================================================
+# ARCH_TYPE
+#=============================================================================
+# - i386   : build 32 bits libraries
+# - x86_64 : build 64 bits libraries
+#-----------------------------------------------------------------------------
+#####> THIS IS SUPPOSED TO BE SPECIFIED BY XCODE: ARCH_TYPE = …
+
+#=============================================================================
+# PROJECT_TYPE
+#=============================================================================
+# - STATIC_LIB : your project is a static library (.a)
+# - SHARED_LIB : your project is a shared library (.so)
+#-----------------------------------------------------------------------------
+#####> THIS IS SUPPOSED TO BE SPECIFIED BY XCODE: PROJECT_TYPE = ...
+
+#=============================================================================
+# RELEASE_TYPE
+#=============================================================================
+# - DEBUG     : debug symbols - no optimization
+# - OPTIMIZED : no debug symbols - optimization level set to O2
+#-----------------------------------------------------------------------------
+#####> THIS IS SUPPOSED TO BE SPECIFIED BY XCODE: RELEASE_TYPE = ...
+
+#=============================================================================
+# ARCH SPECIFIC TANGO DISTIBUTION 
+#=============================================================================
+ifeq ($(ARCH_TYPE), i386)
+	DIST_ROOT=../../../tango-dist-i386
+else
+	DIST_ROOT=../../../tango-dist-x86_64
+endif
+
+#=============================================================================
+# YAT 
+#=============================================================================
+YAT_ROOT=$(DIST_ROOT)/yat
+
+#=============================================================================
+# TANGO DIST ROOT DIR (change or overwrite it using TANGO_ROOT env. var)
+#=============================================================================
+TANGO_ROOT=$(DIST_ROOT)/tango
+
+#=============================================================================
+# OMNIORB DIST ROOT DIR (change or overwrite it using OMNIORB_ROOT env. var)
+#=============================================================================
+OMNIORB_ROOT=$(DIST_ROOT)/omniorb
+
+#=============================================================================
+# PROJECT_NAME is the name of the library/device/exe you want to build
+#=============================================================================
+# - for a STATIC_LIB : PROJECT_NAME will be prefixed by 'lib'
+# - for a SHARED_LIB : PROJECT_NAME will be prefixed by 'lib'
+#-----------------------------------------------------------------------------
+ifeq ($(RELEASE_TYPE),OPTIMIZED)
+  PROJECT_NAME = YAT4Tango
+else
+  PROJECT_NAME = YAT4Tangod
+endif
+
+#=============================================================================
+# INC_DIR_USER - user defined include paths
+#=============================================================================
+# - for a DEVICE     : TANGO dependencies are automatically added
+# - any PROJECT_TYPE : "../include" and "." are automatically added
+#-----------------------------------------------------------------------------
+INC_DIR_USER =-I$(YAT_ROOT)/include \
+              -I$(TANGO_ROOT)/include \
+              -I$(OMNIORB_ROOT)/include
+
+#=============================================================================
+# LIB_DIR_USER - user defined library paths
+#=============================================================================
+# - for a DEVICE     : the TANGO libraries directories are automatically added
+# - any PROJECT_TYPE : "../lib" is automatically added
+#-----------------------------------------------------------------------------
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+LIB_DIR_USER = -L$(YAT_ROOT)/lib-dylib \
+               -L$(TANGO_ROOT)/lib-dylib \
+               -L$(OMNIORB_ROOT)/lib-dylib 
+endif
+
+#=============================================================================
+# LDFLAGS_USER - linker options or user defined libraries
+#=============================================================================
+# - for a DEVICE     : the TANGO libraries are automatically added
+# - any PROJECT_TYPE : '-ldl -lpthread' are automatically added
+#-----------------------------------------------------------------------------
+# - NOTE : Be aware that the order matters! For instance, if you link your 
+#          project versus libA, and libA depends itself on libB, you must 
+#          use '-lA -lB', you will get 'undefined reference' errors otherwise
+#----------------------------------------------------------------------------
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+ifeq ($(RELEASE_TYPE),OPTIMIZED)
+LDFLAGS_USER = -lyat
+else
+LDFLAGS_USER = -lyatd
+endif
+LDFLAGS_USER += -llog4tango \
+				-ltango \
+				-lomniORB4 \
+				-lCOS4 \
+				-lomniDynamic4 \
+				-lomniThread
+endif
+
+#=============================================================================
+# CXXFLAGS_USER - compiler options or user defined macros
+#=============================================================================
+# - NOTE : put your compile-time macros here using '-Dmy_macro'
+#-----------------------------------------------------------------------------
+CXXFLAGS_USER  = -DNoNanoSleep
+CXXFLAGS_USER += -DPthreadDraftVersion=8 
+CXXFLAGS_USER += -UPthreadSupportThreadPriority 
+CXXFLAGS_USER += -UNeedPthreadInit
+CXXFLAGS_USER += -fno-enforce-eh-specs -Wno-unused-parameter
+ifeq ($(RELEASE_TYPE),DEBUG)
+	CXXFLAGS_USER += -D_DEBUG
+endif
+
+#=============================================================================
+#	TANGO.OPT - include standard TANGO compilation options
+#=============================================================================
+include ./build/macosx/tango.opt
+
+#=============================================================================
+# SVC_OBJS - is the list of all objects needed in order to build the project
+#=============================================================================
+SVC_OBJS = $(OBJDIR)/DynamicAttr.o \
+           $(OBJDIR)/DynamicAttrHelper.o \
+           $(OBJDIR)/ExceptionHelper.o \
+           $(OBJDIR)/ThreadSafeDeviceProxy.o \
+           $(OBJDIR)/DeviceTask.o \
+           $(OBJDIR)/PlugInAttr.o \
+           $(OBJDIR)/PlugInHelper.o \
+           $(OBJDIR)/MonitoredAttribute.o \
+           $(OBJDIR)/MonitoredDevice.o \
+           $(OBJDIR)/MonitoredDeviceTask.o
+
+#=============================================================================
+# VERBOSE - comment the following line if you want a verbose compilation
+#=============================================================================
+.SILENT:
+
+#=============================================================================
+#	COMMON_TARGET.OPT - include standard TANGO compilation options
+#=============================================================================
+include ./build/macosx/common_target.opt
+
+
+cleanall:
+	make -f Makefile.macosx clean RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=STATIC_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx clean RELEASE_TYPE=DEBUG PROJECT_TYPE=STATIC_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx clean RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=SHARED_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx clean RELEASE_TYPE=DEBUG PROJECT_TYPE=SHARED_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx clean RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=STATIC_LIB ARCH_TYPE=i386
+	make -f Makefile.macosx clean RELEASE_TYPE=DEBUG PROJECT_TYPE=STATIC_LIB ARCH_TYPE=i386
+	make -f Makefile.macosx clean RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=SHARED_LIB ARCH_TYPE=i386
+	make -f Makefile.macosx clean RELEASE_TYPE=DEBUG PROJECT_TYPE=SHARED_LIB ARCH_TYPE=i386
+	
+releases: cleanall
+	make -f Makefile.macosx all RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=STATIC_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx all RELEASE_TYPE=DEBUG PROJECT_TYPE=STATIC_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx all RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=SHARED_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx all RELEASE_TYPE=DEBUG PROJECT_TYPE=SHARED_LIB ARCH_TYPE=x86_64
+	make -f Makefile.macosx all RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=STATIC_LIB ARCH_TYPE=i386
+	make -f Makefile.macosx all RELEASE_TYPE=DEBUG PROJECT_TYPE=STATIC_LIB ARCH_TYPE=i386
+	make -f Makefile.macosx all RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=SHARED_LIB ARCH_TYPE=i386
+	make -f Makefile.macosx all RELEASE_TYPE=DEBUG PROJECT_TYPE=SHARED_LIB ARCH_TYPE=i386

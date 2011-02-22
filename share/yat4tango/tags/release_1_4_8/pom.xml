@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>fr.soleil</groupId>
+        <artifactId>super-pom-C-CPP-tango</artifactId>
+        <version>RELEASE</version>
+    </parent>
+
+    <groupId>fr.soleil.lib</groupId>
+    <artifactId>YAT4Tango-${aol}-${library}-${mode}</artifactId>
+    <version>1.4.8</version>
+
+    <packaging>nar</packaging>
+
+    <name>YAT4Tango</name>
+    <description>YAT4Tango library</description>
+
+    <developers>
+        <developer>
+            <id>leclercq</id>
+            <name>Nicolas Leclercq</name>
+            <email>nicolas.leclercq@synchrotron-soleil.fr
+            </email>
+            <url>http://controle/</url>
+            <organization>Synchrotron Soleil</organization>
+            <organizationUrl>http://www.synchrotron-soleil.fr
+            </organizationUrl>
+            <roles>
+                <role>developer</role>
+            </roles>
+            <timezone>1</timezone>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>${scm.connection.cvs.tango-ds}:Libraries/YAT4tango</connection>
+        <developerConnection>${scm.developerConnection.cvs.tango-ds}:Libraries/YAT4tango</developerConnection>
+        <url>${scm.url.cvs.tango-ds}/Libraries/YAT4tango</url>
+    </scm>
+
+    <dependencies>
+        <dependency>
+            <groupId>fr.soleil.lib</groupId>
+            <artifactId>YAT-${aol}-${library}-${mode}</artifactId>
+            <!--<version>1.4.8-SNAPSHOT</version>-->
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.freehep</groupId>
+                <artifactId>freehep-nar-plugin</artifactId>
+
+                <configuration>
+                    <cpp>
+                        <sourceDirectory>src</sourceDirectory>
+                        <includePaths>
+                            <includePath>include</includePath>
+                        </includePaths>
+                    </cpp>
+                    <specificConfiguration>
+                        <id>YAT4Tango win32 shared</id>
+                        <activation>
+                            <os>Windows</os>
+                            <libraryType>shared</libraryType>
+                                <!--cppDebug>true</cppDebug-->
+                        </activation>
+                        <cpp>
+                            <defines>
+                                <define>YAT_DLL</define>
+                                <define>YAT4TANGO_DLL</define>
+                                <define>YAT4TANGO_BUILD</define>
+                            </defines>
+                        </cpp>
+                    </specificConfiguration>
+                    <specificConfiguration>
+                        <id>Linux</id>
+                        <activation>
+                            <os>Linux</os>
+                        </activation>
+                        <cpp>
+                            <defines>
+                                <define>NoNanoSleep</define>
+                                <define>PthreadDraftVersion=8</define>
+                            </defines>
+
+                            <options>
+                                <option>-UPthreadSupportThreadPriority</option>
+                                <option>-UNeedPthreadInit</option>
+                            </options>
+                        </cpp>
+                    </specificConfiguration>
+                    <specificConfiguration>
+                        <id>MacOSX</id>
+                        <activation>
+                            <os>MacOSX</os>
+                        </activation>
+                        <cpp>
+                            <defines>
+                                <define>NoNanoSleep</define>
+                                <define>PthreadDraftVersion=8</define>
+                            </defines>
+
+                            <options>
+                                <option>-UPthreadSupportThreadPriority</option>
+                                <option>-UNeedPthreadInit</option>
+                            </options>
+                        </cpp>
+                    </specificConfiguration>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

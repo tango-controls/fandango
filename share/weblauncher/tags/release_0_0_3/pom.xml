@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?><project>
+  <parent>
+    <artifactId>super-pom</artifactId>
+    <groupId>fr.soleil</groupId>
+    <version>1.1</version>
+  </parent>
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>fr.soleil.web</groupId>
+  <artifactId>ATKAppLauncher</artifactId>
+  <name>Tango Web Launcher</name>
+  <version>0.0.3</version>
+  <description>Web Application launcher</description>
+  <scm>
+    <connection>scm:cvs:pserver:anonymous:@tango-cs.cvs.sourceforge.net:/cvsroot/tango-cs:tango/tools/weblauncher</connection>
+    <url>http://tango-cs.cvs.sourceforge.net/tango-cs/tango/tools/weblauncher</url>
+  </scm>
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+    <resources>
+    </resources>
+  </build>
+  <dependencies>
+    <dependency>
+      <groupId>fr.esrf.atk</groupId>
+      <artifactId>ATKCore</artifactId>
+      <version>3.2.7</version>
+       <exclusions>
+        <exclusion>
+          <artifactId>TangORB</artifactId>
+          <groupId>fr.esrf.tango</groupId>
+        </exclusion>
+        </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>fr.soleil.tangoweb</groupId>
+      <artifactId>WebTangORB</artifactId>
+      <version>6.1.0-2</version>
+    </dependency><!--
+    <dependency>
+    	<groupId>fr.soleil.gui</groupId>
+    	<artifactId>AtkTuningWeb</artifactId>
+    	<version>0.0.1-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>fr.soleil.gui</groupId>
+      <artifactId>MamboWeb</artifactId>
+      <version>1.5.6-0</version>
+    </dependency>
+        <dependency>
+      <groupId>fr.soleil.gui</groupId>
+      <artifactId>MachineStatusBean</artifactId>
+      <version>1.8.3</version>
+    </dependency>
+  --></dependencies>
+</project>

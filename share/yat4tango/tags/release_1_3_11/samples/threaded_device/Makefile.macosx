@@ -1,0 +1,155 @@
+#------------------------------------------------------------------------------
+# This file is part of the YAT4Tango library
+#------------------------------------------------------------------------------
+#
+# Copyright (C) 2005-2008  Nicolas Leclercq, Synchrotron SOLEIL.
+#
+# The Libera Tango Device is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or (at your
+# option) any later version.
+#
+# The Libera Tango Device is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General
+# Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc., 51
+# Franklin St, Fifth Floor, Boston, MA 02110-1301 USA
+#
+# Contact:
+#      Nicolas Leclercq
+#      Synchrotron SOLEIL
+#------------------------------------------------------------------------------
+
+#=============================================================================
+# TANGO DIST ROOT DIR (change or overwrite it using TANGO_ROOT env. var)
+#=============================================================================
+ifndef TANGO_ROOT
+TANGO_ROOT=$(SOLEIL_ROOT)/sw-support/Tango
+endif
+
+#=============================================================================
+# OMNIORB DIST ROOT DIR (change or overwrite it using OMNIORB_ROOT env. var)
+#=============================================================================
+ifndef OMNIORB_ROOT
+OMNIORB_ROOT=$(SOLEIL_ROOT)/sw-support/OmniORB
+endif
+
+#=============================================================================
+# PROJECT_TYPE
+#=============================================================================
+# - STATIC_LIB : your project is a static library (.a)
+# - SHARED_LIB : your project is a shared library (.so)
+# - DEVICE     : your project is a TANGO device
+# - SIMPLE_EXE : your project is a simple executable binary 
+#-----------------------------------------------------------------------------
+PROJECT_TYPE = DEVICE
+
+#=============================================================================
+# RELEASE_TYPE
+#=============================================================================
+# - DEBUG     : debug symbols - no optimization
+# - OPTIMIZED : no debug symbols - optimization level set to O2
+#-----------------------------------------------------------------------------
+RELEASE_TYPE = OPTIMIZED
+
+#=============================================================================
+# TANGO_REQUIRED 
+#=============================================================================
+# - TRUE  : your project depends on TANGO
+# - FALSE : your project does not depend on TANGO
+#-----------------------------------------------------------------------------
+# - NOTE : if PROJECT_TYPE is set to DEVICE, TANGO will be auto. added
+#-----------------------------------------------------------------------------  
+TANGO_REQUIRED = TRUE
+
+#=============================================================================
+# OUTPUT_DIR - this directory will contain the build result
+#=============================================================================
+# - STATIC_LIB : defaults to ../lib
+# - SHARED_LIB : defaults to ../lib
+# - DEVICE     : defaults to $(HOME)/DeviceServers
+# - SIMPLE_EXE : defaults to ../bin
+#-----------------------------------------------------------------------------
+OUTPUT_DIR = .
+
+#=============================================================================
+# PROJECT_NAME is the name of the library/device/exe you want to build
+#=============================================================================
+# - for a DEVICE     : PROJECT_NAME will be prefixed by 'ds_'
+# - for a STATIC_LIB : PROJECT_NAME will be prefixed by 'lib'
+# - for a SHARED_LIB : PROJECT_NAME will be prefixed by 'lib'
+# - for a SIMPLE_EXE : PROJECT_NAME will be the name of the executable
+#-----------------------------------------------------------------------------
+PROJECT_NAME = ThreadedDevice
+
+#=============================================================================
+# INC_DIR_USER - user defined include paths
+#=============================================================================
+# - for a DEVICE     : TANGO dependencies are automatically added
+# - any PROJECT_TYPE : "../include" and "." are automatically added
+#-----------------------------------------------------------------------------
+INC_DIR_USER = -I. \
+               -I../../../YAT/include \
+               -I../../include
+
+#=============================================================================
+# LIB_DIR_USER - user defined library paths
+#=============================================================================
+# - for a DEVICE     : the TANGO libraries directories are automatically added
+# - any PROJECT_TYPE : "../lib" is automatically added
+#-----------------------------------------------------------------------------
+LIB_DIR_USER = -L../../../YAT/lib/shared/linux \
+               -L../../lib/shared/linux
+
+#=============================================================================
+# CXXFLAGS_USER - compiler options or user defined macros
+#=============================================================================
+# - NOTE : put your compile-time macros here using '-Dmy_macro'
+#-----------------------------------------------------------------------------
+CXXFLAGS_USER = -fno-enforce-eh-specs -Wno-unused-parameterer
+
+#=============================================================================
+# LDFLAGS_USER - linker options or user defined libraries
+#=============================================================================
+# - for a DEVICE     : the TANGO libraries are automatically added
+# - any PROJECT_TYPE : '-ldl -lpthread' are automatically added
+#-----------------------------------------------------------------------------
+# - NOTE : Be aware that the order matters! For instance, if you link your 
+#          project versus libA, and libA depends itself on libB, you must 
+#          use '-lA -lB', you will get 'undefined reference' errors otherwise
+#----------------------------------------------------------------------------
+ifeq ($(RELEASE_TYPE), OPTIMIZED)
+  LDFLAGS_USER  = -lYAT -lYAT4Tango
+else
+  LDFLAGS_USER  = -lYATd -lYAT4Tangod
+endif
+
+#=============================================================================
+#	TANGO.OPT - include standard TANGO compilation options
+#=============================================================================
+include ../../src/build/macosx/tango.opt
+
+#=============================================================================
+# SVC_OBJS - is the list of all objects needed in order to build the project
+#=============================================================================
+# - NOTE : the following example is given for the average TANGO device
+#-----------------------------------------------------------------------------
+SVC_OBJS =	$(OBJ_DIR)/ClassFactory.o  \
+						$(OBJ_DIR)/main.o  \
+						$(OBJ_DIR)/$(PROJECT_NAME)Class.o \
+						$(OBJ_DIR)/$(PROJECT_NAME).o \
+						$(OBJ_DIR)/$(PROJECT_NAME)StateMachine.o \
+						$(OBJ_DIR)/MyDeviceTask.o
+            
+#=============================================================================
+# VERBOSE - comment the following line if you want a verbose compilation
+#=============================================================================
+.SILENT:
+
+#=============================================================================
+#	COMMON_TARGET.OPT - include standard TANGO compilation options
+#=============================================================================
+include ../../src/build/macosx/common_target.opt

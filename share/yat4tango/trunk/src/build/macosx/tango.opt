@@ -1,0 +1,145 @@
+#------------------------------------------------------------------------------
+#--  CXX
+#------------------------------------------------------------------------------
+ifndef CXX
+	CXX = gcc
+endif
+
+#------------------------------------------------------------------------------
+#--  CC
+#------------------------------------------------------------------------------
+ifndef CC
+	CC = gcc
+endif
+
+#------------------------------------------------------------------------------
+#-- AR
+#------------------------------------------------------------------------------
+ifndef AR
+	AR = ar rv
+endif
+
+#------------------------------------------------------------------------------
+#-- ARCH_TYPE
+#------------------------------------------------------------------------------
+ifndef ARCH_TYPE
+	ARCH_TYPE = x86_64
+endif
+
+#------------------------------------------------------------------------------
+#-- RELEASE_TYPE
+#------------------------------------------------------------------------------
+ifndef RELEASE_TYPE
+	RELEASE_TYPE = OPTIMIZED
+endif
+
+#------------------------------------------------------------------------------
+#-- INCLUDE_DIRS 
+#------------------------------------------------------------------------------
+INCLUDE_DIRS = -I../include -I.
+
+INCLUDE_DIRS += $(INC_DIR_USER)
+
+#------------------------------------------------------------------------------
+#-- LIB_DIRS 
+#------------------------------------------------------------------------------
+LIB_DIRS += $(LIB_DIR_USER)
+
+#------------------------------------------------------------------------------
+#-- OBJ_DIR
+#------------------------------------------------------------------------------
+ifeq ($(ARCH_TYPE),i386)
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+	OBJ_DIR = ./objs/i386/static
+else
+	OBJ_DIR = ./objs/i386/shared
+endif
+else
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+	OBJ_DIR = ./objs/x86_64/static
+else
+	OBJ_DIR = ./objs/x86_64/shared
+endif
+endif
+
+OBJDIR = $(OBJ_DIR)
+
+#------------------------------------------------------------------------------
+#-- OUTPUT_DIR
+#------------------------------------------------------------------------------
+ifeq ($(ARCH_TYPE),i386)
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+	OUTPUT_DIR= ../lib/i386/static
+else
+	OUTPUT_DIR= ../lib/i386/shared
+endif
+else
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+	OUTPUT_DIR= ../lib/x86_64/static
+else
+	OUTPUT_DIR= ../lib/x86_64/shared
+endif
+endif
+
+#------------------------------------------------------------------------------
+#-- CXXFLAGS
+#------------------------------------------------------------------------------
+CXXFLAGS =
+
+ifeq ($(ARCH_TYPE), i386)
+	CXXFLAGS += -m32
+else
+	CXXFLAGS += -m64
+endif
+
+ifeq ($(RELEASE_TYPE),DEBUG)
+	CXXFLAGS += -g -D_DEBUG
+else
+	CXXFLAGS += -O2
+endif
+
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+	CXXFLAGS += -fPIC
+endif
+
+CXXFLAGS += -D_REENTRANT -W -Wall -pipe -fno-enforce-eh-specs $(INCLUDE_DIRS) $(CXXFLAGS_USER)
+
+#------------------------------------------------------------------------------
+#-- CFLAGS
+#------------------------------------------------------------------------------
+CFLAGS =
+
+ifeq ($(ARCH_TYPE), i386)
+	CFLAGS += -m32
+else
+	CFLAGS += -m64
+endif
+
+ifeq ($(RELEASE_TYPE),DEBUG)
+	CFLAGS += -g -D_DEBUG
+else
+	CFLAGS += -O2
+endif
+
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+	CFLAGS += -fPIC
+endif
+
+CFLAGS += -D_REENTRANT -W -Wall -pipe $(INCLUDE_DIRS) $(CFLAGS_USER)
+
+#------------------------------------------------------------------------------
+#-- LDFLAGS
+#------------------------------------------------------------------------------
+LDFLAGS =
+
+ifeq ($(ARCH_TYPE), i386)
+	LDFLAGS += -m32
+else
+	LDFLAGS += -m64
+endif
+
+ifeq ($(PROJECT_TYPE),SHARED_LIB)
+	LDFLAGS += -dynamiclib -o lib$(PROJECT_NAME).dylib
+endif
+
+LDFLAGS += $(LDFLAGS_USER) $(LIB_DIR_USER) -ldl -lpthread -lstdc++

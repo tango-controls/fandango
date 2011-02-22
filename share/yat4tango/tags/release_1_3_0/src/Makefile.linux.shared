@@ -1,0 +1,109 @@
+#=============================================================================
+# PROJECT_TYPE
+#=============================================================================
+# - STATIC_LIB : your project is a static library (.a)
+# - SHARED_LIB : your project is a shared library (.so)
+# - DEVICE     : your project is a TANGO device
+# - SIMPLE_EXE : your project is a simple executable binary 
+#-----------------------------------------------------------------------------
+PROJECT_TYPE = SHARED_LIB
+
+#=============================================================================
+# RELEASE_TYPE
+#=============================================================================
+# - DEBUG     : debug symbols - no optimization
+# - OPTIMIZED : no debug symbols - optimization level set to O2
+#-----------------------------------------------------------------------------
+RELEASE_TYPE = OPTIMIZED
+
+#=============================================================================
+# TANGO_REQUIRED 
+#=============================================================================
+# - TRUE  : your project depends on TANGO
+# - FALSE : your project does not depend on TANGO
+#-----------------------------------------------------------------------------
+# - NOTE : if PROJECT_TYPE is set to DEVICE, TANGO will be auto. added
+#-----------------------------------------------------------------------------  
+TANGO_REQUIRED = TRUE
+
+#=============================================================================
+# OUTPUT_DIR - this directory will contain the build result
+#=============================================================================
+# - STATIC_LIB : defaults to ../lib
+# - SHARED_LIB : defaults to ../lib
+# - DEVICE     : defaults to $(HOME)/DeviceServers
+# - SIMPLE_EXE : defaults to ../bin
+#-----------------------------------------------------------------------------
+OUTPUT_DIR = ../lib/shared/linux
+
+#=============================================================================
+# PROJECT_NAME is the name of the library/device/exe you want to build
+#=============================================================================
+# - for a DEVICE     : PROJECT_NAME will be prefixed by 'ds_'
+# - for a STATIC_LIB : PROJECT_NAME will be prefixed by 'lib'
+# - for a SHARED_LIB : PROJECT_NAME will be prefixed by 'lib'
+# - for a SIMPLE_EXE : PROJECT_NAME will be the name of the executable
+#-----------------------------------------------------------------------------
+PROJECT_NAME = YAT4Tango
+
+#=============================================================================
+# INC_DIR_USER - user defined include paths
+#=============================================================================
+# - for a DEVICE     : TANGO dependencies are automatically added
+# - any PROJECT_TYPE : "../include" and "." are automatically added
+#-----------------------------------------------------------------------------
+INC_DIR_USER = -I$(SOLEIL_ROOT)/sw-support/YAT/include
+
+#=============================================================================
+# LIB_DIR_USER - user defined library paths
+#=============================================================================
+# - for a DEVICE     : the TANGO libraries directories are automatically added
+# - any PROJECT_TYPE : "../lib" is automatically added
+#-----------------------------------------------------------------------------
+#LIB_DIR_USER = 
+
+#=============================================================================
+# CXXFLAGS_USER - compiler options or user defined macros
+#=============================================================================
+# - NOTE : put your compile-time macros here using '-Dmy_macro'
+#-----------------------------------------------------------------------------
+#####> CXXFLAGS_USER = <your macros and/or compiler options> 
+
+#=============================================================================
+# LDFLAGS_USER - linker options or user defined libraries
+#=============================================================================
+# - for a DEVICE     : the TANGO libraries are automatically added
+# - any PROJECT_TYPE : '-ldl -lpthread' are automatically added
+#-----------------------------------------------------------------------------
+# - NOTE : Be aware that the order matters! For instance, if you link your 
+#          project versus libA, and libA depends itself on libB, you must 
+#          use '-lA -lB', you will get 'undefined reference' errors otherwise
+#----------------------------------------------------------------------------
+#####> LDFLAGS_USER  = <your linker options and/or libraries> 
+
+#=============================================================================
+#	TANGO.OPT - include standard TANGO compilation options
+#=============================================================================
+include $(SOLEIL_ROOT)/env/tango.opt
+
+#=============================================================================
+# SVC_OBJS - is the list of all objects needed in order to build the project
+#=============================================================================
+# - NOTE : the following example is given for the average TANGO device
+#-----------------------------------------------------------------------------
+SVC_OBJS =	$(OBJ_DIR)/DynamicAttr.so.o \
+           $(OBJ_DIR)/DynamicAttrHelper.so.o \
+           $(OBJ_DIR)/ExceptionHelper.so.o \
+           $(OBJ_DIR)/PlugInAttr.so.o \
+           $(OBJ_DIR)/PlugInHelper.so.o \
+           $(OBJ_DIR)/ThreadSafeDeviceProxy.so.o
+
+#=============================================================================
+# VERBOSE - comment the following line if you want a verbose compilation
+#=============================================================================
+.SILENT:
+
+#=============================================================================
+#	COMMON_TARGET.OPT - include standard TANGO compilation options
+#=============================================================================
+include $(SOLEIL_ROOT)/env/common_target.opt

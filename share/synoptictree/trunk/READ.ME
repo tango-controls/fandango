@@ -1,0 +1,17 @@
+
+make first
+make all
+jdraw jdrawfile2.jdw
+jdraw jdrawfile.jdw
+#To use Synoptictree features one of the objects in jdrawfile.jdw should contain the extension isSynoptic:"jdrawfile2.jdw"
+#The device referred in both synoptics will appear in the left-side tree of the application
+
+export TANGO_HOST=yourserver:10000
+export TANGO_PATH=# your path to latest ATKCore.jar, ATKWidget.jar, TangORB.jar, ...
+java -Dswing.defaultlaf=com.birosoft.liquid.LiquidLookAndFeel -cp liquidlnf.jar:ATKmod.jar:SynopticTree.jar:$TANGO_PATH -DTANGO_HOST=$TANGO_HOST explorer.SynopticMain jdrawfile.jdw
+
+#a launcher script (to be edited)can be found inside ./bin
+#be patient, it is less than beta
+
+http://www.tango-controls.org/Members/srubio/synoptic-tree
+srubio@cells.es

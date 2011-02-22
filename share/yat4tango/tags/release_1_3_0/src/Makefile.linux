@@ -1,0 +1,129 @@
+#=============================================================================
+# PROJECT_TYPE
+#=============================================================================
+# - STATIC_LIB : your project is a static library (.a)
+# - SHARED_LIB : your project is a shared library (.so)
+# - DEVICE     : your project is a TANGO device
+# - SIMPLE_EXE : your project is a simple executable binary 
+#-----------------------------------------------------------------------------
+PROJECT_TYPE = STATIC_LIB
+
+#=============================================================================
+# RELEASE_TYPE
+#=============================================================================
+# - DEBUG     : debug symbols - no optimization
+# - OPTIMIZED : no debug symbols - optimization level set to O2
+#-----------------------------------------------------------------------------
+RELEASE_TYPE = OPTIMIZED
+
+#=============================================================================
+# TANGO_REQUIRED 
+#=============================================================================
+# - TRUE  : your project depends on TANGO
+# - FALSE : your project does not depend on TANGO
+#-----------------------------------------------------------------------------
+# - NOTE : if PROJECT_TYPE is set to DEVICE, TANGO will be auto. added
+#-----------------------------------------------------------------------------  
+TANGO_REQUIRED = TRUE
+
+
+#=============================================================================
+# OUTPUT_DIR  is the directory which contains the build result.
+# if not set, the standard location is :
+#	- $HOME/DeviceServers if OUTPUT_TYPE is DEVICE
+#	- ../bin for others
+#
+ifeq ($(PROJECT_TYPE),STATIC_LIB)
+  OUTPUT_DIR = ../lib/static/linux
+else
+  OUTPUT_DIR = ../lib/shared/linux
+endif  
+
+#=============================================================================
+# PACKAGE_NAME is the name of the library/device/exe you want to build
+#   - for a device server, PACKAGE_NAME will be prefixed by 'ds_'
+#   - for a library (static or dynamic), PACKAGE_NAME will be prefixed by 'lib'
+#   - for a simple executable, PACKAGE_NAME will be the name of the executable
+#
+ifeq ($(RELEASE_TYPE),OPTIMIZED)
+  PROJECT_NAME = YAT4Tango
+else
+  PROJECT_NAME = YAT4Tangod
+endif
+
+#=============================================================================
+# INC_DIR_USER is the list of all include path needed by your sources
+#   - for a device server, tango dependencies are automatically appended
+#   - '-I ../include' and '-I .' are automatically appended in all cases
+#
+INC_DIR_USER= -I$(SOLEIL_ROOT)/sw-support/YAT/include -I$(SOLEIL_ROOT)/tango/include -I$(SOLEIL_ROOT)/omniorb/include
+
+
+#=============================================================================
+# LIB_DIR_USER is the list of user library directories
+#   - for a device server, tango libraries directories are automatically appended
+#   - '-L ../lib' is automatically appended in all cases
+#
+
+LIB_DIR_USER=
+
+#=============================================================================
+# LFLAGS_USR is the list of user link flags
+#   - for a device server, tango libraries directories are automatically appended
+#   - '-ldl -lpthread' is automatically appended in all cases
+#
+# !!! ATTENTION !!!
+# Be aware that the order matters. 
+# For example if you must link with libA, and if libA depends itself on libB
+# you must use '-lA -lB' in this order as link flags, otherwise you will get
+# 'undefined reference' errors
+#
+LFLAGS_USR=
+
+#=============================================================================
+# CXXFLAGS_USR lists the compilation flags specific for your library/device/exe
+# This is the place where to put your compile-time macros using '-Dmy_macro'
+#
+#CXXFLAGS_USR=-D_DEBUG -DYAT_ENABLE_LOG
+
+
+#
+#	include Standard TANGO compilation options
+#
+include $(SOLEIL_ROOT)/env/tango.opt
+
+
+#=============================================================================
+# SVC_OBJS is the list of all objects needed to make the output
+#
+SVC_OBJS = $(OBJDIR)/DynamicAttr.o \
+           $(OBJDIR)/DynamicAttrHelper.o \
+           $(OBJDIR)/ExceptionHelper.o \
+           $(OBJDIR)/PlugInAttr.o \
+           $(OBJDIR)/PlugInHelper.o \
+           $(OBJDIR)/ThreadSafeDeviceProxy.o
+
+#
+# Verbose mode
+#
+.SILENT:
+
+#
+#	include common targets
+#
+include $(SOLEIL_ROOT)/env/common_target.opt
+
+
+
+releases:
+	make -f Makefile.linux clean all RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=STATIC_LIB
+	make -f Makefile.linux clean all RELEASE_TYPE=DEBUG PROJECT_TYPE=STATIC_LIB
+	make -f Makefile.linux clean all RELEASE_TYPE=OPTIMIZED PROJECT_TYPE=SHARED_LIB
+	make -f Makefile.linux clean all RELEASE_TYPE=DEBUG PROJECT_TYPE=SHARED_LIB
+
+distrib:
+	cd ../include/yat4tango; cp *.h *.i *.tpp $(SOLEIL_ROOT)/sw-support/YAT4tango/include/yat4tango
+	cd ../lib/static/linux; cp *.a $(SOLEIL_ROOT)/sw-support/YAT4tango/lib/static/linux
+	cd ../lib/shared/linux; cp *.so $(SOLEIL_ROOT)/sw-support/YAT4tango/lib/shared/linux
+
+

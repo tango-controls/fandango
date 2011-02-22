@@ -1,0 +1,8 @@
+name = NumberSpectrumViewer
+package fr.esrf.tangoatk.widget.attribute
+
+properties = xAxisUnit
+ICON_COLOR_16x16 = NumberSpectrumViewer.gif
+ICON_MONO_16x16 = NumberSpectrumViewer.gif
+ICON_MONO_32x32 = NumberSpectrumViewer.gif
+ICON_COLOR_32x32 = NumberSpectrumViewer.gif

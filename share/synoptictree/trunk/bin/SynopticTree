@@ -1,0 +1,40 @@
+#!/bin/sh
+#---------------------------------------------------------
+#
+#---------------------------------------------------------
+
+LIB_DIR=$SICILIA/lib/java; export LIB_DIR
+APP_DIR=$LIB_DIR
+
+#--------------------------------------------------------------------------
+#       Set the Class Path for Tango, ATK and Simple Synoptic Appli in ATK
+#--------------------------------------------------------------------------
+
+
+TANGO=$LIB_DIR/TangORB.jar
+TANGOATK=$LIB_DIR/ATKCore.jar:$LIB_DIR/ATKWidget.jar
+ATKPANEL=$LIB_DIR/atkpanel.jar
+JIVE=$LIB_DIR/Jive.jar
+
+APPLI_PACKAGE=explorer;	export APPLI_PACKAGE
+APPLI_MAIN_CLASS=SynopticMain; export APPLI_MAIN_CLASS
+
+STREE_DIR=$PWD
+STREE=$STREE_DIR/SynopticTree.jar
+#STREE=$STREE_DIR/SynopticTree.jar:$STREE_DIR/liquidlnf.jar
+#LAF="-Dswing.defaultlaf=com.birosoft.liquid.LiquidLookAndFeel"
+
+CLASSPATH=$STREE:$JIVE:$TACO:$TANGO:$TANGOATK:$ATKPANEL
+
+echo "ATKPANEL=$ATKPANEL"
+export CLASSPATH
+echo "CLASSPATH=$CLASSPATH"
+echo "JDRAW_LIBS=$JDRAW_LIBS"
+
+#---------------------------------------------------------
+#       Start the synoptic appli process
+#---------------------------------------------------------
+#
+
+java $LAF -DTANGO_HOST=$TANGO_HOST $APPLI_PACKAGE.$APPLI_MAIN_CLASS $*
+

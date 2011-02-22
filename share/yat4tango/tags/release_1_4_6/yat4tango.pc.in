@@ -1,0 +1,11 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: yat4tango
+Description: yat4tango library from the SOLEIL Synchrotron
+Version: @VERSION@
+Requires: yat tango
+Libs: -L${libdir} -lyat4tango
+Cflags: -I${includedir}

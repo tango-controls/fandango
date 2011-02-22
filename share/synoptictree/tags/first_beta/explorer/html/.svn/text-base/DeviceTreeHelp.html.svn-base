@@ -1,0 +1,9 @@
+<h2>The devicetree</h2>
+
+The devicetree will show you all available devices on your system with
+their corresponding attributes and commands. By expanding the nodes
+you will arrive at the attributes and commands, which you can drag and
+drop into their corresponding table.
+<br>
+If your platform doesn't support drag and drop, you can right-click on
+a selected node and choose "add to table" to do the same.

@@ -1,0 +1,5 @@
+LAF="-Dswing.defaultlaf=com.birosoft.liquid.LiquidLookAndFeel"
+LAF=""
+CALL="java $LAF -cp liquidlnf.jar:ATKmod.jar:SynopticTree.jar:$TANGO_PATH -DTANGO_HOST=$TANGO_HOST explorer.SynopticMain $@"
+echo $CALL
+$CALL

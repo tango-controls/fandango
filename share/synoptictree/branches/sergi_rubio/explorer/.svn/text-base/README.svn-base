@@ -1,0 +1,6 @@
+Design-notes
+============
+
+Should make each of the main parts of the application standalone components,
+ie an attribute-table, a command-table and a device-tree.
+

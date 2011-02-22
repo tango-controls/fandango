@@ -1,0 +1,158 @@
+#=============================================================================
+#
+# file :        Makefile.h
+#
+# description : Makefile for DeviceServer
+#
+# $Author: leclercq $
+#
+# $Revision: 1.5 $
+#
+# $Log: Makefile.linux,v $
+# Revision 1.5  2007/01/08 15:35:58  leclercq
+# Small changes in Makefile.linux
+#
+# Revision 1.4  2007/01/08 11:24:56  coquet
+# added AxisRawDataReader device
+# this devices offers read-only acces to raw data of an axis (selected by an attribute)
+# added the files AxisRawDataReader*.*,
+# modified ClassFactory, Makefile.vc, Makefile.linux, DevicesGalilV2.dsp Visual Studio project file
+#
+# Revision 1.3  2007/01/05 16:58:57  ounsy
+# -portage linux
+#
+# Revision 1.2  2007/01/05 08:37:51  coquet
+# * bug corrections
+# * now supports negative AxisPositionRatio use it to have a positive move direction opposite to the positive move direction defined by motorist
+# * added ControlBox:GetFirmwareRevision, view the firmware revision command <CTRL>R<CTRL>V
+#
+# Revision 1.1  2006/11/16 15:03:30  coquet
+# Makefile.linux initial import, not tested.
+# might not work.
+#
+# Revision 1.3  2006/03/21 16:59:13  hardion
+# * Add Software Support to Makefile process
+#
+# Revision 1.2  2006/03/21 15:25:20  hardion
+# * Update Pogo
+# * fix bug in Makefile process
+#
+# Revision 1.3  2006/03/14 14:57:34  hardion
+# * Update Makefile process to allow compilation of library
+#
+# Revision 1.2  2006/01/05 16:51:30  hardion
+# * Update Makefile.linux and tango.opt for library use
+#
+#
+#=============================================================================
+
+
+
+#=============================================================================
+# OUTPUT_TYPE can be one of the following :
+#   - 'STATIC_LIB' for a static library (.a)
+#   - 'DYNAMIC_LIB' for a dynamic library (.so)
+#   - 'DEVICE' for a device server (will automatically include and link
+#            with Tango dependencies)
+#   - 'SIMPLE_EXE' for an executable with no dependency (for exemple the test tool
+#                of a library with no Tango dependencies)
+#
+OUTPUT_TYPE = DEVICE
+
+#=============================================================================
+# OUTPUT_DIR  is the directory which contains the build result.
+# if not set, the standard location is :
+#	- $HOME/DeviceServers if OUTPUT_TYPE is DEVICE
+#	- ../bin for others
+#
+OUTPUT_DIR =
+
+
+#=============================================================================
+# PACKAGE_NAME is the name of the library/device/exe you want to build
+#   - for a device server, PACKAGE_NAME will be prefixed by 'ds_'
+#   - for a library (static or dynamic), PACKAGE_NAME will be prefixed by 'lib'
+#   - for a simple executable, PACKAGE_NAME will be the name of the executable
+#
+PACKAGE_NAME = bitstreamtest
+
+#=============================================================================
+# INC_DIR_USER is the list of all include path needed by your sources
+#   - for a device server, tango dependencies are automatically appended
+#   - '-I ../include' and '-I .' are automatically appended in all cases
+#
+# -I$(SOLEIL_ROOT)/hw-support/ace/include for ACE library
+# -I$(SOLEIL_ROOT)/hw-support/asl/include for ASL library
+#-I/hkl/include for HKL library
+# ...etc
+#
+INC_DIR_USER= -I../../include -I../../src
+
+#=============================================================================
+# LIB_DIR_USER is the list of user library directories
+#   - for a device server, tango libraries directories are automatically appended
+#   - '-L ../lib' is automatically appended in all cases
+# -L $(SOLEIL_ROOT)/hw-support/ace/lib for ACE library
+# -L $(SOLEIL_ROOT)/hw-support/asl/lib for ASL library
+# -L $(SOLEIL_ROOT)/sw-support/hkl/lib for HKL library
+# ...etc
+#
+LIB_DIR_USER= -L ../../lib
+
+#=============================================================================
+# LFLAGS_USR is the list of user link flags
+#   - for a device server, tango libraries directories are automatically appended
+#   - '-ldl -lpthread' is automatically appended in all cases
+#
+# !!! ATTENTION !!!
+# Be aware that the order matters. 
+# For example if you must link with libA, and if libA depends itself on libB
+# you must use '-lA -lB' in this order as link flags, otherwise you will get
+# 'undefined reference' errors
+#
+# -lACE for ACE
+# -lASL for ASL
+# -lHKL for HKL
+#
+LFLAGS_USR=-lADTB
+
+#=============================================================================
+# CXXFLAGS_USR lists the compilation flags specific for your library/device/exe
+# This is the place where to put your compile-time macros using '-Dmy_macro'
+#
+# -DACE_HAS_EXCEPTIONS -D__ACE_INLINE__ for ACE
+#
+#CXXFLAGS_USR=-DSIMULATED_AXIS
+
+#
+#	include Standard TANGO compilation options
+#
+include $(SOLEIL_ROOT)/env/tango.opt
+
+#=============================================================================
+# SVC_OBJS is the list of all objects needed to make the output
+#	
+# 		$(OBJDIR)/ClassFactory.o  \
+# 		$(OBJDIR)/main.o  \
+# 		$(OBJDIR)/$(PACKAGE_NAME)Class.o \
+# 		$(OBJDIR)/$(PACKAGE_NAME).o \
+# 		$(OBJDIR)/$(PACKAGE_NAME)StateMachine.o
+# 
+# other CPP source file path : 
+CPPDIRUSER=
+
+SVC_OBJS = $(OBJDIR)/clientsocket_test.o
+	 
+#
+# Verbose mode
+#
+#.SILENT:
+
+#
+#	include common targets
+#
+include $(SOLEIL_ROOT)/env/common_target.opt
+ 
+
+
+

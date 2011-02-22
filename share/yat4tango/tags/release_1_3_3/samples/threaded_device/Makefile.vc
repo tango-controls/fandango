@@ -1,0 +1,48 @@
+#
+device_server= ThreadedDevice
+#
+#  Des includes particuliers
+#  Mettre /Ic:\monchemininclude /:\monautrechemininclude
+
+
+INCUSER= /I$(SOLEIL_ROOT)/sw-support/yat4tango/include /I$(SOLEIL_ROOT)/sw-support/yat/include
+#
+#  et vos Librairies
+# style
+#
+# LIBUSER = "x:\moncheminlibrairie\malibrairie.lib"
+LIBUSER= $(SOLEIL_ROOT)/sw-support/yat4tango/lib/static/msvc-6.0/libYAT4tango.lib \
+	 $(SOLEIL_ROOT)/sw-support/yat/lib/static/msvc-6.0/libYAT.lib
+
+CPPDIRUSER=../galil_support
+#  et vos Librairies
+# style
+#
+# LIBUSER = "x:\moncheminlibrairie\malibrairie.lib"
+# LIBUSER= $(SOLEIL_ROOT)\hw-support\ace\lib\ace.lib
+#
+# ------------------Fin des modifications pour le end user -------------------------------------
+#
+make_dir=$(SOLEIL_ROOT)\env
+
+#  Les définitions communes à tous les DeviceServeurs
+!include $(make_dir)\tango.opt
+
+exe_device_server= $(EXEDIR)\ds_$(device_server).exe
+pdb_name= $(TEMPLIBDIR)\$(device_server).pdb
+
+# --------------------------------------
+#	Partie spécifique Device Server
+# --------------------------------------
+
+LISTEOBJ = \
+	 $(OBJDIR)\MyYatTask.OBJ\
+	 $(OBJDIR)\ClassFactory.OBJ\
+	 $(OBJDIR)\main.OBJ\
+	 $(OBJDIR)\$(device_server).OBJ\
+	 $(OBJDIR)\$(device_server)Class.OBJ\
+	 $(OBJDIR)\$(device_server)StateMachine.OBJ
+
+# --------------------------------------
+!include $(make_dir)\common_target.opt
+

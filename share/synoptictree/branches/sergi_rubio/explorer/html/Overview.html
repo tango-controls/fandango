@@ -1,0 +1,63 @@
+<html>
+<body>
+<a id="start"><h2>1 - Getting started:</h2></a>
+	<p>
+		Device Tree is an application to watch over a list of attributes and commands.
+		There are 2 different modes in this application:
+		<ul>
+			<li>
+				<b>Administrator mode</b> in which you can parameter the application
+				and save your preferences.<br>
+				To use this mode, launch application with no argument.
+			</li>
+			<li>
+				<b>User mode</b> in which you watch over your attributes and commands defined in
+				a device tree file.<br>
+				To use this mode, launch application with the path of your device tree file
+				as argument.
+			</li>
+		</ul>
+	</p>
+	<p>
+		See <b><a href="Device Tree Manual.pdf">Device Tree Manual</a></b> for more informations.
+	</p>
+<h2>2 - The packages:</h2>
+	<p>
+		There are two packages in this application:
+		<ul>
+			<li>
+				<b>explorer</b> that takes care of the main work
+			</li>
+			<li>
+				<b>explorer.ui</b> that takes care of the User Interface
+			</li>
+		</ul>
+	</p>
+	<p>
+		Browse these packages to see the application architecture
+	</p>
+<h2>3 - The Different ways to start Device Tree:</h2>
+	<h3>3.1 - The "Stand Alone" starting:</h3>
+		<p>
+			This is the most used one. Just launch the devicetree script (main class is <code>explorer.Main</code>),
+			following instructions in the <i><b><a href="#start">1 - Getting started:</a></b></i> section.
+		</p>
+	<h3>3.2 - The "Not Stand Alone" starting:</h3>
+		<p>
+			This case comes when you want to start Device Tree through another application.<br>
+			Let's see how you can start the two different modes as "Not Stand Alone":
+		<ul>
+			<li>
+				<b>Administrator mode:</b><br>
+				To use this mode, instanciate a <code>new explorer.AdminMain()</code>
+			</li>
+			<li>
+				<b>User mode:</b><br>
+				To use this mode, instanciate a <code>new explorer.ViewerMain(<i>filename</i>)</code>, where
+				<code><i>filename</i></code> is a <code>String</code> that represents the path of the device tree file you want
+				to start your user mode with.
+			</li>
+		</ul>
+		</p>
+</body>
+</html>
