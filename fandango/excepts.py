@@ -166,9 +166,9 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
                 print '-'*80
 
             if postmethod: postmethod(exstring)
+            err = e.args[0]
             if rethrow:
                 #PyTango.Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
-                err = e.args[0]
                 PyTango.Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
             else:
                 PyTango.Except.throw_exception(err.reason,err.desc,err.origin)
