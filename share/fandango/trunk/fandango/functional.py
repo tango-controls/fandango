@@ -92,6 +92,11 @@ def notNone(arg,default=None):
     """ Returns arg if not None, else returns default. """
     return [arg,default][arg is None]
 
+def isTrue(arg):
+    """ Returns True if arg is not None, not False and not an empty iterable. """
+    if hasattr(arg,'__len__'): return len(arg)
+    else: return arg
+    
 def join(*seqs):
     """ It returns the a list containing the objects of all given sequences. """
     if len(seqs)==1 and isSequence(seqs[0]):
@@ -103,6 +108,9 @@ def join(*seqs):
     #    result += list(seq)
     return result
     
+def contains(a,b,regexp=True):
+    """ Returns a in b; using a as regular expression if wanted """
+    return inCl(a,b,regexp)
 
 def anyone(seq,method=bool):
     """Returns first that is true or last that is false"""
@@ -162,12 +170,12 @@ def matchTuples(self,mapping,key,value):
                 return False
     return True
         
-def inCl(exp,seq):
-    """ Returns a caseless "in" boolean function """
+def inCl(exp,seq,regexp=True):
+    """ Returns a caseless "in" boolean function, using regex if wanted """
     if not seq: 
         return False
     if isString(seq):
-        return exp.lower() in seq.lower()
+        return searchCl(exp,seq) if (regexp and isRegexp(exp)) else exp.lower() in seq.lower()
     elif isSequence(seq) and isString(seq[0]):
         return any(exp.lower()==s.lower() for s in seq)
     else:
@@ -175,20 +183,34 @@ def inCl(exp,seq):
     
 def matchCl(exp,seq):
     """ Returns a caseless match between expression and given string """
-    return re.match(toRegexp(exp).lower(),seq.lower())
+    return re.match(toRegexp(exp.lower()),seq.lower())
 clmatch = matchCl #For backward compatibility
 
 def searchCl(exp,seq):
     """ Returns a caseless regular expression search between expression and given string """
-    return re.search(exp.lower(),seq.lower())
+    return re.search(toRegexp(exp.lower()),seq.lower())
 clsearch = searchCl #For backward compatibility
+
+def sortedRe(iterator,order):
+    """ Returns a list sorted using regular expressions. 
+        order = list of regular expressions to match ('[a-z]','[0-9].*','.*')
+    """
+    if '.*' not in order: order=list(order)+['.*']
+    rorder = [re.compile(c) for c in order]
+    def sorter(k,ks=rorder):
+        k = str(k[0] if isinstance(k,tuple) else k).lower()
+        return str((i for i,r in enumerate(ks) if r.match(k)).next())+k
+    for i in sorted(iterator,key=sorter):
+        print '%s:%s' % (i,sorter(i))
+    return sorted(iterator,key=sorter)
 
 def toRegexp(exp,terminate=False):
     """ Replaces * by .* and ? by . in the given expression. """
     exp = str(exp)
-    exp = exp.replace('*','.*') if '*' in exp and '.*' not in exp else exp
+    exp = exp.replace('*','.*') if '*' in exp and not any(s in exp for s in ('.*','\*')) else exp
     #exp = exp.replace('?','.') if '?' in exp and not any(s in exp for s in (')?',']?','}?')) else exp
     if terminate and not exp.strip().endswith('$'): exp += '$'
+    exp = exp.replace('(?p<','(?P<') #Preventing missing P<name> clausses
     return exp
 
 ########################################################################
@@ -205,6 +227,7 @@ def isString(seq):
     return False
     
 def isRegexp(seq):
+    """ This function is just a hint, use it with care. """
     RE = r'.^$*+?{[]\|()'
     return anyone(c in RE for c in seq)
     
