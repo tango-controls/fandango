@@ -321,8 +321,8 @@ class ServersDict(CaselessDict,Object):
         for d in devs_list:
             devs = self.get_devs_from_db(d) if '*' in d else [d] 
             [servers_list.add(self.get_device_server(dev)) for dev in devs if dev]
-        self.log.info('Loading %d servers matching %s devices'%(len(servers_list),devs_list))
-        self.load_from_servers_list(list(servers_list))
+        self.log.info('Loading %d servers matching %s devices'%(len(servers_list),len(devs_list)))
+        self.load_from_servers_list(s for s in servers_list if s)
     
     def load_from_servers_list(self,servers_list):
         """ Initializes the dictionary using a list of server_names like ['Exec/Instance'] """
@@ -341,8 +341,7 @@ class ServersDict(CaselessDict,Object):
     def check_servers_names(self,servers_list):
         """ Crosschecks the name of servers (case sensitive) with names retrieved by self.db.get_server_list() """
         all_servers = self.db.get_server_list()
-        for i in range(len(servers_list)):
-            s = servers_list[i]
+        for i,s in enumerate(servers_list):
             if s not in all_servers:
                 good = [v for v in all_servers if s.lower() == v.lower()]
                 if good:
