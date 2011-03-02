@@ -438,7 +438,6 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
     def __init__(self):
         self.log = Logger('ProxiesDict')
         self.log.setLogLevel('INFO')
-        #dict.__init__(self)
         self.call__init__(CaselessDefaultDict,self.__default_factory__)
     def __default_factory__(self,dev_name):
         '''
@@ -449,8 +448,8 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
         if dev_name not in self.keys():
             self.log.debug( 'Getting a Proxy for %s'%dev_name)
             try:
-                dev = PyTango.DeviceProxy(dev_name)
-                #dev = TauManager().getFactory()().getDevice(dev_name)
+                devklass,attrklass = (tau.Device,tau.Attribute) if USE_TAU else (PyTango.DeviceProxy,PyTango.AttributeProxy)
+                dev = (attrklass if str(dev_name).count('/')==3 else devklass)(dev_name)
             except Exception,e:
                 self.log.warning('Device %s doesnt exist!'%dev_name)
                 dev = None
@@ -722,6 +721,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         self.info('In subscribe_external_attributes(%s,%s): Devices in the same server are: %s'%(device,attributes,neighbours.keys()))
         if not hasattr(self,'ExternalAttributes'): self.ExternalAttributes = CaselessDict()
         if not hasattr(self,'PollingCycle'): self.PollingCycle = 5000
+        if not hasattr(self,'last_event_received'): self.last_event_received = 0
         device = device.lower()
         deviceObj = neighbours.get(device,None)
         if deviceObj is None:         
@@ -858,7 +858,8 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         """
         #self.info,debug,error,warning should not be used here to avoid conflicts with tau.core logging
         def log(prio,s): print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
-        log('info','In Dev4Tango.event_received(%s(%s),%s,%s)'%(type(source).__name__,source,fakeEventType[type_],type(attr_value).__name__))
+        self.last_event_received = time.time()
+        log('info','In Dev4Tango.event_received(%s(%s),%s,%s) at %s'%(type(source).__name__,source,fakeEventType[type_],type(attr_value).__name__,self.last_event_received))
         return
         
     ##@}        
@@ -866,15 +867,17 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
 
 ##############################################################################################################
 ## Tango formula evaluation
-import dicts,servers
+import dicts
 
 class TangoEval(object):
     """ Class with methods copied from PyAlarm """
-    def __init__(self,formula='',launch=True,trace=False):
+    def __init__(self,formula='',launch=True,trace=False, proxies=None, attributes=None):
         self.formula = formula
         self.variables = []
-        self.proxies = servers.ProxiesDict()
+        self.proxies = proxies or dicts.defaultdict_fromkey(tau.Device) if USE_TAU else ProxiesDict()
+        self.attributes = attributes or dicts.defaultdict_fromkey(tau.Attribute if USE_TAU else PyTango.AttributeProxy)
         self.previous = dicts.CaselessDict()
+        self.last = dicts.CaselessDict()
         self.result = None
         self.trace = trace
         if self.formula and launch: 
@@ -884,71 +887,102 @@ class TangoEval(object):
         return
         
     def parse_variables(self,formula):
-        ''' This method parses alarm declarations in the following formats:
+        ''' This method parses attributes declarated in formulas with the following formats:
         TAG1: dom/fam/memb/attrib >= V1 #A comment
         TAG2: d/f/m/a1 > V2 and d/f/m/a2 == V3
-        TAG3: d/f/m #Another comment
+        TAG3: d/f/m.quality != QALARM #Another comment
         TAG4: d/f/m/State ##A description?, Why not
-        returns a None value if the alarm is not parsable
+        :return: 
+            - a None value if the alarm is not parsable
+            - a list of (device,attribute,value/time/quality) tuples
         '''            
-        if '#' in formula:
-            formula = formula.split('#',1)[0]
-        if ':' in formula:
-            tag = formula.split(':',1)[0]
-            formula = formula.split(':',1)[1]
-        self.formula = formula
         #operators = '[><=][=>]?|and|or|in|not in|not'
         #l_split = re.split(operators,formula)#.replace(' ',''))
         alnum = '[a-zA-Z0-9-_]+'
-        redev = '(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+')' #It matches a device name
-        tango_reg = '('+redev+')'+'/?'+'('+alnum+')?' # It matches an attribute, and returns a (device,attribute) tuple!
+        no_alnum = '[^a-zA-Z0-9-_]'
+        no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
+        #redev = '(?:^|[^/a-zA-Z0-9_])(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+        redev = '(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)?' #Matches attribute and extension
+        retango = redev+reattr#+'(?!/)'
+        regexp = no_quotes + retango + no_quotes #Excludes attr_names between quotes
+        #print regexp
+        idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
+        if '#' in formula:
+            formula = formula.split('#',1)[0]
+        if ':' in formula and not re.match('^',redev):
+            tag,formula = formula.split(':',1)
+        self.formula = formula
         ##@var all_vars list of tuples with (device,/attribute) name matches
-        self.variables = [(device,attribute) for device,attribute in re.findall(tango_reg,formula) if device]
+        #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
+        self.variables = [s for s in re.findall(regexp,formula)]
+        if self.trace: print 'TangoEval.parse_variables(%s): %s'%(formula,self.variables)
         return self.variables
         
-    def read_attribute(self,device,attribute):
+    def read_attribute(self,device,attribute,what='value',_raise=True):
+        """
+        Executes a read_attribute and returns the value requested
+        :param _raise: if attribute is empty or 'State' exceptions will be rethrown
+        """
+        if self.trace: print 'TangoEval.read_attribute(%s/%s.%s)'%(device,attribute,what)
+        aname = (device+'/'+attribute).lower()
         try:
-            dp = self.proxies[device]
-            dp.ping()
-            attr_list = [a.name.lower()  for a in dp.attribute_list_query()]
-            if attribute.lower() not in attr_list:
-                raise Exception,'TangoEval_AttributeDoesntExist_%s'%attribute
-            value = dp.read_attribute(attribute).value
-            #values['VALUE_%d'%i]=dp.read_attribute(attribute).value        
-            if self.trace: print 'TangoEval: Readed %s/%s = %s' % (device, attribute,value)
+            if aname not in self.attributes:
+                dp = self.proxies[device]
+                dp.ping()
+                # Disabled because we want DevFailed to be triggered
+                #attr_list = [a.name.lower()  for a in dp.attribute_list_query()]
+                #if attribute.lower() not in attr_list: #raise Exception,'TangoEval_AttributeDoesntExist_%s'%attribute
+            value = self.attributes[aname].read()
+            value = value if what=='all' else (False if what=='exception' else getattr(value,what))
+            if self.trace: print 'TangoEval: Read %s.%s = %s' % (aname,what,value)
         except Exception,e:
-            print 'TangoEval: ERROR! Unable to get value for attribute %s/%s: %s' % (device,attribute,e)
+            if _raise and attribute.lower() in ['','state']:
+                raise e
+            if isinstance(e,PyTango.DevFailed) and what=='exception':
+                return True
+            print 'TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e)
             value = None
         return value
     
-    def eval(self,formula=None,previous=None):
-        ''' Evaluates the formula of the given alar; if True returns the values of the read attributes '''
+    def eval(self,formula=None,previous=None,_locals=None ,_raise=True):
+        ''' 
+        Evaluates the given formula
+        :param _raise: if attribute is empty or 'State' exceptions will be rethrown
+        '''
         self.formula = (formula or self.formula).strip()
+        for x in ['or','and']: #Check for case-dependent operators
+            self.formula = self.formula.replace(' '+x.upper()+' ',' '+x+' ')
+        self.formula = self.formula.replace(' || ',' or ')
+        self.formula = self.formula.replace(' && ',' and ')
         self.previous = previous or self.previous
-        values = {}
-        findables = re.findall('find\(([^)]*)\)',self.formula)
+        
+        findables = re.findall('FIND\(([^)]*)\)',self.formula)
         for target in findables:
             res = str([d.lower() for d in servers.get_matching_device_attributes([target.replace('"','').replace("'",'')])])
-            self.formula = self.formula.replace("find(%s)"%target,res).replace('"','').replace("'",'')
+            self.formula = self.formula.replace("FIND(%s)"%target,res).replace('"','').replace("'",'')
             if self.trace: print 'TangoEval: Replacing with results for %s ...%s'%(target,res)
         
         self.parse_variables(self.formula)
         if self.trace: print 'TangoEval: variables in formula are %s' % self.variables
-        source = self.formula #It will be modified on each iteration        
-        for device,attribute in self.variables:
-            var_name = (device+'/'+attribute).replace('/','_').replace('-','_').replace('.','_').replace(':','_').lower()
-            self.previous[var_name] = self.read_attribute(device,attribute or 'State')
-            values[device+'/'+attribute] = self.previous[var_name]
-            source = source.replace(device+('/'+attribute if attribute else ''),var_name,1)
+        source = self.formula #It will be modified on each iteration
+        self.last.clear()
+        for device,attribute,what in self.variables:
+            target = device + (attribute and '/%s'%attribute) + (what and '.%s'%what)
+            var_name = target.replace('/','_').replace('-','_').replace('.','_').replace(':','_').lower()
+            if self.trace: print 'TangoEval(): %s => %s'%(target,var_name)
+            self.previous[var_name] = self.read_attribute(device,attribute or 'State',what or 'value')
+            self.last[target] = self.previous[var_name] #Used from alarm messages
+            source = source.replace(target,var_name,1)
 
-        if self.trace: print 'TangoEval: formula = %s; Values = %s' % (source,dict(self.previous))
-        _locals = {}
+        if self.trace: print 'TangoEval: formula = %s; Values = %s' % (source,dict(self.last))
+        _locals = _locals and dict(_locals) or {}
         [_locals.__setitem__(str(v),v) for v in PyTango.DevState.values.values()]
         [_locals.__setitem__(str(q),q) for q in PyTango.AttrQuality.values.values()]
         _locals['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
         _locals['time'] = time
-        _locals['now'] = time.time()        
-
+        _locals['now'] = time.time()
+        if self.trace: print 'TangoEval(%s,%s)'%(source,self.previous)
         self.result = eval(source,dict(self.previous),_locals)
         if self.trace: print 'TangoEval: result = %s' % self.result
         return self.result
