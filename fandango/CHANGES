@@ -1,3 +1,18 @@
+2nd March 2011
+-------------------------------------------
+
+qt: added TauColorComponent classes
+objects: improved text representation of Structs
+linos: added get_cpu method
+fun: regular expression methods improved
+bug solved in @Catched decorator
+device: ProxiesDict now supports AttributeProxies
+device: TangoEval supports attributes from multiple hosts
+dynamic: get_DynDS_properties modified to be more efficient
+dynamic: regexp bug solved in DynamicDS.get_quality_for_attribute
+functional: bug solved in imports
+device: added more tango database methods
+
 PyTango_utils 10 December 2010
 -------------------------------------------
 dicts: added CaselessList
