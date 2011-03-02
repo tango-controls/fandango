@@ -104,7 +104,6 @@ import functional as fun
 #from .excepts import Catched,ExceptionManager
 #from  . import log
 
-
 try: 
     import tau
     USE_TAU = True
@@ -1139,7 +1138,7 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
-        "evaluateFormula":
+        'evaluateFormula':
             [[PyTango.DevString, "formula to evaluate"],
             [PyTango.DevString, "formula to evaluate"],
             {
@@ -1152,6 +1151,7 @@ class DynamicDSClass(PyTango.DeviceClass):
         }
 
     def dyn_attr(self,dev_list):
+        print 'In DynamicDSClass.dyn_attr(%s)'%dev_list
         for dev in dev_list:
             dev.dyn_attr()
             
