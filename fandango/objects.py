@@ -53,6 +53,10 @@ class Struct(object):
         if dct is None: dct = {}
         elif isSequence(dct) and not isDictionary(dct): dct = dict.fromkeys(dct) #isDictionary also matches items lists
         [setattr(self,k,v) for k,v in (dct.items() if hasattr(dct,'items') else dct)]
+    def __repr__(self):
+        return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) for k,v in self.__dict__.items())+'\n\t})'
+    def __str__(self):
+        return self.__repr__().replace('\n','').replace('\t','')
     pass
         
 def Property(fget=None,fset=None,fdel=None,doc=None):
