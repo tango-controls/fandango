@@ -50,11 +50,18 @@ def get_memory(pid,virtual=False):
     """This function uses '/proc/pid/status' to get the memory consumption of a process """
     mem,units = shell_command('cat /proc/%s/status | grep Vm%s'%(pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
     return int(mem)*(1e3 if 'k' in units else (1e6 if 'm' in units else 1))
+
+def get_cpu(pid):
+    """ Uses ps to get the CPU usage of a process by PID ; it will trigger exception of PID doesn't exist """
+    return float(linos.shell_command('ps h -p %d -o pcpu'%pid))
         
 def get_process_pid(include,exclude='grep|screen'):
     include = include.replace(' ','.*')
     exclude = exclude.replace(' ','.*')
-    lines = [s.strip() for s in shell_command('ps ax | grep -E "%s"'%include+(' | grep -viE "%s"'%exclude if exclude else '')).split('\n')]
+    ps = shell_command('ps ax | grep -E "%s"'%include+(' | grep -viE "%s"'%exclude if exclude else ''))
+    if not ps: 
+        return None #raise Exception('No matching process found')
+    lines = [s.strip() for s in ps.split('\n')]
     print '\n'.join(lines)
     pids = []
     for l in lines:
