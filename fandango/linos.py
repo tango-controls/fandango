@@ -207,7 +207,7 @@ def sysargs_to_dict(defaults=[]):
         a = args[n]
         if '=' in a: #argument like [-]ARG=VALUE
             while a.startswith('-'): a = a[1:]
-            if a: result[a.split('=')[0]] = a.split('=')[1]
+            if a: result[a.split('=',1)[0]] = a.split('=',1)[1]
         elif a.startswith('-'): #argument with - prefix
             while a.startswith('-'): a = a[1:] 
             if not a: continue
