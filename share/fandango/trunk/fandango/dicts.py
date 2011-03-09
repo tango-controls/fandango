@@ -308,13 +308,17 @@ class CaselessDict(dict):
     """
     def __init__(self, other=None):
         if other:
-            # Doesn't do keyword args
-            if isinstance(other, dict):
-                for k,v in other.items():
-                    dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
-            else:
-                for k,v in other:
-                    dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
+            try:
+                # Doesn't do keyword args
+                if hasattr(other,'items'):
+                    for k,v in other.items():
+                        dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
+                else:
+                    for k,v in other:
+                        dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
+            except Exception,e:
+                print 'CaselessDict(%s): failed!\n%s'%(type(other),e)
+                raise e
 
     def __getitem__(self, key):
         if dict.has_key(self,key):
