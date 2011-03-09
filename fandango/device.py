@@ -50,6 +50,7 @@ from excepts import *
 import callbacks
 from callbacks import *
 
+import servers
 import functional as fun
 from objects import Object,Struct
 from dicts import CaselessDefaultDict,CaselessDict
@@ -412,12 +413,12 @@ def check_device_list(devices,attribute=None,command=None):
             hosts[info.host][info.server].append(dev)
         else:
             result[dev] = False
-    for host,servers in hosts.items():
+    for host,servs in hosts.items():
         if not check_host(host):
-            print 'Host %s failed, discarding %d devices'%(host,sum(len(s) for s in servers.values()))
-            result.update((d,False) for s in servers.values() for d in s)
+            print 'Host %s failed, discarding %d devices'%(host,sum(len(s) for s in servs.values()))
+            result.update((d,False) for s in servs.values() for d in s)
         else:
-            for server,devs in servers.items():
+            for server,devs in servs.items():
                 if not check_device('dserver/%s'%server,full=False):
                     print 'Server %s failed, discarding %d devices'%(server,len(devs))
                     result.update((d,False) for d in devs)
@@ -566,7 +567,13 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         type(self).mro()[type(self).mro().index(Dev4Tango)+1].set_state(self,state)
         
     def get_state(self):
+        #@Tango6
         #This have been overriden as it seemed not well managed when connecting devices in a same server
+        return self._state
+    
+    def dev_state(self):
+        #@Tango7
+        #This have been overriden to avoid device servers with states managed by qualities
         return self._state
     
     def State(self):
