@@ -222,7 +222,7 @@ class ServersDict(CaselessDict,Object):
          [dev.poll_attribute(attr,3000) for attr in attrs]
      </pre>
     '''
-    def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='INFO'):
+    def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='WARNING'):
         ''' def __init__(self,pattern='', klass='',devs_list='',servers_list=''):
         The ServersDict can be initialized using any of the three argument lists or a wildcard for Database.get_server_list(pattern) 
         ServersDict('*') can be used to load all servers in database
