@@ -140,7 +140,7 @@ def get_all_devices(expressions,limit=1000):
     expressions = fun.toList(expressions)
     for target in expressions:
         if not target.count('/')>=2:
-            print 'servers.get_all_devices(%s): device names must have 2 slash characters'%target
+            print 'get_all_devices(%s): device names must have 2 slash characters'%target
             if len(expressions)>1: continue
             else: raise 'ThisIsNotAValidDeviceName'
         td,tf,tm = target.split('/')[:3]
@@ -156,7 +156,7 @@ def get_all_devices(expressions,limit=1000):
 def get_matching_devices(expressions,limit=1000):
     all_devs = list(get_database().get_device_name('*','*'))
     expressions = map(fun.toRegexp,fun.toList(expressions))
-    return filter(lambda d: any(fun.matchCl(e,d) for e in expressions),all_devs)
+    return filter(lambda d: any(fun.matchCl(e+'$',d) for e in expressions),all_devs)
 
 def get_matching_attributes(dev,expressions):
     """ Given a device name it returns the attributes matching any of the given expressions """
@@ -220,7 +220,7 @@ def get_all_models(expressions,limit=1000):
           else:
               devs = [device]
               
-          print 'servers.get_all_models(): devices matched by %s / %s are %d:' % (device,attribute,len(devs))
+          print 'get_all_models(): devices matched by %s / %s are %d:' % (device,attribute,len(devs))
           print '%s' % (devs)
           for dev in devs:
               if any(c in attribute for c in '.*[]()+?'):
@@ -966,7 +966,7 @@ class TangoEval(object):
         
         findables = re.findall('FIND\(([^)]*)\)',self.formula)
         for target in findables:
-            res = str([d.lower() for d in servers.get_matching_device_attributes([target.replace('"','').replace("'",'')])])
+            res = str([d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])])
             self.formula = self.formula.replace("FIND(%s)"%target,res).replace('"','').replace("'",'')
             if self.trace: print 'TangoEval: Replacing with results for %s ...%s'%(target,res)
         
