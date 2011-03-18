@@ -111,12 +111,27 @@ exLogger = log.Logger()
 def getLastException():
     return str(traceback.format_exc())
 
+"""
+@TODO: These methods failed with python 2.6; to be checked ...
+
 def get_exception_line(as_str=False):
     ty,e,tb = sys.exc_info()
     file,line = tb[-1][:2] if tb else ('',0)
     result = (file,line,tb)
     if as_str: return '%s[%d]: %s!'%result
     else: return result
+
+def exc2str(e):
+    if isinstance(e,PyTango.DevFailed):
+        msg=''
+        try:
+            msg = getattr(e.args[0],'description',e.args[0]['description'])
+        except:
+            msg = [s for s in str(e).split('\n') if 'desc' in s][0].strip()
+        return 'DevFailed(%s)'%msg
+    else:
+        return get_exception_line(as_str=True)
+"""
 
 def getPreviousExceptions(limit=0):
     """
