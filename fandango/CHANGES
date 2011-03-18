@@ -1,3 +1,18 @@
+17th March 2011
+-----------------------------------------
+db: Added method to get table sizes
+dynamic: solved bug in updateDynamicAttributes
+fun: bug solved in time to date
+
+
+10th March 2011
+-----------------------------------------
+Updates in device and servers modules to enable multi-host TangoEval calls.
+dynamic: Added DynamicSpectrumSize class property
+dynamic: improved search for dependencies and property parsing
+log: log levels case independent
+device: Bug solved in get_matching_device_attributes()
+
 2nd March 2011
 -------------------------------------------
 
