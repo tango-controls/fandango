@@ -113,7 +113,7 @@ class Logger(Object):
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
-        level = level.upper()
+        if isinstance(level,basestring): level = level.upper() 
         if level in self.__levelAliases:
             level = self.__levelAliases[level]
             if type(level)==type(logging.NOTSET):
