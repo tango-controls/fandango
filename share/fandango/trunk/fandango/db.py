@@ -188,6 +188,16 @@ class FriendlyDB(log.Logger):
             q=self.Query('describe %s'%table,False)
             [self.tables[table].append(t[0]) for t in self.tuples2lists(q.fetchall())]
         return self.tables[table]
+        
+    def getTableSize(self,table=''):
+        table = table or '%';
+        res = self.Query("select table_name,table_rows from information_schema.tables where table_schema = '%s' and table_name like '%s';"%(self.db_name,table))
+        if not res: 
+            return 0
+        elif len(res)==1:
+            return res[0][1]
+        else:
+            return dict(res)
 
     def get_all_cols(self):
         if not self.tables: self.getTables()
