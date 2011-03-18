@@ -283,7 +283,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             props = self._db.get_device_property(self.get_name(),targets)
             self.DynamicAttributes=props['DynamicAttributes']
             self.DynamicStates=props['DynamicStates']
-            self.DynamicImports=props['DynamicImports']
             self.DynamicQualities=props['DynamicQualities']
             self.KeepAttributes=props['KeepAttributes']
         try: self.CheckDependencies=props['CheckDependencies'][0]
