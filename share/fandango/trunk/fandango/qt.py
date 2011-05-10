@@ -78,10 +78,10 @@ if USE_TAU:
                 p = self.parentItem()
             return p
     
-        #def fireEvent(self, type):
-        def fireEvent(self, evt_src = None, evt_type = None, evt_value = None):
+        #def fireEvent(self, evt_src = None, evt_type = None, evt_value = None):
+        def handleEvent(self, evt_src = None, evt_type = None, evt_value = None):
             """fires a value changed event to all listeners"""
-            self.info('In TauColorComponent(%s).fireEvent(%s,%s)'%(self.__name,evt_src,evt_type))
+            self.info('In TauColorComponent(%s).handleEvent(%s,%s)'%(self.__name,evt_src,evt_type))
             if evt_type!=tau.core.enums.TauEventType.Config: 
                 #@todo ; added to bypass a problem with getModelValueObj()
                 self.__value = evt_value if evt_type!=tau.core.enums.TauEventType.Error else None
