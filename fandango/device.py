@@ -474,6 +474,17 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
 ########################################################################################
 ## A useful fake attribute value and event class
 
+def cast_tango_type(value_type):
+    """ Returns the python equivalent to a Tango type"""
+    if value_type in (PyTango.DevBoolean,): 
+        return bool
+    elif value_type in (PyTango.DevDouble,PyTango.DevFloat): 
+        return float
+    elif value_type in (PyTango.DevState,PyTango.DevShort,PyTango.DevInt,PyTango.DevLong,PyTango.DevLong64,PyTango.DevULong,PyTango.DevULong64,PyTango.DevUShort,PyTango.DevUChar): 
+        return int
+    else: 
+        return str
+
 class fakeAttributeValue(object):
     """ This class simulates a modifiable AttributeValue object (not available in PyTango)"""
     def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1):
