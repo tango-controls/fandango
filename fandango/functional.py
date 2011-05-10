@@ -185,14 +185,14 @@ def inCl(exp,seq,regexp=True):
     else:
         return exp in seq
     
-def matchCl(exp,seq):
+def matchCl(exp,seq,terminate=False):
     """ Returns a caseless match between expression and given string """
-    return re.match(toRegexp(exp.lower()),seq.lower())
+    return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clmatch = matchCl #For backward compatibility
 
-def searchCl(exp,seq):
+def searchCl(exp,seq,terminate=False):
     """ Returns a caseless regular expression search between expression and given string """
-    return re.search(toRegexp(exp.lower()),seq.lower())
+    return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
 
 def sortedRe(iterator,order):
