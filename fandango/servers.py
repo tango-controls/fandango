@@ -1,5 +1,5 @@
 #!/usr/bin/env python2.5
-"""
+""" @if gnuheader
 #############################################################################
 ##
 ## file :       servers.py
@@ -33,6 +33,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
+@endif
 """
 
 import time,traceback,os,sys,threading,datetime
@@ -56,7 +57,7 @@ if USE_TAU:
 else:
     from log import Logger
 
-from fandango.device import ProxiesDict,\
+from device import ProxiesDict,\
     metachars,parse_labels,re_search_low,re_match_low,\
     get_all_devices,get_matching_attributes,get_matching_device_attributes,\
     get_all_models
@@ -284,26 +285,27 @@ class ServersDict(CaselessDict,Object):
         if type(name) in (list,set):
             for pattern in name:
                 self.load_by_name(pattern)
-        if name.count('/')==2 and not name.startswith('dserver/'):
-            return self.load_from_devs_list([name])
         else:
-            server_name = name.replace('dserver/','')
-            self.log.info('loading by %s server_name'%server_name)
-            family = server_name.split('/')[0] if '/' in server_name else server_name
-            member = server_name.split('/')[1] if '/' in server_name else '*'
-            servers_list = self.get_devs_from_db('dserver/%s/%s' % (family,member))
-            #families = self.db.get_device_family('dserver/%s/%s' % (family,member))
-            #if families:
-                #servers_list = []
-                #for exec_ in families:
-                    #servers_list += ['%s/%s'%(exec_,d) for d in self.db.get_device_member('dserver/%s/%s'%(exec_,member))]
-            if servers_list:
-                self.load_from_servers_list([d.replace('dserver/','') for d in servers_list])
-                self.log.info('%d servers loaded'%len(servers_list))
-                return len(servers_list)
+            if name.count('/')==2 and not name.startswith('dserver/'):
+                return self.load_from_devs_list([name])
             else:
-                self.log.warning('No server matches with %s (family=%s).'%(server_name,family))
-                return 0
+                server_name = name.replace('dserver/','')
+                self.log.info('loading by %s server_name'%server_name)
+                family = server_name.split('/')[0] if '/' in server_name else server_name
+                member = server_name.split('/')[1] if '/' in server_name else '*'
+                servers_list = self.get_devs_from_db('dserver/%s/%s' % (family,member))
+                #families = self.db.get_device_family('dserver/%s/%s' % (family,member))
+                #if families:
+                    #servers_list = []
+                    #for exec_ in families:
+                        #servers_list += ['%s/%s'%(exec_,d) for d in self.db.get_device_member('dserver/%s/%s'%(exec_,member))]
+                if servers_list:
+                    self.load_from_servers_list([d.replace('dserver/','') for d in servers_list])
+                    self.log.info('%d servers loaded'%len(servers_list))
+                    return len(servers_list)
+                else:
+                    self.log.warning('No server matches with %s (family=%s).'%(server_name,family))
+                    return 0
         return
         
     def load_by_host(self,host):
@@ -393,22 +395,19 @@ class ServersDict(CaselessDict,Object):
                 
     def get_device_server(self,device):
         """This method gets the server related to a device; if it is not in the dict gets it from the Database."""
+        device = device.lower()
         for s in self.values():
             if device in s.get_device_list():
                 return s.name
+        #Using database because DeviceProxy.info() was terribly slow if timeout
         try:
-            #Use the device proxy to get the server
-            return self.proxies.get(device).info().server_id
+            db_dev = self.get_db_device()
+            info = db_dev.command_inout('DbImportDevice',device)
+            server,host,klass = info[1][3:6]
+            return server
         except Exception,e:
-            #The device is not running!
-            try:
-                db_dev = self.get_db_device()
-                info = db_dev.command_inout('DbImportDevice',device)
-                server,host,klass = info[1][3:6]
-                return server
-            except Exception,e:
-                self.log.error('Impossible to retrieve server for device %s: %s'%(device,str(e)[:100]+'...' ))
-                self.log.warning('Try ServersDict.load_all_servers (time consuming)')
+            self.log.error('Impossible to retrieve server for device %s: %s'%(device,str(e)[:100]+'...' ))
+            self.log.warning('Try ServersDict.load_all_servers (time consuming)')
         pass
         
     def get_device_class(self,device,server=''):
