@@ -34,6 +34,9 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
 @endif
+"""
+
+__doc__ = """
 @package dynamic
 <pre>
 CLASSES FOR TANGO DEVICE SERVER WITH DYNAMIC ATTRIBUTES
@@ -138,7 +141,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     # INTERNAL DYNAMIC DEVICE SERVER METHODS
     ######################################################################################################
 
-    def __init__(self,cl=None,name=None,_globals=globals(),_locals={}, useDynStates=True):
+    def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel('DEBUG')
         self.info( ' in DynamicDS.__init__ ...')
@@ -159,7 +162,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
         ##Local variables and methods to be bound for the eval methods
         self._globals=globals().copy()
-        self._globals.update(_globals)
+        if _globals: self._globals.update(_globals)
         self._locals={'self':self}
         self._locals['Attr'] = lambda _name: self.getAttr(_name)
         self._locals['ATTR'] = lambda _name: self.getAttr(_name)
@@ -185,7 +188,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.TangoStates = dict((str(v),v) for k,v in PyTango.DevState.values.items())
         self._locals.update(self.TangoStates)
         
-        self._locals.update(_locals) #New submitted methods have priority over the old ones
+        if _locals: self._locals.update(_locals) #New submitted methods have priority over the old ones
 
         # Internal object references
         self.__prepared = False
@@ -530,6 +533,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.debug("DynamicDS("+self.get_name()+")::read_dyn_atr("+attr.get_name()+"), entering at "+time.ctime()+"="+str(tstart)+"...")
         #raise Exception,'DynamicDS_evalAttr_NotExecuted: searching memory leaks ...'
         try:
+            if keep and self.KeepTime and self._last_read.get(aname,0) and time.time()<(self._last_read[aname]+(self.KeepTime/1e3)):
+                v = self.dyn_values[aname]
+                self.debug('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),v.value))
+                return attr.set_value_date_quality(v.value,v.date,v.quality)
+        except Exception,e:
+            self.warning('Unable to reload Kept values, %s'%str(e))
+        try:
             result = self.evalAttr(aname)
             quality = self.get_quality_for_attribute(aname,result)
             date = self.get_date_for_attribute(aname,result)
@@ -623,7 +633,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             if self.CheckDependencies and aname in self.dyn_values:
                 if not self.dyn_values[aname].dependencies:
                     for k,v in self.dyn_values.items():
-                        found = fun.searchCl("(^|[^'_0-9a-z])%s($|[^'_0-9a-z])"%k,formula)
+                        found = fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula)
                         if found and k.lower().strip()!=aname.lower().strip():
                             self.dyn_values[aname].dependencies.add(k)
                             self.dyn_values[k].keep = True
@@ -842,7 +852,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         return result
 
     def get_quality_for_attribute(self,aname,value):
-        print 'In get_quality_for_attribute(%s,%s)' % (aname,(str(value)[:10]+'...'))
+        self.debug('In get_quality_for_attribute(%s,%s)' % (aname,(str(value)[:10]+'...')))
         try:
             if hasattr(self,'DynamicQualities') and self.DynamicQualities:
                 ## DynamicQualities: (*)_VAL = ALARM if $_ALRM else VALID
@@ -927,8 +937,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             an always_executed_hook call or a new event will restart the thread.
         '''
         if self.dyn_states:
-            old_state = self.get_state()
             self.debug('In DynamicDS.check_state()')
+            old_state = self.get_state()
             ## @remarks: the device state is not changed if none of the DynamicStates evaluates to True
             #self.set_state(PyTango.DevState.UNKNOWN)
             self.last_state_exception = ''
@@ -1122,7 +1132,11 @@ class DynamicDSClass(PyTango.DeviceClass):
         'KeepAttributes':
             [PyTango.DevVarStringArray,
             "This property can be used to store the values of only needed attributes; values are 'yes', 'no' or a list of attribute names",
-            ['yes'] ],     
+            ['yes'] ],
+        'KeepTime':
+            [PyTango.DevLong,
+            "The kept value will be returned if a kept value is re-asked before within this ms time (Cache).",
+            [ 1000 ] ],
         'CheckDependencies':
             [PyTango.DevBoolean,
             "This property manages if dependencies between attributes are used to check readability.",
