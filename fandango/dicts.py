@@ -110,6 +110,7 @@ class ThreadDict(dict):
         self._last_read = ''
         self.last_cycle_start = 0
         self.parent = type(self).mro()[1] #equals to self.__class__.__base__ or type(self).__bases__[0]
+        if other: dict.update(self,other)
     
     def tracer(self,text,level=0): 
         #if isinstance(self.trace,int) and level<self.trace: 
@@ -148,7 +149,7 @@ class ThreadDict(dict):
         
     def run(self):
         self.tracer('In ThreadDict.run()')
-        import time        
+        import time
         while not self.event.isSet():
             keys = self.threadkeys()
             if self._last_read and self._last_read!=keys[-1]: #Thread stopped before finishing the cycle!
@@ -203,25 +204,33 @@ class ThreadDict(dict):
         return self._threadkeys[:]
     
     @self_locked
+    def __locked_setitem__(self,key,value):
+        return dict.__setitem__(self,key,value)
+        
+    @self_locked
+    def __locked_getitem__(self,key):
+        return dict.__getitem__(self,key)
+        
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
         import time
         if self.trace: print 'In ThreadDict.__getitem__(%s,%s)'%(key,hw)
         if (hw or not self.threaded) and self.read_method: # or (self.threaded and key not in self._threadkeys) #HW ACCESS MUST NOT BE DONE WITHOUT ASKING EXPLICITLY! (Use __setitem__(k,None) instead)
-            dict.__setitem__(self,key,self.read_method(key))
-            self.last_update = time.time()
-        return dict.__getitem__(self,key)    
+            value = self.read_method(key)
+            self.__locked_setitem__(key,value)
+            self.set_last_update(time.time())
+        return self.__locked_getitem__(key)
 
-    @self_locked
     def __setitem__(self,key,value,hw=True):
         ''' This method launches a write_method execution if the hw flag is not explicitly set to False. '''
         import time
         if self.trace: print 'In ThreadDict.__setitem__(%s,...,%s)'%(key,hw)
         if hw and self.write_method: 
             #It implies that a key will not be added here to read thread!
-            dict.__setitem__(self,key,self.write_method(*[key,value]))
-        else: dict.__setitem__(self,key,value)
-        self.last_update = time.time()
+            nvalue = self.write_method(*[key,value])
+            self.__locked_setitem__(key,nvalue)
+        else: self.__locked_setitem__(key,value)
+        self.set_last_update(time.time())
     
     @self_locked
     def get(self,key,default=None):
