@@ -251,15 +251,16 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
     def read_attr_hardware(self,data):
         self.debug("In DynDS::read_attr_hardware()")
-        try:
-            attrs = self.get_device_attr()
-            for d in data:
-                a_name = attrs.get_attr_by_ind(d).get_name()
-                if a_name in self.dyn_attrs:
-                    pass
-        except Exception,e:
-            self.last_state_exception = 'Exception in read_attr_hardware: %s'%str(e)
-            self.error('Exception in read_attr_hardware: %s'%str(e))                
+        ## Edit this code in child classes if needed
+        #try:
+            #attrs = self.get_device_attr()
+            #for d in data:
+                #a_name = attrs.get_attr_by_ind(d).get_name()
+                #if a_name in self.dyn_attrs:
+                    #pass
+        #except Exception,e:
+            #self.last_state_exception = 'Exception in read_attr_hardware: %s'%str(e)
+            #self.error('Exception in read_attr_hardware: %s'%str(e))
 
     def get_DynDS_properties(self,db=None):
         """
@@ -370,12 +371,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.info('Out of check_polled_attributes ...')
         
     def attribute_polling_report(self):
-        self.info('-'*80)
+        print('-'*80)
         now = time.time()
         self._cycle_start = now-self._cycle_start
         self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
+        print 'Attribute\tinterval\tread_time\teval_time\tcpu'
+        print '-'*80
         for key in self._read_times:
-            self.info('%s read after %s s; needed %f s; eval in %f s; %f of the usage' % (key, self._last_period[key],self._read_times[key],self._eval_times[key],self._read_times[key]/self._total_usage))
+            #self.info('%s read after %s s; needed %f s; eval in %f s; %f of the usage' % (key, self._last_period[key],self._read_times[key],self._eval_times[key],self._read_times[key]/self._total_usage))
+            print('%s\t%s\t%s\t%s\t%s'%(key, self._last_period[key],self._read_times[key],self._eval_times[key],self._read_times[key]/self._total_usage))
         self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
         self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/sum(self._read_times.values())))
         if False: #GARBAGE_COLLECTION:
