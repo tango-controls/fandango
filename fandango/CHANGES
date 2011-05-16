@@ -1,8 +1,23 @@
-17th March 2011
+10th May 2011 - 8.23
+-----------------------------------------
+device: cast_tango_type method added to parse tango types to python 
+cast_tango_type method added to parse tango types to python 
+dynamic: KeepTime property to DynamicDS, values will not be recalculated if interval between read_attribute calls is < KeepTime
+functional: added terminate argument to regexp-related methods
+qt: fireEvent renamed to handleEvent
+servers: solved bug when loading lists of patterns, improved get_device_server method to avoid timeouts with unexported devices
+dicts: solved bug in ThreadDict.__init__ (dict.update not called)
+dicts: ThreadsDict get/set_item methods now lock only during dict update, not while read/write_methods are called; it solves timeout issues
+dynamic: read_attr_hardware commented (unused), polling report format improved
+
+17th March 2011 - 8.22
 -----------------------------------------
 db: Added method to get table sizes
 dynamic: solved bug in updateDynamicAttributes
+dynamic: added KeptTime property to be used in read_dyn_attr: by default no re-evals will be faster than 1 second.
 fun: bug solved in time to date
+log: bug solved in setLogLevel
+
 
 
 10th March 2011
