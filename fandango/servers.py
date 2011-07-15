@@ -57,10 +57,8 @@ if USE_TAU:
 else:
     from log import Logger
 
-from device import ProxiesDict,\
-    metachars,parse_labels,re_search_low,re_match_low,\
-    get_all_devices,get_matching_attributes,get_matching_device_attributes,\
-    get_all_models
+from device import ProxiesDict,parse_labels, get_all_models,\
+    get_all_devices,get_matching_attributes,get_matching_device_attributes
     
 ####################################################################################################################
 
@@ -223,14 +221,16 @@ class ServersDict(CaselessDict,Object):
          [dev.poll_attribute(attr,3000) for attr in attrs]
      </pre>
     '''
-    def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='WARNING'):
+    def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='WARNING',logger=None):
         ''' def __init__(self,pattern='', klass='',devs_list='',servers_list=''):
         The ServersDict can be initialized using any of the three argument lists or a wildcard for Database.get_server_list(pattern) 
         ServersDict('*') can be used to load all servers in database
         '''
         self.call__init__(CaselessDict,self)        
-        self.log = Logger('ServersDict')
-        self.log.setLogLevel(log)
+        if logger is None:
+            self.log = Logger('ServersDict')
+            self.log.setLogLevel(log)
+        else: self.log=logger
         
         ## proxies will keep a list of persistent device proxies
         self.proxies = ProxiesDict()
@@ -525,8 +525,8 @@ class ServersDict(CaselessDict,Object):
         result = dict.fromkeys(servers,None)
         try:
             if not asynch: raise ImportError
-            from callbacks import AsynchronousFunction
-            print 'UPDATE_STATES USING ASYNCHRONOUS CALLS'
+            from threads import AsynchronousFunction
+            #print 'UPDATE_STATES USING ASYNCHRONOUS CALLS'
             def try_device(sdict,server):
                 try:
                     self.log.debug('try_device(%s)'% (server))
