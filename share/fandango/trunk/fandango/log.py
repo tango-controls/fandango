@@ -72,9 +72,9 @@ class Logger(Object):
     Info     = logging.INFO
     Debug    = logging.DEBUG
     
-    def __init__(self, name='', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s'):
+    def __init__(self, name='SerialVacuumDevice', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,level='INFO'):
         self.call__init__(Object)
-        self._ForcePrint    = False
+        self._ForcePrint    = use_print
         self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
         
         if not Logger.root_inited:
@@ -96,6 +96,7 @@ class Logger(Object):
         if parent is not None:
             self.parent = weakref.ref(parent)
             parent.addChild(self)
+        self.setLogLevel(level)
 
     def __del__(self):
         parent = self.getParent()
@@ -110,6 +111,20 @@ class Logger(Object):
     def setLogPrint(self,force):
         ''' This method enables/disables a print to be executed for each log call '''
         self._ForcePrint=force
+        
+    def getTimeString(self,t=None):
+        import time
+        if t is None: t=time.time()
+        cad='%Y-%m-%d %H:%M:%S'
+        s = time.strftime(cad,time.localtime(t))
+        ms = int((t-int(t))*1e3)
+        return '%s.%d'%(s,ms)
+        
+    def logPrint(self,prio,msg):
+        name = self.log_name+'.' if self.log_name else ''
+        l = self.__levelAliases.get(prio,prio)
+        if l<self.log_obj.level: return
+        print ('%s%s\t%s\t%s'%(name,prio,self.getTimeString(),str(msg).replace('\r','')))
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
@@ -177,9 +192,8 @@ class Logger(Object):
     
     def debug(self, msg, *args, **kw):
         try:
-            if self._ForcePrint: print 'DEBUG: %s'%msg
-            #logging.getLogger().debug(msg, *args, **kw)
-            self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
+            if self._ForcePrint: self.logPrint('DEBUG',msg)
+            else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.debug! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()            
@@ -188,8 +202,8 @@ class Logger(Object):
     
     def info(self, msg, *args, **kw):
         try:
-            if self._ForcePrint: print 'INFO: %s'%msg
-            self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
+            if self._ForcePrint: self.logPrint('INFO',msg)
+            else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.info! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
@@ -198,8 +212,8 @@ class Logger(Object):
 
     def warning(self, msg, *args, **kw):
         try:
-            if self._ForcePrint: print 'WARNING: %s'%msg
-            self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
+            if self._ForcePrint: self.logPrint('WARNING',msg)
+            else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.warning! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
@@ -207,8 +221,8 @@ class Logger(Object):
             
     def error(self, msg, *args, **kw):
         try:
-            if self._ForcePrint: print 'ERROR: %s'%msg
-            self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
+            if self._ForcePrint: self.logPrint('ERROR',msg)
+            else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.error! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
