@@ -128,6 +128,7 @@ def everyone(seq,method=bool):
         if not method(s): return s if not s else None
     return s
         
+
 ########################################################################
 ## Regular expressions 
 ########################################################################
