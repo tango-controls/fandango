@@ -1,3 +1,41 @@
+July 2011 - 8.24
+-----------------------------------------
+
+Changes in modules: 
+init: 
+device,web,threads modules added to all 
+ callbacks: 
+All Event/Device management lists changed into protected 
+AsynchronousFunction class moved to threads module 
+ device: 
+able to switch between Tau and Taurus 
+Dev4Tango capable of reading dynamic attributes from other devices within the same server. 
+added TangoCommand class for managing Tango commands with feedback. 
+ dynamic: 
+assigning default property values in DynamicDS init 
+KeepAttributes, KeepTime, CheckDependencies refactored 
+ log: 
+to avoid duplicity of traces with Tau logging the default output (logging or print) can be set using init(use_print=bool) argument. It is set as True by default. 
+ objects: 
+Pool class moved to threads module 
+ qt: 
+DoubleClickable decorator added 
+TangoHostChooser added 
+ threads: 
+SingletonWorker, Pool and AsynchronousFunction classes added 
+ servers: 
+Added logger argument to ServersDict()
+
+KeepTime / KeepAttributes / CheckDependencies properties
+--------------------------------------------------------
+
+The values of dynamic attributes will be kept in *dyn_values* dictionary if **KeepAttributes** is equal to '*', 'yes' or 'true'; or if the attribute name appears in the property.
+
+For each **read_dyn_attr(Attribute)** call the values will not be recalculated if interval between read_attribute calls is < **KeepTime** (1s by default).
+
+**ChekDependencies** (True by default) will force a check of which attributes are accessed in other's formulas, creating an index for each attribute with its pre-requisites for evaluation (which will be automatically assigned to be kept). At each *read_dyn_attr* execution the dependency values will be added to *_locals*, and a *read_dyn_attr(dependency)* may be forced if its values are older than **KeepTime**.
+
+
 10th May 2011 - 8.23
 -----------------------------------------
 device: cast_tango_type method added to parse tango types to python 
