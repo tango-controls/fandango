@@ -39,7 +39,7 @@ srubio@cells.es,
 2010
 """
 import Queue,threading,multiprocessing,traceback
-import imp,__builtin__,pickle
+import imp,__builtin__,pickle,re
 
 from . import functional
 from functional import *
@@ -55,13 +55,34 @@ WorkerException = type('WorkerException',(Exception,),{})
 class WorkerThread(object):
     """
     This class allows to schedule tasks in a background thread or process
+    
+    The tasks introduced in the internal queue using put(Task) method may be:
+         
+         - dictionary of build_int types: {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
+         - string to eval: eval('import $MODULE' or '$VAR=code()' or 'code()')
+         - list if list[0] is callable: value = list[0](*list[1:]) 
+         - callable: value = callable()
+            
+    
+    Usage::
+        wt = fandango.threads.WorkerThread(process=True)
+        wt.start()
+        wt.put('import fandango')
+        wt.put("tc = fandango.device.TangoCommand('lab/15/vgct-01/sendcommand')")
+        command = "tc.execute(feedback='status',args=['ver\r\\n'])"
+        wt.put("tc.execute(feedback='status',args=['ver\r\\n'])")
+        while not wt.getDone():
+            wt.stopEvent.wait(1.)
+            pile = dict(wt.flush())
+        result = pile[command]
     """
     
-    def __init__(self,name='',process=False,wait=.01,target=None,trace=False):
+    SINGLETON = None
+    
+    def __init__(self,name='',process=False,wait=.01,target=None,singleton=False,trace=False):
         self._name = name
         self.wait = wait
         self._process = process
-        self._done = 0
         self._trace = trace
         self.THREAD_CLASS = threading.Thread if not process else multiprocessing.Process
         self.QUEUE_CLASS = Queue.Queue if not process else multiprocessing.Queue
@@ -74,8 +95,18 @@ class WorkerThread(object):
         self.stopEvent = self.EVENT_CLASS()
         if target is not None: 
             self.put(target)
+        
         self._thread = self.THREAD_CLASS(name='Worker',target=self.run)
         self._thread.daemon = True
+            
+        #if not singleton or WorkerThread.SINGLETON is None:
+            #self._thread = self.THREAD_CLASS(name='Worker',target=self.run)
+            #self._thread.daemon = True
+        #if singleton:
+            #if WorkerThread.SINGLETON is None:
+                #WorkerThread.SINGLETON = self._thread
+            #self._thread = WorkerThread.SINGLETON
+                
         pass
     def __del__(self):
         try: 
@@ -84,9 +115,16 @@ class WorkerThread(object):
         except: pass
         
     def put(self,target):
+        """
+        Inserting a new object in the Queue.
+        """
         self.inQueue.put(target,False)
     def get(self):
+        """
+        Getting the oldest element in the output queue in (command,result) format
+        """
         try:
+            self.getDone()
             try:
                 while True: print self.errorQueue.get(False)
             except Queue.Empty: 
@@ -98,6 +136,9 @@ class WorkerThread(object):
                 #self.outQueue = self.QUEUE_CLASS()
             return None
     def flush(self):
+        """
+        Getting all elements stored in the output queue in [(command,result)] format
+        """
         result = []
         try:
             while True: result.append(self.outQueue.get(False))
@@ -118,9 +159,11 @@ class WorkerThread(object):
     def getSize(self):
         return self.inQueue.qsize()
     def getDone(self):
-        if not self._done: return 0.
-        qs = self.inQueue.qsize()
-        return self._done/(self._done+qs) if qs else 1.
+        #self._pending-=self.outQueue.qsize()
+        #if not self._done: return 0.
+        #qs = self.inQueue.qsize()
+        #return self._done/(self._done+qs) if qs else 1.
+        return not self.inQueue.qsize() and not self.outQueue.qsize()
         
     def run(self):
         print 'WorkerThread(%s) started!'%self._name
@@ -191,7 +234,10 @@ class WorkerThread(object):
                                 module = target.replace('import ','')
                                 get_module(module)
                                 value = module
-                            elif '=' in target and '='!=target.split('=',1)[1][0]:
+                            elif (  '=' in target and 
+                                    '='!=target.split('=',1)[1][0] and 
+                                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]+$',target.split('=',1)[0].strip())
+                                ):
                                 var = target.split('=',1)[0].strip()
                                 _locals[var]=eval(target.split('=',1)[1].strip(),modules,_locals)
                                 value = var
@@ -210,12 +256,12 @@ class WorkerThread(object):
                             print traceback.format_exc()
                             raise WorkerException('UnpickableValue')
                         self.outQueue.put((target,value))
-                except:
+                except Exception,e:
                     msg = 'Exception in WorkerThread(%s).run()\n%s'%(self._name,traceback.format_exc())
                     print( msg)
+                    self.outQueue.put((target,e))
                 finally:
                     if not self._process: self.inQueue.task_done()
-                    self._done+=1
             except Queue.Empty:
                 pass
             except:
@@ -223,6 +269,40 @@ class WorkerThread(object):
                 print traceback.format_exc()
         print 'WorkerThread(%s) finished!'%self._name
         
+import objects
+
+class SingletonWorker(WorkerThread,objects.Singleton):
+    """
+    Usage::
+        # ... same like WorkerThread, but command is required to get the result value
+        command = "tc.execute(feedback='status',args=['ver\r\\n'])"
+        sw.put(command)
+        sw.get(command)
+    """
+    def put(self,target):
+        if not hasattr(self,'_queued'): self._queued = []
+        self._queued.append(target)
+        WorkerThread.put(self,target)
+    def get(self,target):
+        """
+        It flushes the value stored for {target} task.
+        The target argument is needed to avoid mixing up commands from different requestors.
+        """
+        if not hasattr(self,'_values'): self._values = {}
+        self._values.update(WorkerThread.flush(self))
+        [self._queued.remove(v) for v in self._values if v in self._queued]
+        return self._values.pop(target)
+        
+    def getDone(self):
+        return not bool(self._queued)
+    def flush(self):
+        l = []
+        l.extend(getattr(self,'_values',{}).items())
+        l.extend(WorkerThread.flush(self))
+        if hasattr(self,'_queued'):
+            while self._queued:
+                self._queued.pop(0)
+        return l
 
 ###############################################################################
 
@@ -333,3 +413,39 @@ class Pool(object):
         return getattr(self._queue,'task_done',lambda:None)()
             
     pass
+    
+###############################################################################
+    
+class AsynchronousFunction(threading.Thread):
+    '''This class executes a given function in a separate thread
+    When finished it sets True to self.finished, a threading.Event object 
+    Whether the function is thread-safe or not is something that must be managed in the caller side.
+    If you want to autoexecute the method with arguments just call: 
+    t = AsynchronousFunction(lambda:your_function(args),start=True)
+    while True:
+        if not t.isAlive(): 
+            if t.exception: raise t.exception
+            result = t.result
+            break
+        print 'waiting ...'
+        threading.Event().wait(0.1)
+    print 'result = ',result
+    '''
+    def __init__(self,function):
+        """It just creates the function object, you must call function.start() afterwards"""
+        self.function  = function
+        self.result = None
+        self.exception = None
+        self.finished = threading.Event()
+        self.finished.clear()
+        threading.Thread.__init__(self)
+        self.wait = self.finished.wait
+        self.daemon = False
+    def run(self):
+        try:
+            self.wait(0.01)
+            self.result = self.function()
+        except Exception,e:
+            self.result = None            
+            self.exception = e
+        self.finished.set() #Not really needed, simply call AsynchronousFunction.isAlive() to know if it has finished
