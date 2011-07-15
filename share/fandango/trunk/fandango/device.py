@@ -39,10 +39,17 @@
 @todo @warning IMPORTING THIS MODULE IS CAUSING SOME ERRORS WHEN CLOSING PYTHON DEVICE SERVERS,  BE CAREFUL!
 """
 
-
-import sys,time,re
+#python imports
+import sys,time,re,os
 import threading,inspect,traceback,exceptions,operator
 
+#pytango imports
+import PyTango
+from PyTango import AttrQuality
+if 'Device_4Impl' not in dir(PyTango):
+    PyTango.Device_4Impl = PyTango.Device_3Impl
+
+#fandango imports
 import log
 from log import Logger
 import excepts
@@ -57,15 +64,16 @@ from dicts import CaselessDefaultDict,CaselessDict
 from arrays import TimedQueue
 from dynamic import DynamicDS
 
-import PyTango
-from PyTango import AttrQuality
-if 'Device_4Impl' not in dir(PyTango):
-    PyTango.Device_4Impl = PyTango.Device_3Impl
-    
+#tau imports
 try:
-    import tau
+    assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
+    #import tau
+    import taurus
+    tau = TAU = taurus
     USE_TAU=True
+    """USE_TAU will be used to choose between taurus.Device and PyTango.DeviceProxy"""
 except:
+    print 'fandango.device: USE_TAU flag is disabled'
     USE_TAU=False
 
 ####################################################################################################################
@@ -129,9 +137,6 @@ def parse_labels(text):
         else:
             labels = [(e,e) for e in exprs]  
         return labels
-        
-def re_search_low(regexp,target): return re.search(regexp.lower(),target.lower())
-def re_match_low(regexp,target): return re.match(regexp.lower(),target.lower())
 
 def get_all_devices(expressions,limit=1000):
     ''' Returns the list of registered devices (including unexported) that match any of the given wildcars (Regexp not admitted!) '''
@@ -216,7 +221,7 @@ def get_all_models(expressions,limit=1000):
           
           if any(c in device for c in '.*[]()+?'):
               if '*' in device and '.*' not in device: device = device.replace('*','.*')
-              devs = [s for s in all_devs if re_match_low(device,s)]
+              devs = [s for s in all_devs if fun.matchCl(device,s)]
           else:
               devs = [device]
               
@@ -227,7 +232,7 @@ def get_all_models(expressions,limit=1000):
                   if '*' in attribute and '.*' not in attribute: attribute = attribute.replace('*','.*')
                   try: 
                       dp = get_device(dev)
-                      attrs = [att.name for att in dp.attribute_list_query() if re_match_low(attribute,att.name)]
+                      attrs = [att.name for att in dp.attribute_list_query() if fun.matchCl(attribute,att.name)]
                       targets.extend(dev+'/'+att for att in attrs)
                   except Exception,e: print 'ERROR! Unable to get attributes for device %s: %s' % (dev,str(e))
               else: targets.append(dev+'/'+attribute)
@@ -486,15 +491,19 @@ def cast_tango_type(value_type):
         return str
 
 class fakeAttributeValue(object):
-    """ This class simulates a modifiable AttributeValue object (not available in PyTango)"""
-    def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1):
+    """ This class simulates a modifiable AttributeValue object (not available in PyTango)
+    :param parent: Apart of common Attribute arguments, parent will be used to keep a proxy to the parent object (a DeviceProxy or DeviceImpl) 
+    """
+    def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1,parent=None,device=''):
         self.name=name
+        self.device=device or (self.name.split('/')[-1] if '/' in self.name else '')
         self.value=value
         self.write_value = None
         self.time=time_ or time.time()
         self.quality=quality
         self.dim_x=dim_x
         self.dim_y=dim_y
+        self.parent=parent
         
     def get_name(self): return self.name
     def get_value(self): return self.value
@@ -742,22 +751,20 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         if not hasattr(self,'last_event_received'): self.last_event_received = 0
         device = device.lower()
         deviceObj = neighbours.get(device,None)
-        if deviceObj is None:         
-            from tau import Attribute,Device
-            from tau.core import TauEventType            
+        if USE_TAU and deviceObj is None:
             for attribute in attributes: #Done in two loops to ensure that all Cache objects are available
-                self.info ('::init_device(%s): Configuring TauAttribute for %s' % (self.get_name(),device+'/'+attribute))
+                self.info ('::init_device(%s): Configuring %s.Attribute for %s' % (self.get_name(),str(TAU.__name__),device+'/'+attribute))
                 aname = (device+'/'+attribute).lower()
-                at = Attribute(aname)
-                self.debug('Adding Listener ...')
+                at = TAU.Attribute(aname)
+                self.debug('Adding Listener to %s ...'%type(at))
                 at.addListener(self.event_received)
                 self.debug('Changing polling period ...')
                 at.changePollingPeriod(self.PollingCycle)
                 self.ExternalAttributes[aname] = at
         else: #Managing attributes from internal devices
-            self.info('===========> Subscribing attributes from an internal device')
+            self.info('===========> Subscribing attributes from an internal or non-tau device')
             for attribute in attributes:
-                self.ExternalAttributes[(device+'/'+attribute).lower()] = fakeAttributeValue(attribute,None)
+                self.ExternalAttributes[(device+'/'+attribute).lower()] = fakeAttributeValue(attribute,None,parent=deviceObj,device=device)
             import threading
             if not hasattr(self,'Event'): self.Event = threading.Event()
             if not hasattr(self,'UpdateAttributesThread'):
@@ -833,30 +840,43 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 if self.Event.isSet(): break                
                 attr = self.ExternalAttributes[aname]
                 device,attribute = aname.rsplit('/',1)
-                self.debug('====> updating values from %s.%s'%(device,attribute))
-                deviceObj = self.get_devs_in_server().get(device,None)
+                self.debug('====> updating values from %s(%s.%s)'%(type(attr.parent),device,attribute))
                 event_type = fakeEventType.lookup['Periodic']
-                try:                                
+                try:
+                    if attr.parent is None: attr.parent = PyTango.DeviceProxy(device)
                     if attr.name.lower()=='state': 
-                        if hasattr(deviceObj,'last_state'): attr.set_value(deviceObj.last_state)
-                        else: attr.set_value(deviceObj.get_state())
+                        if isinstance(attr.parent,PyTango.DeviceProxy): attr.set_value(attr.parent.state())
+                        elif hasattr(attr.parent,'last_state'): attr.set_value(attr.parent.last_state)
+                        else: attr.set_value(attr.parent.get_state())
                     else: 
-                        if isinstance(deviceObj,DynamicDS): 
-                            method = 'read_dyn_attr'
-                            deviceObj.myClass.DynDev = deviceObj
-                        else: 
-                            method = 'read_%s'%attr.name.lower()                         
-                            
-                        alloweds = [c for c in dir(deviceObj) if c.lower()=='is_%s_allowed'%attr.name.lower()]
-                        is_allowed = not alloweds or getattr(deviceObj,alloweds[0])(PyTango.AttReqType.READ_REQ)
-                        if is_allowed:
-                            methods = [c for c in dir(deviceObj) if c.lower()==method]
-                            if not methods: self.error('%s.read_%s method not found!!!'%(device,attr.name))
-                            elif isinstance(deviceObj,DynamicDS): getattr(deviceObj,methods[0])(deviceObj,attr)
-                            else: getattr(deviceObj,methods[0])(attr)
+                        if isinstance(attr.parent,PyTango.DeviceProxy):
+                            self.info('Dev4Tango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
+                            is_allowed = True
+                            #val = lambda obj,val: setattr(val,'value',obj.read_attribute(val.name))
+                            #method(attr.parent,attr)
+                            val = attr.parent.read_attribute(attr.name)
+                            attr.set_value_date_quality(val.value,val.date,val.quality)
                         else:
-                            self.info('%s.read_%s method is not allowed!!!'%(device,attr.name))
-                            event_type = fakeEventType.lookup['Error']
+                            f = [s for s in dir(attr.parent) if s.lower()=='is_%s_allowed'%attr.name.lower()]
+                            if not f: is_allowed = True
+                            else:
+                                self.info('Dev4Tango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
+                                is_allowed = getattr(attr.parent,f[0])(PyTango.AttReqType.READ_REQ)
+                            if is_allowed:
+                                methods = [c for c in dir(attr.parent) if c.lower()=='read_%s'%attr.name.lower()]
+                                if not methods: 
+                                    if isinstance(attr.parent,DynamicDS): 
+                                        self.info('Dev4Tango.update_external_attributes(): calling %s.read_dyn_attr(%s)'%(attr.device,attr.name))
+                                        attr.parent.myClass.DynDev = attr.parent
+                                        attr.parent.read_dyn_attr(attr.parent,attr)
+                                    else:
+                                        self.error('%s.read_%s method not found!!!\n%s'%(device,attr.name,[d for d in dir(attr.parent) if not a.startswith('_')]))
+                                else: 
+                                    self.info('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,attr.name))
+                                    getattr(attr.parent,methods[0])(attr)
+                            else:
+                                self.info('%s.read_%s method is not allowed!!!'%(device,attr.name))
+                                event_type = fakeEventType.lookup['Error']
                             
                     self.info('Sending fake event: %s/%s = %s(%s)' % (device,attr.name,event_type,attr.value))
                     self.event_received(device+'/'+attr.name,event_type,attr)
@@ -888,7 +908,10 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
 import dicts
 
 class TangoEval(object):
-    """ Class with methods copied from PyAlarm """
+    """ 
+    Class for Tango formula evaluation
+    Class with methods copied from PyAlarm 
+    """
     def __init__(self,formula='',launch=True,trace=False, proxies=None, attributes=None):
         self.formula = formula
         self.variables = []
@@ -1005,7 +1028,144 @@ class TangoEval(object):
         if self.trace: print 'TangoEval: result = %s' % self.result
         return self.result
     pass
+        
+##############################################################################################################
+## Tango Command executions
 
+class TangoCommand(object):
+    """
+    This class encapsulates a call to a Tango Command, it manages asynchronous commands in a background thread or process.
+    It also allows to setup a "feedback" condition to validate that the command has been executed.
+    
+    The usage would be like::
+    
+      tc = TangoCommand('move',DeviceProxy('just/a/motor'),asynch=True,process=False)
+      
+      #In this example the value of the command will be returned once the state will change
+      result = tc(args,feedback='state',expected=PyTango.DevState.MOVING,timeout=10000)
+      
+      #In this other example, it will be the value of the state what will be returned
+      result = tc(args,feedback='state',timeout=10000)
+      
+    :param command: the name of a tango command
+    :param device: a device that can be an string, a DeviceProxy or a TaurusDevice
+    :param timeout: when using asynchronous commands default timeout can be overriden
+    :param feedback: attribute, command or callable to be executed
+    :param value: if not None, value that feedback must have to consider the command successful
+    :
+    """
+    
+    class CommandException(Exception): pass
+    class CommandTimeout(Exception): pass
+    class BadResult(Exception): pass
+    class BadFeedback(Exception): pass
+    Proxies = ProxiesDict()
+    
+    def __init__(self,command,device=None,timeout=None,feedback=None,expected=None,wait=1.,asynch=True,process=False):
+        
+        self.device = device
+        if '/' in command:
+            d,self.command = command.rsplit('/',1)
+            if not self.device: self.device = d
+        else: self.command = command
+        self.proxy = TangoCommand.Proxies[self.device]
+        self.info = self.proxy.command_query(self.command)
+            
+        self.timeout = timeout or 3.
+        self.feedback = feedback and self._parse_feedback(feedback)
+        self.expected = expected
+        self.wait = wait
+        self.asynch = asynch
+        self.process = process
+        
+        self.event = threading.Event()
+        if process:
+            import fandango.threads
+            self.process = fandango.threads.WorkerThread(device+'/'+command,process=True)
+        else:
+            self.process = None
+        pass
+        
+    def trace(self,msg,severity='DEBUG'):
+        print '%s %s fandango.TangoCommand: %s'%(severity,time.ctime(),msg)
+    
+    def _parse_feedback(self,feedback):
+        if fun.isCallable(feedback):
+            self.feedback = feedback
+        elif isinstance(feedback,basestring):
+            if '/' in feedback:
+                device,target = feedback.rsplit('/',1) if feedback.count('/')>=3 else (feedback,state)
+            else:
+                device,target = self.device,feedback
+            proxy = TangoCommand.Proxies[device]
+            attrs,comms = proxy.get_attribute_list(),[cmd.cmd_name for cmd in proxy.command_list_query()]
+            if fun.inCl(target,comms):
+                self.feedback = (lambda d=device,c=target: TangoCommand.Proxies[d].command_inout(c))
+            elif fun.inCl(target,attrs):
+                self.feedback = (lambda d=device,a=target: TangoCommand.Proxies[d].read_attribute(a).value)
+            else:
+                raise TangoCommand.CommandException('UnknownFeedbackMethod_%s'%feedback)
+        return self.feedback
+
+    def __call__(self,*args,**kwargs):
+        self.execute(*args,**kwargs)
+    
+    def execute(self,args=None,timeout=None,feedback=None,expected=None,wait=None,asynch=None):
+        self.trace('%s/%s(%s)'%(self.device,self.command,args or ''))
+        args = [self.command] + (args or [])
+        timeout = fun.notNone(timeout,self.timeout)
+        if feedback is not None:
+            feedback = self._parse_feedback(feedback)
+        else:
+            feedback = self.feedback
+        expected = fun.notNone(expected,self.expected)
+        wait = fun.notNone(wait,self.wait)
+        asynch = fun.notNone(asynch,self.asynch)
+        t0 = time.time()
+        result = None
+        if not asynch:
+            result = self.proxy.command_inout(*args)
+        else:
+            self.trace('Using asynchronous commands')
+            cid = self.proxy.command_inout_asynch(*args)
+            while timeout > (time.time()-t0):
+                self.event.wait(.025)
+                try: 
+                    result = self.proxy.command_inout_reply(cid)
+                    break
+                except PyTango.DevFailed,e:
+                    if 'AsynReplyNotArrived' in str(e): 
+                        pass
+                    #elif any(q in str(e) for q in ('DeviceTimedOut','BadAsynPollId')):
+                    else:
+                        #BadAsynPollId is received once the command is discarded
+                        raise TangoCommand.CommandException(str(e).replace('\n','')[:100])
+        if feedback is not None:
+            self.trace('Using feedback: %s'%feedback)
+            ready = False
+            tt,tw = min((timeout,wait)),max((0.025,wait/10.))
+            while (tt > (time.time()-t0)) and not ready:
+                self.event.wait(tw)
+                got = feedback()
+                if not wait or expected is None or got==expected:
+                    self.trace('Feedback (%s) obtained after %s s'%(got,time.time()-t0))
+                    ready = True
+            if expected is None:
+                return got
+            elif got==expected:
+                self.trace('Result (%s) obtained after %s s'%(result,time.time()-t0))
+                return result
+            else:
+                raise TangoCommand.BadFeedback(str(result))
+        elif expected is None or result == expected:
+            self.trace('Result obtained after %s s'%(time.time()-t0))
+            return result
+        else:
+            raise TangoCommand.BadResult(str(result))
+        if self.timeout < time.time()-t0: 
+            raise TangoCommand.CommandTimeout(str(self.timeout)+' ms')
+        return result
+    
 ##############################################################################################################
 ## DevChild ... DEPRECATED and replaced by Dev4Tango + TAU
 
