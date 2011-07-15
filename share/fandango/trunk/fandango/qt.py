@@ -264,3 +264,47 @@ except:
                 #End of while
             self.log.info('#'*80+'\nOut of TauEmitterThread.run()'+'\n'+'#'*80)
             #End of Thread 
+            
+###############################################################################
+
+def DoubleClickable(QtKlass):
+    """ 
+    This decorator enables a Qt class to execute a 'hook' method every time is double-clicked
+    """    
+    class DoubleClickableQtKlass(QtKlass):
+        def __init__(self,*args):
+            self.my_hook = None
+            QtKlass.__init__(self,*args)
+        def setClickHook(self,hook):
+            """ the hook must be a function or callable """
+            self.my_hook = hook #self.onEdit
+        def mouseDoubleClickEvent(self,event):
+            if self.my_hook is not None:
+                self.my_hook()
+            else:
+                try: QtKlass.mouseDoubleClickEvent(self)
+                except: pass
+    return DoubleClickableQtKlass
+                
+class TangoHostChooser(Qt.QWidget):
+    """
+    Allows to choose a tango_host from a list
+    """
+    def __init__(self,hosts):
+        self.hosts = sorted(hosts)
+        Qt.QWidget.__init__(self,None)
+        self.setLayout(Qt.QVBoxLayout())
+        self.layout().addWidget(Qt.QLabel('Choose your TangoHost:'))
+        self.chooser = Qt.QComboBox()
+        self.chooser.addItems(self.hosts)
+        self.layout().addWidget(self.chooser)
+        self.button = Qt.QPushButton('Done')
+        self.layout().addWidget(self.button)
+        self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.done)
+        self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.close)
+    def done(self):
+        import os
+        os.environ['TANGO_HOST']=str(self.chooser.currentText())
+        new_value = os.getenv('TANGO_HOST')
+        print('TANGO_HOST set to %s'% new_value)
+        return new_value
