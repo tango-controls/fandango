@@ -164,7 +164,7 @@ class ThreadDict(dict):
                 except Exception,e:
                     if self.trace:
                         import traceback
-                        print '!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:100] #+': %s'%str(e)
+                        print '!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:1000] #+': %s'%str(e)
                     #raise e
                     self.__setitem__(k,e,hw=False)
                 finally:
