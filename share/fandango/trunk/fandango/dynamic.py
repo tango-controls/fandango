@@ -160,6 +160,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.dyn_values = {}
         self.variables = {}
         self.DEFAULT_POLLING_PERIOD = 3000.
+        
+        #Setting default values for properties
+        [setattr(self,k,v[2]) for k,v in DynamicDSClass.device_property_list.items()]
 
         ##Local variables and methods to be bound for the eval methods
         self._globals=globals().copy()
