@@ -43,6 +43,7 @@
 from __builtin__ import object
 from functional import *
 from operator import isCallable
+import Queue
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
 
@@ -113,181 +114,7 @@ def self_locked(func,reentrant=True):
         return result       
     return lock_fun
 
-import Queue
-class Pool(object):
-    """ 
-    It creates a queue of tasks managed by a pool of threads.
-    Each task can be a Callable or a Tuple containing args for the "action" class argument.
-    If "action" is not defined the first element of the tuple can be a callable, and the rest will be arguments
-    
-    Usage:
-        p = Pool()
-        for item in source(): p.add_task(item)
-        p.start()
-        while len(self.pending()):
-            time.sleep(1.)
-        print 'finished!'
-    """
-    
-    def __init__(self,action=None,max_threads=5,start=False,mp=False):   
-        import threading
-        if mp==True:
-            import multiprocessing
-            self._myThread = multiprocessing.Process
-            self._myQueue = multiprocessing.Queue
-        else:
-            import Queue
-            self._myThread = threading.Thread
-            self._myQueue = Queue.Queue
-        self._action = action
-        self._max_threads = max_threads
-        self._threads = []
-        self._pending = []
-        self._stop = threading.Event()
-        self._lock = threading.Lock()
-        self._locked = partial(locked,_lock=self._lock)
-        self._started = start
-        self._queue = self._myQueue()
-        
-    def start(self):
-        """ 
-        Start all threads.
-        """
-        [t.start() for t in self._threads]
-        self._started = True
-        
-    def stop(self):
-        self._stop.set()
-        [t.join(3.) for t in self._threads]
-        #while not self._queue.empty(): self._queue.get()
-        self._retire()
-        self._started = False
-        
-    def add_task(self,item):#,block=False,timeout=None):
-        """
-        Adds a new task to the queue
-        :param task: a callable or a tuple with callable and arguments
-        """
-        self._locked(self._pending.append,str(item))
-        if self._started: self._retire()
-        if len(self._pending)>len(self._threads) and len(self._threads)<self._max_threads:
-            self._new_worker()        
-        self._queue.put(item)#,block,timeout)
-
-    def pending(self):
-        """ returns a list of strings with the actions not finished yet"""
-        self._retire()
-        return self._pending
-        
-    ####################################################################################
-    #Protected methods
-            
-    def _new_worker(self):
-        #Creates a new thread
-        t = self._myThread(target=self._worker)
-        self._locked(self._threads.append,t)
-        t.daemon = True
-        if self._started: t.start()      
-        
-    def _retire(self):
-        #Cleans dead threads
-        dead = [t for t in self._threads if not t.is_alive()]
-        for t in dead:
-            self._locked(self._threads.remove,t) 
-    
-    def _worker(self):
-        #Processing queue items
-        while not self._stop.isSet() and not self._queue.empty():
-            item = self._queue.get()
-            try:
-                if item is not None and isCallable(item): 
-                    item()
-                elif isSequence(item): 
-                    if self._action: self._action(*item)
-                    elif isCallable(item[0]): item[0](*item[1:])
-                elif self._action: 
-                    self._action(item)
-            except:
-                import traceback
-                print('objects.Pool.worker(%s) failed: %s'%(str(item),traceback.format_exc()))
-            self._remove_task(item)
-        return
-                
-        
-    def _remove_task(self,item=None):
-        #Remove a finished task from the list
-        if str(item) in self._pending: 
-            self._locked(self._pending.remove,str(item))
-        return getattr(self._queue,'task_done',lambda:None)()
-            
-    pass
-    
-
-class Singleton(object):
-    """This class allows Singleton objects overriding __new__ and renaming __init__ to init_single
-    The __new__ method is overriden to force Singleton behaviour, the Singleton is created for the lowest subClass.
-    @warning although __new__ is overriden __init__ is still being called for each instance=Singleton()
-    """   
-    ## Singleton object
-    __instance = None     # the one, true Singleton, private members cannot be read directly
-    __dumb_init = (lambda self,*p,**k:None)
-    
-    def __new__(cls, *p, **k):
-        if cls != type(cls.__instance):
-            __instance = object.__new__(cls)
-            #srubio: added init_single check to prevent redundant __init__ calls
-            if hasattr(cls,'__init__') and cls.__init__ != cls.__dumb_init:
-                setattr(cls,'init_single',cls.__init__)
-                setattr(cls,'__init__',cls.__dumb_init)  #Needed to avoid parent __init__ methods to be called
-            if hasattr(cls,'init_single'): 
-                cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
-            cls.__instance = __instance #Done at the end to prevent failed __init__ to create singletons
-        return cls.__instance
-    
-    @classmethod
-    def get_singleton(cls,*p,**k):
-        return cls.__instance or cls(*p,**k)
-
-class SingletonMap(object):
-    """This class allows distinct Singleton objects for each args combination.
-    The __new__ method is overriden to force Singleton behaviour, the Singleton is created for the lowest subClass.
-    @warning although __new__ is overriden __init__ is still being called for each instance=Singleton()
-    """
-    
-    ## Singleton object
-    __instances = {} # the one, true Singleton, private members cannot be read directly
-    __dumb_init = (lambda self,*p,**k:None)    
-    
-    def __new__(cls, *p, **k):
-        key = cls.parse_instance_key(*p,**k)
-        if cls != type(cls.__instances.get(key)):
-            __instance = object.__new__(cls)
-            __instance.__instance_key = key
-            #srubio: added init_single check to prevent redundant __init__ calls
-            if hasattr(cls,'__init__') and cls.__init__ != cls.__dumb_init:
-                setattr(cls,'init_single',cls.__init__)
-                setattr(cls,'__init__',cls.__dumb_init) #Needed to avoid parent __init__ methods to be called
-            if hasattr(cls,'init_single'): 
-                cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
-            cls.__instances[key] = __instance
-        return cls.__instances[key]
-            
-    @classmethod
-    def get_singleton(cls,*p,**k):
-        key = cls.parse_instance_key(*p,**k)
-        return cls.__instances.get(key,cls(*p,**k))
-    
-    @classmethod
-    def get_singletons(cls):
-        return cls.__instances       
-      
-    @classmethod
-    def parse_instance_key(cls,*p,**k):
-        return '%s(*%s,**%s)' % (cls.__name__,list(p),list(sorted(k.items())))
-    
-    def get_instance_key(self):
-        return self.__instance_key
-   
+###############################################################################
 
 class Object(object):
     """
@@ -375,4 +202,72 @@ class Object(object):
         attr = other.getAttrDict()
         self.__dict__.update(attr)
         
+
+###############################################################################
+
+class Singleton(object):
+    """This class allows Singleton objects overriding __new__ and renaming __init__ to init_single
+    The __new__ method is overriden to force Singleton behaviour, the Singleton is created for the lowest subClass.
+    @warning although __new__ is overriden __init__ is still being called for each instance=Singleton(), this is way we replace it by __dub_init
+    """   
+    ## Singleton object
+    __instance = None     # the one, true Singleton, private members cannot be read directly
+    __dumb_init = (lambda self,*p,**k:None)
+    
+    def __new__(cls, *p, **k):
+        if cls != type(cls.__instance):
+            __instance = object.__new__(cls)
+            #srubio: added init_single check to prevent redundant __init__ calls
+            if hasattr(cls,'__init__') and cls.__init__ != cls.__dumb_init:
+                setattr(cls,'init_single',cls.__init__)
+                setattr(cls,'__init__',cls.__dumb_init)  #Needed to avoid parent __init__ methods to be called
+            if hasattr(cls,'init_single'): 
+                cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
+            cls.__instance = __instance #Done at the end to prevent failed __init__ to create singletons
+        return cls.__instance
+    
+    @classmethod
+    def get_singleton(cls,*p,**k):
+        return cls.__instance or cls(*p,**k)
+
+class SingletonMap(object):
+    """This class allows distinct Singleton objects for each args combination.
+    The __new__ method is overriden to force Singleton behaviour, the Singleton is created for the lowest subClass.
+    @warning although __new__ is overriden __init__ is still being called for each instance=Singleton(), this is way we replace it by __dub_init
+    """
+    
+    ## Singleton object
+    __instances = {} # the one, true Singleton, private members cannot be read directly
+    __dumb_init = (lambda self,*p,**k:None)    
+    
+    def __new__(cls, *p, **k):
+        key = cls.parse_instance_key(*p,**k)
+        if cls != type(cls.__instances.get(key)):
+            __instance = object.__new__(cls)
+            __instance.__instance_key = key
+            #srubio: added init_single check to prevent redundant __init__ calls
+            if hasattr(cls,'__init__') and cls.__init__ != cls.__dumb_init:
+                setattr(cls,'init_single',cls.__init__)
+                setattr(cls,'__init__',cls.__dumb_init) #Needed to avoid parent __init__ methods to be called
+            if hasattr(cls,'init_single'): 
+                cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
+            cls.__instances[key] = __instance
+        return cls.__instances[key]
+            
+    @classmethod
+    def get_singleton(cls,*p,**k):
+        key = cls.parse_instance_key(*p,**k)
+        return cls.__instances.get(key,cls(*p,**k))
+    
+    @classmethod
+    def get_singletons(cls):
+        return cls.__instances       
+      
+    @classmethod
+    def parse_instance_key(cls,*p,**k):
+        return '%s(*%s,**%s)' % (cls.__name__,list(p),list(sorted(k.items())))
+    
+    def get_instance_key(self):
+        return self.__instance_key
+    
 
