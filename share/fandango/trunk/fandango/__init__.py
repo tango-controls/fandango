@@ -73,8 +73,11 @@ except:
     print traceback.format_exc()
 
 try:
-    from objects import Object,Singleton,SingletonMap,Struct,Pool
-except: print 'Unable to import objects module'
+    from objects import Object,Singleton,SingletonMap,Struct
+except: 
+    import traceback
+    print traceback.format_exc()
+    print 'Unable to import objects module'
 
 try:
     from linos import shell_command,ping,sysargs_to_dict,listdir
@@ -96,7 +99,10 @@ try:
     from interface import FullTangoInheritance,NewTypeInheritance
 except: print 'Unable to import interface module'
 
-
+#try: import web
+#except: print 'Unable to import fandango.web module'
+#try: import qt
+#except: print 'Unable to import fandango.qt module'
 
 
 
@@ -104,5 +110,5 @@ except: print 'Unable to import interface module'
 
 RELEASE = (7,17,0)
 
-__all__ = ['dicts','excepts','log','objects','db','dynamic','callbacks','arrays','servers','linos','functional','interface']
+__all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
 #print 'module reloaded'
