@@ -132,11 +132,11 @@ class Logger(Object):
         if level in self.__levelAliases:
             level = self.__levelAliases[level]
             if type(level)==type(logging.NOTSET):
-                self.debug('log.Logger: Logging  level set to %s'%str(level).upper())
                 self.log_obj.setLevel(level)
+                self.debug('log.Logger: Logging  level set to %s'%str(level).upper())
             if type(level) is str and level.upper() in logging.__dict__.keys():
-                self.debug('log.Logger: Logging  level set to %s'%str(logging.__dict__[level.upper()]))
                 self.log_obj.setLevel(logging.__dict__[level.upper()])
+                self.debug('log.Logger: Logging  level set to %s'%str(logging.__dict__[level.upper()]))
         elif level in self.__levelAliases.values():
             self.log_obj.setLevel(level)
         else:
