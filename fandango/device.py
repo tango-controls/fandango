@@ -67,9 +67,12 @@ from dynamic import DynamicDS
 #tau imports
 try:
     assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
-    #import tau
-    import taurus
-    tau = TAU = taurus
+    try: 
+        import taurus
+        tau = TAU = taurus
+    except:
+        import tau
+        TAU = tau
     USE_TAU=True
     """USE_TAU will be used to choose between taurus.Device and PyTango.DeviceProxy"""
 except:
@@ -455,9 +458,10 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
             self.log.debug( 'Getting a Proxy for %s'%dev_name)
             try:
                 devklass,attrklass = (tau.Device,tau.Attribute) if USE_TAU else (PyTango.DeviceProxy,PyTango.AttributeProxy)
-                dev = (attrklass if str(dev_name).count('/')==3 else devklass)(dev_name)
+                dev = (attrklass if str(dev_name).count('/')==(4 if ':' in dev_name else 3) else devklass)(dev_name)
             except Exception,e:
-                self.log.warning('Device %s doesnt exist!'%dev_name)
+                print('ProxiesDict: %s doesnt exist!'%dev_name)
+                print traceback.format_exc()
                 dev = None
         return dev
             
