@@ -1,28 +1,52 @@
+8.25
+
+ dynamic: 
+static methods links for dyn_attr/read_dyn_attr/write_dyn_attr reviewed
+LOCALS added to _locals, TangoCommand with feedback added to COMM macro (getXCommand).
+Added UseEvents property and push_event triggered by attribute event config and/or XAttr calls.
+DynamicQualities improved and moved from read_dyn_attr to dyn_attr and evalAttr methods.
+Check_State machine improved to push events if State in UseEvents list.
+
+ device:
+TangoCommand bugs solved to be usable with callables in DynamicDS.DynamicCommands
+added undo_property to restore old property values
+
+ linos:
+added methods for copying and making diff of directories
+
 July 2011 - 8.24
 -----------------------------------------
 
 Changes in modules: 
 init: 
 device,web,threads modules added to all 
+
  callbacks: 
 All Event/Device management lists changed into protected 
 AsynchronousFunction class moved to threads module 
+
  device: 
 able to switch between Tau and Taurus 
 Dev4Tango capable of reading dynamic attributes from other devices within the same server. 
 added TangoCommand class for managing Tango commands with feedback. 
+
  dynamic: 
 assigning default property values in DynamicDS init 
 KeepAttributes, KeepTime, CheckDependencies refactored 
+
  log: 
 to avoid duplicity of traces with Tau logging the default output (logging or print) can be set using init(use_print=bool) argument. It is set as True by default. 
+
  objects: 
 Pool class moved to threads module 
+
  qt: 
 DoubleClickable decorator added 
 TangoHostChooser added 
+
  threads: 
 SingletonWorker, Pool and AsynchronousFunction classes added 
+
  servers: 
 Added logger argument to ServersDict()
 
