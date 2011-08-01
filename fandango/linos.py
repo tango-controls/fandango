@@ -84,6 +84,21 @@ def KillEmAll(klass):
 ################################################################################3
 # Filesystem methods
 
+import os,stat,time
+
+def is_dir(path):
+    return stat.S_ISDIR(os.stat(path)[stat.ST_MODE])
+
+def file_exists(path):
+    try: 
+        os.stat(path)
+        return True
+    except:
+        return False
+
+def file_size(path):
+    os.stat(path)[stat.ST_SIZE]
+
 def listdir(folder,mask='.*',files=False,folders=False):
     try:
         if folders and not files:
@@ -99,7 +114,61 @@ def listdir(folder,mask='.*',files=False,folders=False):
     except Exception,e:
         print e
         raise Exception('FolderDoesNotExist',folder)
+ 
+def copydir(origin,destination,timewait=0.1,overwrite=False):
+    """ 
+    This method copies recursively a folder, creating subdirectories if needed and exiting at first error.
+    Origin and destination must be existing folders.
+    It includes a timewait between file copying
+    """
+    if not file_exists(origin): return
+    if not is_dir(origin): return
+    fs = listdir(origin)
+    print '%s dir contains %d files' % (origin,len(fs))
+
+    def exec_(com):
+        print(com)
+        r = os.system(com)
+        assert not r, 'OS Error %s returned by: %s'%(r,com)
         
+    if not file_exists(destination):
+        exec_('mkdir "%s"'%(destination))
+        
+    for f in sorted(fs):
+        if is_dir('%s/%s'%(origin,f)):
+            #if the file to process is a directory, we create it and process it
+            copydir('%s/%s'%(origin,f),'%s/%s'%(destination,f),timewait)
+        else:
+            #if it was not a directory, we copy it
+            if not overwrite and file_exists('%s/%s'%(destination,f)): 
+                print '\t%s/%s already exists'%(destination,f)
+                continue
+            size,t0 = file_size('%s/%s'%(origin,f)),time.time()
+            exec_('cp "%s/%s" "%s/"'%(origin,f,destination))
+            t1 = time.time()
+            if t1>t0: print('\t%f b/s'%(size/(t1-t0)))
+        time.sleep(timewait)
+        
+def diffdir(origin,destination,caseless=False,checksize=True):
+    fs,nfs = listdir(origin),listdir(destination)
+    lfs,lnfs = [s.lower() for s in fs],[n.lower() for n in nfs]
+    missing = []
+    for f in sorted(fs):
+        df = '%s/%s'%(origin,f)
+        if not (f in nfs) and (not caseless or not f.lower() in lnfs):
+            print '> %s/%s not in %s'%(origin,f,destination)
+            missing.append(df)
+        elif is_dir(df):
+            missing.extend(diffdir(df,'%s/%s'%(destination,f)))
+        elif checksize:
+            if file_size(df)!=file_size('%s/%s'%(destination,f)):
+                print '---> %s and %s differs!'%(df,'%s/%s'%(destination,nf))
+                missing.append(df)
+    for n in sorted(nfs):
+        if not (n in fs) and (not caseless or not n.lower() in lfs):
+            print '>> %s/%s not in %s'%(destination,n,origin)
+    return missing
+
 ################################################################################3
 # Kde methods        
         
