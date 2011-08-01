@@ -118,6 +118,17 @@ def add_new_device(server,klass,device):
     dev_info.klass = klass
     dev_info.server = server
     get_database().add_device(dev_info)    
+    
+def property_undo(dev,prop,epoch):
+    his = db.get_device_property_history(dev,prop)
+    valids = [h for h in his if fandango.functional.str2time(h.get_date())<epoch]
+    news = [h for h in his if fandango.functional.str2time(h.get_date())>epoch]
+    if valids and news:
+        print('Restoring property %s/%s to %s'%(dev,prop,valids[-1].get_date()))
+        db.put_device_property(dev,{prop:valids[-1].get_value().value_string})
+    elif not valids:print('No property values found for %s/%s before %s'%(dev,prop,fandango.functional.time2str(epoch)))
+    elif not news: print('Property %s/%s not modified after %s'%(dev,prop,fandango.functional.time2str(epoch)))
+
 
 ####################################################################################################################
 ##@name Methods for searching the database with regular expressions
@@ -1051,11 +1062,14 @@ class TangoCommand(object):
       #In this other example, it will be the value of the state what will be returned
       result = tc(args,feedback='state',timeout=10000)
       
-    :param command: the name of a tango command
+    :param command: the name of a tango command; or a callable
     :param device: a device that can be an string, a DeviceProxy or a TaurusDevice
     :param timeout: when using asynchronous commands default timeout can be overriden
     :param feedback: attribute, command or callable to be executed
-    :param value: if not None, value that feedback must have to consider the command successful
+    :param expected: if not None, value that feedback must have to consider the command successful
+    :param wait: time to wait for feedback (once command has been executed)
+    :param asynch: to perform the wait in a different thread instead of blocking
+    :param process: whether to use a different process to execute the command (if CPU intensive or trhead-blocking)
     :
     """
     
@@ -1065,15 +1079,18 @@ class TangoCommand(object):
     class BadFeedback(Exception): pass
     Proxies = ProxiesDict()
     
-    def __init__(self,command,device=None,timeout=None,feedback=None,expected=None,wait=1.,asynch=True,process=False):
+    def __init__(self,command,device=None,timeout=None,feedback=None,expected=None,wait=3.,asynch=True,process=False):
         
         self.device = device
-        if '/' in command:
-            d,self.command = command.rsplit('/',1)
-            if not self.device: self.device = d
-        else: self.command = command
         self.proxy = TangoCommand.Proxies[self.device]
-        self.info = self.proxy.command_query(self.command)
+        if isinstance(command,basestring):
+            if '/' in command:
+                d,self.command = command.rsplit('/',1)
+                if not self.device: self.device = d
+            else: self.command = command
+            self.info = self.proxy.command_query(self.command)
+        else: #May be a callable
+            self.command,self.info = command,None
             
         self.timeout = timeout or 3.
         self.feedback = feedback and self._parse_feedback(feedback)
@@ -1098,7 +1115,7 @@ class TangoCommand(object):
             self.feedback = feedback
         elif isinstance(feedback,basestring):
             if '/' in feedback:
-                device,target = feedback.rsplit('/',1) if feedback.count('/')>=3 else (feedback,state)
+                device,target = feedback.rsplit('/',1) if feedback.count('/')>=(4 if ':' in feedback else 3) else (feedback,state)
             else:
                 device,target = self.device,feedback
             proxy = TangoCommand.Proxies[device]
@@ -1116,7 +1133,7 @@ class TangoCommand(object):
     
     def execute(self,args=None,timeout=None,feedback=None,expected=None,wait=None,asynch=None):
         self.trace('%s/%s(%s)'%(self.device,self.command,args or ''))
-        args = [self.command] + (args or [])
+        #args = (args or []) #Not convinient
         timeout = fun.notNone(timeout,self.timeout)
         if feedback is not None:
             feedback = self._parse_feedback(feedback)
@@ -1127,47 +1144,62 @@ class TangoCommand(object):
         asynch = fun.notNone(asynch,self.asynch)
         t0 = time.time()
         result = None
-        if not asynch:
-            result = self.proxy.command_inout(*args)
-        else:
-            self.trace('Using asynchronous commands')
-            cid = self.proxy.command_inout_asynch(*args)
-            while timeout > (time.time()-t0):
-                self.event.wait(.025)
-                try: 
-                    result = self.proxy.command_inout_reply(cid)
-                    break
-                except PyTango.DevFailed,e:
-                    if 'AsynReplyNotArrived' in str(e): 
-                        pass
-                    #elif any(q in str(e) for q in ('DeviceTimedOut','BadAsynPollId')):
-                    else:
-                        #BadAsynPollId is received once the command is discarded
-                        raise TangoCommand.CommandException(str(e).replace('\n','')[:100])
+        
+        if fun.isString(self.command):
+            if not asynch:
+                if args: result = self.proxy.command_inout(self.command,args)
+                else: result = self.proxy.command_inout(self.command)
+            else:
+                self.trace('Using asynchronous commands')
+                if args: cid = self.proxy.command_inout_asynch(self.command,args)
+                else: cid = self.proxy.command_inout_asynch(self.command)
+                while timeout > (time.time()-t0):
+                    self.event.wait(.025)
+                    try: 
+                        result = self.proxy.command_inout_reply(cid)
+                        break
+                    except PyTango.DevFailed,e:
+                        if 'AsynReplyNotArrived' in str(e): 
+                            pass
+                        #elif any(q in str(e) for q in ('DeviceTimedOut','BadAsynPollId')):
+                        else:
+                            #BadAsynPollId is received once the command is discarded
+                            raise TangoCommand.CommandException(str(e).replace('\n','')[:100])
+        elif fun.isCallable(self.command):
+            result = self.command(args)
+            
+        t1 = time.time()
+        if t1 > (t0+self.timeout): 
+            raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
         if feedback is not None:
             self.trace('Using feedback: %s'%feedback)
-            ready = False
-            tt,tw = min((timeout,wait)),max((0.025,wait/10.))
-            while (tt > (time.time()-t0)) and not ready:
+            tt,tw = min((timeout,(t1-t0+wait))),max((0.025,wait/10.))
+            now,got = t1,None
+            while True:
                 self.event.wait(tw)
-                got = feedback()
+                now = time.time()
+                got = type(expected)(feedback())
                 if not wait or expected is None or got==expected:
                     self.trace('Feedback (%s) obtained after %s s'%(got,time.time()-t0))
-                    ready = True
+                    break
+                if now > (t0+timeout):
+                    raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
+                if now > (t1+wait):
+                    break
             if expected is None:
                 return got
             elif got==expected:
-                self.trace('Result (%s) obtained after %s s'%(result,time.time()-t0))
-                return result
+                self.trace('Result (%s,%s==%s) verified after %s s'%(result,got,expected,time.time()-t0))
+                return (result if result is not None else got)
             else:
-                raise TangoCommand.BadFeedback(str(result))
+                raise TangoCommand.BadFeedback('%s!=%s'%(got,expected))
         elif expected is None or result == expected:
             self.trace('Result obtained after %s s'%(time.time()-t0))
             return result
         else:
             raise TangoCommand.BadResult(str(result))
         if self.timeout < time.time()-t0: 
-            raise TangoCommand.CommandTimeout(str(self.timeout)+' ms')
+            raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
         return result
     
 ##############################################################################################################
