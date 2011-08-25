@@ -38,7 +38,7 @@ by Sergi Rubio,
 srubio@cells.es, 
 2010
 """
-import Queue,threading,multiprocessing,traceback
+import time,Queue,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
 
 from . import functional
@@ -49,6 +49,140 @@ from objects import Singleton
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
 
+###############################################################################
+
+class CronTab(object):
+    """
+    Line Syntax:
+    #Minutes Hour DayOfMonth(1-31) Month(1-12) DayOfWeek(0=Sunday-6) Task
+    00 */6 * * * /homelocal/sicilia/archiving/bin/cleanTdbFiles /tmp/archiving/tdb --no-prompt
+
+    ct = fandango.threads.CronTab('* 11 24 08 3 ./command &') #command can be replaced by a callable task argument
+    ct.match() #It will return True if actual time matches crontab condition, self.last_match stores last time check
+        True
+    ct.start()
+        In CronTab(* 11 24 08 3 date).start()
+        CronTab thread started
+
+        In CronTab(* 11 24 08 3 date).do_task(<function <lambda> at 0x8cc4224>)
+        CronTab(* 11 24 08 3 date).do_task() => 3
+        
+    ct.stop()
+
+    """
+    def __init__(self,line='',task=None,start=False,process=False,keep=10,trace=False):
+        if line: self.load(line)
+        if task is not None: self.task = task
+        self.last_match = 0
+        self.trace = trace
+        self.keep = keep
+        
+        self.THREAD_CLASS = threading.Thread if not process else multiprocessing.Process
+        self.QUEUE_CLASS = Queue.Queue if not process else multiprocessing.Queue
+        self.EVENT_CLASS = threading.Event if not process else multiprocessing.Event
+        self.LOCK_CLASS = threading.RLock if not process else multiprocessing.RLock
+
+        self._thread = None
+        self.event = None
+        self._queue = self.QUEUE_CLASS(maxsize=int(self.keep or 10))
+        if start: self.start()
+        
+    def load(self,line):
+        """
+        Crontab line parsing
+        """
+        print 'In CronTab().load(%s)'%line
+        vals = line.split()
+        if len(vals)<5: raise Exception('NotEnoughArguments')
+        self.minute,self.hour,self.day,self.month,self.weekday = vals[:5]
+        if vals[5:] or not getattr(self,'task',None): self.task = ' '.join(vals[5:])
+        self.line = line
+        
+    def _check(self,cond,value):
+        if '*'==cond: return True
+        elif '*/' in cond: return not int(value)%int(cond.replace('*/',''))
+        else: return int(cond)==int(value)
+        
+    def match(self,now=None):
+        """
+        Returns True if actual timestamp matches cron configuration
+        """
+        if now is None: now=time.time()
+        self.last_match = now-(now%60)
+        tt = functional.time2tuple(now)
+        if all(self._check(c,v) for c,v in 
+            zip([self.minute,self.hour,self.day,self.month,self.weekday],
+                [tt.tm_min,tt.tm_hour,tt.tm_mday,tt.tm_mon,tt.tm_wday+1])
+            ):
+                return True
+        else:
+            return False
+        
+    def changed(self,now=None):
+        """
+        Checks if actual timestamp differs from last cron check
+        """
+        if now is None: now=time.time()
+        return (now-(now%60))!=self.last_match
+        
+    def do_task(self,task=None,trace=False):
+        """
+        Executes an string or callable
+        """
+        trace = trace or self.trace
+        task = task or self.task
+        if trace: print 'In CronTab(%s).do_task(%s)'%(self.line,task)
+        if functional.isCallable(task):
+            ret = task()
+        elif functional.isString(task):
+            from fandango.linos import shell_command
+            ret = shell_command(self.task)
+        else:
+            raise Exception('NotCallable/String')
+        if self.keep:
+            if self._queue.full(): self.get()
+            self._queue.put(ret,False)
+        if trace: 
+            print 'CronTab(%s).do_task() => %s'%(self.line,ret)
+            
+    def get(self):
+        return self._queue.get(False)
+        
+    def _run(self):
+        print 'CronTab thread started' 
+        from fandango.linos import shell_command
+        while not self.event.is_set():
+            now = time.time()
+            if self.changed(now) and self.match(now):
+                try:
+                    self.do_task()
+                except:
+                    print 'CronTab thread exception' 
+                    print traceback.format_exc()
+            self.event.wait(15)
+        print 'CronTab thread finished' 
+        return 
+        
+    def start(self):
+        print 'In CronTab(%s).start()'%self.line
+        if self._thread and self._thread.is_alive:
+            self.stop()
+        import threading
+        self._thread = self.THREAD_CLASS(target=self._run)
+        self.event = self.EVENT_CLASS()
+        self._thread.daemon = True
+        self._thread.start()
+        
+    def stop(self):
+        print 'In CronTab(%s).stop()'%self.line
+        if self._thread and self._thread.is_alive:
+            self.event.set()
+            self._thread.join()
+            
+    def is_alive(self):
+        if not self._thread: return False
+        else: return self._thread.is_alive()
+    
 ###############################################################################
 WorkerException = type('WorkerException',(Exception,),{})
 
