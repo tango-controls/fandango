@@ -64,6 +64,7 @@ except:
     USE_TAU=False
 
 from . import objects
+from . import functional as fun
 from objects import Object,Struct
 
 ####################################################################################################################
