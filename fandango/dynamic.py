@@ -411,38 +411,41 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     def check_attribute_events(self,aname):
         self.UseEvents = [u.lower().strip() for u in self.UseEvents]
-        return bool(self.UseEvents[0] in ('yes','true') or any(fun.matchCl(s,aname) for s in self.UseEvents))
+        return bool(len(self.UseEvents) and self.UseEvents[0] in ('yes','true') or any(fun.matchCl(s,aname) for s in self.UseEvents))
     
     def check_changed_event(self,aname,new_value):
         if aname not in self.dyn_values: return False
-        v = self.dyn_values[aname].value
-        new_value = getattr(new_value,'value',new_value)
-        ac = self.get_attribute_config_3(aname)[0]
-        try: cabs = float(ac.event_prop.ch_event.abs_change)
-        except: cabs = 0
-        try: crel = float(ac.event_prop.ch_event.rel_change)
-        except: crel = 0
-        self.info('In check_changed_event(%s,%s): %s!=%s > (%s,%s)?'%(aname,new_value,v,new_value,cabs,crel))
-        if fun.isSequence(v) and cabs>0 and crel>0: 
-            self.info('In check_changed_event(%s,%s): list changed!'%(aname,new_value))            
-            return bool(v!=new_value)
-        else:
-            try: v,new_value = (float(v) if v is not None else None),float(new_value)
-            except: 
-                self.info('In check_changed_event(%s,%s): values not evaluable (%s,%s)'%(aname,new_value,v,new_value))
-                return False
-            if v is None:
-                self.info('In check_changed_event(%s,%s): first value read!'%(aname,new_value))
-                return True
-            elif cabs>0 and not v-cabs<new_value<v+cabs: 
-                self.info('In check_changed_event(%s,%s): absolute change!'%(aname,new_value))
-                return True
-            elif crel>0 and not v*(1-crel/100.)<new_value<v*(1+crel/100.): 
-                self.info('In check_changed_event(%s,%s): relative change!'%(aname,new_value))
-                return True
-            else: 
-                self.info('In check_changed_event(%s,%s): nothing changed'%(aname,new_value))
-                return False
+        try:
+            v = self.dyn_values[aname].value
+            new_value = getattr(new_value,'value',new_value)
+            ac = self.get_attribute_config_3(aname)[0]
+            try: cabs = float(ac.event_prop.ch_event.abs_change)
+            except: cabs = 0
+            try: crel = float(ac.event_prop.ch_event.rel_change)
+            except: crel = 0
+            self.info('In check_changed_event(%s,%s): %s!=%s > (%s,%s)?'%(aname,new_value,v,new_value,cabs,crel))
+            if fun.isSequence(v) and cabs>0 and crel>0: 
+                self.info('In check_changed_event(%s,%s): list changed!'%(aname,new_value))            
+                return bool(v!=new_value)
+            else:
+                try: v,new_value = (float(v) if v is not None else None),float(new_value)
+                except: 
+                    self.info('In check_changed_event(%s,%s): values not evaluable (%s,%s)'%(aname,new_value,v,new_value))
+                    return False
+                if v is None:
+                    self.info('In check_changed_event(%s,%s): first value read!'%(aname,new_value))
+                    return True
+                elif cabs>0 and not v-cabs<new_value<v+cabs: 
+                    self.info('In check_changed_event(%s,%s): absolute change!'%(aname,new_value))
+                    return True
+                elif crel>0 and not v*(1-crel/100.)<new_value<v*(1+crel/100.): 
+                    self.info('In check_changed_event(%s,%s): relative change!'%(aname,new_value))
+                    return True
+                else: 
+                    self.info('In check_changed_event(%s,%s): nothing changed'%(aname,new_value))
+                    return False
+        except: #Needed to prevent fails if attribute_config_3 is not available
+            print traceback.format_exc()
         return False
         
     #------------------------------------------------------------------------------------------------------
