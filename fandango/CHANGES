@@ -1,5 +1,13 @@
-8.25
 
+August 2011 - 8.26
+-------------------
+
+tango: generic tango methods moved from fandango.device to fandango.tango module
+Dynamic: UseEvent property bug solved, added try/except in check_changed_event to prevent errors in read attribute with PyTango releases that does not support events.
+threads: added CronTab class to manage task schedule
+
+August 2011 - 8.25
+-------------------
  dynamic: 
 static methods links for dyn_attr/read_dyn_attr/write_dyn_attr reviewed
 LOCALS added to _locals, TangoCommand with feedback added to COMM macro (getXCommand).
