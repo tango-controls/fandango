@@ -123,7 +123,16 @@ def property_undo(dev,prop,epoch):
 ##@name Methods for searching the database with regular expressions
 #@{
 
+#Regular Expressions
 metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
+#alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
+alnum = '(?:[a-zA-Z_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
+no_alnum = '[^a-zA-Z0-9-_]'
+no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
+rehost = '(?:(?P<host>'+alnum+':[0-9]+)/)?' #(?:'+alnum+':[0-9]+/)?
+redev = '(?P<device>'+rehost+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)?' #Matches attribute and extension
+retango = redev+reattr+'(?:\$?)' 
 
 def parse_labels(text):
     if any(text.startswith(c[0]) and text.endswith(c[1]) for c in [('{','}'),('(',')'),('[',']')]):
@@ -147,11 +156,14 @@ def get_all_devices(expressions,limit=1000):
     db = get_database()
     expressions = fun.toList(expressions)
     for target in expressions:
-        if not target.count('/')>=2:
-            print 'get_all_devices(%s): device names must have 2 slash characters'%target
-            if len(expressions)>1: continue
-            else: raise 'ThisIsNotAValidDeviceName'
-        td,tf,tm = target.split('/')[:3]
+        #if not target.count('/')>=2:
+            #print 'get_all_devices(%s): device names must have 2 slash characters'%target
+            #if len(expressions)>1: continue
+            #else: raise 'ThisIsNotAValidDeviceName'
+        match = fun.matchCl(retango,target,terminate=True)
+        if not match: raise 'ThisIsNotAValidDeviceName:%s'%target
+        #target = match.groups()[0]
+        td,tf,tm = target.split('/')[-3:]
         domains = db.get_device_domain(target)
         for d in domains:
             families = db.get_device_family(d+'/'+tf+'/'+tm)
@@ -164,13 +176,13 @@ def get_all_devices(expressions,limit=1000):
 def get_matching_devices(expressions,limit=1000):
     all_devs = list(get_database().get_device_name('*','*'))
     expressions = map(fun.toRegexp,fun.toList(expressions))
-    return filter(lambda d: any(fun.matchCl(e+'$',d) for e in expressions),all_devs)
+    return filter(lambda d: any(fun.matchCl(e,d,terminate=True) for e in expressions),all_devs)
 
 def get_matching_attributes(dev,expressions):
     """ Given a device name it returns the attributes matching any of the given expressions """
     expressions = map(fun.toRegexp,fun.toList(expressions))
     al = get_device(dev).get_attribute_list()
-    result = [a for a in al for expr in expressions if fun.matchCl(expr,a)]
+    result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
     return result
 
 def get_matching_device_attributes(expressions,limit=1000):
@@ -180,20 +192,31 @@ def get_matching_device_attributes(expressions,limit=1000):
     :param express: like [domain_wild/family_wild/member_wild/attribute_regexp] 
     """
     attrs = []
-    expressions = map(fun.partial(fun.toRegexp,terminate=True),fun.toList(expressions))
+    def_host = os.getenv('TANGO_HOST')
+    #expressions = map(fun.partial(fun.toRegexp,terminate=True),fun.toList(expressions))
     for e in expressions:
-        if e.count('/')==2: 
-            dev,attr = e,'state'
-        elif e.count('/')==3: 
-            dev,attr = e.rsplit('/',1)
-        else: 
+        match = fun.matchCl(retango,e,terminate=True)
+        if not match:
             raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
+        else:
+            host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
+            host,attr = host or def_host,attr or 'state'
+        #if e.count('/')==2: 
+            #dev,attr = e,'state'
+        #elif e.count('/')==3: 
+            #dev,attr = e.rsplit('/',1)
+        #else: 
+            #raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
         for d in get_matching_devices(dev):
-            try: 
-                ats = get_matching_attributes(d,[attr])
-                attrs.extend([d+'/'+a for a in ats])
-                if len(attrs)>limit: break
-            except: print 'Unable to get attributes for %s'%d
+            if fun.matchCl(attr,'state',terminate=True):
+                attrs.append(d+'/State')
+            if attr.lower().strip() != 'state':
+                try: 
+                    ats = get_matching_attributes(d,[attr])
+                    attrs.extend([d+'/'+a for a in ats])
+                    if len(attrs)>limit: break
+                except: 
+                    print 'Unable to get attributes for %s'%d
     return list(set(attrs))
     
 def get_all_models(expressions,limit=1000):
