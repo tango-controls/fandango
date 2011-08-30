@@ -490,15 +490,23 @@ class TangoEval(object):
         regexp = no_quotes + retango + no_quotes #Excludes attr_names between quotes
         #print regexp
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
+        
         if '#' in formula:
             formula = formula.split('#',1)[0]
         if ':' in formula and not re.match('^',redev):
             tag,formula = formula.split(':',1)
         self.formula = formula
+        
+        findables = re.findall('FIND\(([^)]*)\)',self.formula)
+        for target in findables:
+            res = str([d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])])
+            self.formula = self.formula.replace("FIND(%s)"%target,res).replace('"','').replace("'",'')
+            if self.trace: print 'TangoEval: Replacing with results for %s ...%s'%(target,res)
+        
         ##@var all_vars list of tuples with (device,/attribute) name matches
         #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
-        self.variables = [s for s in re.findall(regexp,formula)]
-        if self.trace: print 'TangoEval.parse_variables(%s): %s'%(formula,self.variables)
+        self.variables = [s for s in re.findall(regexp,self.formula)]
+        if self.trace: print 'TangoEval.parse_variables(%s): %s'%(self.formula,self.variables)
         return self.variables
         
     def read_attribute(self,device,attribute,what='value',_raise=True):
@@ -538,12 +546,6 @@ class TangoEval(object):
         self.formula = self.formula.replace(' || ',' or ')
         self.formula = self.formula.replace(' && ',' and ')
         self.previous = previous or self.previous
-        
-        findables = re.findall('FIND\(([^)]*)\)',self.formula)
-        for target in findables:
-            res = str([d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])])
-            self.formula = self.formula.replace("FIND(%s)"%target,res).replace('"','').replace("'",'')
-            if self.trace: print 'TangoEval: Replacing with results for %s ...%s'%(target,res)
         
         self.parse_variables(self.formula)
         if self.trace: print 'TangoEval: variables in formula are %s' % self.variables
