@@ -452,6 +452,8 @@ class TangoEval(object):
     """ 
     Class for Tango formula evaluation
     Class with methods copied from PyAlarm 
+    All tango-like variables are parsed.
+    Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
     """
     def __init__(self,formula='',launch=True,trace=False, proxies=None, attributes=None):
         self.formula = formula
@@ -468,7 +470,7 @@ class TangoEval(object):
                 print 'TangoEval: result = %s' % self.result
         return
         
-    def parse_variables(self,formula):
+    def parse_variables(self,formula,_locals=None):
         ''' This method parses attributes declarated in formulas with the following formats:
         TAG1: dom/fam/memb/attrib >= V1 #A comment
         TAG2: d/f/m/a1 > V2 and d/f/m/a2 == V3
@@ -494,9 +496,13 @@ class TangoEval(object):
         if '#' in formula:
             formula = formula.split('#',1)[0]
         if ':' in formula and not re.match('^',redev):
-            tag,formula = formula.split(':',1)
+            tag,formula = formula.split(':',1)            
         self.formula = formula
         
+        if _locals and '$(' in self.formula: #explicit replacement of env variables if $() used
+            for l,v in _locals.items():
+                self.formula = self.formula.replace('$(%s)'%str(l),str(v))
+                
         findables = re.findall('FIND\(([^)]*)\)',self.formula)
         for target in findables:
             res = str([d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])])
@@ -537,7 +543,8 @@ class TangoEval(object):
     
     def eval(self,formula=None,previous=None,_locals=None ,_raise=True):
         ''' 
-        Evaluates the given formula
+        Evaluates the given formula.
+        Any variable in locals is evaluated or explicitly replaced in the formula if appearing with brackets (e.g. FIND({VARNAME}/*/*))
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         '''
         self.formula = (formula or self.formula).strip()
@@ -545,6 +552,9 @@ class TangoEval(object):
             self.formula = self.formula.replace(' '+x.upper()+' ',' '+x+' ')
         self.formula = self.formula.replace(' || ',' or ')
         self.formula = self.formula.replace(' && ',' and ')
+        if _locals and '$(' in self.formula: #explicit replacement of env variables if $() used
+            for l,v in _locals.items():
+                self.formula = self.formula.replace('$(%s)'%str(l),str(v))
         self.previous = previous or self.previous
         
         self.parse_variables(self.formula)
