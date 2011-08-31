@@ -4,7 +4,7 @@ August 2011 - 8.26
 tango: generic tango methods moved from fandango.device to fandango.tango module
 Dynamic: UseEvent property bug solved, added try/except in check_changed_event to prevent errors in read attribute with PyTango releases that does not support events.
 threads: added CronTab class to manage task schedule
-device: TangoEval.parse_variables modified to get devices not running when using FIND(...)
+device: TangoEval.parse_variables modified to get devices not running when using FIND(...); parsing of $(_locals) added
 tango: now able to find devices in multiple hosts.
 
 
