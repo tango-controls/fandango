@@ -218,6 +218,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._last_read = {}
         self._read_times = {}
         self._eval_times = {}
+        self._polled_attr_ = []
         self.GARBAGE = []
 
         self.useDynStates = useDynStates
@@ -291,12 +292,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         targets = DynamicDSClass.device_property_list.keys()
         if targets:
             self._db = getattr(self,'_db',None) or PyTango.Database()
-            props = self._db.get_device_property(self.get_name(),targets)
+            props = self._db.get_device_property(self.get_name(),list(targets)+['polled_attr'])
             self.DynamicAttributes=props['DynamicAttributes']
             self.DynamicStates=props['DynamicStates']
             self.DynamicQualities=props['DynamicQualities']
             self.KeepAttributes=props['KeepAttributes']
             self.UseEvents=props['UseEvents']
+            self._polled_attr_=[a.lower() for a in props['polled_attr']]
         try: self.CheckDependencies=props['CheckDependencies'][0]
         except Exception,e: 
             self.error(str(e))
@@ -409,20 +411,32 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._total_usage = 0
         self.info('-'*80)
         
-    def check_attribute_events(self,aname):
+    def check_attribute_events(self,aname,poll=False):
         self.UseEvents = [u.lower().strip() for u in self.UseEvents]
-        return bool(len(self.UseEvents) and self.UseEvents[0] in ('yes','true') or any(fun.matchCl(s,aname) for s in self.UseEvents))
+        if not len(self.UseEvents): return False
+        elif self.UseEvents[0] in ('no','false'): return False
+        elif aname.lower().strip() == 'state': return True
+        elif any(fun.matchCl(s,aname) for s in self.UseEvents): return True #Attrs explicitly set doesn't need event config
+        elif self.UseEvents[0] in ('yes','true') and any(self.check_events_config(aname)): return True
+        else: return False
+    
+    def check_events_config(self,aname):
+        cabs,crel = 0,0
+        try:
+            ac = self.get_attribute_config_3(aname)[0]
+            try: cabs = float(ac.event_prop.ch_event.abs_change)
+            except: pass
+            try: crel = float(ac.event_prop.ch_event.rel_change)
+            except: pass
+        except:pass
+        return cabs,crel
     
     def check_changed_event(self,aname,new_value):
         if aname not in self.dyn_values: return False
         try:
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
-            ac = self.get_attribute_config_3(aname)[0]
-            try: cabs = float(ac.event_prop.ch_event.abs_change)
-            except: cabs = 0
-            try: crel = float(ac.event_prop.ch_event.rel_change)
-            except: crel = 0
+            cabs,crel = self.check_events_config(aname)
             self.info('In check_changed_event(%s,%s): %s!=%s > (%s,%s)?'%(aname,new_value,v,new_value,cabs,crel))
             if fun.isSequence(v) and cabs>0 and crel>0: 
                 self.info('In check_changed_event(%s,%s): list changed!'%(aname,new_value))            
@@ -492,6 +506,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 else:
                     self.debug( self.get_name()+".dyn.attr(): Unknown State: %s"%line)
 
+        polled_attrs = set(self._polled_attr_[::2])
         for line in self.DynamicAttributes:
             if not line.strip() or line.strip().startswith('#'): continue
             fields=[]
@@ -571,7 +586,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 #Setting up change events:
                 if self.check_attribute_events(aname):
                     self._locals[aname] = None
-                    self.set_change_event(aname,True,False)
+                    if aname in polled_attrs: self.set_change_event(aname,True,False)
+                    else: polled_attrs.add(aname)
                 elif self.dyn_values[aname].keep:
                     self._locals[aname] = None
                 
@@ -599,7 +615,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         print traceback.format_exc()
                         
         #Setting up state events:
-        if self.check_attribute_events('State'): self.set_change_event('State',True,False)
+        if self.check_attribute_events('State'): 
+            if 'state' in polled_attrs: self.set_change_event('State',True,False)
+            else: polled_attrs.add('state')
+        
+        try:
+            self.check_polled_attributes(new_attr=dict.fromkeys(polled_attrs,self.DEFAULT_POLLING_PERIOD))
+        except:
+            'DynamicDS.dyn_attr( ... ), unable to set polling for (%s): \n%s'%(list(polled_attrs),traceback.format_exc())
         
         print 'DynamicDS.dyn_attr( ... ), finished. Attributes ready to accept request ...'
 
