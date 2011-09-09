@@ -117,7 +117,23 @@ def property_undo(dev,prop,epoch):
         db.put_device_property(dev,{prop:valids[-1].get_value().value_string})
     elif not valids:print('No property values found for %s/%s before %s'%(dev,prop,fun.time2str(epoch)))
     elif not news: print('Property %s/%s not modified after %s'%(dev,prop,fun.time2str(epoch)))
-
+    
+def search_device_properties(dev,prop,exclude=''):
+    db = get_database()
+    result = {}
+    devs = get_matching_devices(dev) #devs if fun.isSequence(dev) else [devs]
+    props = prop if fun.isSequence(prop) else [prop]
+    for d in devs:
+        if exclude and fun.matchCl(exclude,d): continue
+        r = {}
+        vals = db.get_device_property(d,props)
+        for k,v in vals.items():
+            if v: r[k] = v[0]
+        if r: result[d] = r
+    if not fun.isSequence(devs):
+        if not fun.isSequence(prop): return result.values().values()[0]
+        else: return result.values()[0]
+    else: return result
 
 ####################################################################################################################
 ##@name Methods for searching the database with regular expressions
@@ -129,10 +145,10 @@ metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 alnum = '(?:[a-zA-Z_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-rehost = '(?:(?P<host>'+alnum+':[0-9]+)/)?' #(?:'+alnum+':[0-9]+/)?
-redev = '(?P<device>'+rehost+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)?' #Matches attribute and extension
-retango = redev+reattr+'(?:\$?)' 
+rehost = '(?:(?P<host>'+alnum+':[0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
+redev = '(?P<device>'+(rehost+'?')+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)' #Matches attribute and extension
+retango = redev+(reattr+'?')+'(?:\$?)' 
 
 def parse_labels(text):
     if any(text.startswith(c[0]) and text.endswith(c[1]) for c in [('{','}'),('(',')'),('[',']')]):
@@ -174,7 +190,17 @@ def get_all_devices(expressions,limit=1000):
     return results
                 
 def get_matching_devices(expressions,limit=1000):
-    all_devs = list(get_database().get_device_name('*','*'))
+    if not fun.isSequence(expressions): expressions = [expressions]
+    all_devs = []
+    if any(not fun.matchCl(rehost,expr) for expr in expressions):
+        all_devs.extend(list(get_database().get_device_name('*','*')))
+    for expr in expressions:
+        m = fun.matchCl(rehost,expr) 
+        if m:
+            host = m.groups()[0]
+            print 'get_matching_devices(%s): getting %s devices ...'%(expr,host)
+            odb = PyTango.Database(*host.split(':'))
+            all_devs.extend('%s/%s'%(host,d) for d in odb.get_device_name('*','*'))
     expressions = map(fun.toRegexp,fun.toList(expressions))
     return filter(lambda d: any(fun.matchCl(e,d,terminate=True) for e in expressions),all_devs)
 
@@ -189,10 +215,11 @@ def get_matching_device_attributes(expressions,limit=1000):
     """ 
     Returns all matching device/attribute pairs. 
     regexp only allowed in attribute names
-    :param express: like [domain_wild/family_wild/member_wild/attribute_regexp] 
+    :param expressions: a list of expressions like [domain_wild/family_wild/member_wild/attribute_regexp] 
     """
     attrs = []
     def_host = os.getenv('TANGO_HOST')
+    if not fun.isSequence(expressions): expressions = [expressions]
     #expressions = map(fun.partial(fun.toRegexp,terminate=True),fun.toList(expressions))
     for e in expressions:
         match = fun.matchCl(retango,e,terminate=True)
@@ -201,6 +228,7 @@ def get_matching_device_attributes(expressions,limit=1000):
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
+        print 'get_matching_device_attributes(e) -> %s / %s / %s'%(host,dev,attr)
         #if e.count('/')==2: 
             #dev,attr = e,'state'
         #elif e.count('/')==3: 
@@ -208,6 +236,7 @@ def get_matching_device_attributes(expressions,limit=1000):
         #else: 
             #raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
         for d in get_matching_devices(dev):
+            print 'get_matching_device_attributes(%s,%s)...'%(dev,attr)
             if fun.matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
