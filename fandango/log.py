@@ -64,6 +64,12 @@ def printf(s):
     # This is a 'lambdable' version of print
     print s
     
+def shortstr(s,max_len=80):
+    s = str(s)
+    if len(s) > max_len:
+        s = s[:max_len-3]+'...'
+    return s
+    
 class Logger(Object):
     root_inited    = False
 
@@ -72,10 +78,11 @@ class Logger(Object):
     Info     = logging.INFO
     Debug    = logging.DEBUG
     
-    def __init__(self, name='SerialVacuumDevice', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,level='INFO'):
+    def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,level='INFO',max_len=0):
         self.call__init__(Object)
         self._ForcePrint    = use_print
         self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
+        self.max_len = max_len
         
         if not Logger.root_inited:
             #print 'log format is ',format
@@ -128,26 +135,40 @@ class Logger(Object):
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
-        if isinstance(level,basestring): level = level.upper() 
-        if level in self.__levelAliases:
-            level = self.__levelAliases[level]
-            if type(level)==type(logging.NOTSET):
-                self.log_obj.setLevel(level)
-                self.debug('log.Logger: Logging  level set to %s'%str(level).upper())
-            if type(level) is str and level.upper() in logging.__dict__.keys():
-                self.log_obj.setLevel(logging.__dict__[level.upper()])
-                self.debug('log.Logger: Logging  level set to %s'%str(logging.__dict__[level.upper()]))
-        elif level in self.__levelAliases.values():
+        #if isinstance(level,basestring): level = level.upper() 
+        if type(level)==type(logging.NOTSET):
             self.log_obj.setLevel(level)
+            self.info('log.Logger: Logging  level set to %s'%str(level).upper())
         else:
-            self.warning('log.Logger: Logging level cannot be set to %s'%str(level))
-            pass
+            l = self.getLogLevel(level)
+            if l is not None:
+                self.log_obj.setLevel(l)
+                self.info('log.Logger: Logging  level set to "%s" = %s'%(level,l))
+            else:
+                self.warning('log.Logger: Logging level cannot be set to "%s"'%level)
+        return level
         
     setLevel = setLogLevel
 
     def setLevelAlias(self,alias,level):
         ''' setLevelAlias(alias,level), allows to setup predefined levels for different tags '''
         self.__levelAliases[alias]=level
+        
+    def getLogLevel(self,alias=None):
+        if alias is None:
+            l = self.log_obj.level
+            try: l = (k for k,v in self.__levelAliases.iteritems() if v==l).next()
+            except: return l
+        else:
+            if not isinstance(alias,basestring):
+                try: return (k for k,v in self.__levelAliases.iteritems() if v==alias).next()
+                except: return None
+            elif alias.lower() in ('debug','info','warning','error'):
+                return logging.__dict__.get(alias.upper())
+            else:
+                try: return (v for k,v in self.__levelAliases.iteritems() if k.lower()==alias.lower()).next()
+                except: return None
+        return
 
     def getRootLog(self):
         return logging.getLogger()
@@ -191,6 +212,7 @@ class Logger(Object):
         
     
     def debug(self, msg, *args, **kw):
+        if self.max_len>=0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('DEBUG',msg)
             else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
@@ -201,6 +223,7 @@ class Logger(Object):
     
     
     def info(self, msg, *args, **kw):
+        if self.max_len>=0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('INFO',msg)
             else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
@@ -211,6 +234,7 @@ class Logger(Object):
      
 
     def warning(self, msg, *args, **kw):
+        if self.max_len>=0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('WARNING',msg)
             else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
@@ -220,6 +244,7 @@ class Logger(Object):
             #raise e
             
     def error(self, msg, *args, **kw):
+        if self.max_len>=0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('ERROR',msg)
             else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
