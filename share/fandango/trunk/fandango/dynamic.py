@@ -102,6 +102,7 @@ from PyTango import DevState
 from excepts import *
 from fandango.objects import self_locked
 from fandango.dicts import SortedDict,CaselessDefaultDict
+from fandango.log import Logger,shortstr
 import fandango.functional as fun
 import fandango.device
 
@@ -114,8 +115,7 @@ try:
 except: 
     print 'Unable to import tau'
     USE_TAU=False
-if False and USE_TAU: from tau.core.utils import Logger #DEPRECATED
-else: from log import Logger
+
 
 import os
 MEM_CHECK = str(os.environ.get('PYMEMCHECK')).lower() == 'true'
@@ -144,8 +144,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
-        self.setLogLevel('DEBUG')
-        self.info( ' in DynamicDS.__init__ ...')
+        self.setLogLevel('WARNING')
+        self.warning( ' in DynamicDS.__init__ ...')
         self.trace=False
 
         #Tango Properties
@@ -223,13 +223,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
         self.useDynStates = useDynStates
         if self.useDynStates:
-            self.info('useDynamicStates is set, disabling automatic State generation by attribute config.'+
+            self.warning('useDynamicStates is set, disabling automatic State generation by attribute config.'+
                     'States fixed with set/get_state will continue working.')
             self.State=self.rawState      
         self.call__init__('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
 
     def delete_device(self):
-        self.info( 'DynamicDS.delete_device(): ... ')
+        self.warning( 'DynamicDS.delete_device(): ... ')
         ('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl).delete_device(self)
         
     def get_parent_class(self):
@@ -277,35 +277,42 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         It is used by self.updateDynamicAttributes() and required in PyTango<3.0.4
         """
         ## THIS FUNCTION IS USED FROM updateDynamicAttributes
-        self.get_device_properties(self.get_device_class()) #It will reload all properly specified properties
+        self.get_device_properties(self.get_device_class()) #It will reload all subclass specific properties
+        self._db = getattr(self,'_db',None) or PyTango.Util.instance().get_database() #PyTango.Database()
         
         #Loading class properties
         if not getattr(self,'DynamicSpectrumSize',False):
             U = PyTango.Util.instance()
-            self._db = getattr(self,'_db',U.get_database())
             props = self._db.get_class_property(self.get_name(),['DynamicSpectrumSize'])
             for p in props.keys(): self.info(self.get_name()+'.'+str(p)+'="'+str(props[p])+'"')
-            self.DynamicSpectrumSize=props['DynamicSpectrumSize']        
+            self.DynamicSpectrumSize=props['DynamicSpectrumSize']
         
         #Loading DynamicDS specific properties
         #targets = [p for p in DynamicDSClass.device_property_list.keys() if p not in getattr(self.get_device_class(),'device_property_list',[])]
         targets = DynamicDSClass.device_property_list.keys()
-        if targets:
-            self._db = getattr(self,'_db',None) or PyTango.Database()
-            props = self._db.get_device_property(self.get_name(),list(targets)+['polled_attr'])
-            self.DynamicAttributes=props['DynamicAttributes']
-            self.DynamicStates=props['DynamicStates']
-            self.DynamicQualities=props['DynamicQualities']
-            self.KeepAttributes=props['KeepAttributes']
-            self.UseEvents=props['UseEvents']
-            self._polled_attr_=[a.lower() for a in props['polled_attr']]
-        try: self.CheckDependencies=props['CheckDependencies'][0]
+        props = self._db.get_device_property(self.get_name(),list(targets)+['polled_attr'])
+        [setattr(self,PROPERTY,props[PROPERTY]) for PROPERTY in targets]
+        self._polled_attr_=[a.lower() for a in props['polled_attr']]
+        #Loading non-spectrum properties
+        try: 
+            self.LogLevel=props['LogLevel'][0]
+            self.setLogLevel(self.LogLevel)
         except Exception,e: 
-            self.error(str(e))
+            self.error('Error in get_DynDS_properties(LogLevel): %s'%str(e))
+            self.LogLevel='INFO'
+            self.setLogLevel(self.LogLevel)
+        try: self.CheckDependencies=bool(props['CheckDependencies'][0])
+        except Exception,e: 
+            self.error('Error in get_DynDS_properties(CheckDependencies): %s'%str(e))
             self.CheckDependencies=True
+        try: self.KeepTime=float(props['KeepTime'][0])
+        except Exception,e: 
+            self.error('Error in get_DynDS_properties(KeepTime): %s'%str(e))
+            self.KeepTime=200
         
-        for p in DynamicDSClass.device_property_list: 
+        for p in targets: 
             self.info(self.get_name()+'.'+str(p)+'="'+str(getattr(self,p,None))+'"')
+        return
         
     def get_device_property(self,property,update=False):
         if update or not hasattr(self,property):
@@ -389,7 +396,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         print '-'*80
         for t,key in reversed(sorted((v,k) for k,v in self._read_times.items())):
             #self.info('%s read after %s s; needed %f s; eval in %f s; %f of the usage' % (key, self._last_period[key],self._read_times[key],self._eval_times[key],self._read_times[key]/self._total_usage))
-            print('%s\t%1.2e\t%1.2e\t%1.2e\t%1.2f%%'%(key, self._last_period[key],self._read_times[key],self._eval_times[key],100*self._eval_times[key]/(self._total_usage or 1.)))
+            print('%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
+                int(1e3*self._last_period[key]),
+                self._read_times[key],
+                self._eval_times[key],
+                100*self._eval_times[key]/(self._total_usage or 1.)))
         self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
         self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/(sum(self._read_times.values()) or 1)))
         if False: #GARBAGE_COLLECTION:
@@ -437,9 +448,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
             cabs,crel = self.check_events_config(aname)
-            self.info('In check_changed_event(%s,%s): %s!=%s > (%s,%s)?'%(aname,new_value,v,new_value,cabs,crel))
+            self.info('In check_changed_event(%s,%s): %s!=%s > (%s,%s)?'%(aname,shortstr(new_value),v,shortstr(new_value),cabs,crel))
             if fun.isSequence(v) and cabs>0 and crel>0: 
-                self.info('In check_changed_event(%s,%s): list changed!'%(aname,new_value))            
+                self.info('In check_changed_event(%s,%s): list changed!'%(aname,shortstr(new_value)))
                 return bool(v!=new_value)
             else:
                 try: v,new_value = (float(v) if v is not None else None),float(new_value)
@@ -530,7 +541,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     create = True
                     self.dyn_values[aname]=DynamicAttribute()
                     self.dyn_values[aname].keep = self.KeepAttributes and (not 'no' in self.KeepAttributes) and any(q.lower() in self.KeepAttributes for q in [aname,'*','yes','true'])
-                    self.dyn_types[aname]=None                
+                    self.dyn_types[aname]=None
                 else: create = False
 
                 is_allowed = (lambda s,req_type,a=aname: type(self).is_dyn_allowed(s,req_type,a))
@@ -606,7 +617,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     try:
                         match = re.match(exp,aname)
                         if match:
-                            self.info('There is a Quality for this attribute!: '+str((aname,exp,value)))
+                            self.info('There is a Quality for this attribute!: '+str((aname,exp,shortstr(value))))
                             for group in (match.groups()): #It will replace $ in the formula for all strings matched by .* in the expression
                                 value=value.replace('$',group,1) #e.g: (.*)_VAL=ATTR_ALARM if ATTR('$_ALRM') ... => RF_VAL=ATTR_ALARM if ATTR('RF_ALRM') ...
                             self.dyn_qualities[aname.lower()] = value
@@ -647,7 +658,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try:
             if keep and self.KeepTime and self._last_read.get(aname,0) and time.time()<(self._last_read[aname]+(self.KeepTime/1e3)):
                 v = self.dyn_values[aname]
-                self.info('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),v.value))
+                self.info('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),shortstr(v.value)))
                 return attr.set_value_date_quality(v.value,v.date,v.quality)
         except Exception,e:
             self.warning('Unable to reload Kept values, %s'%str(e))
@@ -679,7 +690,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.debug('DynamicDS('+self.get_name()+").read_dyn_attr("+aname+")="+text_result+
                     ", ellapsed %1.2e"%(self._eval_times[aname])+" seconds.\n")
                     #", finished at "+time.ctime(now)+"="+str(now)+", timestamp is %s"%str(date)+", difference is "+str(now-date))
-            if (aname=='POLL' if 'POLL' in self.dyn_values else aname==self.dyn_values.keys()[-1]):
+            if (aname=='POLL' if 'POLL' in self.dyn_values else 
+                (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==self.dyn_values.keys()[-1])
+                ):
                 self.attribute_polling_report()
         except Exception, e:           
             now=time.time()
@@ -722,7 +735,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         ''' SPECIFIC METHODS DEFINITION DONE IN self._locals!!! 
         @remark Generators don't work  inside eval!, use lists instead
         '''
-        self.info("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"%getattr(self.dyn_values.get(aname,None),'value',None))
+        self.debug("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"%shortstr(getattr(self.dyn_values.get(aname,None),'value',None)))
         
         if aname in self.dyn_values:
             formula,compiled = self.dyn_values[aname].formula,self.dyn_values[aname].compiled#self.dyn_attrs[aname]       
@@ -796,13 +809,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if keep: 
                     old = self.dyn_values[aname].value
                     self.dyn_values[aname].update(value,date,quality)
-                    self.info('Value of %s (%s) will be kept for later reuse' % (aname,self.dyn_values[aname].value))
+                    (self.debug if self.KeepAttributes[0] in ('yes','true') else self.info)('evalAttr(%s): Value will be kept for later reuse' % (aname))
                     #Updating state if needed:
                     if old!=value and self.dyn_values.get(aname).states_queue:
                         self.check_state()
                 return result
             else:
-                self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,str(VALUE)))
+                self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
                 #self.debug('vars in self._locals: %s'%self._locals.keys())
                 return eval(compiled or formula,self._globals,self._locals)
 
@@ -1009,7 +1022,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             return fandango.device.TangoCommand(command=cmd,device=device,feedback=feedback,timeout=10.,wait=10.).execute(args,expected=expected)
 
     def get_quality_for_attribute(self,aname,attr_value):
-        self.debug('In get_quality_for_attribute(%s,%s)' % (aname,(str(attr_value)[:10]+'...')))
+        self.debug('In get_quality_for_attribute(%s,%s)' % (aname,shortstr(attr_value,15)[:10]))
         try:
             if aname.lower() in self.dyn_qualities:
                 formula = self.dyn_qualities[aname.lower()]
@@ -1018,7 +1031,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 quality = eval(formula,{},self._locals) or PyTango.AttrQuality.ATTR_VALID
             else:
                 quality =  getattr(attr_value,'quality',PyTango.AttrQuality.ATTR_VALID)
-            print 'And the quality is: '+str(quality)
+            self.debug('\t%s.quality = %s'%(aname,quality))
             return quality
         except Exception,e:
             self.error('Unable to generate quality for attribute %s: %s'%(aname,traceback.format_exc()))
@@ -1271,7 +1284,7 @@ class DynamicDSClass(PyTango.DeviceClass):
         'DynamicQualities':
             [PyTango.DevVarStringArray,
             "This property will allow to declare formulas for Attribute Qualities.",
-            [] ],       
+            [] ],
         'DynamicStatus':
             [PyTango.DevVarStringArray,
             "Each line generated by this property code will be added to status",
@@ -1292,6 +1305,10 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "Value of this property will be yes/true,no/false or a list of attributes that will trigger push_event (if configured from jive)",
             ['false'] ],
+        'LogLevel':
+            [PyTango.DevString,
+            "This property selects the log level (DEBUG/INFO/WARNING/ERROR)",
+            ['INFO'] ],
         }
 
     #    Command definitions
