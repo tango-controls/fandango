@@ -138,12 +138,12 @@ class Logger(Object):
         #if isinstance(level,basestring): level = level.upper() 
         if type(level)==type(logging.NOTSET):
             self.log_obj.setLevel(level)
-            self.info('log.Logger: Logging  level set to %s'%str(level).upper())
+            self.debug('log.Logger: Logging  level set to %s'%str(level).upper())
         else:
             l = self.getLogLevel(level)
             if l is not None:
                 self.log_obj.setLevel(l)
-                self.info('log.Logger: Logging  level set to "%s" = %s'%(level,l))
+                self.debug('log.Logger: Logging  level set to "%s" = %s'%(level,l))
             else:
                 self.warning('log.Logger: Logging level cannot be set to "%s"'%level)
         return level
