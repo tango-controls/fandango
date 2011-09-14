@@ -291,24 +291,27 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #targets = [p for p in DynamicDSClass.device_property_list.keys() if p not in getattr(self.get_device_class(),'device_property_list',[])]
         targets = DynamicDSClass.device_property_list.keys()
         props = self._db.get_device_property(self.get_name(),list(targets)+['polled_attr'])
-        [setattr(self,PROPERTY,props[PROPERTY]) for PROPERTY in targets]
+        [setattr(self,PROPERTY,props[PROPERTY]) for PROPERTY in targets if props[PROPERTY]]
         self._polled_attr_=[a.lower() for a in props['polled_attr']]
         #Loading non-spectrum properties
         try: 
             self.LogLevel=props['LogLevel'][0]
             self.setLogLevel(self.LogLevel)
         except Exception,e: 
-            self.error('Error in get_DynDS_properties(LogLevel): %s'%str(e))
-            self.LogLevel='INFO'
-            self.setLogLevel(self.LogLevel)
+            if not getattr(self,'LogLevel',None):
+                self.error('Error in get_DynDS_properties(LogLevel): %s'%str(e))
+                self.LogLevel=DynamicDSClass.device_property_list['LogLevel'][2][0]
+                self.setLogLevel(self.LogLevel)
         try: self.CheckDependencies=bool(props['CheckDependencies'][0])
         except Exception,e: 
-            self.error('Error in get_DynDS_properties(CheckDependencies): %s'%str(e))
-            self.CheckDependencies=True
+            if getattr(self,'CheckDependencies',None) is None:
+                self.error('Error in get_DynDS_properties(CheckDependencies): %s'%str(e))
+                self.CheckDependencies=DynamicDSClass.device_property_list['CheckDependencies'][2][0]
         try: self.KeepTime=float(props['KeepTime'][0])
         except Exception,e: 
-            self.error('Error in get_DynDS_properties(KeepTime): %s'%str(e))
-            self.KeepTime=200
+            if not getattr(self,'KeepTime',None):
+                self.error('Error in get_DynDS_properties(KeepTime): %s'%str(e))
+                self.KeepTime=DynamicDSClass.device_property_list['KeepTime'][2][0]
         
         for p in targets: 
             self.info(self.get_name()+'.'+str(p)+'="'+str(getattr(self,p,None))+'"')
