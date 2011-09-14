@@ -66,7 +66,7 @@ def printf(s):
     
 def shortstr(s,max_len=80):
     s = str(s)
-    if len(s) > max_len:
+    if max_len>0 and len(s) > max_len:
         s = s[:max_len-3]+'...'
     return s
     
@@ -212,7 +212,7 @@ class Logger(Object):
         
     
     def debug(self, msg, *args, **kw):
-        if self.max_len>=0: msg = shortstr(msg,self.max_len)
+        if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('DEBUG',msg)
             else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
@@ -223,7 +223,7 @@ class Logger(Object):
     
     
     def info(self, msg, *args, **kw):
-        if self.max_len>=0: msg = shortstr(msg,self.max_len)
+        if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('INFO',msg)
             else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
@@ -234,7 +234,7 @@ class Logger(Object):
      
 
     def warning(self, msg, *args, **kw):
-        if self.max_len>=0: msg = shortstr(msg,self.max_len)
+        if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('WARNING',msg)
             else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
@@ -244,7 +244,7 @@ class Logger(Object):
             #raise e
             
     def error(self, msg, *args, **kw):
-        if self.max_len>=0: msg = shortstr(msg,self.max_len)
+        if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('ERROR',msg)
             else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
