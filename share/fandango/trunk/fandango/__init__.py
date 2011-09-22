@@ -49,13 +49,13 @@ try:
     from servers import ServersDict,Astor,ProxiesDict
 except: print 'Unable to import servers module'
 
-try: 
-    from arrays import CSVArray
-except: print 'Unable to import arrays module'
+#try: 
+    #from arrays import CSVArray
+#except: print 'Unable to import arrays module'
 
-try:
-    from db import FriendlyDB
-except: print 'Unable to import db module'    
+#try:
+    #from db import FriendlyDB
+#except: print 'Unable to import db module'    
 
 try:
     from device import Dev4Tango,TangoEval,TimedQueue,DevChild
@@ -79,9 +79,9 @@ except:
     print traceback.format_exc()
     print 'Unable to import objects module'
 
-try:
-    from linos import shell_command,ping,sysargs_to_dict,listdir
-except: print 'Unable to import linos module'
+#try:
+    #from linos import shell_command,ping,sysargs_to_dict,listdir
+#except: print 'Unable to import linos module'
 
 try:
     from log import printf,Logger,LogFilter
@@ -95,20 +95,16 @@ try:
     from functional import *
 except: print 'Unable to import functional module'
 
-try:
-    from interface import FullTangoInheritance,NewTypeInheritance
-except: print 'Unable to import interface module'
+#try:
+    #from interface import FullTangoInheritance,NewTypeInheritance
+#except: print 'Unable to import interface module'
 
 #try: import web
 #except: print 'Unable to import fandango.web module'
 #try: import qt
 #except: print 'Unable to import fandango.qt module'
 
-
-
-
-
-RELEASE = (7,17,0)
+RELEASE = (8,28,0)
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
 #print 'module reloaded'
