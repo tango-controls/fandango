@@ -110,11 +110,19 @@ import fandango.device
 #from  . import log
 
 try: 
-    import tau
+    import taurus
     USE_TAU = True
-except: 
-    print 'Unable to import tau'
-    USE_TAU=False
+    TAU = taurus
+    EVENT_TYPE = taurus.core.TaurusEventType
+except:
+    try:
+        import tau
+        USE_TAU = True
+        TAU = tau
+        EVENT_TYPE = tau.core.TauEventType
+    except: 
+        print 'Unable to import tau'
+        USE_TAU=False
 
 
 import os
@@ -874,13 +882,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     def event_received(self,source,type_,attr_value):
         def log(prio,s): print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
-        if type_ == tau.core.TauEventType.Config:
+        if type_ == EVENT_TYPE.Config:
             log('debug','In DynamicDS.event_received(%s(%s),%s,%s(%s)): Not Implemented!'%(
-                type(source).__name__,source,tau.core.TauEventType[type_],type(attr_value).__name__,getattr(attr_value,'value',attr_value))
+                type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__,getattr(attr_value,'value',attr_value))
                 )
         else:
             log('info','In DynamicDS.event_received(%s(%s),%s,%s)'%(
-                type(source).__name__,source,tau.core.TauEventType[type_],type(attr_value).__name__)
+                type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__)
                 )
             try:
                 full_name = source.getFullName() #.get_full_name()
@@ -902,7 +910,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         This method returns a DeviceProxy to the given attribute.
         """
         if USE_TAU:
-            return tau.Device(dname)
+            return TAU.Device(dname)
         else:
             return PyTango.DeviceProxy(dname)
 
@@ -938,11 +946,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.debug('getXAttr calling a proxy to %s' % full_name)
                     if full_name not in self._external_attributes:
                         if USE_TAU: 
-                            a = tau.Attribute(full_name)
+                            a = TAU.Attribute(full_name)
                             #full_name = a.getFullName() #If the host is external it must be specified in the formula
                             self._external_attributes[full_name] = a
                             self._external_attributes[full_name].changePollingPeriod(self.DEFAULT_POLLING_PERIOD)
-                            if len(self._external_attributes) == 1: tau.core.utils.Logger.disableLogOutput()
+                            if len(self._external_attributes) == 1: TAU.core.utils.Logger.disableLogOutput()
                             if self._locals.get('ATTRIBUTE') and self.check_attribute_events(self._locals.get('ATTRIBUTE')):
                                 self.info('\t%s.addListener(%s)'%(full_name,self._locals['ATTRIBUTE']))
                                 if a.getFullName() not in self._external_listeners: self._external_listeners[a.getFullName()]=set()
@@ -999,8 +1007,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self.debug('getXCommand calling a proxy to %s' % device)
                         if full_name not in self._external_commands:
                             if USE_TAU: 
-                                self._external_commands[full_name] =  tau.Device(device)
-                                if len(self._external_commands)==1: tau.core.utils.Logger.disableLogOutput()
+                                self._external_commands[full_name] =  TAU.Device(device)
+                                if len(self._external_commands)==1: TAU.core.utils.Logger.disableLogOutput()
                             else: self._external_commands[full_name] = PyTango.DeviceProxy(device)
                         self.debug('getXCommand(%s(%s))'%(full_name,args))
                         if args in (None,[],()):
