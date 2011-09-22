@@ -3,9 +3,11 @@ October 2011 - 8.28
 __init__: default imports reduced
 dynamic: Modified get_DynDS_properties to respect Default values assigned in subclasses
 dynamic: Using taurus instead of Tau for XAttr calls
+dynamic: set_state forces push_event(State) if UseEvents is enabled
 log: shortstr patched
 TangoEval: proxy timeout reduced to 2 seconds
 Qt: Added QCustomPushButton and QCustomTab classes for having extendend StackWidgets.
+qt: Added TauFakeEventReceiver class
 servers: removed Tau dependency
 
 September 2011 - 8.27
