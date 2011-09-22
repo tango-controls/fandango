@@ -46,16 +46,7 @@ import PyTango
 import functional as fun
 from objects import Object
 from dicts import CaselessDefaultDict,CaselessDict
-
-USE_TAU = False
-if USE_TAU:
-    from tau.core import TauManager
-    from tau.core.utils.log import Logger
-    Logger.setLogLevel(Logger.Info)
-    #from tau.core.utils import Object
-    #from tau.core.utils.containers import CaselessDefaultDict,CaselessDict
-else:
-    from log import Logger
+from fandango.log import Logger
 
 from device import ProxiesDict,parse_labels, get_all_models,\
     get_all_devices,get_matching_attributes,get_matching_device_attributes
@@ -111,9 +102,7 @@ class TServer(Object):
     
     def init_from_db(self,db=None):
         """ Gets name, classes, devices, host, level information from Tango Database. """
-        ##@todo use Tau instead of PyTango
         db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
-        #db = db or (self._db if hasattr(self,'_db') else TauManager().getFactory()().getDatabase())
         ssi = db.get_server_info(self.name)
         self.update_level(ssi.host,ssi.level)
         devs = db.get_device_class_list(self.name)
@@ -235,8 +224,7 @@ class ServersDict(CaselessDict,Object):
         ## proxies will keep a list of persistent device proxies
         self.proxies = ProxiesDict()
         ## db will keep a persistent link to PyTango database
-        try: self.db = USE_TAU and TauManager().getFactory()().getDatabase() or PyTango.Database()
-        except: self.db = PyTango.Database()
+        self.db = PyTango.Database()
         
         self.server_names = self.keys
         self.servers = self.values
