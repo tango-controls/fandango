@@ -515,7 +515,7 @@ class TangoEval(object):
         if self.trace: print 'TangoEval.parse_variables(%s): %s'%(self.formula,self.variables)
         return self.variables
         
-    def read_attribute(self,device,attribute,what='value',_raise=True):
+    def read_attribute(self,device,attribute,what='value',_raise=True, timeout=2000):
         """
         Executes a read_attribute and returns the value requested
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
@@ -525,6 +525,8 @@ class TangoEval(object):
         try:
             if aname not in self.attributes:
                 dp = self.proxies[device]
+                try: dp.set_timeout_millis(timeout)
+                except: print 'TangoEval: unable to set %s proxy timeout to %s ms: %s'%(device,timeout,traceback.format_exc())
                 dp.ping()
                 # Disabled because we want DevFailed to be triggered
                 #attr_list = [a.name.lower()  for a in dp.attribute_list_query()]
