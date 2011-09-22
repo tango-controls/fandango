@@ -1,9 +1,9 @@
 
 from PyQt4 import Qt,QtCore,QtGui
-import Queue,traceback
+import Queue,traceback,time
 from functools import partial
 from functional import isString
-from log import Logger
+from fandango.log import Logger,shortstr
 
 import tau,tau.widget,tau.core
 from tau.widget import taubase,colors
@@ -207,6 +207,11 @@ def getColorsForValue(value,palette = colors.QT_DEVICE_STATE_PALETTE):
         bg_brush, fg_brush = palette.qbrush(int(value))
         
     return bg_brush.color(),fg_brush.color()
+    
+class TauFakeEventReceiver():
+    def event_received(self,source,type_,value):
+        print '%s: Event from %s: %s(%s)'% (time.ctime(),source,type_,shortstr(getattr(value,'value',value)))
+        
 
 class TauColorComponent(tau.widget.taubase.TauBaseComponent):
     """
@@ -298,6 +303,7 @@ class TauColorComponent(tau.widget.taubase.TauBaseComponent):
     #import traceback
     #print 'Unable to load TauEmitterThread from tau.widget.utils'
     #print traceback.format_exc()
+    
     
 #############################################################################################
 ## DO NOT EDIT THIS CLASS HERE, THE ORIGINAL ONE IS IN tau.widget.utils.emitter!!!
