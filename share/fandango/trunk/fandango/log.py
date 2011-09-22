@@ -64,7 +64,7 @@ def printf(s):
     # This is a 'lambdable' version of print
     print s
     
-def shortstr(s,max_len=80):
+def shortstr(s,max_len=144):
     s = str(s)
     if max_len>0 and len(s) > max_len:
         s = s[:max_len-3]+'...'
