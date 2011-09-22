@@ -436,8 +436,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def check_attribute_events(self,aname,poll=False):
         self.UseEvents = [u.lower().strip() for u in self.UseEvents]
         if not len(self.UseEvents): return False
-        elif self.UseEvents[0] in ('no','false'): return False
-        elif aname.lower().strip() == 'state': return True
+        elif self.UseEvents[0] in ('','no','false'): return False
+        elif aname.lower().strip() == 'state': 
+            return True
         elif any(fun.matchCl(s,aname) for s in self.UseEvents): return True #Attrs explicitly set doesn't need event config
         elif self.UseEvents[0] in ('yes','true') and any(self.check_events_config(aname)): return True
         else: return False
@@ -638,7 +639,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         
         #Setting up state events:
         if self.check_attribute_events('State'): 
-            if 'state' in polled_attrs: self.set_change_event('State',True,False)
+            if 'state' in polled_attrs: 
+                self.warning('State events will be managed always by polling') 
+                self.set_change_event('State',True,False) #Implemented, don't check conditions to push
             else: polled_attrs.add('state')
         
         try:
@@ -1097,6 +1100,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def set_state(self,state):
         self._locals['STATE']=state
+        try:
+            if self.check_attribute_events('state'): 
+                self.info('DynamicDS(%s.check_state(): pushing new state event'%(self.get_name()))
+                try: self.push_change_event('State',state,time.time(),PyTango.AttrQuality.ATTR_VALID)
+                except Exception,e: self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
+        except Exception,e: 
+            self.warning('DynamicDS.check_attribute_events(State=%s) failed!: %s'%(state,e))
         DynamicDS.get_parent_class(self).set_state(self,state)
 
     def check_state(self,set_state=True):
