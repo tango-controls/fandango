@@ -469,19 +469,19 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             else:
                 try: v,new_value = (float(v) if v is not None else None),float(new_value)
                 except: 
-                    self.info('In check_changed_event(%s,%s): values not evaluable (%s,%s)'%(aname,new_value,v,new_value))
+                    self.info('In check_changed_event(%s): values not evaluable (%s,%s)'%(aname,shortstr(v),shortstr(new_value)))
                     return False
                 if v is None:
-                    self.info('In check_changed_event(%s,%s): first value read!'%(aname,new_value))
+                    self.info('In check_changed_event(%s,%s): first value read!'%(aname,shortstr(new_value)))
                     return True
                 elif cabs>0 and not v-cabs<new_value<v+cabs: 
-                    self.info('In check_changed_event(%s,%s): absolute change!'%(aname,new_value))
+                    self.info('In check_changed_event(%s,%s): absolute change!'%(aname,shortstr(new_value)))
                     return True
                 elif crel>0 and not v*(1-crel/100.)<new_value<v*(1+crel/100.): 
-                    self.info('In check_changed_event(%s,%s): relative change!'%(aname,new_value))
+                    self.info('In check_changed_event(%s,%s): relative change!'%(aname,shortstr(new_value)))
                     return True
                 else: 
-                    self.debug('In check_changed_event(%s,%s): nothing changed'%(aname,new_value))
+                    self.debug('In check_changed_event(%s,%s): nothing changed'%(aname,shortstr(new_value)))
                     return False
         except: #Needed to prevent fails if attribute_config_3 is not available
             print traceback.format_exc()
