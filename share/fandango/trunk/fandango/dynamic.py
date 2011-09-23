@@ -463,13 +463,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             new_value = getattr(new_value,'value',new_value)
             cabs,crel = self.check_events_config(aname)
             self.debug('In check_changed_event(%s): %s!=%s > (%s,%s)?'%(aname,shortstr(v),shortstr(new_value),cabs,crel))
-            if fun.isSequence(v) and cabs>0 and crel>0: 
+            if fun.isSequence(new_value) and cabs>0 and crel>0: 
                 self.info('In check_changed_event(%s,%s): list changed!'%(aname,shortstr(new_value)))
                 return bool(v!=new_value)
             else:
                 try: v,new_value = (float(v) if v is not None else None),float(new_value)
-                except: 
-                    self.info('In check_changed_event(%s): values not evaluable (%s,%s)'%(aname,shortstr(v),shortstr(new_value)))
+                except Exception,e: 
+                    self.info('In check_changed_event(%s): values not evaluable (%s,%s): %s'%(aname,shortstr(v),shortstr(new_value),e))
                     return False
                 if v is None:
                     self.info('In check_changed_event(%s,%s): first value read!'%(aname,shortstr(new_value)))
