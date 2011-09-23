@@ -462,7 +462,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
             cabs,crel = self.check_events_config(aname)
-            self.info('In check_changed_event(%s,%s): %s!=%s > (%s,%s)?'%(aname,shortstr(new_value),v,shortstr(new_value),cabs,crel))
+            self.debug('In check_changed_event(%s): %s!=%s > (%s,%s)?'%(aname,shortstr(v),shortstr(new_value),cabs,crel))
             if fun.isSequence(v) and cabs>0 and crel>0: 
                 self.info('In check_changed_event(%s,%s): list changed!'%(aname,shortstr(new_value)))
                 return bool(v!=new_value)
@@ -481,7 +481,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.info('In check_changed_event(%s,%s): relative change!'%(aname,new_value))
                     return True
                 else: 
-                    self.info('In check_changed_event(%s,%s): nothing changed'%(aname,new_value))
+                    self.debug('In check_changed_event(%s,%s): nothing changed'%(aname,new_value))
                     return False
         except: #Needed to prevent fails if attribute_config_3 is not available
             print traceback.format_exc()
