@@ -475,7 +475,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 except Exception,e: 
                     self.info('In check_changed_event(%s): values not evaluable (%s,%s): %s'%(aname,shortstr(v),shortstr(new_value),e))
                     return bool((cabs>0 or crel>0) and v!=new_value) #False
-                elif cabs>0 and not v-cabs<new_value<v+cabs: 
+                if cabs>0 and not v-cabs<new_value<v+cabs: 
                     self.info('In check_changed_event(%s,%s): absolute change!'%(aname,shortstr(new_value)))
                     return True
                 elif crel>0 and not v*(1-crel/100.)<new_value<v*(1+crel/100.): 
