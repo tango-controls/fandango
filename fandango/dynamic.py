@@ -114,12 +114,14 @@ try:
     USE_TAU = True
     TAU = taurus
     EVENT_TYPE = taurus.core.TaurusEventType
+    TAU_LOGGER = taurus.core.util.Logger
 except:
     try:
         import tau
         USE_TAU = True
         TAU = tau
         EVENT_TYPE = tau.core.TauEventType
+        TAU_LOGGER = tau.core.utils.Logger
     except: 
         print 'Unable to import tau'
         USE_TAU=False
@@ -953,7 +955,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             #full_name = a.getFullName() #If the host is external it must be specified in the formula
                             self._external_attributes[full_name] = a
                             self._external_attributes[full_name].changePollingPeriod(self.DEFAULT_POLLING_PERIOD)
-                            if len(self._external_attributes) == 1: TAU.core.utils.Logger.disableLogOutput()
+                            if len(self._external_attributes) == 1: TAU_LOGGER.disableLogOutput()
                             if self._locals.get('ATTRIBUTE') and self.check_attribute_events(self._locals.get('ATTRIBUTE')):
                                 self.info('\t%s.addListener(%s)'%(full_name,self._locals['ATTRIBUTE']))
                                 if a.getFullName() not in self._external_listeners: self._external_listeners[a.getFullName()]=set()
@@ -1011,7 +1013,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         if full_name not in self._external_commands:
                             if USE_TAU: 
                                 self._external_commands[full_name] =  TAU.Device(device)
-                                if len(self._external_commands)==1: TAU.core.utils.Logger.disableLogOutput()
+                                if len(self._external_commands)==1: TAU_LOGGER.disableLogOutput()
                             else: self._external_commands[full_name] = PyTango.DeviceProxy(device)
                         self.debug('getXCommand(%s(%s))'%(full_name,args))
                         if args in (None,[],()):
