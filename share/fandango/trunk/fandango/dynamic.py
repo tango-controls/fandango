@@ -405,11 +405,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         now = time.time()
         self._cycle_start = now-self._cycle_start
         self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
-        print 'Attribute\tinterval\tread_time\teval_time\tcpu'
+        print 'Attribute\ttype\tinterval\tread_time\teval_time\tcpu'
         print '-'*80
         for t,key in reversed(sorted((v,k) for k,v in self._read_times.items())):
             #self.info('%s read after %s s; needed %f s; eval in %f s; %f of the usage' % (key, self._last_period[key],self._read_times[key],self._eval_times[key],self._read_times[key]/self._total_usage))
-            print('%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
+            print('%s\t%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
+                type(self.dyn_values[key].value if key in self.dyn_values else None).__name__,
                 int(1e3*self._last_period[key]),
                 self._read_times[key],
                 self._eval_times[key],
@@ -675,7 +676,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try:
             if keep and self.KeepTime and self._last_read.get(aname,0) and time.time()<(self._last_read[aname]+(self.KeepTime/1e3)):
                 v = self.dyn_values[aname]
-                self.info('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),shortstr(v.value)))
+                self.debug('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),shortstr(v.value)))
                 return attr.set_value_date_quality(v.value,v.date,v.quality)
         except Exception,e:
             self.warning('Unable to reload Kept values, %s'%str(e))
@@ -819,7 +820,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 #Events must be checked before updating the cache
                 if has_events and self.check_changed_event(aname,result):
                     self.info('>'*80)
-                    self.info('Pushing %s event!: %s(%s)'%(aname,type(result),result))
+                    self.info('Pushing %s event!: %s(%s)'%(aname,type(result),shortstr(result)))
                     self.push_change_event(aname,value,date,quality)
                 #Updating the cache:
                 keep = aname in self.dyn_values and self.dyn_values[aname].keep or has_events
