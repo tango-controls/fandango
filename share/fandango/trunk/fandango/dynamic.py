@@ -729,9 +729,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             #PyTango.Except.throw_exception('DynamicDS_read_dyn_attr_Exception',str(e),last_exc)
     
     ##This hook has been used to force self to be passed always as argument and avoid dynattr missmatching
-    read_dyn_attr=staticmethod(read_dyn_attr)
+    #read_dyn_attr=staticmethod(read_dyn_attr)
 
-    @Catched
+    #@Catched
     @self_locked
     def write_dyn_attr(self,attr,fire_event=True):
         aname = attr.get_name()
@@ -742,7 +742,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.setAttr(aname,data)
         #self.dyn_values[aname].update(result,time.time(),PyTango.AttrQuality.ATTR_VALID)
         ##if fire_event: self.fireAttrEvent(aname,data)
-    write_dyn_attr=staticmethod(write_dyn_attr)
+    #write_dyn_attr=staticmethod(write_dyn_attr)
 
     #------------------------------------------------------------------------------------------------------
     #   Attributes and State Evaluation Methods

@@ -44,6 +44,7 @@ from __builtin__ import object
 from functional import *
 from operator import isCallable
 import Queue
+import functools
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
 
@@ -99,7 +100,9 @@ def self_locked(func,reentrant=True):
         With Lock() this decorator should not be used to decorate nested functions; it will cause Deadlock!
         With RLock this problem is avoided ... but you should rely more on python threading.
     '''
+    @functools.wraps(func)
     def lock_fun(self,*args,**kwargs):
+        #self,args = args[0],args[1:]
         if not hasattr(self,'lock'):
             setattr(self,'lock',threading.RLock() if reentrant else threading.Lock())
         if not hasattr(self,'trace'):
@@ -111,7 +114,9 @@ def self_locked(func,reentrant=True):
         finally: 
             self.lock.release()
             #if self.trace: print "released: %s"%self.lock
-        return result       
+        return result
+    #lock_fun.__name__ = func.__name__
+    #lock_fun.__doc__ = func.__doc__
     return lock_fun
 
 ###############################################################################
