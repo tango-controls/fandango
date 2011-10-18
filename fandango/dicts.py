@@ -243,18 +243,29 @@ class ThreadDict(dict):
     
     #__getitem__ = self_locked(dict.__getitem__)
     #__setitem__ = self_locked(dict.__setitem__)
-    __delitem__ = self_locked(dict.__delitem__)
-    __contains__ = self_locked(dict.__contains__)
-    __iter__ = self_locked(dict.__iter__)
     
-    pop = self_locked(dict.pop)
-    #@self_locked
-    #def pop(self,k,d=None):
-        #if k in self.keys():
-            #self.stop()
-            #d = dict.pop(self,k)
-            #self.start()
-        #return d
+    @self_locked
+    def __delitem__(self, key):
+        return dict.__delitem__(self, key)
+        
+    @self_locked
+    def __contains__(self, key):
+        return dict.__contains__(self, key)
+
+    @self_locked
+    def __iter__(self):
+        return dict.__iter__(self)
+        
+    #__delitem__ = self_locked(dict.__delitem__)
+    #__contains__ = self_locked(dict.__contains__)
+    #__iter__ = self_locked(dict.__iter__)
+    #pop = self_locked(dict.pop)
+    
+    @self_locked
+    def pop(self, key):
+        return dict.pop(self, key)
+    
+
     
     @self_locked
     def __str__(self):
@@ -266,16 +277,16 @@ class ThreadDict(dict):
     #__repr__ = self_locked(dict.__repr__)
     
     #get = self_locked(dict.get)
-    has_key = self_locked(dict.has_key)
-    update = self_locked(dict.update)
-    copy = self_locked(dict.copy)
+    #has_key = self_locked(dict.has_key)
+    #update = self_locked(dict.update)
+    #copy = self_locked(dict.copy)
     
-    keys = self_locked(dict.keys)
-    values = self_locked(dict.values)
-    items = self_locked(dict.items)
-    iterkeys = self_locked(dict.iterkeys)
-    itervalues = self_locked(dict.itervalues)   
-    iteritems = self_locked(dict.iteritems) 
+    #keys = self_locked(dict.keys)
+    #values = self_locked(dict.values)
+    #items = self_locked(dict.items)
+    #iterkeys = self_locked(dict.iterkeys)
+    #itervalues = self_locked(dict.itervalues)   
+    #iteritems = self_locked(dict.iteritems) 
 
 class defaultdict_fromkey(collections.defaultdict):
     """ Creates a dictionary with a default_factory function that creates new elements using key as argument.
