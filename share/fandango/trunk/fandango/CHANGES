@@ -5,6 +5,7 @@ This change is no backwards compatible, so an "if PyTango.__version__ ..." has b
 dynamic: get_DynDS_properties and __init__ refactored to load default values also for class properties and do a better parsing of property types.
 dynamic: improved logging and comments parsing in dyn_attr
 dynamic: locks added to check_state to avoid recursive calls from DynamicStates evaluation
+dynamic: added FILE(...) command to formulas to allow .csv file parsing
 device: bug solved when dictionaries in TangoEval are empty
 qt: patched an error in QCustomTabWidget
 qt: added DictToolBar and QGridTable classes
