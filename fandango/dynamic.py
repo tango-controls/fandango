@@ -205,7 +205,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['Add2Status'] = lambda status: [True,self.set_status(self.get_status()+status)]
         self._locals['EVAL'] = lambda formula: self.evaluateFormula(formula)
         self._locals['PROPERTY'] = lambda property,update=False: self.get_device_property(property,update)
-        self._locals['FILE'] = lambda filename: self.open_file(filename)
+        self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
         self._locals['DYN'] = DynamicAttribute
         [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
         
