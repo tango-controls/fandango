@@ -107,6 +107,18 @@ def add_new_device(server,klass,device):
     dev_info.server = server
     get_database().add_device(dev_info)    
     
+def get_attribute_label(target):
+    ap = PyTango.AttributeProxy(target)
+    cf = ap.get_config()
+    return cf.label
+
+def set_attribute_label(target,label='',unit=''):
+    ap = PyTango.AttributeProxy(target)
+    cf = ap.get_config()
+    if label: cf.label = label
+    if unit: cf.unit = unit
+    ap.set_config(cf)
+    
 def property_undo(dev,prop,epoch):
     db = get_database()
     his = db.get_device_property_history(dev,prop)
