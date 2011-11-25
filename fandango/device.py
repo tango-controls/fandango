@@ -557,7 +557,7 @@ class TangoEval(object):
         if _locals and '$(' in self.formula: #explicit replacement of env variables if $() used
             for l,v in _locals.items():
                 self.formula = self.formula.replace('$(%s)'%str(l),str(v))
-        self.previous = previous or self.previous
+        self.previous = (previous or {}) or self.previous
         
         self.parse_variables(self.formula)
         if self.trace: print 'TangoEval: variables in formula are %s' % self.variables
