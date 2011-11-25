@@ -82,7 +82,7 @@ class QCustomTabWidget(Qt.QWidget):
         self.buttonGroup.addButton(button)
         self.buttonFrame.layout().addWidget(button)
         self.stackWidget.addWidget(widget)
-        self.connect(button,Qt.SIGNAL("pressed()"),lambda w=widget:self.setCurrentWidget(w))
+        self.connect(button,Qt.SIGNAL("pressed()"),lambda w=widget,l=label:self.setCurrentWidget(w,l))
         
     def insertTab(self,index,page,label): return self.addTab(page,label)
     def insertTab(self,index,page,icon,label): return self.addTab(page,label,icon)
@@ -118,7 +118,21 @@ class QCustomTabWidget(Qt.QWidget):
     def labelOf(self,widget):
         return (k for k,v in self.widgets.items() if v is widget).next()
     def currentIndex(self): return self.stackWidget.currentIndex()
-    def setCurrentWidget(self,widget): self.stackWidget.setCurrentWidget(widget)
+    def setCurrentWidget(self,widget,label=''): 
+        self.stackWidget.setCurrentWidget(widget)
+        if (not label or label not in self.buttons):
+            for l,w in self.widgets.items():
+                if w==widget:
+                    label = l
+                    break
+        if label: 
+            self.buttons[label].setBold(True)
+            self.buttons[label].setDown(True)
+            for l,b in self.buttons.items():
+                if l!=label:
+                    #print 'In QCustomTabWidget.setCurrentWidget(%s): push down %s(%s)'%(label,b,l)
+                    (b.setDown(False),b.setBold(False))
+                else: (b.setDown(True),b.setBold(True))
     def currentWidget(self): return self.stackWidget.currentWidget()
     def tabBar(self): return self.buttonFrame
     def isTabEnabled(self,index): 
@@ -490,3 +504,136 @@ class TangoHostChooser(Qt.QWidget):
         new_value = os.getenv('TANGO_HOST')
         print('TANGO_HOST set to %s'% new_value)
         return new_value
+    
+###############################################################################
+
+class QGridTable(Qt.QFrame):#Qt.QFrame):
+    """
+    This class is a frame with a QGridLayout that emulates some methods of QTableWidget
+    """
+    def __init__(self,parent=None):
+        Qt.QFrame.__init__(self,parent)
+        self.setLayout(Qt.QGridLayout())
+        self._widgets = []
+    def setHorizontalHeaderLabels(self,labels):
+        print 'QGridTable.setHorizontalHeaderLabels(%s)'%labels
+        for i,l in enumerate(labels):
+            ql = Qt.QLabel(l)
+            f = ql.font()
+            f.setBold(True)
+            ql.setFont(f)
+            ql.setAlignment(Qt.Qt.AlignCenter)
+            self.setCellWidget(0,i,ql)
+            if ql not in self._widgets: self._widgets.append(ql)
+    def setVerticalHeaderLabels(self,labels):
+        print 'QGridTable.setVerticalHeaderLabels(%s)'%labels
+        for i,l in enumerate(labels):
+            ql = Qt.QLabel(l)
+            f = ql.font()
+            f.setBold(True)
+            ql.setFont(f)
+            ql.setAlignment(Qt.Qt.AlignCenter)
+            self.setCellWidget(i,0,ql)
+            if ql not in self._widgets: self._widgets.append(ql)
+    def rowCount(self):
+        return self.layout().rowCount()
+    def setRowCount(self,count):
+        return None
+    def columnCount(self):
+        return self.layout().columnCount()
+    def setColumnCount(self,count):
+        None
+    def itemAt(self,x,y):
+        return self.layout().itemAtPosition(x,y)
+    def setItem(self,x,y,item,spanx=1,spany=1):
+        #print 'QGridTable.setItem(%s,%s,%s)'%(x,y,item)
+        self.layout().addWidget(item,x,y,spanx,spany)
+        if item not in self._widgets: self._widgets.append(item)
+    def setCellWidget(self,*args):
+        self.setItem(*args)
+    def resizeColumnsToContents(self): 
+        return None
+    def resizeRowsToContents(self): 
+        return None
+    def setRowHeight(self,row,height):
+        self.layout().setRowMinimumHeight(row,height)
+    def setColumnWidth(self,col,width):
+        self.layout().setColumnMinimumWidth(col,width)
+    def clear(self):
+        for item in self._widgets:
+            self.removeWidget(item)
+    def removeWidget(self,widget):
+        self.layout().removeWidget(widget)
+        if widget in self._widgets: self._widgets.remove(widget)
+        
+###############################################################################
+
+class QDictToolBar(Qt.QToolBar):
+    """
+    Just a customizable toolbar that can be setup using a dictionary:
+        toolbar = QDictToolBar(tmw)
+        toolbar.set_toolbar([('Archiving Viewer','Mambo-icon.ico', lambda:launch('mambo')),])
+    """
+    def __init__(self,parent=None):
+        Qt.QToolBar.__init__(self,parent)
+        self.setup_ui()
+    def setup_ui(self):
+        self.setWindowModality(Qt.Qt.NonModal)
+        sizePolicy = Qt.QSizePolicy(Qt.QSizePolicy.Expanding,Qt.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.sizePolicy().hasHeightForWidth())        
+        self.setSizePolicy(sizePolicy)
+        self.setMinimumSize(Qt.QSize(0,0))     
+        font = Qt.QFont()
+        font.setWeight(75)
+        font.setBold(True)
+        self.setFont(font)
+        self.setMouseTracking(False)
+        self.setContextMenuPolicy(Qt.Qt.ActionsContextMenu)
+        self.setAutoFillBackground(True)
+        self.setMovable(False)
+        self.setAllowedAreas(Qt.Qt.AllToolBarAreas)
+        self.setIconSize(Qt.QSize(40,30))
+        self.setToolButtonStyle(Qt.Qt.ToolButtonTextUnderIcon)
+        #self.setPalette(get_halfWhite_palette())
+    def build_action(self,name,icon,action):
+        qaction = Qt.QAction(self)
+        if name: qaction.setText(name) 
+        if icon: 
+            qpixmap = Qt.QPixmap(icon).scaled(35,30)
+            qaction.setIcon(Qt.QIcon(qpixmap))
+        #qaction.setShortcut(QtGui.QApplication.translate("SynopticTree", "Ctrl+J", None, QtGui.QApplication.UnicodeUTF8))                    
+        #qaction.setMenuRole(QtGui.QAction.TextHeuristicRole)
+        if action: Qt.QObject.connect(qaction,Qt.SIGNAL("triggered()"),action)
+        return qaction
+    def set_toolbar(self,toolbar):
+        """ The toolbar argument must be a list of ('Name','icon.jpg',action) tuples.
+        """        
+        for name,icon,action in toolbar:
+            print 'Adding action to toolbar: %s,%s,%s'%(name,icon,action)
+            if fun.isSequence(action):
+                #Building a sub menu
+                print '\tAdding SubMenu: %s'%action
+                qaction = Qt.QPushButton(name)
+                qaction.setLayout(Qt.QVBoxLayout())
+                if icon: 
+                    pixmap = Qt.QPixmap(icon).scaled(40,30)
+                    qaction.setIcon(Qt.QIcon(pixmap))
+                    qaction.setIconSize(Qt.QSize(40,30))
+                menu = Qt.QMenu()
+                [menu.addAction(self.build_action(n,i,a)) for n,i,a in action]
+                qaction.setMenu(menu)
+                self.addWidget(qaction)
+            elif (name or icon or action):
+                self.addAction(self.build_action(name,icon,action))
+            else:
+                self.addSeparator()
+        self.setObjectName("ToolBar")
+        print 'Out of set_toolbar()'
+        return self
+    def add_to_main_window(self,MainWindow,where=Qt.Qt.TopToolBarArea):
+        try: MainWindow.addToolBar(where,self)
+        except: 
+            print('Unable to add toolbar to MainWindow(%s)'%MainWindow)
+            print traceback.format_exc()
