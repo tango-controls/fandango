@@ -312,11 +312,12 @@ class ServersDict(CaselessDict,Object):
             devs = self.get_devs_from_db(d) if '*' in d else [d] 
             [servers_list.add(self.get_device_server(dev)) for dev in devs if dev]
         self.log.info('Loading %d servers matching %s devices'%(len(servers_list),len(devs_list)))
-        self.load_from_servers_list(s for s in servers_list if s)
+        self.load_from_servers_list([s for s in servers_list if s])
     
     def load_from_servers_list(self,servers_list):
         """ Initializes the dictionary using a list of server_names like ['Exec/Instance'] """
         if type(servers_list) is str: servers_list = servers_list.split(',')
+        self.check_servers_names(servers_list)
         for s in servers_list:
             try:           
                 self.log.debug('loading from %s server'%s)
@@ -575,7 +576,6 @@ class ServersDict(CaselessDict,Object):
         event = threading.Event()
         new_servers = [s for s in servers_list if s not in self]
         if new_servers:
-            self.check_servers_names(new_servers)
             self.load_from_servers_list(new_servers)
             
         full_servers_list = []
