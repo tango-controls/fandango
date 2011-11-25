@@ -679,7 +679,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         aname = attr.get_name()
         tstart=time.time()
         keep = aname in self.dyn_values and self.dyn_values[aname].keep or self.check_attribute_events(aname)
-        self.debug("DynamicDS("+self.get_name()+")::read_dyn_atr("+str(attr.get_assoc_ind())+":"+attr.get_name()+"), entering at "+time.ctime()+"="+str(tstart)+"...")
+        self.debug("DynamicDS("+self.get_name()+")::read_dyn_atr("+attr.get_name()+"), entering at "+time.ctime()+"="+str(tstart)+"...")
         try:
             if keep and self.KeepTime and self._last_read.get(aname,0) and time.time()<(self._last_read[aname]+(self.KeepTime/1e3)):
                 v = self.dyn_values[aname]
