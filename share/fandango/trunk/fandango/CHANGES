@@ -1,3 +1,16 @@
+November 2011 - 9.00 : LIMITED COMPATIBILITY WITH PREVIOUS RELEASES
+------------------------------------------------------------------
+Changes by Tiago: dynamic/objects/dicts: compatible with Tango 7.2.2. Staticmethod decorators removed from Dynamic calls as they are no longer needed; now any decorator has to be wrapped in order to be recognized. Single-line method declaration with decorators is no longer allowed (may affect DynamicCommands?).
+This change is no backwards compatible, so an "if PyTango.__version__ ..." has been added to enable/disable USE_STATIC_METHODS in fandango.dynamic module
+dynamic: get_DynDS_properties and __init__ refactored to load default values also for class properties and do a better parsing of property types.
+dynamic: improved logging and comments parsing in dyn_attr
+dynamic: locks added to check_state to avoid recursive calls from DynamicStates evaluation
+device: bug solved when dictionaries in TangoEval are empty
+qt: patched an error in QCustomTabWidget
+qt: added DictToolBar and QGridTable classes
+servers: solved a bug in load_from_servers_list() method
+tango: added methods to manage attribute labels
+
 October 2011 - 8.28
 -------------------
 __init__: default imports reduced
