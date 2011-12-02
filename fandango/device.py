@@ -51,7 +51,7 @@ from . import functional as fun
 from log import Logger
 from excepts import *
 from callbacks import *
-from tango import *
+from tango import * #USE_TAU imported here
 from objects import Object,Struct
 from dicts import CaselessDefaultDict,CaselessDict
 from arrays import TimedQueue
@@ -321,10 +321,11 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 self.Event.set()
             if hasattr(self,'UpdateAttributesThread'):
                 self.UpdateAttributesThread.join(getattr(self,'PollingCycle',3000.))            
-            from tau import Attribute
-            for at in self.ExternalAttributes.values():
-                if isinstance(at,Attribute):
-                    at.removeListener(self.event_received)
+            if USE_TAU: 
+                from tau import Attribute
+                for at in self.ExternalAttributes.values():
+                    if isinstance(at,Attribute):
+                        at.removeListener(self.event_received)
         except Exception,e:
             self.error('Dev4Tango.unsubscribe_external_attributes() failed: %s'%e)
         return
@@ -334,8 +335,14 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         device,attribute = device.lower(),attribute.lower()
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None:
-            from tau import Device
-            Device(device).write_attribute(attribute,data)
+            if USE_TAU: 
+                from tau import Device
+                Device(device).write_attribute(attribute,data)
+            else:
+                aname = str(device+'/'+attribute).lower()
+                attr = self.ExternalAttributes[aname]
+                if attr.parent is None: attr.parent = PyTango.DeviceProxy(device)
+                attr.parent.write_attribute(attribute,data)
         else:
             if isinstance(deviceObj,DynamicDS): 
                 method = 'write_dyn_attr'
@@ -361,8 +368,11 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         device,target = device.lower(),target.lower()
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None: 
-            from tau import Device
-            return Device(device).command_inout(target,argin)
+            if USE_TAU:
+                from tau import Device
+                return Device(device).command_inout(target,argin)
+            else:
+                PyTango.DeviceProxy(device).command_inout(target,argin)
         else:
             alloweds = [c for c in dir(deviceObj) if c.lower()=='is_%s_allowed'%target]
             is_allowed = not alloweds or getattr(deviceObj,alloweds[0])() 
