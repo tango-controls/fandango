@@ -114,6 +114,7 @@ print 'PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTan
 #from  . import log
 
 try: 
+    #raise Exception('no-taurus')
     import taurus
     USE_TAU = True
     TAU = taurus
@@ -181,7 +182,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         for d in (DynamicDSClass.class_property_list,DynamicDSClass.device_property_list):
             for prop,value in d.items():
                 if not hasattr(self,prop): 
-                    setattr(self,prop,(value[-1] if 'Array' in str(value[0]) else value[-1][0]))
+                    setattr(self,prop,(value[-1] if 'Array' in str(value[0]) else 
+                        (value[-1][0] if fun.isSequence(value[-1]) else value[-1]))
+                        )
         
         ##Local variables and methods to be bound for the eval methods
         self._globals=globals().copy()
@@ -312,7 +315,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 dstype = DynamicDSTypes.get(str(config[prop][0]),DynamicDSType('','',pytype=list))
                 try: value = dstype.pytype(value if dstype.dimx>1 or dstype.dimy>1 else value[0])
                 except Exception,e:
-                    print self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
+                    self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
                 setattr(self,prop if prop!='polled_attr' else '_polled_attr',value)
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
