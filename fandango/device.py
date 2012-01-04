@@ -545,7 +545,7 @@ class TangoEval(object):
             value = value if what=='all' else (False if what=='exception' else getattr(value,what))
             if self.trace: print 'TangoEval: Read %s.%s = %s' % (aname,what,value)
         except Exception,e:
-            if _raise and attribute.lower() in ['','state']:
+            if _raise: #and attribute.lower() in ['','state']:
                 raise e
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return True
@@ -553,7 +553,7 @@ class TangoEval(object):
             value = None
         return value
     
-    def eval(self,formula=None,previous=None,_locals=None ,_raise=True):
+    def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
         ''' 
         Evaluates the given formula.
         Any variable in locals is evaluated or explicitly replaced in the formula if appearing with brackets (e.g. FIND({VARNAME}/*/*))
@@ -577,7 +577,7 @@ class TangoEval(object):
             target = device + (attribute and '/%s'%attribute) + (what and '.%s'%what)
             var_name = target.replace('/','_').replace('-','_').replace('.','_').replace(':','_').lower()
             if self.trace: print 'TangoEval(): %s => %s'%(target,var_name)
-            self.previous[var_name] = self.read_attribute(device,attribute or 'State',what or 'value')
+            self.previous[var_name] = self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise)
             self.last[target] = self.previous[var_name] #Used from alarm messages
             source = source.replace(target,var_name,1)
 
