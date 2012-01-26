@@ -37,6 +37,10 @@
 @package tango
 @brief provides tango utilities for fandango, like database search methods and emulated Attribute Event/Value types
 @todo @warning IMPORTING THIS MODULE IS CAUSING SOME ERRORS WHEN CLOSING PYTHON DEVICE SERVERS,  BE CAREFUL!
+
+This module is a light-weight set of utilities for PyTango.
+Classes dedicated for device management will go to fandango.device
+Methods for Astor-like management will go to fandango.servers
 """
 
 #python imports
@@ -65,7 +69,9 @@ except:
 
 from . import objects
 from . import functional as fun
+from dicts import CaselessDefaultDict,CaselessDict
 from objects import Object,Struct
+from log import Logger
 
 ####################################################################################################################
 ##@name Access Tango Devices and Database
@@ -240,7 +246,7 @@ def get_matching_device_attributes(expressions,limit=1000):
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
-        print 'get_matching_device_attributes(e) -> %s / %s / %s'%(host,dev,attr)
+        #print 'get_matching_device_attributes(e) -> %s / %s / %s'%(host,dev,attr)
         #if e.count('/')==2: 
             #dev,attr = e,'state'
         #elif e.count('/')==3: 
@@ -248,7 +254,7 @@ def get_matching_device_attributes(expressions,limit=1000):
         #else: 
             #raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
         for d in get_matching_devices(dev):
-            print 'get_matching_device_attributes(%s,%s)...'%(dev,attr)
+            #print 'get_matching_device_attributes(%s,%s)...'%(dev,attr)
             if fun.matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
@@ -583,3 +589,47 @@ class fakeEvent(object):
         self.attr_value=attr_value
         self.err=err
         self.errors=errors
+        
+####################################################################################################################
+## The ProxiesDict class, to manage DeviceProxy pools
+
+class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logger):
+    ''' Dictionary that stores PyTango.DeviceProxies
+    It is like a normal dictionary but creates a new proxy each time that the "get" method is called
+    An earlier version is used in PyTangoArchiving.utils module
+    This class must be substituted by Tau.Core.TauManager().getFactory()()
+    '''
+    def __init__(self):
+        self.log = Logger('ProxiesDict')
+        self.log.setLogLevel('INFO')
+        self.call__init__(CaselessDefaultDict,self.__default_factory__)
+    def __default_factory__(self,dev_name):
+        '''
+        Called by defaultdict_fromkey.__missing__ method
+        If a key doesn't exists this method is called and returns a proxy for a given device.
+        If the proxy caused an exception (usually because device doesn't exists) a None value is returned
+        '''        
+        if dev_name not in self.keys():
+            self.log.debug( 'Getting a Proxy for %s'%dev_name)
+            try:
+                devklass,attrklass = (tau.Device,tau.Attribute) if USE_TAU else (PyTango.DeviceProxy,PyTango.AttributeProxy)
+                dev = (attrklass if str(dev_name).count('/')==(4 if ':' in dev_name else 3) else devklass)(dev_name)
+            except Exception,e:
+                print('ProxiesDict: %s doesnt exist!'%dev_name)
+                print traceback.format_exc()
+                dev = None
+        return dev
+            
+    def get(self,dev_name):
+        return self[dev_name]   
+    def get_admin(self,dev_name):
+        '''Adds to the dictionary the admin device for a given device name and returns a proxy to it.'''
+        dev = self[dev_name]
+        class_ = dev.info().dev_class
+        admin = dev.info().server_id
+        return self['dserver/'+admin]
+    def pop(self,dev_name):
+        '''Removes a device from the dict'''
+        if dev_name not in self.keys(): return
+        self.log.debug( 'Deleting the Proxy for %s'%dev_name)
+        return CaselessDefaultDict.pop(self,dev_name)
