@@ -37,6 +37,9 @@
 @package device
 @brief provides Dev4Tango, StateQueue, DevChild
 @todo @warning IMPORTING THIS MODULE IS CAUSING SOME ERRORS WHEN CLOSING PYTHON DEVICE SERVERS,  BE CAREFUL!
+
+This module is used to have all those classes used inside DeviceServers or to control/configure them 
+and are not part of the Astor api (ServersDict)
 """
 
 #python imports
@@ -55,52 +58,9 @@ from tango import * #USE_TAU imported here
 from objects import Object,Struct
 from dicts import CaselessDefaultDict,CaselessDict
 from arrays import TimedQueue
-from dynamic import DynamicDS
+from dynamic import DynamicDS,USE_STATIC_METHODS
+from servers import ServersDict
 
-
-####################################################################################################################
-## The ProxiesDict class, to manage DeviceProxy pools
-
-class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logger):
-    ''' Dictionary that stores PyTango.DeviceProxies
-    It is like a normal dictionary but creates a new proxy each time that the "get" method is called
-    An earlier version is used in PyTangoArchiving.utils module
-    This class must be substituted by Tau.Core.TauManager().getFactory()()
-    '''
-    def __init__(self):
-        self.log = Logger('ProxiesDict')
-        self.log.setLogLevel('INFO')
-        self.call__init__(CaselessDefaultDict,self.__default_factory__)
-    def __default_factory__(self,dev_name):
-        '''
-        Called by defaultdict_fromkey.__missing__ method
-        If a key doesn't exists this method is called and returns a proxy for a given device.
-        If the proxy caused an exception (usually because device doesn't exists) a None value is returned
-        '''        
-        if dev_name not in self.keys():
-            self.log.debug( 'Getting a Proxy for %s'%dev_name)
-            try:
-                devklass,attrklass = (tau.Device,tau.Attribute) if USE_TAU else (PyTango.DeviceProxy,PyTango.AttributeProxy)
-                dev = (attrklass if str(dev_name).count('/')==(4 if ':' in dev_name else 3) else devklass)(dev_name)
-            except Exception,e:
-                print('ProxiesDict: %s doesnt exist!'%dev_name)
-                print traceback.format_exc()
-                dev = None
-        return dev
-            
-    def get(self,dev_name):
-        return self[dev_name]   
-    def get_admin(self,dev_name):
-        '''Adds to the dictionary the admin device for a given device name and returns a proxy to it.'''
-        dev = self[dev_name]
-        class_ = dev.info().dev_class
-        admin = dev.info().server_id
-        return self['dserver/'+admin]
-    def pop(self,dev_name):
-        '''Removes a device from the dict'''
-        if dev_name not in self.keys(): return
-        self.log.debug( 'Deleting the Proxy for %s'%dev_name)
-        return CaselessDefaultDict.pop(self,dev_name)
 
 ########################################################################################
 ## Device servers template
@@ -417,9 +377,12 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                                 methods = [c for c in dir(attr.parent) if c.lower()=='read_%s'%attr.name.lower()]
                                 if not methods: 
                                     if isinstance(attr.parent,DynamicDS): 
-                                        self.info('Dev4Tango.update_external_attributes(): calling %s.read_dyn_attr(%s)'%(attr.device,attr.name))
-                                        attr.parent.myClass.DynDev = attr.parent
-                                        attr.parent.read_dyn_attr(attr.parent,attr)
+                                        self.info('Dev4Tango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
+                                        if attr.parent.myClass:
+                                            attr.parent.myClass.DynDev = attr.parent
+                                            if USE_STATIC_METHODS: attr.parent.read_dyn_attr(attr.parent,attr)
+                                            else: attr.parent.read_dyn_attr(attr)
+                                        else: self.warning('\t%s is a dynamic device not initialized yet.'%attr.device)
                                     else:
                                         self.error('%s.read_%s method not found!!!\n%s'%(device,attr.name,[d for d in dir(attr.parent) if not a.startswith('_')]))
                                 else: 
@@ -751,6 +714,58 @@ class TangoCommand(object):
         if self.timeout < time.time()-t0: 
             raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
         return result
+    
+###############################################################################
+# Composers / DynamicAttributes manager
+
+class ComposersDict(ServersDict):
+    def load_attributes(self):
+        """Loads device/attribute formulas from the database"""
+        from . import dicts
+        if not hasattr(self,'attributes'): self.attributes = dicts.CaselessDict()
+        self.attributes.clear()
+        for d in self.get_all_devices():
+            attrs = self.db.get_device_property(d,['DynamicAttributes'])['DynamicAttributes']
+            for l in attrs:
+                l = l.split('#')[0].strip()
+                if not l: continue
+                else: self.attributes[d+'/'+l.split('=')[0].strip()] = l.split('=')[-1].strip()
+        return #self.attributes
+                
+    def get_attributes(self,device=None,attribute=None):
+        """Both device and attribute are regexps"""
+        getattr(self,'attributes',self.load_attributes())
+        result = sorted(n for n,f in self.attributes.items() if 
+                    (not device or fun.matchCl(device,n.rsplit('/',1)[0],terminate=True)) and
+                    (not attribute or fun.matchCl(attribute,n.rsplit('/',1)[-1],terminate=True))
+                )
+        return result
+    
+    def get_formula(self,attribute):
+        return self.attributes.get(attribute)
+    
+    def set_formula(self,attribute,formula,update=False):
+        dev,attr = attribute.rsplit('/',1)
+        new,prop = [],self.db.get_device_property(dev,['DynamicAttributes'])['DynamicAttributes']
+        found = False
+        for p in prop:
+            if not attr.lower() == p.split('=')[0].strip().lower(): 
+                new.append(p)
+            else:
+                attr = p.split('#',1)[0].split('=')[0].strip()
+                comment = p.split('#',1)[-1] if '#' in p else ''
+                new.append('%s=%s%s'%(attr,formula,'#'+comment if comment and '#' not in formula else ''))
+                found = True
+        if found: 
+            self.db.put_device_property(dev,{'DynamicAttributes':new})
+            if update:
+                try:
+                    self.proxies[dev].ping()
+                    self.proxies[dev].updateDynamicAttributes()
+                except Exception,e:
+                    print e
+                    return e
+        return found
     
 ##############################################################################################################
 ## DevChild ... DEPRECATED and replaced by Dev4Tango + TAU
