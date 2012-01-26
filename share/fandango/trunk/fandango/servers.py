@@ -48,7 +48,7 @@ from objects import Object
 from dicts import CaselessDefaultDict,CaselessDict
 from fandango.log import Logger
 
-from device import ProxiesDict,parse_labels, get_all_models,\
+from fandango.tango import ProxiesDict,parse_labels, get_all_models,\
     get_all_devices,get_matching_attributes,get_matching_device_attributes
     
 ####################################################################################################################
