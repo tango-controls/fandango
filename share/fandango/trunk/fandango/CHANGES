@@ -1,3 +1,9 @@
+Jan 2012 - 9.2
+------------------------
+device: ProxiesDict class moved to fandango.tango module to solve import issues
+device: ComposersDict class added to manage DynamicDS-like attributes
+device: Solved bug in PyTango>7.2.2 when reading DynamicDS attributes from Dev4Tango
+
 December 2011 - 9.1
 ------------------------
 device: dependencies from Tau removed
