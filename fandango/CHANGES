@@ -8,6 +8,13 @@ December 2011 - 9.1
 ------------------------
 device: dependencies from Tau removed
 dynamic: solved bug when reading DynDS class properties
+tango: Improved methods for getting attribute labels, commands and parse tango-taurus models.
+arrays: better export from csv to dictionary
+functional:
+ - Added number conversion methods from PyPLC.
+ - Added evalX(dict/class/string) from WorkerThread
+ - Added str2time conversions from PyTangoArchiving.
+ - All functional methods exported to fandango
 
 November 2011 - 9.00 : LIMITED COMPATIBILITY WITH PREVIOUS RELEASES
 ------------------------------------------------------------------
