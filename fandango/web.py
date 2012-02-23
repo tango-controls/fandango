@@ -51,6 +51,8 @@ srubio@cells.es,
 page = lambda s: '<html>%s</html>'%s
 body = lambda s: '<body>%s</body>'%s
 paragraph = lambda s: '<p>%s</p>'%s
+code = lambda s: '<pre>%s</pre>'%str(s)
+raw = code
 linebreak = '<br>'
 separator = '<hr>'
 
@@ -59,7 +61,7 @@ item = lambda s: '<li>%s</li>'%s
 
 bold = lambda s: '<b>%s</b>'%s
 em = lambda s: '<em>'+str(s)+'</em>'
-under = lambda s: '<u>'+str(s)+'</u>'
+under = lambda s: '<u>\n'+str(s)+'\n</u>'
 camel = lambda s: ''.join(r[0].upper()+(r[1:] or '').lower() for r in s.split())
 color = lambda s,color: '<font color="%s">%s</font>'%(camel(color),s)
 colors = "black white yellow blue green red gray fuchsia lime maroon aqua navy olive purple silver teal".split()
@@ -74,6 +76,9 @@ title1 = lambda s: '<h1>%s</h1>'%s
 
 row,cell = (lambda s: '<tr>%s</tr>'%s) , (lambda s: '<td>%s</td>'%s)
 table = lambda s: '<table border=1>\n'+'\n'.join([row(''.join([(cell('%s'%c) if i and j else cell(bold('%s'%c))) for j,c in enumerate(r)])) for i,r in enumerate(s)])+'\n</table>'
+
+def list_to_ulist(l):
+    return ulist('\n'.join(item(str(s)) for s in l))
 
 def dicts2table(dcts,keys=None,formatter=None):
     """
