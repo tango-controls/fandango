@@ -46,7 +46,15 @@ from itertools import dropwhile,takewhile,ifilter,ifilterfalse,izip
 try: from itertools import combinations,permutations,product
 except: pass
 
-__all__ = ['partial','first','last','anyone','everyone','isString','isNumber','isSequence','isDictionary','isIterable']
+#Load all by default
+#__all__ = [
+    #'partial','first','last','anyone','everyone',
+    #'notNone','isTrue','join','splitList','contains',
+    #'matchAll','matchAny','matchMap','matchTuples','inCl','matchCl','searchCl',
+    #'toRegexp','isString','isRegexp','isNumber','isSequence','isDictionary','isIterable','isMapping',
+    #'list2str','char2int','int2char','int2hex','int2bin','hex2int',
+    #'bin2unsigned','signedint2bin',
+    #]
 
 ########################################################################
 ## Some miscellaneous logic methods
@@ -237,7 +245,10 @@ def isRegexp(seq):
     return anyone(c in RE for c in seq)
     
 def isNumber(seq):
-    return operator.isNumberType(seq)
+    #return operator.isNumberType(seq)
+    if isinstance(seq,bool): return False
+    try: return float(seq)
+    except: return False
 
 def isGenerator(seq):
     from types import GeneratorType
@@ -297,6 +308,42 @@ def list2str(seq,MAX_LENGTH=80):
     s = str(seq)
     return s if len(s)<MAX_LENGTH else '%s...%d]'%(s[:MAX_LENGTH-4],len(seq))
 
+########################################################################
+## Number conversion
+########################################################################
+
+def negbin(old):
+    """ Given a binary number as an string, it returns all bits negated """
+    return ''.join(('0','1')[x=='0'] for x in old)
+
+def char2int(c): return ord(c)
+def int2char(n): return unichr(n)
+def int2hex(n): return hex(n)
+def int2bin(n): return bin(n)
+def hex2int(c): return int(c,16)
+def bin2unsigned(c): return int(c,2)
+
+def signedint2bin(x,N=16):
+    """ It converts an integer to an string with its binary representation """ 
+    if x>=0: bStr = bin(int(x))
+    else: bStr = bin(int(x)%2**16)
+    bStr = bStr.replace('0b','')
+    if len(bStr)<N: bStr='0'*(N-len(bStr))+bStr
+    return bStr[-N:]
+
+def bin2signedint(x,N=16):
+    """ Converts an string with a binary number into a signed integer """
+    i = int(x,2)
+    if i>=2**(N-1): i=i-2**N
+    return i
+    
+def int2bool(dec,N=16):
+    """Decimal to binary converter"""
+    result,dec = [],int(dec)
+    for i in range(N):
+        result.append(bool(dec % 2))
+        dec = dec >> 1
+    return result        
 
 ########################################################################
 ## Time conversion
@@ -330,11 +377,23 @@ epoch2str = time2str
     
 def str2time(seq,cad=''):
     """ Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format"""
-    if not cad:
-        date = '%Y-%m-%d' if '-' in seq else '%d/%m/%Y'
-        hour =  ['',' %H:%M',' %H:%M:%S'][min((seq.count(':'),2))]
-        cad = date+hour
-    return time.mktime(time.strptime(seq,cad))
+    t,ms = None,re.match('.*(\.[0-9]+)$',seq)
+    if ms: ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
+    else: ms = 0
+    time_fmts = ([cad] if cad else
+        [('%s%s%s'%(date.replace('-',dash),separator if hour else '',hour)) 
+        for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y','%d-%m-%y','%m-%d-%Y','%m-%d-%y')
+        for dash in ('-','/')
+        for separator in (' ','T')
+        for hour in ('%H:%M','%H:%M:%S','')
+        ])
+    for tf in time_fmts:
+        try:
+            t = time.strptime(seq,tf)
+            break
+        except: pass
+    if t is not None: return time.mktime(t)+ms
+    else: raise Exception('PARAMS_ERROR','date format cannot be parsed!: %s'%str(seq))    
 str2epoch = str2time
 
 def time2gmt(epoch=None):
@@ -353,3 +412,93 @@ def mysql2time(mysql_time):
     return time.mktime(mysql_time.timetuple())
     
 
+########################################################################
+## Extended eval
+########################################################################
+
+def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exception=Exception):
+    """
+    target may be:
+            - dictionary of built-in types: {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
+         - string to eval: eval('import $MODULE' or '$VAR=code()' or 'code()')
+         - list if list[0] is callable: value = list[0](*list[1:]) 
+         - callable: value = callable()
+    """
+    import imp,__builtin__
+    
+    # Only if immutable types are passed as arguments these dictionaries will be preserved.
+    _locals = notNone(_locals,{})
+    modules = notNone(modules,{})
+    instances = notNone(instances,{})
+    
+    def get_module(_module):
+        if module not in modules: 
+            modules[module] = imp.load_module(*([module]+list(imp.find_module(module))))
+        return modules[module]
+    def get_instance(_module,_klass,_klass_args):
+        if (_module,_klass,_klass_args) not in instances:
+            instances[(_module,_klass,_klass_args)] = getattr(get_module(module),klass)(*klass_args)
+        return instances[(_module,_klass,_klass_args)]
+        
+    if isDictionary(target):
+        model = target
+        keywords = ['__args__','__target__','__class__','__module__','__class_args__']
+        args = model['__args__'] if '__args__' in model else dict((k,v) for k,v in model.items() if k not in keywords)
+        target = model.get('__target__',None)
+        module = model.get('__module__',None)
+        klass = model.get('__class__',None)
+        klass_args = model.get('__class_args__',tuple())
+        if isCallable(target): 
+            target = model['__target__']
+        elif isString(target):
+            if module:
+                #module,subs = module.split('.',1)
+                if klass: 
+                    if _trace: print('evalX: %s.%s(%s).%s(%s)'%(module,klass,klass_args,target,args))
+                    target = getattr(get_instance(module,klass,klass_args),target)
+                else:
+                    if _trace: print('evalX: %s.%s(%s)'%(module,target,args))
+                    target = getattr(get_module(module),target)
+            elif klass and klass in dir(__builtin__):
+                if _trace: print('evalX: %s(%s).%s(%s)'%(klass,klass_args,target,args))
+                instance = getattr(__builtin__,klass)(*klass_args)
+                target = getattr(instance,target)
+            elif target in dir(__builtin__): 
+                if _trace: print('evalX: %s(%s)'%(name,target,args))
+                target = getattr(__builtin__,target)
+            else:
+                raise _exception('%s()_MethodNotFound'%target)
+        else:
+            raise _exception('%s()_NotCallable'%target)
+        value = target(**args) if isDictionary(args) else target(*args)
+        if _trace: print('%s: %s'%(model,value))
+        return value
+    else:
+        #Parse: method[0](*method[1:])
+        if isIterable(target) and isCallable(target[0]):
+            value = target[0](*target[1:])
+        #Parse: method()
+        elif isCallable(target):
+            value = target()
+        elif isString(target):
+            if _trace: print('evalX("%s")'%target)
+            #Parse: import $MODULE
+            if target.startswith('import '): 
+                module = target.replace('import ','')
+                get_module(module)
+                value = module
+            #Parse: $VAR = #code
+            elif (  '=' in target and 
+                    '='!=target.split('=',1)[1][0] and 
+                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]?$',target.split('=',1)[0].strip())
+                ):
+                var = target.split('=',1)[0].strip()
+                _locals[var]=eval(target.split('=',1)[1].strip(),modules,_locals)
+                value = var
+            #Parse: #code
+            else:
+                value = eval(target,modules,_locals)
+        else:
+            raise _exception('targetMustBeCallable, not %s(%s)'%(type(target),target))
+        if _trace: print('%s: %s'%(target,value))
+    return value
