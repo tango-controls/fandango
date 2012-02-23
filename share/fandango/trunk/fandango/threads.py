@@ -44,7 +44,7 @@ import imp,__builtin__,pickle,re
 from . import functional
 from functional import *
 from operator import isCallable
-from objects import Singleton
+from objects import Singleton,Object,SingletonMap
 
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
@@ -184,19 +184,21 @@ class CronTab(object):
         else: return self._thread.is_alive()
     
 ###############################################################################
+
 WorkerException = type('WorkerException',(Exception,),{})
 
 class WorkerThread(object):
     """
     This class allows to schedule tasks in a background thread or process
     
-    The tasks introduced in the internal queue using put(Task) method may be:
+    If no process() method is overriden, the tasks introduced in the internal queue using put(Task) method may be:
          
-         - dictionary of build_int types: {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
+         - dictionary of built-in types: {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
          - string to eval: eval('import $MODULE' or '$VAR=code()' or 'code()')
          - list if list[0] is callable: value = list[0](*list[1:]) 
          - callable: value = callable()
             
+    It also allows to pass a hook method to be called for every main method execution.
     
     Usage::
         wt = fandango.threads.WorkerThread(process=True)
@@ -213,11 +215,12 @@ class WorkerThread(object):
     
     SINGLETON = None
     
-    def __init__(self,name='',process=False,wait=.01,target=None,singleton=False,trace=False):
+    def __init__(self,name='',process=False,wait=.01,target=None,hook=None,singleton=False,trace=False):
         self._name = name
         self.wait = wait
         self._process = process
         self._trace = trace
+        self.hook=hook
         self.THREAD_CLASS = threading.Thread if not process else multiprocessing.Process
         self.QUEUE_CLASS = Queue.Queue if not process else multiprocessing.Queue
         self.EVENT_CLASS = threading.Event if not process else multiprocessing.Event
@@ -298,104 +301,46 @@ class WorkerThread(object):
         #qs = self.inQueue.qsize()
         #return self._done/(self._done+qs) if qs else 1.
         return not self.inQueue.qsize() and not self.outQueue.qsize()
+    
+    def process(self,target):
+        """
+        This method can be overriden in child classes to perform actions distinct from evalX
+        """
+        self.modules = getattr(self,'modules',{})
+        self.instances = getattr(self,'instances',{})
+        self._locals = getattr(self,'_locals',{})
+        evalX(target,
+            _locals=self._locals,modules=self.modules,instances=self.instances,
+            _trace=self._trace,_exception=WorkerException)
+        return evalX(*args,**kwargs)
         
     def run(self):
         print 'WorkerThread(%s) started!'%self._name
-        modules = {}
-        instances = {}
-        _locals = {}
         logger = getattr(__builtin__,'print') if not self._process else (lambda s:(getattr(__builtin__,'print')(s),self.errorQueue.put(s)))
-        def get_module(_module):
-            if module not in modules: 
-                modules[module] = imp.load_module(*([module]+list(imp.find_module(module))))
-            return modules[module]
-        def get_instance(_module,_klass,_klass_args):
-            if (_module,_klass,_klass_args) not in instances:
-                instances[(_module,_klass,_klass_args)] = getattr(get_module(module),klass)(*klass_args)
-            return instances[(_module,_klass,_klass_args)]
-                
         while not self.stopEvent.is_set():
             try:
-                target = self.inQueue.get(True,timeout=self.wait)
+                target,value = self.inQueue.get(True,timeout=self.wait),None
                 if self.stopEvent.is_set(): break
-                if target is None: continue
-                try:
-                    result = None
-                    #f,args = objects.parseMappedFunction(target)
-                    #if not f: raise WorkerException('targetMustBeCallable')
-                    #else: self.outQueue.put(f())
-                    if isDictionary(target):
-                        model = target
-                        keywords = ['__args__','__target__','__class__','__module__','__class_args__']
-                        args = model['__args__'] if '__args__' in model else dict((k,v) for k,v in model.items() if k not in keywords)
-                        target = model.get('__target__',None)
-                        module = model.get('__module__',None)
-                        klass = model.get('__class__',None)
-                        klass_args = model.get('__class_args__',tuple())
-                        if isCallable(target): 
-                            target = model['__target__']
-                        elif isString(target):
-                            if module:
-                                #module,subs = module.split('.',1)
-                                if klass: 
-                                    if self._trace: print('WorkerThread(%s) executing %s.%s(%s).%s(%s)'%(self._name,module,klass,klass_args,target,args))
-                                    target = getattr(get_instance(module,klass,klass_args),target)
-                                else:
-                                    if self._trace: print('WorkerThread(%s) executing %s.%s(%s)'%(self._name,module,target,args))
-                                    target = getattr(get_module(module),target)
-                            elif klass and klass in dir(__builtin__):
-                                if self._trace: print('WorkerThread(%s) executing %s(%s).%s(%s)'%(self._name,klass,klass_args,target,args))
-                                instance = getattr(__builtin__,klass)(*klass_args)
-                                target = getattr(instance,target)
-                            elif target in dir(__builtin__): 
-                                if self._trace: print('WorkerThread(%s) executing %s(%s)'%(self._name,target,args))
-                                target = getattr(__builtin__,target)
-                            else:
-                                raise WorkerException('%s()_MethodNotFound'%target)
-                        else:
-                            raise WorkerException('%s()_NotCallable'%target)
-                        value = target(**args) if isDictionary(args) else target(*args)
-                        if self._trace: print('%s: %s'%(model,value))
-                        self.outQueue.put((model,value))
-                    else:
-                        if isIterable(target) and isCallable(target[0]):
-                            value = target[0](*target[1:])
-                        elif isCallable(target):
-                            value = target()
-                        if isString(target):
-                            if self._trace: print('eval(%s)'%target)
-                            if target.startswith('import '): 
-                                module = target.replace('import ','')
-                                get_module(module)
-                                value = module
-                            elif (  '=' in target and 
-                                    '='!=target.split('=',1)[1][0] and 
-                                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]+$',target.split('=',1)[0].strip())
-                                ):
-                                var = target.split('=',1)[0].strip()
-                                _locals[var]=eval(target.split('=',1)[1].strip(),modules,_locals)
-                                value = var
-                            else:
-                                value = eval(target,modules,_locals)
-                                #try: 
-                                    #pickle.dumps(value)
-                                #except: 
-                                    #print traceback.format_exc()
-                                    #raise WorkerException('unpickableValue')
-                        else:
-                            raise WorkerException('targetMustBeCallable')
-                        if self._trace: print('%s: %s'%(target,value))
+                if target is not None:
+                    try:
+                        model = target #To avoid original target to be overriden in process()
+                        value = self.process(target)
                         try: pickle.dumps(value)
                         except pickle.PickleError: 
                             print traceback.format_exc()
                             raise WorkerException('UnpickableValue')
-                        self.outQueue.put((target,value))
-                except Exception,e:
-                    msg = 'Exception in WorkerThread(%s).run()\n%s'%(self._name,traceback.format_exc())
-                    print( msg)
-                    self.outQueue.put((target,e))
-                finally:
-                    if not self._process: self.inQueue.task_done()
+                        self.outQueue.put((model,value))
+                    except Exception,e:
+                        msg = 'Exception in WorkerThread(%s).run()\n%s'%(self._name,traceback.format_exc())
+                        print( msg)
+                        self.outQueue.put((target,e))
+                    finally:
+                        if not self._process: self.inQueue.task_done()
+                if self.hook is not None: 
+                    try: 
+                        self.hook()
+                    except: 
+                        print('Exception in WorkerThread(%s).hook()\n%s'%(self._name,traceback.format_exc()))
             except Queue.Empty:
                 pass
             except:
@@ -423,20 +368,131 @@ class SingletonWorker(WorkerThread,objects.Singleton):
         The target argument is needed to avoid mixing up commands from different requestors.
         """
         if not hasattr(self,'_values'): self._values = {}
-        self._values.update(WorkerThread.flush(self))
-        [self._queued.remove(v) for v in self._values if v in self._queued]
+        self._values.update(self.flush())
         return self._values.pop(target)
-        
-    def getDone(self):
-        return not bool(self._queued)
     def flush(self):
+        #It just flushes received values
         l = []
         l.extend(getattr(self,'_values',{}).items())
         l.extend(WorkerThread.flush(self))
-        if hasattr(self,'_queued'):
-            while self._queued:
-                self._queued.pop(0)
+        [self._queued.remove(v) for v in l if v in self._queued]
         return l
+    def values(self):
+        return self._values
+    def done(self):
+        return not bool(self._queued)
+
+###############################################################################
+
+class CallbackProcess(Object,SingletonMap): #,Object,SingletonMap):
+    """
+    This class have not been finished yet.
+    It uses Pipes instead of Queues, throws Callbacks instead of just storing values and has an 
+    isAlive() check of the main thread to know if it is still running.
+    Class that provides a multiprocessing interface to PyTangoArchiving.Reader class
+    The manager class will have methods to Send and Receive queries/results.
+    The managed class will have Process(key,data) method to process queries and return results.
+    """
+    ALIVE_PERIOD = 3
+    def __init__(self,manager=True,args=None,timeout=300000,log='INFO',logger=None):
+        import multiprocessing
+        import threading
+        from collections import defaultdict
+        raise Exception('Not implemented yet')
+        print 'In CallbackProcess(%s)'%([db,config,servers,schema,timeout,log,logger,tango_host,alias_file])
+        #Process Part
+        self._pipe1,self._pipe2 = multiprocessing.Pipe()
+        self._process_event,self._threading_event,self._command_event = multiprocessing.Event(),threading.Event(),threading.Event()
+        self._process = multiprocessing.Process(
+            target=self._reader_process,
+            args=(db,config,servers,schema,timeout,log,logger,tango_host,alias_file,
+                self._pipe2,self._process_event)
+            )
+        self._receiver = threading.Thread(target=self._receive_data)
+        self._reader.daemon,self._receiver.daemon = True,True
+        self.callbacks = defaultdict(list)
+        if manager: self.start()
+    def __del__(self):
+        self.stop()
+        type(self).__base__.__del__(self)
+    
+    def start(self):
+        self._receiver.start(),self._process.start()
+        self.get_attributes()
+    def stop(self):
+        print 'ReaderProces().stop()'
+        self._process_event.set(),self._threading_event.set()
+        self._pipe1.close(),self._pipe2.close() 
+    
+    # Protected methods
+    @staticmethod
+    def get_key(d):
+        return str(sorted(d.items()))
+    @staticmethod
+    def _reader_process(args,timeout,log,logger,pipe,event,type_=None,alive=ALIVE_PERIOD):
+        reader = (type_ or CallbackProcess)(manager=False,args=args,timeout=timeout,log=log,logger=logger)
+        last_alive = time.time()
+        while not event.is_set() and (pipe.poll() or time.time()<(last_alive+2*alive)):
+            if pipe.poll():
+                key,query = pipe.recv()
+                try:
+                    if (key,query)==('ALIVE',None):
+                        last_alive = time.time()
+                    elif hasattr(getattr(reader,key,None),'__call__'):
+                        print('CallbackProcess(): launching command %s(%s)'%(key,query))
+                        pipe.send((key,getattr(reader,key)(*query)))
+                    elif hasattr(reader,'Process'):
+                        [pipe.send(msg) for msg in reader.Process(key,data)]
+                    else:
+                        print('CallbackProcess(): nothing to do with (%s,%s)'%(key,data))
+                except Exception,e:
+                    print('\tError in %s process!\n%s'%(key,traceback.format_exc()))
+                    pipe.send((key,e))
+            event.wait(0.1)
+        print 'Exiting PyTangoArchiving.ReaderProcess()._reader_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive)
+    def _receive_data(self):
+        self.last_alive = 0
+        while not self._threading_event.is_set():
+            if self._pipe1.poll():
+                key,query = self._pipe1.recv()
+                if key.lower() in self.asked_attributes:
+                    #Updating last_dates dictionary
+                    print('... ReaderProcess: Received %s last_dates %s'%(key,query))
+                    self.last_dates[key] = query
+                else:
+                    print('... ReaderProcess: got data from query = %s; %d queries pending'%(key,len(self.callbacks)))
+                    if key in self.callbacks:
+                        for callback in self.callbacks[key]:
+                            if callback is None: continue
+                            try:
+                                print('\tlaunching callback %s'%callback)
+                                callback(query)
+                            except:
+                                print('\tError in %s callback %s!'%(key,callback))
+                                print traceback.format_exc()
+                        self.callbacks.pop(key)
+                    else:
+                        pass
+            if time.time() > self.last_alive+3: 
+                self._pipe1.send(('ALIVE',None))
+                self.last_alive = time.time()
+            self._threading_event.wait(0.1)
+        print 'Exiting PyTangoArchiving.ReaderProcess()._receive_data thread'
+    def _send_query(self,key,query,callback):
+        if key not in self.callbacks: 
+            self.callbacks[key] = [callback]
+            self._pipe1.send((key,query))
+        elif callback not in self.callbacks[key]: 
+            self.callbacks[key].append(callback)
+        return
+    def _remote_command(self,command,args=None):
+        self._return,args = None,args or []
+        self._send_query(command,args,lambda q,e=self._command_event,s=self:(setattr(s,'_return',q),e.set()))
+        while not self._command_event.is_set(): self._command_event.wait(.02)
+        self._command_event.clear()
+        return self._return
+    def Send(self,key,query,callback=None):
+        self._send_query(self,key,query,callback)
 
 ###############################################################################
 
