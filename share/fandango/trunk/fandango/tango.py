@@ -89,8 +89,13 @@ def get_database():
     return TangoDatabase
 
 def get_device(dev): 
-    #return USE_TAU and tau.core.TauManager().getFactory()().getDevice(dev) or PyTango.DeviceProxy(dev)
-    return USE_TAU and tau.Device(dev) or PyTango.DeviceProxy(dev)
+    if isinstance(dev,basestring): 
+        if USE_TAU: return TAU.Device(dev)
+        else: return PyTango.DeviceProxy(dev)
+    elif isinstance(dev,PyTango.DeviceProxy) or (USE_TAU and isinstance(dev,TAU.Device)):
+        return device
+    else:
+        return None
 
 def get_database_device(): 
     global TangoDevice
@@ -114,16 +119,47 @@ def add_new_device(server,klass,device):
     get_database().add_device(dev_info)    
     
 def get_attribute_label(target):
+    if target.lower().rsplit('/')[-1] in ('state','status'): 
+        return target.lower().rsplit('/')[-1]
     ap = PyTango.AttributeProxy(target)
     cf = ap.get_config()
     return cf.label
 
 def set_attribute_label(target,label='',unit=''):
+    if target.lower().rsplit('/')[-1] in ('state','status'): 
+        return
     ap = PyTango.AttributeProxy(target)
     cf = ap.get_config()
     if label: cf.label = label
     if unit: cf.unit = unit
     ap.set_config(cf)
+
+def get_device_labels(target,filters='',brief=True):
+    """
+    Returns an {attr:label} dict for all attributes of this device 
+    Filters will be a regular expression to apply to attr or label.
+    If brief is True (default) only those attributes with label are returned.
+    """
+    labels = {}
+    d = get_device(target)
+    for a in d.get_attribute_list():
+        l = d.get_attribute_config(a).label
+        if (not filters or any(map(fun.matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
+            labels[a] = l
+    return labels
+
+def set_device_labels(target,labels):
+    """
+    Applies an {attr:label} dict for attributes of this device 
+    """
+    labels = CaselessDict(labels)
+    d = get_device(target)
+    for a in d.get_attribute_list():
+        if a in labels:
+            ac = d.get_attribute_config(a)
+            ac.label = labels[a]
+            d.set_attribute_config(ac)
+    return labels
     
 def property_undo(dev,prop,epoch):
     db = get_database()
@@ -136,11 +172,13 @@ def property_undo(dev,prop,epoch):
     elif not valids:print('No property values found for %s/%s before %s'%(dev,prop,fun.time2str(epoch)))
     elif not news: print('Property %s/%s not modified after %s'%(dev,prop,fun.time2str(epoch)))
     
-def search_device_properties(dev,prop,exclude=''):
+def get_matching_device_properties(dev,prop,exclude=''):
     db = get_database()
     result = {}
-    devs = get_matching_devices(dev) #devs if fun.isSequence(dev) else [devs]
-    props = prop if fun.isSequence(prop) else [prop]
+    devs = dev if fun.isSequence(dev) else get_matching_devices(dev) #devs if fun.isSequence(dev) else [devs]
+    props = prop if fun.isSequence(prop) else list(set(s for d in devs for s in db.get_device_property_list(d,prop)))
+    print 'devs: %s'%devs
+    print 'props: %s'%props
     for d in devs:
         if exclude and fun.matchCl(exclude,d): continue
         r = {}
@@ -148,8 +186,8 @@ def search_device_properties(dev,prop,exclude=''):
         for k,v in vals.items():
             if v: r[k] = v[0]
         if r: result[d] = r
-    if not fun.isSequence(devs):
-        if not fun.isSequence(prop): return result.values().values()[0]
+    if not fun.isSequence(devs) or len(devs)==1:
+        if len(props)==1: return result.values()[0].values()[0]
         else: return result.values()[0]
     else: return result
 
@@ -163,10 +201,10 @@ metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 alnum = '(?:[a-zA-Z_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-rehost = '(?:(?P<host>'+alnum+':[0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
-redev = '(?P<device>'+(rehost+'?')+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+':[0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
+redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
 reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)' #Matches attribute and extension
-retango = redev+(reattr+'?')+'(?:\$?)' 
+retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
 
 def parse_labels(text):
     if any(text.startswith(c[0]) and text.endswith(c[1]) for c in [('{','}'),('(',')'),('[',']')]):
@@ -183,6 +221,31 @@ def parse_labels(text):
         else:
             labels = [(e,e) for e in exprs]  
         return labels
+        
+def parse_tango_model(name):
+    """
+    {'attributename': 'state',
+    'devicename': 'bo01/vc/ipct-01',
+    'host': 'alba02',
+    'port': '10000',
+    'scheme': 'tango'}
+    """
+    values = {'scheme':'tango'}
+    values['host'],values['port'] = os.getenv('TANGO_HOST').split(':',1)
+    try:
+        if not USE_TAU: raise Exception('NotTau')
+        from taurus.core import tango,AttributeNameValidator,DeviceNameValidator
+        validator = {tango.TangoDevice:DeviceNameValidator,tango.TangoAttribute:AttributeNameValidator}
+        values.update((k,v) for k,v in validator[tango.TangoFactory().findObjectClass(name)]().getParams(name).items() if v)
+    except:
+        name = str(name).replace('tango://','')
+        m = re.match(fandango.tango.retango,name)
+        if m:
+            gd = m.groupdict()
+            values['devicename'] = '/'.join([s for s in gd['device'].split('/') if ':' not in s])
+            if gd.get('attribute'): values['attributename'] = gd['attribute']
+            if gd.get('host'): values['host'],values['port'] = gd['host'].split(':',1)
+    return values if 'devicename' in values else None
 
 def get_all_devices(expressions,limit=1000):
     ''' Returns the list of registered devices (including unexported) that match any of the given wildcars (Regexp not admitted!) '''
@@ -246,13 +309,6 @@ def get_matching_device_attributes(expressions,limit=1000):
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
-        #print 'get_matching_device_attributes(e) -> %s / %s / %s'%(host,dev,attr)
-        #if e.count('/')==2: 
-            #dev,attr = e,'state'
-        #elif e.count('/')==3: 
-            #dev,attr = e.rsplit('/',1)
-        #else: 
-            #raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
         for d in get_matching_devices(dev):
             #print 'get_matching_device_attributes(%s,%s)...'%(dev,attr)
             if fun.matchCl(attr,'state',terminate=True):
@@ -312,6 +368,9 @@ def get_all_models(expressions,limit=1000):
           models.extend(targets)
     models = models[:limit]
     return models
+
+def get_command_list(dev):
+    return [c.cmd_name for c in get_device(dev).command_list_query()]
               
 #@}
 ########################################################################################    
