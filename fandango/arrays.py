@@ -509,10 +509,10 @@ class CSVArray:
         elif type(lastbranch) is str: lastbranch=self.colByHead(lastbranch)
             
         klines=self.get(y=root,distinct=True,xsubset=xsubset)
-        if root+1>=self.ncols: #Last column
-            return dict.fromkeys(klines.keys(),{})
-        elif len(klines)==1 and root>lastbranch: #Return resting columns in a single line
+        if len(klines)==1 and root>lastbranch: #Return resting columns in a single line
             return self.get(x=klines.values()[0][0],ysubset=range(root,self.ncols))
+        elif root+1>=self.ncols: #Last column
+            return dict.fromkeys(klines.keys(),{})
         else:
             tree={}
             for k in klines.keys():
