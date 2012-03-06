@@ -42,7 +42,9 @@ import time,Queue,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
 
 from . import functional
+from log import except2str
 from functional import *
+from excepts import trial
 from operator import isCallable
 from objects import Singleton,Object,SingletonMap
 
@@ -215,7 +217,7 @@ class WorkerThread(object):
     
     SINGLETON = None
     
-    def __init__(self,name='',process=False,wait=.01,target=None,hook=None,singleton=False,trace=False):
+    def __init__(self,name='',process=False,wait=.01,target=None,hook=None,trace=False):
         self._name = name
         self.wait = wait
         self._process = process
@@ -235,15 +237,6 @@ class WorkerThread(object):
         
         self._thread = self.THREAD_CLASS(name='Worker',target=self.run)
         self._thread.daemon = True
-            
-        #if not singleton or WorkerThread.SINGLETON is None:
-            #self._thread = self.THREAD_CLASS(name='Worker',target=self.run)
-            #self._thread.daemon = True
-        #if singleton:
-            #if WorkerThread.SINGLETON is None:
-                #WorkerThread.SINGLETON = self._thread
-            #self._thread = WorkerThread.SINGLETON
-                
         pass
     def __del__(self):
         try: 
@@ -252,14 +245,10 @@ class WorkerThread(object):
         except: pass
         
     def put(self,target):
-        """
-        Inserting a new object in the Queue.
-        """
+        """Inserting a new object in the Queue."""
         self.inQueue.put(target,False)
     def get(self):
-        """
-        Getting the oldest element in the output queue in (command,result) format
-        """
+        """Getting the oldest element in the output queue in (command,result) format"""
         try:
             self.getDone()
             try:
@@ -296,10 +285,6 @@ class WorkerThread(object):
     def getSize(self):
         return self.inQueue.qsize()
     def getDone(self):
-        #self._pending-=self.outQueue.qsize()
-        #if not self._done: return 0.
-        #qs = self.inQueue.qsize()
-        #return self._done/(self._done+qs) if qs else 1.
         return not self.inQueue.qsize() and not self.outQueue.qsize()
     
     def process(self,target):
@@ -331,7 +316,7 @@ class WorkerThread(object):
                             raise WorkerException('UnpickableValue')
                         self.outQueue.put((model,value))
                     except Exception,e:
-                        msg = 'Exception in WorkerThread(%s).run()\n%s'%(self._name,traceback.format_exc())
+                        msg = 'Exception in WorkerThread(%s).run()\n%s'%(self._name,except2str())
                         print( msg)
                         self.outQueue.put((target,e))
                     finally:
@@ -340,12 +325,12 @@ class WorkerThread(object):
                     try: 
                         self.hook()
                     except: 
-                        print('Exception in WorkerThread(%s).hook()\n%s'%(self._name,traceback.format_exc()))
+                        print('Exception in WorkerThread(%s).hook()\n%s'%(self._name,except2str()))
             except Queue.Empty:
                 pass
             except:
                 print 'FATAL Exception in WorkerThread(%s).run()'%self._name
-                print traceback.format_exc()
+                print except2str()
         print 'WorkerThread(%s) finished!'%self._name
         
 import objects
@@ -384,115 +369,327 @@ class SingletonWorker(WorkerThread,objects.Singleton):
 
 ###############################################################################
 
-class CallbackProcess(Object,SingletonMap): #,Object,SingletonMap):
+class DataExpired(Exception): 
+    def __str__(self):
+        return 'DataExpired(%s)'%Exception.__str__(self)
+    __repr__ = __str__
+
+def getPickable(value):
+    try: 
+        pickle.dumps(value)
+    except:# pickle.PickleError: 
+        if isinstance(value,Exception):
+            return Exception(str(value))
+        else:
+            value = str(value)
+    return value
+
+    
+class ProcessedData(object):
+    """ This struct stores named data with value,date associated and period,expire time constraints """
+    def __init__(self,name,target=None,args=None,period=None,expire=None,callback=None):
+        self.name = name
+        self.target = target or name
+        self.args = args
+        self.period = period or 0
+        self.expire = expire or 0
+        self.callback = callback
+        self.date = -1
+        self.value = None
+    def get_args(self):
+        return (self.name,self.target,self.args,self.period,self.expire,None)
+    def __repr__(self):
+        return 'ProcessedData(%s)=(%s) at %s'%(str(self.get_args()),self.value,time2str(self.date))
+    def __str__(self):
+        return str(self.get_args())
+    def set(self,value):
+        self.date = time.time()
+        self.value = value
+    def get(self):
+        result = self.value
+        if self.date<=0: 
+            raise DataExpired('%s s'%self.expire)
+        else:
+            now = time.time()
+            expired = self.date+max((self.expire,self.period)) < now
+            if self.expire>=0 and expired: #(self.expire==0 or self.date>0 and expired)):
+                self.date = -1
+                self.value = None
+        return result
+        
+class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     """
     This class have not been finished yet.
-    It uses Pipes instead of Queues, throws Callbacks instead of just storing values and has an 
+    
+    Compared to WorkerThread it uses Pipes instead of Queues, throws Callbacks instead of just storing values and has an 
     isAlive() check of the main thread to know if it is still running.
+    It also adds some ThreadDict behaviour, allowing a fixed list of keys to be permanently updated.
+    It can be bound to an executorobject that processes the given queries.
+    
     Class that provides a multiprocessing interface to PyTangoArchiving.Reader class
     The manager class will have methods to Send and Receive queries/results.
     The managed class will have Process(key,data) method to process queries and return results.
+    
+    The queries are sent between receiver thread and process using tuples.
+    Queries may be: (key,) ; (key,args=None) ; (key,command,args)
+    
+    CP = WorkerProcess()
+    CP.command('comm') # Execute comm() and returns result
+    CP.command('comm',args=(,)) # Excecute comm(*args) and returns result
+    CP.send(key='comm',query=args) # Returns immediately and execute comm(*args) in a background process
+    CP.send( 'comm',args,callback) # Returns immediately, executes data=comm(*args) in background and launches callback(data) when ready
+    CP.add(key,command,args,period)
+    
+    The parameters will be:
+     - key: command to be called / key to be identified
+     - query: arguments to previous command
+     - period: how often data must be read (if >0)
+     - expire: time that data will be kept (-1 = forever)
+     - callback: method to be called with received data as argument
+    
+    To different dictionaries will keep track of process results:
+     - data : will store named data with and update period associated
+     - callbacks : will store associated callbacks to throw-1 calls
     """
     ALIVE_PERIOD = 3
-    def __init__(self,manager=True,args=None,timeout=300000,log='INFO',logger=None):
+    __ALIVE,__ADDKEY,__REMOVEKEY,__BIND = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND'
+    
+    def __init__(self,target=None,start=True):
+        """ 
+        :param target: If not None, target will be an object which methods could be targetted by queries. 
+        """
         import multiprocessing
         import threading
         from collections import defaultdict
-        raise Exception('Not implemented yet')
-        print 'In CallbackProcess(%s)'%([db,config,servers,schema,timeout,log,logger,tango_host,alias_file])
+        self.trace('__init__(%s)'%(target))
+        
+        self.data = {} #It will contain a {key:ProcessedData} dictionary
+        
         #Process Part
         self._pipe1,self._pipe2 = multiprocessing.Pipe()
         self._process_event,self._threading_event,self._command_event = multiprocessing.Event(),threading.Event(),threading.Event()
         self._process = multiprocessing.Process(
-            target=self._reader_process,
-            args=(db,config,servers,schema,timeout,log,logger,tango_host,alias_file,
-                self._pipe2,self._process_event)
+            target=self._run_process, #Callable for the process.main()
+            args=[self._pipe2,self._process_event,target] #List of target method arguments
             )
+        #Thread part
         self._receiver = threading.Thread(target=self._receive_data)
-        self._reader.daemon,self._receiver.daemon = True,True
+        self._process.daemon,self._receiver.daemon = True,True
         self.callbacks = defaultdict(list)
-        if manager: self.start()
+        if start: self.start()
+        
     def __del__(self):
         self.stop()
         type(self).__base__.__del__(self)
-    
+    def trace(self,msg):
+        print '%s, %s: %s'%(time2str(),type(self).__name__,str(msg))
+        
+    def bind(self,target,args=None):
+        self.send(self.__BIND,target=target,args=args)
+        
+    #Thread Management
     def start(self):
         self._receiver.start(),self._process.start()
-        self.get_attributes()
     def stop(self):
-        print 'ReaderProces().stop()'
+        self.trace('stop()')
         self._process_event.set(),self._threading_event.set()
         self._pipe1.close(),self._pipe2.close() 
+    def isAlive(self):
+        return self._process.is_alive() and self._receiver.is_alive()
+    
+    def keys(self): 
+        return self.data.keys()
+    def add(self,key,target=None,args=None,period=0,expire=0,callback=None):
+        data = self.data[key] = ProcessedData(key,target=target,args=args,period=period,expire=expire,callback=callback)
+        self.send(self.__ADDKEY,target=data.get_args())
+    def get(self,key,_raise=False):
+        # Returns a key value
+        result = self.data[key].get()
+        if _raise and isinstance(result,Exception): raise result
+        return result
+    def pop(self,key):
+        # Returns a key value and removes from dictionary
+        d = self.data.pop(key)
+        self.send(self.__REMOVEKEY,key)
+        return d
+        
+    def send(self,key,target,args=None,callback=None):
+        """ 
+        This method throws a new key,query,callback tuple to the process Pipe 
+        Queries may be: (key,) ; (key,args=None) ; (key,command,args=None)
+        """
+        keywords = (self.__BIND,self.__ADDKEY,self.__ALIVE,self.__REMOVEKEY,None)
+        if (key in keywords or key not in self.callbacks):
+            self.trace('send(%s,%s,%s,%s)'%(key,target,args,callback))
+            if key not in keywords: self.callbacks[key] = [callback]
+            if args is not None: self._pipe1.send((key,target,args))
+            else: self._pipe1.send((key,target))
+        elif callback not in self.callbacks[key]: 
+            self.trace('send(%s,%s,%s,%s) => %s'%(key,target,args,callback,self.callbacks[key]))
+            self.callbacks[key].append(callback)
+        return
+    def command(self,command,args=None):
+        """ This method performs a synchronous command (no callback, no persistence),
+        it doesn't return until it is resolved """
+        self._return = None
+        self.send(key=str(command),target=command,args=args,callback=lambda q,e=self._command_event,s=self:(setattr(s,'_return',q),e.set()))
+        while not self._command_event.is_set(): self._command_event.wait(.02)
+        self._command_event.clear()
+        return self._return
     
     # Protected methods
     @staticmethod
-    def get_key(d):
-        return str(sorted(d.items()))
+    def get_hash(d):
+        """This method just converts a dictionary into a hashable type""" 
+        if isMapping(d): d = d.items()
+        if isSequence(d): d = sorted(d)
+        return str(d)
+        
     @staticmethod
-    def _reader_process(args,timeout,log,logger,pipe,event,type_=None,alive=ALIVE_PERIOD):
-        reader = (type_ or CallbackProcess)(manager=False,args=args,timeout=timeout,log=log,logger=logger)
+    def get_callable(key,executor=None):
+        try:
+            x = []
+            if isinstance(key,basestring):
+                trial(lambda:x.append(evalX(key)),lambda:x.append(None))
+            return first(a for a in (
+                key,
+                x and x[0],
+                isinstance(key,basestring) and getattr(executor,key,None), #key is a member of executor
+                getattr(executor,'process',None), #executor is a process object
+                executor, #executor is a callable
+                #isinstance(key,basestring) and evalX(key), # key may be name of function
+                ) if a and isCallable(a))
+        except StopIteration,e:
+            return None
+        
+    #@staticmethod
+    def _run_process(self,pipe,event,executor=None,alive=ALIVE_PERIOD):
+        """ 
+        Queries sent to Process can be executed in different ways:
+         - Having a process(query) method given as argument.
+         - Having an object with a key(query) method: returns (key,result)
+         - If none of this, passing query to an evalX call.
+         
+        Executor will be a callable or an object with 'target' methods
+        """
         last_alive = time.time()
+        scheduled = {} #It will be a {key:[data,period,last_read]} dictionary
+        locals_,modules,instances = {'executor':executor},{},{}
+        key = None
+        self.trace('.Process(%s) started'%str(executor or ''))
         while not event.is_set() and (pipe.poll() or time.time()<(last_alive+2*alive)):
-            if pipe.poll():
-                key,query = pipe.recv()
-                try:
-                    if (key,query)==('ALIVE',None):
-                        last_alive = time.time()
-                    elif hasattr(getattr(reader,key,None),'__call__'):
-                        print('CallbackProcess(): launching command %s(%s)'%(key,query))
-                        pipe.send((key,getattr(reader,key)(*query)))
-                    elif hasattr(reader,'Process'):
-                        [pipe.send(msg) for msg in reader.Process(key,data)]
-                    else:
-                        print('CallbackProcess(): nothing to do with (%s,%s)'%(key,data))
-                except Exception,e:
-                    print('\tError in %s process!\n%s'%(key,traceback.format_exc()))
-                    pipe.send((key,e))
-            event.wait(0.1)
-        print 'Exiting PyTangoArchiving.ReaderProcess()._reader_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive)
+            try:
+                now = time.time()
+                if pipe.poll():
+                    t = pipe.recv() #May be (key,) ; (key,args=None) ; (key,command,args)
+                    key,target,args = [(None,None,None),(t[0],None,None),(t[0],t[1],None),t][len(t)]
+                    if key!=self.__ALIVE: self.trace('.Process: Received: %s => (%s,%s,%s)'%(str(t),key,target,args))
+                elif scheduled:
+                    data = first(sorted((v.expire,v) for n,v in scheduled.items()))[-1]
+                    if data.expire<=now: 
+                        data.expire = now+data.period
+                        key,target,args = data.name,data.target,data.args
+                    else: #print '%s > %s - %s' % (time2str(now),time2str(next))
+                        key = None
+                if key == self.__ADDKEY: #(__ADDKEY,(args for ProcessedData(*)))
+                    #Done here to evaluate not-periodic keys in the same turn that they are received
+                    data = ProcessedData(*target)
+                    if data.period>0: 
+                        data.expire = now+data.period
+                        scheduled[data.name]=data
+                        self.trace('.Process: updated key: %s'%str(data))
+                    else: 
+                        if data.name in scheduled: 
+                            self.trace('.Process: Removing %s key'%data.name)
+                            scheduled.pop(data.name)
+                    key,target,args = data.name,data.target,data.args #Added data will be immediately read
+                if key is not None:
+                    try:
+                        if key==self.__ALIVE: #Keep Alive Thread
+                            last_alive = time.time()
+                        elif key == self.__REMOVEKEY: #(__REMOVEKEY,key)
+                            if target in scheduled: scheduled.pop(target)
+                            self.trace(scheduled)
+                        elif key == self.__BIND:
+                            # Setting a new executor object
+                            if isCallable(target): executor = target
+                            elif isinstance(target,basestring): executor = evalX(target,locals_,modules,instances)
+                            else: executor = target
+                            if isCallable(executor) and args is not None:
+                                if isMapping(args): executor = executor(**args)
+                                elif isSequence(args): executor = executor(*args)
+                                else: executor = executor(args)
+                            locals_['executor'] = executor
+                            self.trace('.Process: Bound executor object to %s'%(executor))
+                        else:
+                            if executor is not None and (isCallable(executor) or getattr(executor,'process',None)) and args is None:
+                                # Target is a set of arguments to Executor object
+                                exec_ = getattr(executor,'process',executor)
+                                args = target
+                            elif isinstance(target,basestring):
+                                # Target is a member of executor or an string to be evaluated
+                                # e.g. getattr(Reader,'get_attribute_values')(*(attr,start,stop))
+                                if hasattr(executor,target): exec_ = getattr(executor,target)
+                                else: exec_ = evalX(target,locals_,modules,instances) #Executor bypassed if both target and args are sent
+                            else:
+                                #Target is a value or callable
+                                exec_ = target
+                            
+                            if isCallable(exec_): 
+                                # Executing 
+                                if key not in scheduled: 
+                                    self.trace('.Process:  [%s] = %s(%s)(*%s)'%(key,exec_,target,args))
+                                if args is None: value = exec_()
+                                elif isMapping(args): value = exec_(**args)
+                                elif isSequence(args): value = exec_(*args)
+                                else: value = exec_(args)
+                            else: 
+                                #target can be a an object member or eval(target) result
+                                if key not in scheduled: 
+                                    self.trace('.Process: [%s] = %s(*%s)'%(key,target,args))
+                                value = exec_ 
+
+                            pipe.send((key,getPickable(value)))
+                    except Exception,e:
+                        self.trace('.Process:\tError in %s process!\n%s'%(key,except2str()))
+                        pipe.send((key,getPickable(e)))
+            except Exception,e:
+                self.trace('.Process:\tUnknown Error in process!\n%s'%(except2str()))
+            key = None
+            event.wait(0.02)
+        self.trace('.Process: exit_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive))
+                        
     def _receive_data(self):
         self.last_alive = 0
         while not self._threading_event.is_set():
             if self._pipe1.poll():
                 key,query = self._pipe1.recv()
-                if key.lower() in self.asked_attributes:
-                    #Updating last_dates dictionary
-                    print('... ReaderProcess: Received %s last_dates %s'%(key,query))
-                    self.last_dates[key] = query
-                else:
-                    print('... ReaderProcess: got data from query = %s; %d queries pending'%(key,len(self.callbacks)))
-                    if key in self.callbacks:
-                        for callback in self.callbacks[key]:
-                            if callback is None: continue
-                            try:
-                                print('\tlaunching callback %s'%callback)
-                                callback(query)
-                            except:
-                                print('\tError in %s callback %s!'%(key,callback))
-                                print traceback.format_exc()
-                        self.callbacks.pop(key)
-                    else:
-                        pass
+                if key not in self.data: self.trace('.Thread: received %s data; pending: %s'%(key,self.callbacks.keys()))
+                if key in self.keys():
+                    self.data[key].set(query)
+                    if self.data[key].callback: 
+                        try:
+                            self.trace('.Thread:\tlaunching %s callback %s'%(key,callback))
+                            self.data[key].callback(query)
+                        except:
+                            self.trace('.Thread:\tError in %s callback %s!'%(key,callback))
+                            self.trace(except2str())
+                if key in self.callbacks:
+                    for callback in self.callbacks[key]:
+                        if callback is None: continue
+                        try:
+                            self.trace('.Thread:\tlaunching callback %s'%callback)
+                            callback(query)
+                        except:
+                            self.trace('.Thread:\tError in %s callback %s!'%(key,callback))
+                            self.trace(except2str())
+                    self.callbacks.pop(key)
             if time.time() > self.last_alive+3: 
-                self._pipe1.send(('ALIVE',None))
+                self._pipe1.send((self.__ALIVE,None))
                 self.last_alive = time.time()
-            self._threading_event.wait(0.1)
-        print 'Exiting PyTangoArchiving.ReaderProcess()._receive_data thread'
-    def _send_query(self,key,query,callback):
-        if key not in self.callbacks: 
-            self.callbacks[key] = [callback]
-            self._pipe1.send((key,query))
-        elif callback not in self.callbacks[key]: 
-            self.callbacks[key].append(callback)
-        return
-    def _remote_command(self,command,args=None):
-        self._return,args = None,args or []
-        self._send_query(command,args,lambda q,e=self._command_event,s=self:(setattr(s,'_return',q),e.set()))
-        while not self._command_event.is_set(): self._command_event.wait(.02)
-        self._command_event.clear()
-        return self._return
-    def Send(self,key,query,callback=None):
-        self._send_query(self,key,query,callback)
+            self._threading_event.wait(0.02)
+        self.trace('.Thread: exit_data_thread')
+
 
 ###############################################################################
 
