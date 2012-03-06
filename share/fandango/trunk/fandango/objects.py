@@ -284,5 +284,5 @@ class SingletonMap(object):
     
     def get_instance_key(self):
         return self.__instance_key
-    
+
 
