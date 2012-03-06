@@ -48,6 +48,16 @@ import functools
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
 
+## Inspection methods
+
+def dirModule(module):
+    return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
+
+def dirClasses(module,owned=False):
+    v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
+    if owned: return [a for a in dirModule(module) if a in v]
+    else: return v
+
 ## Useful class objects
 
 class Struct(object):
