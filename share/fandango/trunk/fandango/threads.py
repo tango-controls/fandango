@@ -651,7 +651,9 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
 
                             pipe.send((key,getPickable(value)))
                     except Exception,e:
-                        self.trace('.Process:\tError in %s process!\n%s'%(key,except2str()))
+                        self.trace('.Process:\tError in %s process!\n%s'%(key,except2str(e)))
+                        #print traceback.format_exc()
+                        #print e
                         pipe.send((key,getPickable(e)))
             except Exception,e:
                 self.trace('.Process:\tUnknown Error in process!\n%s'%(except2str()))
