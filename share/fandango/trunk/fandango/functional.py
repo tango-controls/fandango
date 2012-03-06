@@ -249,6 +249,9 @@ def isNumber(seq):
     if isinstance(seq,bool): return False
     try: return float(seq)
     except: return False
+    
+def isNone(seq):
+    return seq is None
 
 def isGenerator(seq):
     from types import GeneratorType
