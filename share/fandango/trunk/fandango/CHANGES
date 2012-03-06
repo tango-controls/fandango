@@ -1,3 +1,11 @@
+March 2012 - 9.3
+------------------------
+
+device: limited traces in TangoEval, _locals dictionary is now persistent
+log: added except2str methods
+threads: added WorkerProcess, provides WorkerThread+evalX+Process+ThreadDict functionality.
+objects: Added dirModule/dirClasses methods
+
 Jan 2012 - 9.2
 ------------------------
 device: ProxiesDict class moved to fandango.tango module to solve import issues
@@ -15,6 +23,10 @@ functional:
  - Added evalX(dict/class/string) from WorkerThread
  - Added str2time conversions from PyTangoArchiving.
  - All functional methods exported to fandango
+threads:
+ - Added CallbackProcess from PyTangoArchiving.reader
+ - evalX method moved from WorkerThread to functional module
+web: added list_to_ulist converter
 
 November 2011 - 9.00 : LIMITED COMPATIBILITY WITH PREVIOUS RELEASES
 ------------------------------------------------------------------
