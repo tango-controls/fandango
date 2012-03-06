@@ -51,7 +51,7 @@ import PyTango
 #fandango imports
 from . import log,excepts,callbacks,tango,objects,dicts,arrays,dynamic
 from . import functional as fun
-from log import Logger
+from log import Logger,except2str
 from excepts import *
 from callbacks import *
 from tango import * #USE_TAU imported here
@@ -428,20 +428,25 @@ class TangoEval(object):
     All tango-like variables are parsed.
     Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
     """
-    def __init__(self,formula='',launch=True,trace=False, proxies=None, attributes=None):
+    def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None):
         self.formula = formula
         self.variables = []
+        self.timeout = timeout
         self.proxies = proxies or dicts.defaultdict_fromkey(tau.Device) if USE_TAU else ProxiesDict()
         self.attributes = attributes or dicts.defaultdict_fromkey(tau.Attribute if USE_TAU else PyTango.AttributeProxy)
         self.previous = dicts.CaselessDict()
         self.last = dicts.CaselessDict()
         self.result = None
-        self.trace = trace
+        self._trace = trace
+        self._locals = {}
         if self.formula and launch: 
             self.eval()
-            if not self.trace: 
+            if not self._trace: 
                 print 'TangoEval: result = %s' % self.result
         return
+            
+    def trace(self,msg):
+        if self._trace: print 'TangoEval: %s'%str(msg)
         
     def parse_variables(self,formula,_locals=None):
         ''' This method parses attributes declarated in formulas with the following formats:
@@ -463,7 +468,7 @@ class TangoEval(object):
         reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)?' #Matches attribute and extension
         retango = redev+reattr#+'(?!/)'
         regexp = no_quotes + retango + no_quotes #Excludes attr_names between quotes
-        #print regexp
+        #self.trace( regexp)
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
         
         if '#' in formula:
@@ -480,39 +485,40 @@ class TangoEval(object):
         for target in findables:
             res = str(sorted(d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])))
             self.formula = self.formula.replace("FIND(%s)"%target,res).replace('"','').replace("'",'')
-            if self.trace: print 'TangoEval: Replacing with results for %s ...%s'%(target,res)
+            self.trace('Replacing with results for %s ...%s'%(target,res))
         
         ##@var all_vars list of tuples with (device,/attribute) name matches
         #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
         self.variables = [s for s in re.findall(regexp,self.formula)]
-        if self.trace: print 'TangoEval.parse_variables(%s): %s'%(self.formula,self.variables)
+        self.trace('parse_variables(%s): %s'%(self.formula,self.variables))
         return self.variables
         
-    def read_attribute(self,device,attribute,what='value',_raise=True, timeout=2000):
+    def read_attribute(self,device,attribute,what='value',_raise=True, timeout=None):
         """
         Executes a read_attribute and returns the value requested
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         """
-        if self.trace: print 'TangoEval.read_attribute(%s/%s.%s)'%(device,attribute,what)
+        self.trace('read_attribute(%s/%s.%s)'%(device,attribute,what))
+        timeout = timeout or self.timeout
         aname = (device+'/'+attribute).lower()
         try:
             if aname not in self.attributes:
                 dp = self.proxies[device]
                 try: dp.set_timeout_millis(timeout)
-                except: print 'TangoEval: unable to set %s proxy timeout to %s ms: %s'%(device,timeout,traceback.format_exc())
+                except: self.trace('unable to set %s proxy timeout to %s ms: %s'%(device,timeout,except2str()))
                 dp.ping()
                 # Disabled because we want DevFailed to be triggered
                 #attr_list = [a.name.lower()  for a in dp.attribute_list_query()]
                 #if attribute.lower() not in attr_list: #raise Exception,'TangoEval_AttributeDoesntExist_%s'%attribute
             value = self.attributes[aname].read()
             value = value if what=='all' else (False if what=='exception' else getattr(value,what))
-            if self.trace: print 'TangoEval: Read %s.%s = %s' % (aname,what,value)
+            self.trace('Read %s.%s = %s' % (aname,what,value))
         except Exception,e:
             if _raise: #and attribute.lower() in ['','state']:
                 raise e
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return True
-            print 'TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e)
+            self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
             value = None
         return value
     
@@ -527,33 +533,34 @@ class TangoEval(object):
             self.formula = self.formula.replace(' '+x.upper()+' ',' '+x+' ')
         self.formula = self.formula.replace(' || ',' or ')
         self.formula = self.formula.replace(' && ',' and ')
+        _locals = _locals and dict(_locals) or self._locals
+        if not _locals:
+            [_locals.__setitem__(str(v),v) for v in PyTango.DevState.values.values()]
+            [_locals.__setitem__(str(q),q) for q in PyTango.AttrQuality.values.values()]
+            _locals['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
+            _locals['time'] = time
+            _locals['now'] = time.time()
         if _locals and '$(' in self.formula: #explicit replacement of env variables if $() used
             for l,v in _locals.items():
                 self.formula = self.formula.replace('$(%s)'%str(l),str(v))
         self.previous = (previous or {}) or self.previous
         
         self.parse_variables(self.formula)
-        if self.trace: print 'TangoEval: variables in formula are %s' % self.variables
+        self.trace('variables in formula are %s' % self.variables)
         source = self.formula #It will be modified on each iteration
         self.last.clear()
         for device,attribute,what in self.variables:
             target = device + (attribute and '/%s'%attribute) + (what and '.%s'%what)
             var_name = target.replace('/','_').replace('-','_').replace('.','_').replace(':','_').lower()
-            if self.trace: print 'TangoEval(): %s => %s'%(target,var_name)
+            self.trace('\t%s => %s'%(target,var_name))
             self.previous[var_name] = self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise)
             self.last[target] = self.previous[var_name] #Used from alarm messages
             source = source.replace(target,var_name,1)
 
-        if self.trace: print 'TangoEval: formula = %s; Values = %s' % (source,dict(self.last))
-        _locals = _locals and dict(_locals) or {}
-        [_locals.__setitem__(str(v),v) for v in PyTango.DevState.values.values()]
-        [_locals.__setitem__(str(q),q) for q in PyTango.AttrQuality.values.values()]
-        _locals['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
-        _locals['time'] = time
-        _locals['now'] = time.time()
-        if self.trace: print 'TangoEval(%s,%s)'%(source,self.previous)
+        self.trace('formula = %s; Values = %s' % (source,dict(self.last)))
+        self.trace('(%s,%s)'%(source,self.previous))
         self.result = eval(source,dict(self.previous),_locals)
-        if self.trace: print 'TangoEval: result = %s' % self.result
+        self.trace('result = %s' % self.result)
         return self.result
     pass
         
