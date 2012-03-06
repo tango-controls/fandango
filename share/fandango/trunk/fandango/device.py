@@ -448,6 +448,10 @@ class TangoEval(object):
     def trace(self,msg):
         if self._trace: print 'TangoEval: %s'%str(msg)
         
+    def set_timeout(self,timeout):
+        self.timeout = int(timeout)
+        self.trace('timeout: %s'%timeout)
+        
     def parse_variables(self,formula,_locals=None):
         ''' This method parses attributes declarated in formulas with the following formats:
         TAG1: dom/fam/memb/attrib >= V1 #A comment
