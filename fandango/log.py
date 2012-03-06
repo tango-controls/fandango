@@ -70,6 +70,18 @@ def shortstr(s,max_len=144):
         s = s[:max_len-3]+'...'
     return s
     
+def except2str(e=None,max_len=5*80):
+    if e is None: e = traceback.format_exc()
+    e = str(e)
+    if 'desc=' or 'desc =' in e:
+        r,c = '',0
+        for i in range(e.count('desc')):
+            c = e.index('desc',c)+1
+            r+=e[c-15:c+max_len-18]+'...\n'
+        return r
+    else: 
+        return str(e)[-(max_len-3):]+'...'
+    
 class Logger(Object):
     root_inited    = False
 
