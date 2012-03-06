@@ -104,7 +104,7 @@ except: print 'Unable to import interface module'
 #try: import qt
 #except: print 'Unable to import fandango.qt module'
 
-RELEASE = (9,1,0)
+RELEASE = (9,3,0)
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
 #print 'module reloaded'
