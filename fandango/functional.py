@@ -493,7 +493,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             #Parse: $VAR = #code
             elif (  '=' in target and 
                     '='!=target.split('=',1)[1][0] and 
-                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]?$',target.split('=',1)[0].strip())
+                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]*$',target.split('=',1)[0].strip())
                 ):
                 var = target.split('=',1)[0].strip()
                 _locals[var]=eval(target.split('=',1)[1].strip(),modules,_locals)
