@@ -488,7 +488,7 @@ class TangoEval(object):
         findables = re.findall('FIND\(([^)]*)\)',self.formula)
         for target in findables:
             res = str(sorted(d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])))
-            self.formula = self.formula.replace("FIND(%s)"%target,res).replace('"','').replace("'",'')
+            self.formula = self.formula.replace("FIND(%s)"%target,res.replace('"','').replace("'",''))
             self.trace('Replacing with results for %s ...%s'%(target,res))
         
         ##@var all_vars list of tuples with (device,/attribute) name matches
