@@ -92,8 +92,8 @@ def get_device(dev):
     if isinstance(dev,basestring): 
         if USE_TAU: return TAU.Device(dev)
         else: return PyTango.DeviceProxy(dev)
-    elif isinstance(dev,PyTango.DeviceProxy) or (USE_TAU and isinstance(dev,TAU.Device)):
-        return device
+    elif isinstance(dev,PyTango.DeviceProxy) or (USE_TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
+        return dev
     else:
         return None
 
@@ -118,13 +118,45 @@ def add_new_device(server,klass,device):
     dev_info.server = server
     get_database().add_device(dev_info)    
     
-def get_attribute_label(target):
-    if target.lower().rsplit('/')[-1] in ('state','status'): 
-        return target.lower().rsplit('/')[-1]
-    ap = PyTango.AttributeProxy(target)
-    cf = ap.get_config()
-    return cf.label
+def parse_db_command_array(data,keys=1,depth=2):
+    """ 
+    This command will parse data received from DbGetDeviceAttributeProperty2 command.
+    DB device commands return data in this format: X XSize Y YSize Z ZSize ZValue W WSize WValue
+    This corresponds to {X:{Y:{Z:[Zdata],W:[Wdata]}}}
+    Depth of the array is 2 by default
+    e.g.: 
+    label_of_dev_test_attribute = parse_db_command_array(dbd.DbGetDeviceAttributeProperty2([dev,attr]).,keys=1,depth=2)[dev][attr]['label'][0]
+    """
+    dict = {}
+    #print '[%s]: %s' % (keys,data)
+    for x in range(keys):
+        key = data.pop(0)
+        try: length = data.pop(0)
+        except: None
+        #print '%s,%s,%s => '%(key,length,depth)
+        if depth:
+            k,v = key,parse_db_command_array(data,keys=int(length),depth=depth-1)
+        else:
+            try:
+                length = int(length)
+                k,v = key,[data.pop(0) for y in range(length)]
+            except:
+                k,v = key,[length]
+        #print '\t%s,%s'%(k,v)
+        dict.update([(k,v)])
+    return dict
 
+def get_attribute_label(target,use_db=False):
+    dev,attr = target.rsplit('/',1)
+    if not use_db: #using AttributeProxy
+        if attr.lower() in ('state','status'): 
+            return attr
+        ap = PyTango.AttributeProxy(target)
+        cf = ap.get_config()
+        return cf.label
+    else: #using DatabaseDevice
+        return (get_database().get_device_attribute_property(dev,[attr])[attr].get('label',[attr]) or [''])[0]
+    
 def set_attribute_label(target,label='',unit=''):
     if target.lower().rsplit('/')[-1] in ('state','status'): 
         return
@@ -139,14 +171,22 @@ def get_device_labels(target,filters='',brief=True):
     Returns an {attr:label} dict for all attributes of this device 
     Filters will be a regular expression to apply to attr or label.
     If brief is True (default) only those attributes with label are returned.
+    This method works offline, does not need device to be running
     """
     labels = {}
     d = get_device(target)
-    for a in d.get_attribute_list():
-        l = d.get_attribute_config(a).label
+    db = get_database()
+    attrlist = db.get_device_attribute_list(target,filters) if brief else d.get_attribute_list()
+    for a in attrlist:
+        l = get_attribute_label(target+'/'+a,use_db=True) if brief else d.get_attribute_config(a).label
         if (not filters or any(map(fun.matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
             labels[a] = l
     return labels
+        
+def get_matching_device_attribute_labels(device,attribute):
+    """ To get all gauge port labels: get_matching_device_attribute_labels('*vgct*','p*') """
+    devs = get_matching_devices(device)
+    return dict((t+'/'+a,l) for t in devs for a,l in get_device_labels(t,attribute).items())
 
 def set_device_labels(target,labels):
     """
@@ -234,9 +274,10 @@ def parse_tango_model(name):
     values['host'],values['port'] = os.getenv('TANGO_HOST').split(':',1)
     try:
         if not USE_TAU: raise Exception('NotTau')
-        from taurus.core import tango,AttributeNameValidator,DeviceNameValidator
-        validator = {tango.TangoDevice:DeviceNameValidator,tango.TangoAttribute:AttributeNameValidator}
-        values.update((k,v) for k,v in validator[tango.TangoFactory().findObjectClass(name)]().getParams(name).items() if v)
+        from taurus.core import tango as tctango
+        from taurus.core import AttributeNameValidator,DeviceNameValidator
+        validator = {tctango.TangoDevice:DeviceNameValidator,tctango.TangoAttribute:AttributeNameValidator}
+        values.update((k,v) for k,v in validator[tctango.TangoFactory().findObjectClass(name)]().getParams(name).items() if v)
     except:
         name = str(name).replace('tango://','')
         m = re.match(fandango.tango.retango,name)
@@ -671,7 +712,7 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
         if dev_name not in self.keys():
             self.log.debug( 'Getting a Proxy for %s'%dev_name)
             try:
-                devklass,attrklass = (tau.Device,tau.Attribute) if USE_TAU else (PyTango.DeviceProxy,PyTango.AttributeProxy)
+                devklass,attrklass = (TAU.Device,TAU.Attribute) if USE_TAU else (PyTango.DeviceProxy,PyTango.AttributeProxy)
                 dev = (attrklass if str(dev_name).count('/')==(4 if ':' in dev_name else 3) else devklass)(dev_name)
             except Exception,e:
                 print('ProxiesDict: %s doesnt exist!'%dev_name)
