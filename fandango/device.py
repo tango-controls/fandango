@@ -438,7 +438,11 @@ class TangoEval(object):
         self.last = dicts.CaselessDict()
         self.result = None
         self._trace = trace
-        self._locals = {}
+        self._defaults = dict([(str(v),v) for v in PyTango.DevState.values.values()]+[(str(q),q) for q in PyTango.AttrQuality.values.values()])
+        self._defaults['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
+        self._defaults['time'] = time
+        self._locals = dict(self._defaults) #Having 2 dictionaries to reload defaults when needed
+        
         if self.formula and launch: 
             self.eval()
             if not self._trace: 
@@ -525,6 +529,11 @@ class TangoEval(object):
             self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
             value = None
         return value
+                
+    def update_locals(self,dct=None):
+        self._locals.update(dct or {})
+        self._locals['now'] = time.time()
+        return self._locals
     
     def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
         ''' 
@@ -533,21 +542,17 @@ class TangoEval(object):
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         '''
         self.formula = (formula or self.formula).strip()
-        for x in ['or','and']: #Check for case-dependent operators
+        for x in ['or','and','not','in','is']: #Check for case-dependent operators
             self.formula = self.formula.replace(' '+x.upper()+' ',' '+x+' ')
         self.formula = self.formula.replace(' || ',' or ')
         self.formula = self.formula.replace(' && ',' and ')
-        _locals = _locals and dict(_locals) or self._locals
-        if not _locals:
-            [_locals.__setitem__(str(v),v) for v in PyTango.DevState.values.values()]
-            [_locals.__setitem__(str(q),q) for q in PyTango.AttrQuality.values.values()]
-            _locals['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
-            _locals['time'] = time
-            _locals['now'] = time.time()
-        if _locals and '$(' in self.formula: #explicit replacement of env variables if $() used
-            for l,v in _locals.items():
+        self.update_locals(_locals)
+        self.previous.update(previous or {})
+        
+        if self._locals and '$(' in self.formula: #explicit replacement of env variables if $() used
+            for l,v in self._locals.items():
                 self.formula = self.formula.replace('$(%s)'%str(l),str(v))
-        self.previous = (previous or {}) or self.previous
+        
         
         self.parse_variables(self.formula)
         self.trace('variables in formula are %s' % self.variables)
@@ -561,9 +566,10 @@ class TangoEval(object):
             self.last[target] = self.previous[var_name] #Used from alarm messages
             source = source.replace(target,var_name,1)
 
-        self.trace('formula = %s; Values = %s' % (source,dict(self.last)))
-        self.trace('(%s,%s)'%(source,self.previous))
-        self.result = eval(source,dict(self.previous),_locals)
+        self.trace('formula = %s' % (source))
+        self.trace('\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
+        self.trace('\n'.join(str((str(k),str(i))) for k,i in self._locals.items() if k not in self._defaults))
+        self.result = eval(source,dict(self.previous),self._locals)
         self.trace('result = %s' % self.result)
         return self.result
     pass
