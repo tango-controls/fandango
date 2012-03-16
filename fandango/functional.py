@@ -307,9 +307,23 @@ def toList(val,default=[],check=isSequence):
         return val
 toSequence = toList
 
-def list2str(seq,MAX_LENGTH=80):
-    s = str(seq)
-    return s if len(s)<MAX_LENGTH else '%s...%d]'%(s[:MAX_LENGTH-4],len(seq))
+def str2list(s,separator=''): 
+    return map(str.strip,s.split(separator) if separator else s.split())
+
+def text2list(s,separator='\n'):
+    return filter(bool,str2list(s,separator))
+
+def list2str(s,separator='\t',MAX_LENGTH=255):
+    s = str(separator).join(str(t) for t in s)
+    if MAX_LENGTH>0 and separator not in ('\n','\r') and len(s)>MAX_LENGTH: 
+        s = s[:MAX_LENGTH-4]+'... '
+    return s
+
+def text2tuples(s,separator='\t'):
+    return [str2list(t,separator) for t in text2list(txt)]
+
+def tuples2text(s,separator='\t'):
+    return list2text([list2str(t,separator) for t in s],'\n')
 
 ########################################################################
 ## Number conversion
