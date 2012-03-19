@@ -81,7 +81,7 @@ def except2str(e=None,max_len=5*80):
         result =  r
     else: 
         result = str(e)[-(max_len-3):]+'...'
-    return result or e
+    return result or e[:max_len]
     
 class Logger(Object):
     root_inited    = False
