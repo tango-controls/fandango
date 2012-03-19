@@ -78,9 +78,10 @@ def except2str(e=None,max_len=5*80):
         for i in range(e.count('desc')):
             c = e.index('desc',c)+1
             r+=e[c-15:c+max_len-18]+'...\n'
-        return r
+        result =  r
     else: 
-        return str(e)[-(max_len-3):]+'...'
+        result = str(e)[-(max_len-3):]+'...'
+    return result or e
     
 class Logger(Object):
     root_inited    = False
