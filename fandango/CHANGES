@@ -1,3 +1,9 @@
+March 2012 - 9.4
+------------------------
+device: _locals dictionary persistent always, even if new _locals is passed by argument
+functional: added methods to convert between text and lists of strings
+bugs solved in TangoEval and except2str methods.
+
 March 2012 - 9.3
 ------------------------
 
