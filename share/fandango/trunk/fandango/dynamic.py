@@ -208,6 +208,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['Add2Status'] = lambda status: [True,self.set_status(self.get_status()+status)]
         self._locals['EVAL'] = lambda formula: self.evaluateFormula(formula)
         self._locals['PROPERTY'] = lambda property,update=False: self.get_device_property(property,update)
+        self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
         self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
         self._locals['DYN'] = DynamicAttribute
         [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
@@ -326,7 +327,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if update or not hasattr(self,property):
             setattr(self,property,self._db.get_device_property(self.get_name(),[property])[property])
         value = getattr(self,property) 
-        return value[0] if type(value) is list else value
+        return value[0] if fandango.isSequence(value) and len(value)==1 else value
         
     def open_file(self,filename):
         try:
@@ -1150,14 +1151,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self.error('DynamicDS(%s).check_state(): Exception in evalState(%s): %s'%(self.get_name(),formula,str(traceback.format_exc())))
                         self.last_state_exception += '\n'+time.ctime()+': '+str(traceback.format_exc())
                     self.info('In DynamicDS.check_state(): %s : %s ==> %s' % (state,value['formula'],result))
-                    if result and self.TangoStates[nstate]!=old_state:
-                        self.info('DynamicDS(%s.check_state(): New State is %s := %s'%(self.get_name(),nstate,formula))
-                        if set_state:
-                            self.set_state(self.TangoStates[nstate])
-                            if self.check_attribute_events('state'): 
-                                self.info('DynamicDS(%s.check_state(): pushing new state event'%(self.get_name()))
-                                self.push_change_event('State',self.TangoStates[nstate],time.time(),PyTango.AttrQuality.ATTR_VALID)
+                    
+                    if result:
+                        if self.TangoStates[nstate]!= old_state:
+                            self.info('DynamicDS(%s.check_state(): New State is %s := %s'%(self.get_name(),nstate,formula))
+                            if set_state:
+                                self.set_state(self.TangoStates[nstate])
+                                if self.check_attribute_events('state'):
+                                    self.info('DynamicDS(%s.check_state(): pushing new state event'%(self.get_name()))
+                                    self.push_change_event('State',self.TangoStates[nstate],time.time(),PyTango.AttrQuality.ATTR_VALID)
                         break
+        
         except Exception,e:
             raise e
         finally:
