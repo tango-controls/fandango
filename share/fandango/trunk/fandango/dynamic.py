@@ -212,6 +212,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
         self._locals['DYN'] = DynamicAttribute
         [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
+        [self._locals.__setitem__(k,dst.pytype) for k,dst in DynamicDSTypes.items()]
         
         #Adding states for convenience evaluation
         self.TangoStates = dict((str(v),v) for k,v in PyTango.DevState.values.items())
@@ -303,7 +304,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         ## THIS FUNCTION IS USED FROM updateDynamicAttributes
         self.get_device_properties(self.get_device_class()) #It will reload all subclass specific properties (with its own default values)
         self._db = db or getattr(self,'_db',None) or PyTango.Util.instance().get_database()
-        
+        if self.LogLevel: 
+            try: self.setLogLevel(self.LogLevel)
+            except: self.warning('Unable to setLogLevel(%s)'%self.LogLevel)
         #Loading DynamicDS specific properties (from Class and Device)
         for method,target,config in (
             (self._db.get_class_property,self.get_device_class().get_name(),DynamicDSClass.class_property_list),
@@ -820,10 +823,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
             if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
             
-            if not WRITE:
-                self.debug('%s::evalAttr(): Attribute=%s; formula=%s;'%(self.get_name(),aname,formula,))
-                #self.debug('vars in self._locals: %s'%self._locals.keys())
-                result = eval(compiled or formula,self._globals,self._locals)
+            if WRITE: self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
+            elif aname in self.dyn_values: self.debug('%s::evalAttr(READ): Attribute=%s; formula=%s;'%(self.get_name(),aname,formula,))
+            else: self.info('%s::evalAttr(COMMAND): formula=%s;'%(self.get_name(),formula,))
+            result = eval(compiled or formula,self._globals,self._locals)
+
+            #Push/Keep Read Attributes
+            if not WRITE and aname in self.dyn_values:
                 quality = self.get_quality_for_attribute(aname,result)
                 if hasattr(result,'quality'): result.quality = quality
                 date = self.get_date_for_attribute(aname,result)
@@ -835,7 +841,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.info('Pushing %s event!: %s(%s)'%(aname,type(result),shortstr(result)))
                     self.push_change_event(aname,value,date,quality)
                 #Updating the cache:
-                keep = aname in self.dyn_values and self.dyn_values[aname].keep or has_events
+                keep = self.dyn_values[aname].keep or has_events
                 if keep: 
                     old = self.dyn_values[aname].value
                     self.dyn_values[aname].update(value,date,quality)
@@ -843,11 +849,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     #Updating state if needed:
                     if old!=value and self.dyn_values.get(aname).states_queue:
                         self.check_state()
-                return result
-            else:
-                self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
-                #self.debug('vars in self._locals: %s'%self._locals.keys())
-                return eval(compiled or formula,self._globals,self._locals)
+            return result
 
         except PyTango.DevFailed, e:
             if self.trace:
@@ -1416,6 +1418,7 @@ class DynamicDSType(object):
     """ Allows to parse all the Tango types for Attributes """
     def __init__(self,tangotype,labels,pytype,dimx=1,dimy=1):
         self.tangotype=tangotype
+        self.name=labels[0] if labels else ''
         self.labels=labels
         self.pytype=pytype
         self.dimx=dimx
@@ -1457,9 +1460,6 @@ def CreateDynamicCommands(ds,ds_class):
     print 'class = %s; classes = %s' % (ds.__name__,classes)
     devs = [classes[i] for i in range(len(classes)-1) if classes[i+1]==ds.__name__]    
     print 'devs = %s'%devs
-    
-    arg_command = [[PyTango.DevVarStringArray, "ARGS"],[PyTango.DevString, "result"],]
-    void_command = [[PyTango.DevVoid, "ARGS"],[PyTango.DevString, "result"],]
     if not hasattr(ds,'dyn_comms'): ds.dyn_comms = {}
     
     for dev in devs:
@@ -1475,12 +1475,15 @@ def CreateDynamicCommands(ds,ds_class):
                 print ('Dynamic Command %s Already Exists, skipping!!!'%name)
                 continue
             name = ([n for n in ds_class.cmd_list.keys() if n.lower()==name.lower()] or [name])[0]
+            return_type = PyTango.CmdArgType.names.get(formula.split('(')[0],PyTango.DevString)
+            arg_command = [[PyTango.DevVarStringArray, "ARGS"],[return_type, "result"],]
+            void_command = [[PyTango.DevVoid, "ARGS"],[return_type, "result"],]
             ds_class.cmd_list[name] = arg_command if 'ARGS' in formula else void_command
             setattr(ds,name,
-                lambda obj,argin=None,cmd_name=name: 
-                    (obj._locals.__setitem__('ARGS',argin),
-                    str(obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name]))
-                    )[1]
+                lambda obj,argin=None,cmd_name=name: (
+                    obj._locals.update((('ARGS',argin),)), 
+                    obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name])
+                    )[-1]
                 )
     print 'Out of DynamicDS.CreateDynamicCommands(%s)'%(server)
     return
