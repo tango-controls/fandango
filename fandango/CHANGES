@@ -3,6 +3,9 @@ March 2012 - 9.4
 device: _locals dictionary persistent always, even if new _locals is passed by argument
 functional: added methods to convert between text and lists of strings
 bugs solved in TangoEval and except2str methods, the latest caused problems in PyAlarm.
+dynamic: dynamic: added LogLevel parsing
+dynamic: added DynamicCommands for any Tango type
+dynamic: added WPROPERTY
 
 March 2012 - 9.3
 ------------------------
