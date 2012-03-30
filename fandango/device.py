@@ -456,6 +456,23 @@ class TangoEval(object):
         self.timeout = int(timeout)
         self.trace('timeout: %s'%timeout)
         
+    def parse_formula(self,formula,_locals=None):
+        _locals = _locals or {}
+        _locals.update(self._locals)
+        if '#' in formula:
+            formula = formula.split('#',1)[0]
+        if ':' in formula and not re.match('^',redev):
+            tag,formula = formula.split(':',1)            
+        if _locals and '$(' in formula: #explicit replacement of env variables if $() used
+            for l,v in _locals.items():
+                formula = formula.replace('$(%s)'%str(l),str(v))
+        findables = re.findall('FIND\(([^)]*)\)',formula)
+        for target in findables:
+            res = str(sorted(d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])))
+            formula = formula.replace("FIND(%s)"%target,res.replace('"','').replace("'",''))
+            self.trace('Replacing with results for %s ...%s'%(target,res))
+        return formula
+        
     def parse_variables(self,formula,_locals=None):
         ''' This method parses attributes declarated in formulas with the following formats:
         TAG1: dom/fam/memb/attrib >= V1 #A comment
@@ -479,27 +496,13 @@ class TangoEval(object):
         #self.trace( regexp)
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
         
-        if '#' in formula:
-            formula = formula.split('#',1)[0]
-        if ':' in formula and not re.match('^',redev):
-            tag,formula = formula.split(':',1)            
-        self.formula = formula
-        
-        if _locals and '$(' in self.formula: #explicit replacement of env variables if $() used
-            for l,v in _locals.items():
-                self.formula = self.formula.replace('$(%s)'%str(l),str(v))
-                
-        findables = re.findall('FIND\(([^)]*)\)',self.formula)
-        for target in findables:
-            res = str(sorted(d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])))
-            self.formula = self.formula.replace("FIND(%s)"%target,res.replace('"','').replace("'",''))
-            self.trace('Replacing with results for %s ...%s'%(target,res))
+        formula = self.parse_formula(formula)
         
         ##@var all_vars list of tuples with (device,/attribute) name matches
         #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
-        self.variables = [s for s in re.findall(regexp,self.formula)]
-        self.trace('parse_variables(%s): %s'%(self.formula,self.variables))
-        return self.variables
+        variables = [s for s in re.findall(regexp,formula)]
+        self.trace('parse_variables(%s): %s'%(formula,variables))
+        return variables
         
     def read_attribute(self,device,attribute,what='value',_raise=True, timeout=None):
         """
@@ -531,9 +534,15 @@ class TangoEval(object):
         return value
                 
     def update_locals(self,dct=None):
-        self._locals.update(dct or {})
-        self._locals['now'] = time.time()
+        if dct:
+            if not hasattr(dct,'keys'): dct = dict(dct)
+            self._locals.update(dct)
+            self.trace('update_locals(%s)'%dct.keys())
+            self._locals['now'] = time.time()
         return self._locals
+            
+    def parse_tag(self,target,wildcard='_'):
+        return target.replace('/',wildcard).replace('-',wildcard).replace('.',wildcard).replace(':',wildcard).replace('_',wildcard).lower()
     
     def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
         ''' 
@@ -549,26 +558,23 @@ class TangoEval(object):
         self.update_locals(_locals)
         self.previous.update(previous or {})
         
-        if self._locals and '$(' in self.formula: #explicit replacement of env variables if $() used
-            for l,v in self._locals.items():
-                self.formula = self.formula.replace('$(%s)'%str(l),str(v))
-        
-        
-        self.parse_variables(self.formula)
-        self.trace('variables in formula are %s' % self.variables)
+        self.formula = self.parse_formula(self.formula) #Replacement of FIND(...), env variables and comments.
+        variables = self.parse_variables(self.formula)
+        self.trace('>'*80)
+        self.trace('eval(): variables in formula are %s' % self.variables)
         source = self.formula #It will be modified on each iteration
         self.last.clear()
-        for device,attribute,what in self.variables:
+        for device,attribute,what in variables:
             target = device + (attribute and '/%s'%attribute) + (what and '.%s'%what)
-            var_name = target.replace('/','_').replace('-','_').replace('.','_').replace(':','_').lower()
+            var_name = self.parse_tag(target)
             self.trace('\t%s => %s'%(target,var_name))
             self.previous[var_name] = self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise)
             self.last[target] = self.previous[var_name] #Used from alarm messages
             source = source.replace(target,var_name,1)
 
         self.trace('formula = %s' % (source))
-        self.trace('\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
-        self.trace('\n'.join(str((str(k),str(i))) for k,i in self._locals.items() if k not in self._defaults))
+        self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
+        self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self._locals.items() if k not in self._defaults))
         self.result = eval(source,dict(self.previous),self._locals)
         self.trace('result = %s' % self.result)
         return self.result
@@ -743,10 +749,12 @@ class ComposersDict(ServersDict):
         self.attributes.clear()
         for d in self.get_all_devices():
             attrs = self.db.get_device_property(d,['DynamicAttributes'])['DynamicAttributes']
+            if not attrs: attrs = self.db.get_device_property(d,['AlarmList'])['AlarmList']
             for l in attrs:
                 l = l.split('#')[0].strip()
                 if not l: continue
-                else: self.attributes[d+'/'+l.split('=')[0].strip()] = l.split('=')[-1].strip()
+                elif '=' in l: self.attributes[d+'/'+l.split('=')[0].strip()] = l.split('=',1)[-1].strip()
+                elif ':' in l: self.attributes[d+'/'+l.split(':')[0].strip()] = l.split(':',1)[-1].strip()
         return #self.attributes
                 
     def get_attributes(self,device=None,attribute=None):
@@ -761,6 +769,20 @@ class ComposersDict(ServersDict):
     def get_formula(self,attribute):
         return self.attributes.get(attribute)
     
+    def get_property(self,*args):
+        """ get_property(property) or get_property(device_regexp,property) """
+        property = args[-1]
+        devs = self.get_all_devices()
+        if len(args)==2: devs = [d for d in devs if fandango.matchCl(args[0],d)]
+        return dict((d,self.db.get_device_property(d,[property])[property]) for d in devs)
+        
+    def set_property(self,*args):
+        """ get_property(property,value) or get_property(device_regexp,property,value) """
+        property,value = args[-2:]
+        devs = self.get_all_devices()
+        if len(args)==3: devs = [d for d in devs if fandango.matchCl(args[0],d)]
+        return [(d,self.db.put_device_property(d,{property:value}))[0] for d in devs]
+        
     def set_formula(self,attribute,formula,update=False):
         dev,attr = attribute.rsplit('/',1)
         new,prop = [],self.db.get_device_property(dev,['DynamicAttributes'])['DynamicAttributes']
