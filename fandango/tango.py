@@ -52,7 +52,7 @@ from PyTango import AttrQuality
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
-#tau imports
+#tau imports, here USE_TAU is defined for all fandango
 try:
     assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
     try: 
@@ -60,11 +60,12 @@ try:
         tau = TAU = taurus
     except:
         import tau
+        print 'fandango.tango: import taurus failed, using tau instead'
         TAU = tau
     USE_TAU=True
     """USE_TAU will be used to choose between taurus.Device and PyTango.DeviceProxy"""
 except:
-    print 'fandango.device: USE_TAU flag is disabled'
+    print 'fandango.tango: USE_TAU disabled'
     USE_TAU=False
 
 from . import objects
