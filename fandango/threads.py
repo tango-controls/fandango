@@ -53,6 +53,11 @@ except: pass
 
 ###############################################################################
 
+class FakeLock(object):
+    """ Just for debugging, can replace a Lock when debugging a deadLock issue. """
+    def acquire(self):pass
+    def release(self):pass
+
 class CronTab(object):
     """
     Line Syntax:
