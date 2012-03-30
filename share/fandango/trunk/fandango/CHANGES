@@ -1,3 +1,10 @@
+April 2012 - 9.5
+------------------------
+
+TangoEval: parsing split in parse_formula, parse_tag, parse_variables to make methods more reusable. Only eval() keeps cache, rest of methods do not keep data. Better management of locals using update_locals(dct).
+ComposersDict: added get/set_property methods
+WorkerProcess: Documentation+Better KeepAlive management
+
 March 2012 - 9.4
 ------------------------
 device: _locals dictionary persistent always, even if new _locals is passed by argument
