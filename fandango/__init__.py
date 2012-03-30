@@ -58,9 +58,11 @@ except: print 'Unable to import arrays module'
 #except: print 'Unable to import db module'    
 
 try:
-    from device import Dev4Tango,TangoEval,TimedQueue,DevChild
-except: 
-    print 'Unable to import device module'
+    from tango import get_device,get_database,ProxiesDict
+    try:
+        from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand,ComposersDict
+    except: print 'Unable to import fandango.device module'    
+except: print 'Unable to import fandango.tango module'
     
 try:
     from dicts import ThreadDict,CaselessDict,ReversibleDict,CaselessDefaultDict,DefaultThreadDict,Enumeration,SortedDict,CaselessList
@@ -73,7 +75,7 @@ except:
     print traceback.format_exc()
 
 try:
-    from objects import Object,Singleton,SingletonMap,Struct
+    from objects import Object,Singleton,SingletonMap,Struct,Property
 except: 
     import traceback
     print traceback.format_exc()
@@ -84,7 +86,7 @@ try:
 except: print 'Unable to import linos module'
 
 try:
-    from log import printf,Logger,LogFilter
+    from log import printf,Logger,LogFilter,shortstr,except2str
 except: print 'Unable to import log module'
 
 try:
@@ -99,12 +101,16 @@ try:
     from interface import FullTangoInheritance,NewTypeInheritance
 except: print 'Unable to import interface module'
 
+try:
+    from threads import WorkerProcess,WorkerThread,SingletonWorker
+except: print 'Unable to import threads module'
+
 #try: import web
 #except: print 'Unable to import fandango.web module'
 #try: import qt
 #except: print 'Unable to import fandango.qt module'
 
-RELEASE = (9,3,0)
+RELEASE = (9,5,0)
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
 #print 'module reloaded'
