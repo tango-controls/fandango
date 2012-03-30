@@ -108,10 +108,7 @@ import fandango.device
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 USE_STATIC_METHODS = getattr(PyTango,'__version_number__',0)<722
-print 'PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS)
-
-#from .excepts import Catched,ExceptionManager
-#from  . import log
+#print 'PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS)
 
 try: 
     #raise Exception('no-taurus')
