@@ -42,7 +42,7 @@ import time,Queue,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
 
 from . import functional
-from log import except2str
+from log import except2str,shortstr
 from functional import *
 from excepts import trial
 from operator import isCallable
@@ -419,40 +419,55 @@ class ProcessedData(object):
         
 class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     """
-    This class have not been finished yet.
+    Class that provides a multiprocessing interface to process tasks in a background process and throw callbacks when finished.
     
-    Compared to WorkerThread it uses Pipes instead of Queues, throws Callbacks instead of just storing values and has an 
-    isAlive() check of the main thread to know if it is still running.
-    It also adds some ThreadDict behaviour, allowing a fixed list of keys to be permanently updated.
-    It can be bound to an executorobject that processes the given queries.
+    The queries are sent between sender/receiver thread and worker process using tuples.
+    Queries may be: (key,) ; (key,target) ; (key,target,args)
+     - key is just an identifier to internally store data results and callbacks
+     - if target is a callable it will be thrown with args as argument (use [] if target is a void function)
+     - if it isn't, then executor(target) will be called
+     - executor can be fandango.evalX or other object/method assigned using WorkerProcess.bind(class,args)
     
-    Class that provides a multiprocessing interface to PyTangoArchiving.Reader class
-    The manager class will have methods to Send and Receive queries/results.
-    The managed class will have Process(key,data) method to process queries and return results.
+    By default fandango.evalX is used to perform tasks, a different executor can be defined as WorkerProcess argument or calling:
+      CP = WorkerProcess(targetClass(initArgs))
+      CP.bind(targetClass,initArgs)
     
-    The queries are sent between receiver thread and process using tuples.
-    Queries may be: (key,) ; (key,args=None) ; (key,command,args)
+    Sending tasks to the process:
+      CP.send(key='A1',target) 
+      # Returns immediately and executes target() or executor(*target) in a background process
+      CP.send('A1',target,args,callback=callback) 
+      # Returns immediately, executes x=target(args) in background and launches callback(x) when ready
+      
+    When a (key,target,args) tuple is received the procedure is:
+     * obtain the exec_ method (executor if args is None, 
+     * obtain arguments (target if args is None, if args is map/sequence it is pre-parsed):
+     * if args is None and there's a valid executor: return executor(target)
+     
+    How the executable method is obtained:
+     - if args is None it tries to get a valid executor and target will be args.
+     - if target is string first it tries to get executor.target
+     - if failed, then it evals target (that may return an executable)
+     - if args is not none and target is not string, target is used as executable if callable
+    Return value:
+     - if a valid executable method is found it returns exec_([*/**]args)
+     - if not, it returns what has been found instead (evalX(target), executor.target or target)
     
-    CP = WorkerProcess()
-    CP.command('comm') # Execute comm() and returns result
-    CP.command('comm',args=(,)) # Excecute comm(*args) and returns result
-    CP.send(key='comm',query=args) # Returns immediately and execute comm(*args) in a background process
-    CP.send( 'comm',args,callback) # Returns immediately, executes data=comm(*args) in background and launches callback(data) when ready
-    CP.add(key,command,args,period)
+    To use it like a threadDict, allowing a fixed list of keys to be permanently updated:
+      CP.add(key,target,args,period,expire,callback)
+      #This call will add a key to dictionary, which target(args) method will be executed every period, value obtained will expire after X seconds.
+      #Optional Callback will be executed every time value is updated.
     
-    The parameters will be:
-     - key: command to be called / key to be identified
-     - query: arguments to previous command
-     - period: how often data must be read (if >0)
-     - expire: time that data will be kept (-1 = forever)
-     - callback: method to be called with received data as argument
+    Throwing commands in a sequential way (it will return when everything already in the queue is done):
+      CP.command('comm') # Execute comm() and returns result
+      CP.command('comm',args=(,)) # Execute comm(*args) and returns result
     
-    To different dictionaries will keep track of process results:
+    Two different dictionaries will keep track of process results:
      - data : will store named data with and update period associated
      - callbacks : will store associated callbacks to throw-1 calls
     """
+    
     ALIVE_PERIOD = 3
-    __ALIVE,__ADDKEY,__REMOVEKEY,__BIND = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND'
+    __ALIVE,__ADDKEY,__REMOVEKEY,__BIND,__NULL = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND','__NULL'
     
     def __init__(self,target=None,start=True):
         """ 
@@ -502,8 +517,9 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     def add(self,key,target=None,args=None,period=0,expire=0,callback=None):
         data = self.data[key] = ProcessedData(key,target=target,args=args,period=period,expire=expire,callback=callback)
         self.send(self.__ADDKEY,target=data.get_args())
-    def get(self,key,_raise=False):
-        # Returns a key value
+    def get(self,key,default=__NULL,_raise=False):
+        # Returns a key value (or default if defined)
+        if key not in self.data and default!=self.__NULL: return default
         result = self.data[key].get()
         if _raise and isinstance(result,Exception): raise result
         return result
@@ -520,12 +536,12 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         """
         keywords = (self.__BIND,self.__ADDKEY,self.__ALIVE,self.__REMOVEKEY,None)
         if (key in keywords or key not in self.callbacks):
-            self.trace('send(%s,%s,%s,%s)'%(key,target,args,callback))
+            #self.trace('send(%s,%s,%s,%s)'%(key,target,args,callback))
             if key not in keywords: self.callbacks[key] = [callback]
             if args is not None: self._pipe1.send((key,target,args))
             else: self._pipe1.send((key,target))
         elif callback not in self.callbacks[key]: 
-            self.trace('send(%s,%s,%s,%s) => %s'%(key,target,args,callback,self.callbacks[key]))
+            #self.trace('send(%s,%s,%s,%s) => %s'%(key,target,args,callback,self.callbacks[key]))
             self.callbacks[key].append(callback)
         return
     def command(self,command,args=None):
@@ -583,7 +599,8 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                 if pipe.poll():
                     t = pipe.recv() #May be (key,) ; (key,args=None) ; (key,command,args)
                     key,target,args = [(None,None,None),(t[0],None,None),(t[0],t[1],None),t][len(t)]
-                    if key!=self.__ALIVE: self.trace('.Process: Received: %s => (%s,%s,%s)'%(str(t),key,target,args))
+                    if key!=self.__ALIVE: self.trace(shortstr('.Process: Received: %s => (%s,%s,%s)'%(str(t),key,target,args)))
+                    last_alive = time.time() #Keep Alive Thread
                 elif scheduled:
                     data = first(sorted((v.expire,v) for n,v in scheduled.items()))[-1]
                     if data.expire<=now: 
@@ -597,7 +614,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                     if data.period>0: 
                         data.expire = now+data.period
                         scheduled[data.name]=data
-                        self.trace('.Process: updated key: %s'%str(data))
+                        self.trace('.Process: Added key: %s'%str(data))
                     else: 
                         if data.name in scheduled: 
                             self.trace('.Process: Removing %s key'%data.name)
@@ -605,9 +622,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                     key,target,args = data.name,data.target,data.args #Added data will be immediately read
                 if key is not None:
                     try:
-                        if key==self.__ALIVE: #Keep Alive Thread
-                            last_alive = time.time()
-                        elif key == self.__REMOVEKEY: #(__REMOVEKEY,key)
+                        if key == self.__REMOVEKEY: #(__REMOVEKEY,key)
                             if target in scheduled: scheduled.pop(target)
                             self.trace(scheduled)
                         elif key == self.__BIND:
@@ -621,8 +636,8 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                                 else: executor = executor(args)
                             locals_['executor'] = executor
                             self.trace('.Process: Bound executor object to %s'%(executor))
-                        else:
-                            if executor is not None and (isCallable(executor) or getattr(executor,'process',None)) and args is None:
+                        elif key!=self.__ALIVE:
+                            if args is None and executor is not None and (isCallable(executor) or getattr(executor,'process',None)):
                                 # Target is a set of arguments to Executor object
                                 exec_ = getattr(executor,'process',executor)
                                 args = target
@@ -640,7 +655,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                                 if key not in scheduled: 
                                     self.trace('.Process:  [%s] = %s(%s)(*%s)'%(key,exec_,target,args))
                                 if args is None: value = exec_()
-                                elif isMapping(args): value = exec_(**args)
+                                elif isDictionary(args): value = exec_(**args)
                                 elif isSequence(args): value = exec_(*args)
                                 else: value = exec_(args)
                             else: 
@@ -664,33 +679,41 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     def _receive_data(self):
         self.last_alive = 0
         while not self._threading_event.is_set():
-            if self._pipe1.poll():
-                key,query = self._pipe1.recv()
-                if key not in self.data: self.trace('.Thread: received %s data; pending: %s'%(key,self.callbacks.keys()))
-                if key in self.keys():
-                    self.data[key].set(query)
-                    if self.data[key].callback: 
-                        try:
-                            self.trace('.Thread:\tlaunching %s callback %s'%(key,callback))
-                            self.data[key].callback(query)
-                        except:
-                            self.trace('.Thread:\tError in %s callback %s!'%(key,callback))
-                            self.trace(except2str())
-                if key in self.callbacks:
-                    for callback in self.callbacks[key]:
-                        if callback is None: continue
-                        try:
-                            self.trace('.Thread:\tlaunching callback %s'%callback)
-                            callback(query)
-                        except:
-                            self.trace('.Thread:\tError in %s callback %s!'%(key,callback))
-                            self.trace(except2str())
-                    self.callbacks.pop(key)
-            if time.time() > self.last_alive+3: 
-                self._pipe1.send((self.__ALIVE,None))
-                self.last_alive = time.time()
+            try:
+                if self._pipe1.poll():
+                    key,query = self._pipe1.recv()
+                    if key not in self.data: 
+                        self.trace('.Thread: received %s data; pending: %s'%(key,self.callbacks.keys()))
+                        pass
+                    if key in self.keys():
+                        self.data[key].set(query)
+                        if self.data[key].callback: 
+                            try:
+                                self.trace('.Thread:\tlaunching %s callback %s'%(key,callback))
+                                self.data[key].callback(query)
+                            except:
+                                self.trace('.Thread:\tError in %s callback %s!'%(key,callback))
+                                self.trace(except2str())
+                    if key in self.callbacks:
+                        for callback in self.callbacks[key]:
+                            if callback is None: continue
+                            try:
+                                self.trace('.Thread:\tlaunching callback %s'%callback)
+                                callback(query)
+                            except:
+                                self.trace('.Thread:\tError in %s callback %s!'%(key,callback))
+                                self.trace(except2str())
+                        self.callbacks.pop(key)
+            except: self.trace('.Thread,Exception:%s'%traceback.format_exc())
+            try:
+                if time.time() > self.last_alive+3: 
+                    self._pipe1.send((self.__ALIVE,None))
+                    self.last_alive = time.time()
+            except: self.trace('.Thread.is_alive(),Exception:%s'%traceback.format_exc())
             self._threading_event.wait(0.02)
         self.trace('.Thread: exit_data_thread')
+        self.trace('<'*80)
+        self.trace('<'*80)
 
 
 ###############################################################################
