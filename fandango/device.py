@@ -496,7 +496,7 @@ class TangoEval(object):
         #self.trace( regexp)
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
         
-        formula = self.parse_formula(formula)
+        formula = self.parse_formula(formula,_locals)
         
         ##@var all_vars list of tuples with (device,/attribute) name matches
         #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
