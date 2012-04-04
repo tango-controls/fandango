@@ -471,10 +471,10 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
      - callbacks : will store associated callbacks to throw-1 calls
     """
     
-    ALIVE_PERIOD = 3
+    ALIVE_PERIOD = 15
     __ALIVE,__ADDKEY,__REMOVEKEY,__BIND,__NULL = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND','__NULL'
     
-    def __init__(self,target=None,start=True):
+    def __init__(self,target=None,start=True,timeout=0):
         """ 
         :param target: If not None, target will be an object which methods could be targetted by queries. 
         """
@@ -482,7 +482,8 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         import threading
         from collections import defaultdict
         self.trace('__init__(%s)'%(target))
-        
+        self.timeout = timeout or self.ALIVE_PERIOD #Maximum time between requests, process will die if exceeded
+        self.timewait = 0.02 #Time to wait between operations
         self.data = {} #It will contain a {key:ProcessedData} dictionary
         
         #Process Part
@@ -501,7 +502,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     def __del__(self):
         self.stop()
         type(self).__base__.__del__(self)
-    def trace(self,msg):
+    def trace(self,msg,level=0):
         print '%s, %s: %s'%(time2str(),type(self).__name__,str(msg))
         
     def bind(self,target,args=None):
@@ -554,7 +555,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         it doesn't return until it is resolved """
         self._return = None
         self.send(key=str(command),target=command,args=args,callback=lambda q,e=self._command_event,s=self:(setattr(s,'_return',q),e.set()))
-        while not self._command_event.is_set(): self._command_event.wait(.02)
+        while not self._command_event.is_set(): self._command_event.wait(self.timewait)
         self._command_event.clear()
         return self._return
     
@@ -584,7 +585,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
             return None
         
     #@staticmethod
-    def _run_process(self,pipe,event,executor=None,alive=ALIVE_PERIOD):
+    def _run_process(self,pipe,event,executor=None):
         """ 
         Queries sent to Process can be executed in different ways:
          - Having a process(query) method given as argument.
@@ -593,19 +594,20 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
          
         Executor will be a callable or an object with 'target' methods
         """
-        last_alive = time.time()
+        last_alive,idle = time.time(),0 #Using NCycles count instead of raw time to avoid CPU influence
         scheduled = {} #It will be a {key:[data,period,last_read]} dictionary
         locals_,modules,instances = {'executor':executor},{},{}
         key = None
         self.trace('.Process(%s) started'%str(executor or ''))
-        while not event.is_set() and (pipe.poll() or time.time()<(last_alive+2*alive)):
+        while not event.is_set() and (pipe.poll() or idle<(self.timeout/self.timewait)): #time.time()<(last_alive+self.timeout)):
             try:
+                idle+=1
                 now = time.time()
                 if pipe.poll():
                     t = pipe.recv() #May be (key,) ; (key,args=None) ; (key,command,args)
                     key,target,args = [(None,None,None),(t[0],None,None),(t[0],t[1],None),t][len(t)]
                     if key!=self.__ALIVE: self.trace(shortstr('.Process: Received: %s => (%s,%s,%s)'%(str(t),key,target,args)))
-                    last_alive = time.time() #Keep Alive Thread
+                    last_alive,idle = time.time(),0 #Keep Alive Thread
                 elif scheduled:
                     data = first(sorted((v.expire,v) for n,v in scheduled.items()))[-1]
                     if data.expire<=now: 
@@ -676,9 +678,9 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                         #print e
                         pipe.send((key,getPickable(e)))
             except Exception,e:
-                self.trace('.Process:\tUnknown Error in process!\n%s'%(except2str()))
+                self.trace('.Process:\tUnknown Error in process!\n%s'%traceback.format_exc())
             key = None
-            event.wait(0.02)
+            event.wait(self.timewait)
         self.trace('.Process: exit_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive))
                         
     def _receive_data(self):
@@ -715,7 +717,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                     self._pipe1.send((self.__ALIVE,None))
                     self.last_alive = time.time()
             except: self.trace('.Thread.is_alive(),Exception:%s'%traceback.format_exc())
-            self._threading_event.wait(0.02)
+            self._threading_event.wait(self.timewait)
         self.trace('.Thread: exit_data_thread')
         self.trace('<'*80)
         self.trace('<'*80)
