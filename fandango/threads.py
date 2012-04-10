@@ -474,7 +474,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     ALIVE_PERIOD = 15
     __ALIVE,__ADDKEY,__REMOVEKEY,__BIND,__NULL = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND','__NULL'
     
-    def __init__(self,target=None,start=True,timeout=0):
+    def __init__(self,target=None,start=True,timeout=0,timewait=0):
         """ 
         :param target: If not None, target will be an object which methods could be targetted by queries. 
         """
@@ -483,7 +483,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         from collections import defaultdict
         self.trace('__init__(%s)'%(target))
         self.timeout = timeout or self.ALIVE_PERIOD #Maximum time between requests, process will die if exceeded
-        self.timewait = 0.02 #Time to wait between operations
+        self.timewait = max((timewait,0.02)) #Time to wait between operations
         self.data = {} #It will contain a {key:ProcessedData} dictionary
         
         #Process Part
