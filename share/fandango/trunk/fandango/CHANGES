@@ -1,3 +1,8 @@
+TangoEval: Attribute values overridable using eval(previous=...) argument
+excepts.trial: Added args/kwargs to trial methods
+fun: setitem/getitem generic methods
+tango:added get_device_started method
+
 April 2012 - 9.5
 ------------------------
 
