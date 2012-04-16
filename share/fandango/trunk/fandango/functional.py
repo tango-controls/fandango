@@ -135,7 +135,14 @@ def everyone(seq,method=bool):
     for s in seq:
         if not method(s): return s if not s else None
     return s
-        
+
+#Dictionary methods
+
+def setitem(mapping,key,value):
+    mapping[key]=value
+
+def getitem(mapping,key):
+    return mapping[key]
 
 ########################################################################
 ## Regular expressions 
@@ -285,6 +292,8 @@ isMapping = isDictionary
 def isIterable(seq):
     """ It includes dicts and listlikes but not strings """
     return hasattr(seq,'__iter__') and not isString(seq)
+
+###############################################################################
 
 def str2int(seq):
     """ It returns the first integer encountered in the string """
