@@ -547,6 +547,7 @@ class TangoEval(object):
     def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
         ''' 
         Evaluates the given formula.
+        Previous can be used to add extra local values, or predefined values for attributes ({'a/b/c/d':1} that would override its reading
         Any variable in locals is evaluated or explicitly replaced in the formula if appearing with brackets (e.g. FIND({VARNAME}/*/*))
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         '''
@@ -556,19 +557,21 @@ class TangoEval(object):
         self.formula = self.formula.replace(' || ',' or ')
         self.formula = self.formula.replace(' && ',' and ')
         self.update_locals(_locals)
-        self.previous.update(previous or {})
+        #self.previous.update(previous or {}) #<<< Values passed as eval locals are persistent, do we really want that?!?
         
         self.formula = self.parse_formula(self.formula) #Replacement of FIND(...), env variables and comments.
         variables = self.parse_variables(self.formula)
         self.trace('>'*80)
-        self.trace('eval(): variables in formula are %s' % self.variables)
+        self.trace('eval(): variables in formula are %s' % variables)
         source = self.formula #It will be modified on each iteration
         self.last.clear()
         for device,attribute,what in variables:
             target = device + (attribute and '/%s'%attribute) + (what and '.%s'%what)
             var_name = self.parse_tag(target)
             self.trace('\t%s => %s'%(target,var_name))
-            self.previous[var_name] = self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise)
+            #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
+            self.previous[var_name] = previous.get(target,self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise))
+            self.previous.pop(target,None)
             self.last[target] = self.previous[var_name] #Used from alarm messages
             source = source.replace(target,var_name,1)
 
@@ -777,7 +780,7 @@ class ComposersDict(ServersDict):
         return dict((d,self.db.get_device_property(d,[property])[property]) for d in devs)
         
     def set_property(self,*args):
-        """ get_property(property,value) or get_property(device_regexp,property,value) """
+        """ set_property(property,value) or set_property(device_regexp,property,value) """
         property,value = args[-2:]
         devs = self.get_all_devices()
         if len(args)==3: devs = [d for d in devs if fandango.matchCl(args[0],d)]
