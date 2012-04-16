@@ -167,6 +167,10 @@ def set_attribute_label(target,label='',unit=''):
     if unit: cf.unit = unit
     ap.set_config(cf)
 
+def get_device_started(target):
+    """ Returns device started time """
+    return get_database_device().DbGetDeviceInfo(target)[-1][5]
+    
 def get_device_labels(target,filters='',brief=True):
     """
     Returns an {attr:label} dict for all attributes of this device 
