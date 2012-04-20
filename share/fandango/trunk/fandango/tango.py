@@ -293,34 +293,14 @@ def parse_tango_model(name):
             if gd.get('host'): values['host'],values['port'] = gd['host'].split(':',1)
     return values if 'devicename' in values else None
 
-def get_all_devices(expressions,limit=1000):
-    ''' Returns the list of registered devices (including unexported) that match any of the given wildcars (Regexp not admitted!) '''
-    results = []
-    db = get_database()
-    expressions = fun.toList(expressions)
-    for target in expressions:
-        #if not target.count('/')>=2:
-            #print 'get_all_devices(%s): device names must have 2 slash characters'%target
-            #if len(expressions)>1: continue
-            #else: raise 'ThisIsNotAValidDeviceName'
-        match = fun.matchCl(retango,target,terminate=True)
-        if not match: raise 'ThisIsNotAValidDeviceName:%s'%target
-        #target = match.groups()[0]
-        td,tf,tm = target.split('/')[-3:]
-        domains = db.get_device_domain(target)
-        for d in domains:
-            families = db.get_device_family(d+'/'+tf+'/'+tm)
-            for f in families:
-                members = db.get_device_member((d+'/'+f+'/'+tm))
-                for m in members:
-                    results.append('/'.join((d,f,m)))
-    return results
-                
-def get_matching_devices(expressions,limit=1000):
+def get_matching_devices(expressions,limit=0,exported=False):
+    """ 
+    Searches for devices matching expressions, if exported is True only running devices are returned 
+    """
     if not fun.isSequence(expressions): expressions = [expressions]
     all_devs = []
     if any(not fun.matchCl(rehost,expr) for expr in expressions):
-        all_devs.extend(list(get_database().get_device_name('*','*')))
+        all_devs.extend(list(get_database().get_device_exported('*') if exported else get_database().get_device_name('*','*')))
     for expr in expressions:
         m = fun.matchCl(rehost,expr) 
         if m:
@@ -329,16 +309,22 @@ def get_matching_devices(expressions,limit=1000):
             odb = PyTango.Database(*host.split(':'))
             all_devs.extend('%s/%s'%(host,d) for d in odb.get_device_name('*','*'))
     expressions = map(fun.toRegexp,fun.toList(expressions))
-    return filter(lambda d: any(fun.matchCl(e,d,terminate=True) for e in expressions),all_devs)
+    result = filter(lambda d: any(fun.matchCl(e,d,terminate=True) for e in expressions),all_devs)
+    return result[:limit] if limit else result
+        
+find_devices = get_matching_devices
 
-def get_matching_attributes(dev,expressions):
+def get_device_commands(dev):
+    return [c.cmd_name for c in get_device(dev).command_list_query()]
+
+def get_device_attributes(dev,expressions='*'):
     """ Given a device name it returns the attributes matching any of the given expressions """
     expressions = map(fun.toRegexp,fun.toList(expressions))
     al = get_device(dev).get_attribute_list()
     result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
     return result
 
-def get_matching_device_attributes(expressions,limit=1000):
+def get_matching_attributes(expressions,limit=0):
     """ 
     Returns all matching device/attribute pairs. 
     regexp only allowed in attribute names
@@ -351,27 +337,33 @@ def get_matching_device_attributes(expressions,limit=1000):
     for e in expressions:
         match = fun.matchCl(retango,e,terminate=True)
         if not match:
-            raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
+            if '/' not in e:
+                host,dev,attr = def_host,e.rsplit('/',1)[0],'state'
+                #raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
+            else:
+                host,dev,attr = def_host,e.rsplit('/',1)[0],e.rsplit('/',1)[1]
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
-        for d in get_matching_devices(dev):
-            #print 'get_matching_device_attributes(%s,%s)...'%(dev,attr)
+        for d in get_matching_devices(dev,exported=True):
             if fun.matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
                 try: 
-                    ats = get_matching_attributes(d,[attr])
+                    ats = get_device_attributes(d,[attr])
                     attrs.extend([d+'/'+a for a in ats])
                     if len(attrs)>limit: break
                 except: 
                     print 'Unable to get attributes for %s'%d
-    return list(set(attrs))
+    result = list(set(attrs))
+    return result[:limit] if limit else result
+                    
+find_attributes = get_matching_attributes
     
 def get_all_models(expressions,limit=1000):
-    ''' It returns all the available Tango attributes matching any of a list of regular expressions.
-    All devices matching expressions must be obtained.
-    For each device only the good attributes are read.
+    ''' 
+    Customization of get_matching_attributes to be usable in Taurus widgets.
+    It returns all the available Tango attributes (exported!) matching any of a list of regular expressions.
     '''
     if isinstance(expressions,str): #evaluating expressions ....
         if any(re.match(s,expressions) for s in ('\{.*\}','\(.*\)','\[.*\]')): expressions = list(eval(expressions))
@@ -382,41 +374,8 @@ def get_all_models(expressions,limit=1000):
     print 'In get_all_models(%s:"%s") ...' % (type(expressions),expressions)
     db = get_database()
     if 'SimulationDatabase' in str(type(db)): #used by TauWidgets displayable in QtDesigner
-      models = expressions
-    else:
-      all_devs = db.get_device_exported('*')
-      models = []
-      for exp in expressions:
-          print 'evaluating exp = "%s"' % exp
-          exp = str(exp)
-          devs = []
-          targets = []
-          if exp.count('/')==3: device,attribute = exp.rsplit('/',1)
-          else: device,attribute = exp,'State'
-          
-          if any(c in device for c in '.*[]()+?'):
-              if '*' in device and '.*' not in device: device = device.replace('*','.*')
-              devs = [s for s in all_devs if fun.matchCl(device,s)]
-          else:
-              devs = [device]
-              
-          print 'get_all_models(): devices matched by %s / %s are %d:' % (device,attribute,len(devs))
-          print '%s' % (devs)
-          for dev in devs:
-              if any(c in attribute for c in '.*[]()+?'):
-                  if '*' in attribute and '.*' not in attribute: attribute = attribute.replace('*','.*')
-                  try: 
-                      dp = get_device(dev)
-                      attrs = [att.name for att in dp.attribute_list_query() if fun.matchCl(attribute,att.name)]
-                      targets.extend(dev+'/'+att for att in attrs)
-                  except Exception,e: print 'ERROR! Unable to get attributes for device %s: %s' % (dev,str(e))
-              else: targets.append(dev+'/'+attribute)
-          models.extend(targets)
-    models = models[:limit]
-    return models
-
-def get_command_list(dev):
-    return [c.cmd_name for c in get_device(dev).command_list_query()]
+      return expressions
+    return get_matching_attributes(expressions,limit)
               
 #@}
 ########################################################################################    
