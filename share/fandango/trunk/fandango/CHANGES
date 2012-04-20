@@ -1,7 +1,11 @@
-TangoEval: Attribute values overridable using eval(previous=...) argument
+April 2012 - 9.6
+-----------------------
+
+TangoEval: Attribute values overridable using eval(previous=...) argument, CRITICAL BUG SOLVED HERE!
 excepts.trial: Added args/kwargs to trial methods
 fun: setitem/getitem generic methods
-tango:added get_device_started method
+tango:added get_device_started method, find_devices/find_attributes added to fandango root, get_matching_device_attributes renamed to get_matching_attributes
+tango: get_device_commands/attributes methods added (with regexp filter)
 
 April 2012 - 9.5
 ------------------------
