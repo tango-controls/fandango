@@ -552,6 +552,7 @@ class TangoEval(object):
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         '''
         self.formula = (formula or self.formula).strip()
+        previous = previous or {}
         for x in ['or','and','not','in','is','now']: #Check for case-dependent operators
             self.formula = self.formula.replace(' '+x.upper()+' ',' '+x+' ')
         self.formula = self.formula.replace(' || ',' or ')
