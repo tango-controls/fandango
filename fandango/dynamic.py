@@ -844,8 +844,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.dyn_values[aname].update(value,date,quality)
                     (self.debug if self.KeepAttributes[0] in ('yes','true') else self.info)('evalAttr(%s): Value will be kept for later reuse' % (aname))
                     #Updating state if needed:
-                    if old!=value and self.dyn_values.get(aname).states_queue:
-                        self.check_state()
+                    try:
+                        if old!=value and self.dyn_values.get(aname).states_queue:
+                            self.check_state()
+                    except:
+                        self.warning('Unable to check state!')
+                        #print 'old = %s'%old
+                        #print 'value = %s'%value
+                        self.warning(traceback.format_exc())
             return result
 
         except PyTango.DevFailed, e:
@@ -1162,13 +1168,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         break
         
         except Exception,e:
+            print traceback.format_exc()
             raise e
         finally:
             if self.state_lock.locked(): self.state_lock.release()
         return state
     
-    def set_status(self,status):
-        if not any('STATUS' in s for s in self.DynamicStatus):
+    def set_status(self,status,save=True):
+        if save: #not any('STATUS' in s for s in self.DynamicStatus): #adds STATUS to locals only if not used in DynamicStatus?
             self._locals['STATUS']=status
         DynamicDS.get_parent_class(self).set_status(self,status)
         
@@ -1186,7 +1193,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.debug('In DynamicDS.check_status')
             try:
                 status = '\n'.join([self.evaluateFormula(s) for s in self.DynamicStatus])
-                if set: self.set_status(status)
+                if set: self.set_status(status,save=False)
             except Exception,e:
                 self.warning('Unable to generate DynamicStatus:\n%s'%traceback.format_exc())
         return status
