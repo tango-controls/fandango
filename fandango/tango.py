@@ -68,8 +68,8 @@ except:
     print 'fandango.tango: USE_TAU disabled'
     USE_TAU=False
 
-from . import objects
-from . import functional as fun
+import objects
+import functional as fun
 from dicts import CaselessDefaultDict,CaselessDict
 from objects import Object,Struct
 from log import Logger
