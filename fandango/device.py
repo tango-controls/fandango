@@ -49,8 +49,8 @@ import os,threading,traceback
 import PyTango
 
 #fandango imports
-from . import log,excepts,callbacks,tango,objects,dicts,arrays,dynamic
-from . import functional as fun
+from fandango import log,excepts,callbacks,tango,objects,dicts,arrays,dynamic
+from fandango import functional as fun
 from log import Logger,except2str
 from excepts import *
 from callbacks import *
@@ -468,7 +468,7 @@ class TangoEval(object):
                 formula = formula.replace('$(%s)'%str(l),str(v))
         findables = re.findall('FIND\(([^)]*)\)',formula)
         for target in findables:
-            res = str(sorted(d.lower() for d in get_matching_device_attributes([target.replace('"','').replace("'",'')])))
+            res = str(sorted(d.lower() for d in get_matching_attributes([target.replace('"','').replace("'",'')])))
             formula = formula.replace("FIND(%s)"%target,res.replace('"','').replace("'",''))
             self.trace('Replacing with results for %s ...%s'%(target,res))
         return formula
