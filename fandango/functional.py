@@ -35,7 +35,6 @@
 ###########################################################################
 """
 
-import operator
 import re
 import time,datetime
 
@@ -64,7 +63,7 @@ def first(seq):
     """Returns first element of sequence"""
     try: 
         return seq[0]
-    except Exception,e: 
+    except Exception,e:
         try: 
             return seq.next()
         except Exception,d:
@@ -90,6 +89,10 @@ def last(seq,MAX=1000):
             return n
     return
         
+def avg(seq):
+    seq = [s for s in seq if seq is not None]
+    return sum(seq)/len(seq)
+        
 def xor(A,B):
     """Returns (A and not B) or (not A and B);
     the difference with A^B is that it works also with different types and returns one of the two objects..
@@ -108,7 +111,7 @@ def isTrue(arg):
 def join(*seqs):
     """ It returns the a list containing the objects of all given sequences. """
     if len(seqs)==1 and isSequence(seqs[0]):
-        seqs = seqs
+        seqs = seqs[0]
     result = []
     for seq in seqs: 
         if isSequence(seq): result.extend(seq)
@@ -155,7 +158,7 @@ def matchAll(exprs,seq):
     exprs,seq = toSequence(exprs),toSequence(seq)
     if anyone(isRegexp(e) for e in exprs):
         exprs = [(e.endswith('$') and e or (e+'$')) for e in exprs]
-        return [s for s in seq if fun.anyone(re.match(e,s) for e in exprs)]
+        return [s for s in seq if anyone(re.match(e,s) for e in exprs)]
     else:
         return [s for s in seq if s in exprs]
     
@@ -180,7 +183,7 @@ def matchMap(mapping,key,regexp=True):
             return value
     raise KeyError(key)
     
-def matchTuples(self,mapping,key,value):
+def matchTuples(mapping,key,value):
     """ mapping is a (regexp,[regexp]) tuple list where it is verified that value matches any from the matched key """
     for k,regexps in mapping:
         if re.match(k,key):
@@ -329,10 +332,10 @@ def list2str(s,separator='\t',MAX_LENGTH=255):
     return s
 
 def text2tuples(s,separator='\t'):
-    return [str2list(t,separator) for t in text2list(txt)]
+    return [str2list(t,separator) for t in text2list(s)]
 
 def tuples2text(s,separator='\t'):
-    return list2text([list2str(t,separator) for t in s],'\n')
+    return list2str([list2str(t,separator) for t in s],'\n')
 
 ########################################################################
 ## Number conversion
@@ -492,7 +495,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
                 instance = getattr(__builtin__,klass)(*klass_args)
                 target = getattr(instance,target)
             elif target in dir(__builtin__): 
-                if _trace: print('evalX: %s(%s)'%(name,target,args))
+                if _trace: print('evalX: %s(%s)'%(target,args))
                 target = getattr(__builtin__,target)
             else:
                 raise _exception('%s()_MethodNotFound'%target)
