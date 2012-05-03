@@ -41,7 +41,6 @@ srubio@cells.es,
 import time,Queue,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
 
-from . import functional
 from log import except2str,shortstr
 from functional import *
 from excepts import trial
@@ -116,7 +115,7 @@ class CronTab(object):
         """
         if now is None: now=time.time()
         self.last_match = now-(now%60)
-        tt = functional.time2tuple(now)
+        tt = time2tuple(now)
         if all(self._check(c,v) for c,v in 
             zip([self.minute,self.hour,self.day,self.month,self.weekday],
                 [tt.tm_min,tt.tm_hour,tt.tm_mday,tt.tm_mon,tt.tm_wday+1])
@@ -139,9 +138,9 @@ class CronTab(object):
         trace = trace or self.trace
         task = task or self.task
         if trace: print 'In CronTab(%s).do_task(%s)'%(self.line,task)
-        if functional.isCallable(task):
+        if isCallable(task):
             ret = task()
-        elif functional.isString(task):
+        elif isString(task):
             from fandango.linos import shell_command
             ret = shell_command(self.task)
         else:
