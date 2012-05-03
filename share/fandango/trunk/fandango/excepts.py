@@ -76,7 +76,7 @@ import traceback
 import functools
 import contextlib
 import PyTango
-from . import log
+from fandango import log
 import fandango.functional as fun
 
 def trial(tries,excepts=None,args=None,kwargs=None):
