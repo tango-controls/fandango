@@ -1,3 +1,10 @@
+May 2012 - 9.7
+-----------------------
+TangoEval: patched bug in FIND()
+functional: small bugs solved
+dynamic: problems with state/status generation solved
+dynamic: ATTRIBUTES added to _locals
+
 April 2012 - 9.6
 -----------------------
 
