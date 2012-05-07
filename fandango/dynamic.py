@@ -817,6 +817,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 'VALUE':VALUE,
                 'STATE':self.get_state(),
                 'LOCALS':self._locals,
+                'ATTRIBUTES':dict((a,self._locals[a]) for a in self.dyn_values if a in self._locals),
                 }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
             if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
             
@@ -888,7 +889,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         __locals=locals().copy() #Low priority: local variables
         __locals.update(self._locals) #Second priority: object statements
         __locals.update(_locals) #High Priority: variables passed as argument
-        __locals.update({'STATE':self.get_state(),'t':time.time()-self.time0,'NAME': self.get_name()})
+        __locals.update({'STATE':self.get_state(),'t':time.time()-self.time0,'NAME': self.get_name(),'ATTRIBUTES':dict((a,self._locals[a]) for a in self.dyn_values if a in self._locals)})
         #print 'IN EVALSTATE LOCALS ARE:\n',__locals
         return eval(formula,self._globals,__locals)
 
@@ -1177,6 +1178,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def set_status(self,status,save=True):
         if save: #not any('STATUS' in s for s in self.DynamicStatus): #adds STATUS to locals only if not used in DynamicStatus?
             self._locals['STATUS']=status
+        self.debug('STATUS: %s'%status)
         DynamicDS.get_parent_class(self).set_status(self,status)
         
     def set_full_status(self,status,set=True):
@@ -1192,11 +1194,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if self.DynamicStatus:
             self.debug('In DynamicDS.check_status')
             try:
-                status = '\n'.join([self.evaluateFormula(s) for s in self.DynamicStatus])
+                status = '\n'.join([self.evaluateFormula(s) for s in self.DynamicStatus if s])
                 if set: self.set_status(status,save=False)
             except Exception,e:
                 self.warning('Unable to generate DynamicStatus:\n%s'%traceback.format_exc())
-        return status
+        return status.strip()
 
 #------------------------------------------------------------------------------------------------------
 #   Lock/Unlock Methods
