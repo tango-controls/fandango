@@ -1,3 +1,8 @@
+Tango: New bugs solved in FIND()
+dynamic: ATTRIBUTES set as list
+CSV: arrays are iterable
+
+
 May 2012 - 9.7
 -----------------------
 TangoEval: patched bug in FIND()
