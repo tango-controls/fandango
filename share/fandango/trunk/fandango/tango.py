@@ -345,6 +345,7 @@ def get_matching_attributes(expressions,limit=0):
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
+        #print '%s => %s: %s /%s' % (e,host,dev,attr)
         for d in get_matching_devices(dev,exported=True):
             if fun.matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
@@ -352,7 +353,7 @@ def get_matching_attributes(expressions,limit=0):
                 try: 
                     ats = get_device_attributes(d,[attr])
                     attrs.extend([d+'/'+a for a in ats])
-                    if len(attrs)>limit: break
+                    if limit and len(attrs)>limit: break
                 except: 
                     print 'Unable to get attributes for %s'%d
     result = list(set(attrs))
