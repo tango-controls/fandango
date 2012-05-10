@@ -817,7 +817,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 'VALUE':VALUE,
                 'STATE':self.get_state(),
                 'LOCALS':self._locals,
-                'ATTRIBUTES':dict((a,self._locals[a]) for a in self.dyn_values if a in self._locals),
+                #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
+                'ATTRIBUTES':sorted(self.dyn_values.keys()),
                 }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
             if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
             
@@ -889,7 +890,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         __locals=locals().copy() #Low priority: local variables
         __locals.update(self._locals) #Second priority: object statements
         __locals.update(_locals) #High Priority: variables passed as argument
-        __locals.update({'STATE':self.get_state(),'t':time.time()-self.time0,'NAME': self.get_name(),'ATTRIBUTES':dict((a,self._locals[a]) for a in self.dyn_values if a in self._locals)})
+        __locals.update(
+            {'STATE':self.get_state(),'t':time.time()-self.time0,'NAME': self.get_name(),
+            #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
+            'ATTRIBUTES':sorted(self.dyn_values.keys()),
+            })
         #print 'IN EVALSTATE LOCALS ARE:\n',__locals
         return eval(formula,self._globals,__locals)
 
@@ -1194,7 +1199,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if self.DynamicStatus:
             self.debug('In DynamicDS.check_status')
             try:
-                status = '\n'.join([self.evaluateFormula(s) for s in self.DynamicStatus if s])
+                status = ''
+                for s in self.DynamicStatus:
+                    try:
+                        t = s and self.evaluateFormula(s) or ''
+                        status += t+'\n'
+                    except Exception,x:
+                        self.warning('\tevaluateStatus(%s) failed: %s'%(s,traceback.format_exc()))
                 if set: self.set_status(status,save=False)
             except Exception,e:
                 self.warning('Unable to generate DynamicStatus:\n%s'%traceback.format_exc())
@@ -1248,7 +1259,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def evaluateFormula(self,argin):
-        argout=str(self.evalState(str(argin)))
+        print '\tevaluateFormula(%s)'%argin
+        e = self.evalState(str(argin))
+        argout=str(e)
         return argout
 
     """
@@ -1549,6 +1562,8 @@ class DynamicAttribute(object):
         if value is None:
             if op_name in ['__nonzero__','__int__','__float__','__long__','__complex__']: 
                 value = 0
+            elif op_name in ['__str__','__repr__']:
+                return ''
             else:
                 return None
 
