@@ -1,4 +1,4 @@
-Tango: New bugs solved in FIND()
+Tango: New bugs solved in FIND(), modified to not load database with constant queries.
 dynamic: ATTRIBUTES set as list
 CSV: arrays are iterable
 
