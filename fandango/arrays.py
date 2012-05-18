@@ -222,8 +222,11 @@ class CSVArray:
                 result = result + str(row[n]) + ('\t' if n<self.ncols-1 else '\n')
         return result
             
+    def __len__(self):
+        return self.size()[0]
+    
     def __iter__(self):
-        return (self.get(i) for i in range(self.size()[0]))
+        return (self.get(i) for i in range(len(self)))
        
     #@Catched
     def load(self,filename,comment=None,delimiter=None,prune_empty_lines=True,filters=None):
