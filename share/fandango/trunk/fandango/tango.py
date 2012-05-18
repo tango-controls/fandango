@@ -293,14 +293,31 @@ def parse_tango_model(name):
             if gd.get('host'): values['host'],values['port'] = gd['host'].split(':',1)
     return values if 'devicename' in values else None
 
+import fandango.objects
+class get_all_devices(fandango.objects.SingletonMap):
+    def __init__(self,exported=False,keeptime=60):
+        self._all_devs = []
+        self._last_call = 0
+        self._keeptime = keeptime #Only 1 query/minute to DB allowed
+        self._exported = exported
+    def get_all_devs(self):
+        now = time.time()
+        if not self._all_devs or now>(self._last_call+self._keeptime):
+            print 'updating all_devs ...'
+            self._all_devs = list(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*'))
+            self._last_call = now
+        return self._all_devs
+    def __new__(cls,*p,**k):
+        instance = fandango.objects.SingletonMap.__new__(cls,*p,**k)
+        return instance.get_all_devs()
+    
 def get_matching_devices(expressions,limit=0,exported=False):
     """ 
     Searches for devices matching expressions, if exported is True only running devices are returned 
     """
     if not fun.isSequence(expressions): expressions = [expressions]
     all_devs = []
-    if any(not fun.matchCl(rehost,expr) for expr in expressions):
-        all_devs.extend(list(get_database().get_device_exported('*') if exported else get_database().get_device_name('*','*')))
+    if any(not fun.matchCl(rehost,expr) for expr in expressions): all_devs.extend(get_all_devices(exported))
     for expr in expressions:
         m = fun.matchCl(rehost,expr) 
         if m:
