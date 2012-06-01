@@ -5,9 +5,6 @@ from functools import partial
 from functional import isString
 from fandango.log import Logger,shortstr
 
-import tau,tau.widget,tau.core
-from tau.widget import taubase,colors
-
 def getStateLed(model):
     from taurus.qt.qtgui.display import TaurusStateLed
     led = TaurusStateLed()
@@ -202,114 +199,120 @@ class QCustomTabWidget(Qt.QWidget):
 
 #-------------------------------------------------------------------------------
 
-def getColorsForValue(value,palette = colors.QT_DEVICE_STATE_PALETTE):
-    """ 
-    Get QColor equivalent for a given Tango attribute value 
-    It returns a Background,Foreground tuple
-    """
-    print 'In getColorsForValue(%s)'%value
-    if value is None:
-        return Qt.QColor(Qt.Qt.gray),Qt.QColor(Qt.Qt.black)
-    elif hasattr(value,'value'): #isinstance(value,PyTango.DeviceAttribute):
-        if value.type == taubase.PyTango.ArgType.DevState:
-            bg_brush, fg_brush = colors.QT_DEVICE_STATE_PALETTE.qbrush(value.value)
-        elif value.type == taubase.PyTango.ArgType.DevBoolean:
-            bg_brush, fg_brush = colors.QT_DEVICE_STATE_PALETTE.qbrush((taubase.PyTango.DevState.FAULT,taubase.PyTango.DevState.ON)[value.value])                    
-        else:
-            bg_brush, fg_brush = colors.QT_ATTRIBUTE_QUALITY_PALETTE.qbrush(value.quality)            
-    else:
-        bg_brush, fg_brush = palette.qbrush(int(value))
-        
-    return bg_brush.color(),fg_brush.color()
-    
 class TauFakeEventReceiver():
     def event_received(self,source,type_,value):
         print '%s: Event from %s: %s(%s)'% (time.ctime(),source,type_,shortstr(getattr(value,'value',value)))
         
+try:
+    import tau,tau.widget,tau.core
+    from tau.widget import taubase,colors    
 
-class TauColorComponent(tau.widget.taubase.TauBaseComponent):
-    """
-    Abstract class for Tau color-based items.
-    
-    :param: defaults will be a tuple with the default foreground,background colors (appliable if value not readable)
-            It may allow to differentiate not-read from UNKNOWN
-            
-    The TauColorComponent contains a QObject to emit Qt.SIGNALs if needed:
-        self.emitter.connect(self.emitter,Qt.SIGNAL("setColors"),self.parent.tabBar().setTabTextColor)
-        self.emitter.emit(Qt.SIGNAL("setColors"),self.getIndex(),color)
-    """
-    
-    def __init__(self, name = None, parent = None, defaults = None):
-        self.__name = name
-        self.call__init__(tau.widget.taubase.TauBaseComponent, name, parent)
-        self.__value = None
-        self._defBgColor = defaults and defaults[0] or Qt.QColor(Qt.Qt.gray)
-        self._defFgColor = defaults and defaults[-1] or Qt.QColor(Qt.Qt.black)
-        self._currBgColor,self._currFgColor = self._defBgColor,self._defFgColor
-        self.emitter = Qt.QObject(parent)
-        
-    def setColors(self,background,foreground):
-        raise Exception('Method should be overriden in %s subclass!'%type(self))
-        
-    #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-    # Mandatory methods to be implemented in any subclass of TauComponent
-    #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
-    
-    def setModel(self,model):
-        print '#'*80
-        self.info('In %s.setModel(%s)'%(type(self).__name__,model))
-        model = str(model)
-        self.__name = model
-        #If the model is a device the color will depend of its State
-        if model.count('/')==2: model += '/state'
-        #We don't want the ._name to be overriden by ._name+/state            
-        tau.widget.taubase.TauBaseComponent.setModel(self,model) 
-
-    def getParentTauComponent(self):
-        """ Returns a parent Tau component or None if no parent TauBaseComponent 
-            is found."""
-        p = self.parentItem()
-        while p and not isinstance(p, TauGraphicsItem):
-            p = self.parentItem()
-        return p
-
-    #def fireEvent(self, evt_src = None, evt_type = None, evt_value = None):
-    def handleEvent(self, evt_src = None, evt_type = None, evt_value = None):
-        """fires a value changed event to all listeners"""
-        self.info('In TauColorComponent(%s).handleEvent(%s,%s)'%(self.__name,evt_src,evt_type))
-        if evt_type!=tau.core.enums.TauEventType.Config: 
-            #@todo ; added to bypass a problem with getModelValueObj()
-            self.__value = evt_value if evt_type!=tau.core.enums.TauEventType.Error else None
-            self.updateStyle()
-
-    def updateStyle(self):
-        """ Method called when the component detects an event that triggers a change
-            in the style.
-            If the value is not parseable the default colors will be set.
+    def getColorsForValue(value,palette = colors.QT_DEVICE_STATE_PALETTE):
+        """ 
+        Get QColor equivalent for a given Tango attribute value 
+        It returns a Background,Foreground tuple
         """
-        try:
-            self._currBgColor,self._currFgColor = self._defBgColor,self._defFgColor
-            #@todo ; added to bypass a problem with getModelValueObj()
-            value = self.__value #self.getModelValueObj()
-            if value is not None:
-                value = value.value
-                self.info('In TauColorComponent(%s).updateStyle(%s)'%(self.__name,value))
-                self._currBgColor,self._currFgColor = getColorsForValue(value)
+        print 'In getColorsForValue(%s)'%value
+        if value is None:
+            return Qt.QColor(Qt.Qt.gray),Qt.QColor(Qt.Qt.black)
+        elif hasattr(value,'value'): #isinstance(value,PyTango.DeviceAttribute):
+            if value.type == taubase.PyTango.ArgType.DevState:
+                bg_brush, fg_brush = colors.QT_DEVICE_STATE_PALETTE.qbrush(value.value)
+            elif value.type == taubase.PyTango.ArgType.DevBoolean:
+                bg_brush, fg_brush = colors.QT_DEVICE_STATE_PALETTE.qbrush((taubase.PyTango.DevState.FAULT,taubase.PyTango.DevState.ON)[value.value])                    
             else:
-                self.info('In TauColorComponent(%s).updateStyle(%s), using defaults'%(self.__name,value))
-        except: 
-                self.info('TauColorComponent(%s).updateStyle(): Unable to getColorsForValue(%s):\n%s'%(self.__name,value,traceback.format_exc()))
-        self.setColors(self._currBgColor,self._currFgColor)
-        return
-
-    def isReadOnly(self):
-        return True
-
-    def __str__(self):
-        return self.log_name + "(" + self.modelName + ")"
-
-    def getModelClass(self):
-        return tau.core.TauAttribute
+                bg_brush, fg_brush = colors.QT_ATTRIBUTE_QUALITY_PALETTE.qbrush(value.quality)            
+        else:
+            bg_brush, fg_brush = palette.qbrush(int(value))
+            
+        return bg_brush.color(),fg_brush.color()
+    
+    class TauColorComponent(tau.widget.taubase.TauBaseComponent):
+        """
+        Abstract class for Tau color-based items.
+        
+        :param: defaults will be a tuple with the default foreground,background colors (appliable if value not readable)
+                It may allow to differentiate not-read from UNKNOWN
+                
+        The TauColorComponent contains a QObject to emit Qt.SIGNALs if needed:
+            self.emitter.connect(self.emitter,Qt.SIGNAL("setColors"),self.parent.tabBar().setTabTextColor)
+            self.emitter.emit(Qt.SIGNAL("setColors"),self.getIndex(),color)
+        """
+        
+        def __init__(self, name = None, parent = None, defaults = None):
+            self.__name = name
+            self.call__init__(tau.widget.taubase.TauBaseComponent, name, parent)
+            self.__value = None
+            self._defBgColor = defaults and defaults[0] or Qt.QColor(Qt.Qt.gray)
+            self._defFgColor = defaults and defaults[-1] or Qt.QColor(Qt.Qt.black)
+            self._currBgColor,self._currFgColor = self._defBgColor,self._defFgColor
+            self.emitter = Qt.QObject(parent)
+            
+        def setColors(self,background,foreground):
+            raise Exception('Method should be overriden in %s subclass!'%type(self))
+            
+        #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+        # Mandatory methods to be implemented in any subclass of TauComponent
+        #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-
+        
+        def setModel(self,model):
+            print '#'*80
+            self.info('In %s.setModel(%s)'%(type(self).__name__,model))
+            model = str(model)
+            self.__name = model
+            #If the model is a device the color will depend of its State
+            if model.count('/')==2: model += '/state'
+            #We don't want the ._name to be overriden by ._name+/state            
+            tau.widget.taubase.TauBaseComponent.setModel(self,model) 
+    
+        def getParentTauComponent(self):
+            """ Returns a parent Tau component or None if no parent TauBaseComponent 
+                is found."""
+            p = self.parentItem()
+            while p and not isinstance(p, TauGraphicsItem):
+                p = self.parentItem()
+            return p
+    
+        #def fireEvent(self, evt_src = None, evt_type = None, evt_value = None):
+        def handleEvent(self, evt_src = None, evt_type = None, evt_value = None):
+            """fires a value changed event to all listeners"""
+            self.info('In TauColorComponent(%s).handleEvent(%s,%s)'%(self.__name,evt_src,evt_type))
+            if evt_type!=tau.core.enums.TauEventType.Config: 
+                #@todo ; added to bypass a problem with getModelValueObj()
+                self.__value = evt_value if evt_type!=tau.core.enums.TauEventType.Error else None
+                self.updateStyle()
+    
+        def updateStyle(self):
+            """ Method called when the component detects an event that triggers a change
+                in the style.
+                If the value is not parseable the default colors will be set.
+            """
+            try:
+                self._currBgColor,self._currFgColor = self._defBgColor,self._defFgColor
+                #@todo ; added to bypass a problem with getModelValueObj()
+                value = self.__value #self.getModelValueObj()
+                if value is not None:
+                    value = value.value
+                    self.info('In TauColorComponent(%s).updateStyle(%s)'%(self.__name,value))
+                    self._currBgColor,self._currFgColor = getColorsForValue(value)
+                else:
+                    self.info('In TauColorComponent(%s).updateStyle(%s), using defaults'%(self.__name,value))
+            except: 
+                    self.info('TauColorComponent(%s).updateStyle(): Unable to getColorsForValue(%s):\n%s'%(self.__name,value,traceback.format_exc()))
+            self.setColors(self._currBgColor,self._currFgColor)
+            return
+    
+        def isReadOnly(self):
+            return True
+    
+        def __str__(self):
+            return self.log_name + "(" + self.modelName + ")"
+    
+        def getModelClass(self):
+            return tau.core.TauAttribute
+        
+except:
+        print 'fandango.qt: unable to import TauColorComponent'
     
 #try:
     #from tau.widget.utils.emitter import modelSetter,TauEmitterThread,SingletonWorker
