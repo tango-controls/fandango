@@ -129,15 +129,17 @@ def contains(a,b,regexp=True):
 
 def anyone(seq,method=bool):
     """Returns first that is true or last that is false"""
+    if not seq: return False
     for s in seq:
         if method(s): return s
-    return s if not s else None        
+    return s if not s else None
 
 def everyone(seq,method=bool):
     """Returns last that is true or first that is false"""
+    if not seq: return False
     for s in seq:
         if not method(s): return s if not s else None
-    return s
+    return seq[-1]
 
 #Dictionary methods
 
