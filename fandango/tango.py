@@ -188,6 +188,14 @@ def get_device_labels(target,filters='',brief=True):
             labels[a] = l
     return labels
         
+def get_devices_properties(devs,properties,hosts=[],port=10000):
+    """get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])"""
+    if not isinstance(properties,dict): properties = dict.fromkeys(properties,[])
+    get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fandango.matchCl(reg,d)]
+    if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
+    else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
+    return dict(('/'.join((host,d)),db.get_device_property(d,props.keys())) for host,db in tango_dbs.items() for d in get_devs(db,'*alarms*'))
+
 def get_matching_device_attribute_labels(device,attribute):
     """ To get all gauge port labels: get_matching_device_attribute_labels('*vgct*','p*') """
     devs = get_matching_devices(device)
@@ -243,7 +251,7 @@ def get_matching_device_properties(dev,prop,exclude=''):
 #Regular Expressions
 metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 #alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
-alnum = '(?:[a-zA-Z_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
+alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+':[0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
