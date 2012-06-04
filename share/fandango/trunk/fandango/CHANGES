@@ -5,6 +5,7 @@ June 2012 - 9.9
 servers: tango_host argument added
 tango: added get_devices_properties to get properties in multiple hosts
 tango: re_tango expression modified to accept device names numeric only
+tango: reduced db load in get_matching_devices calls
 
 May 2012 - 9.8
 -----------------------
