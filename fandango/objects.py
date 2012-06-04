@@ -244,6 +244,10 @@ class Singleton(object):
     @classmethod
     def get_singleton(cls,*p,**k):
         return cls.__instance or cls(*p,**k)
+    
+    @classmethod
+    def clear_singleton(cls):
+        cls.__instance = None
 
 class SingletonMap(object):
     """This class allows distinct Singleton objects for each args combination.
@@ -277,6 +281,14 @@ class SingletonMap(object):
     @classmethod
     def get_singletons(cls):
         return cls.__instances       
+    
+    @classmethod
+    def clear_singleton(cls,*p,**k):
+        cls.__instances.pop(cls.parse_instance_key(*p,**k))
+        
+    @classmethod
+    def clear_singletons(cls):
+        cls.__instances.clear()
       
     @classmethod
     def parse_instance_key(cls,*p,**k):
