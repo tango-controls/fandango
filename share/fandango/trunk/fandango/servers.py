@@ -209,7 +209,7 @@ class ServersDict(CaselessDict,Object):
          [dev.poll_attribute(attr,3000) for attr in attrs]
      </pre>
     '''
-    def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='WARNING',logger=None):
+    def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='WARNING',logger=None,tango_host=''):
         ''' def __init__(self,pattern='', klass='',devs_list='',servers_list=''):
         The ServersDict can be initialized using any of the three argument lists or a wildcard for Database.get_server_list(pattern) 
         ServersDict('*') can be used to load all servers in database
@@ -223,7 +223,7 @@ class ServersDict(CaselessDict,Object):
         ## proxies will keep a list of persistent device proxies
         self.proxies = ProxiesDict()
         ## db will keep a persistent link to PyTango database
-        self.db = PyTango.Database()
+        self.db = PyTango.Database() if not tango_host else PyTango.Database(*(tango_host.split(':')))
         
         self.server_names = self.keys
         self.servers = self.values
