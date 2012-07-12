@@ -239,6 +239,49 @@ def toRegexp(exp,terminate=False):
     return exp
 
 ########################################################################
+## Methods for piped iterators
+## Inspired by Maxim Krikun [ http://code.activestate.com/recipes/276960-shell-like-data-processing/?in=user-1085177]
+########################################################################
+        
+class Piped:
+    """This class gives a "Pipeable" interface to a python method:
+        cat | Piped(method,args) | Piped(list)
+        list(method(args,cat))
+    e.g.: 
+    class grep:
+        #keep only lines that match the regexp
+        def __init__(self,pat,flags=0):
+            self.fun = re.compile(pat,flags).match
+        def __ror__(self,input):
+            return ifilter(self.fun,input) #imap,izip,count,ifilter could ub useful
+    cat('filename') | grep('myname') | printlines
+    """
+    import itertools
+    def __init__(self,method,*args,**kwargs):
+        self.process=partial(method,*args,**kwargs)
+    def __ror__(self,input):
+        return imap(self.process,input)
+        
+class PipeEnd:
+    """ Used to pipe methods that already manage iterators 
+    e.g.: hdb.keys() | PipeEnd(filter,partial(fandango.inCl,'elotech')) | plist
+    """
+    def __init__(self,method,*args,**kwargs): self.process = partial(method,*args,**kwargs)
+    def __ror__(self,input): return self.process(input)
+    
+pgrep = lambda exp: PipeEnd(lambda input: (x for x in input if inCl(exp,x)))
+pmatch = lambda exp: PipeEnd(lambda input: (x for x in input if matchCl(exp,str(x))))
+pfilter = lambda meth=bool,*args: PipeEnd(filter,partial(meth,*args))
+plist = PipeEnd(list)
+psorted = PipeEnd(sorted)
+pdict = PipeEnd(dict)
+ptuple = PipeEnd(tuple)
+pindex = lambda i: Piped(lambda x:x[i])
+pslice = lambda i,j: Piped(lambda x:x[i,j])
+penum = PipeEnd(lambda input: izip(count(),input) )
+ptext = PipeEnd(lambda input: '\n'.join(imap(str,input)))
+
+########################################################################
 ## Methods for identifying types        
 ########################################################################
 """ Note of the author:
