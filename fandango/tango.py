@@ -188,13 +188,13 @@ def get_device_labels(target,filters='',brief=True):
             labels[a] = l
     return labels
         
-def get_devices_properties(devs,properties,hosts=[],port=10000):
+def get_devices_properties(expr,properties,hosts=[],port=10000):
     """get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])"""
     if not isinstance(properties,dict): properties = dict.fromkeys(properties,[])
     get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fandango.matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
     else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
-    return dict(('/'.join((host,d)),db.get_device_property(d,props.keys())) for host,db in tango_dbs.items() for d in get_devs(db,'*alarms*'))
+    return dict(('/'.join((host,d)),db.get_device_property(d,properties.keys())) for host,db in tango_dbs.items() for d in get_devs(db,expr))
 
 def get_matching_device_attribute_labels(device,attribute):
     """ To get all gauge port labels: get_matching_device_attribute_labels('*vgct*','p*') """
