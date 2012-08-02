@@ -109,7 +109,7 @@ def isTrue(arg):
     else: return arg
     
 def join(*seqs):
-    """ It returns the a list containing the objects of all given sequences. """
+    """ It returns a list containing the objects of all given sequences. """
     if len(seqs)==1 and isSequence(seqs[0]):
         seqs = seqs[0]
     result = []
@@ -262,24 +262,34 @@ class Piped:
     def __ror__(self,input):
         return imap(self.process,input)
         
-class PipeEnd:
-    """ Used to pipe methods that already manage iterators 
-    e.g.: hdb.keys() | PipeEnd(filter,partial(fandango.inCl,'elotech')) | plist
+class iPiped:
+    """ Used to pipe methods that already return iterators 
+    e.g.: hdb.keys() | iPiped(filter,partial(fandango.inCl,'elotech')) | plist
     """
     def __init__(self,method,*args,**kwargs): self.process = partial(method,*args,**kwargs)
     def __ror__(self,input): return self.process(input)
     
-pgrep = lambda exp: PipeEnd(lambda input: (x for x in input if inCl(exp,x)))
-pmatch = lambda exp: PipeEnd(lambda input: (x for x in input if matchCl(exp,str(x))))
-pfilter = lambda meth=bool,*args: PipeEnd(filter,partial(meth,*args))
-plist = PipeEnd(list)
-psorted = PipeEnd(sorted)
-pdict = PipeEnd(dict)
-ptuple = PipeEnd(tuple)
+class zPiped:
+    """ 
+    Returns a callable that applies elements of a list of tuples to a set of functions 
+    e.g. [(1,2),(3,0)] | zPiped(str,bool) | plist => [('1',True),('3',False)]
+    """
+    def __init__(self,*args): self.processes = args
+    def __ror__(self,input): return (tuple(p(i[j]) for j,p in enumerate(self.processes))+tuple(i[len(self.processes):]) for i in input)
+    
+pgrep = lambda exp: iPiped(lambda input: (x for x in input if inCl(exp,x)))
+pmatch = lambda exp: iPiped(lambda input: (x for x in input if matchCl(exp,str(x))))
+pfilter = lambda meth=bool,*args: iPiped(filter,partial(meth,*args))
+ppass = Piped(lambda x:x)
+plist = iPiped(list)
+psorted = iPiped(sorted)
+pdict = iPiped(dict)
+ptuple = iPiped(tuple)
 pindex = lambda i: Piped(lambda x:x[i])
 pslice = lambda i,j: Piped(lambda x:x[i,j])
-penum = PipeEnd(lambda input: izip(count(),input) )
-ptext = PipeEnd(lambda input: '\n'.join(imap(str,input)))
+penum = iPiped(lambda input: izip(count(),input) )
+pzip = iPiped(lambda i:izip(*i))
+ptext = iPiped(lambda input: '\n'.join(imap(str,input)))
 
 ########################################################################
 ## Methods for identifying types        
@@ -302,7 +312,9 @@ def isRegexp(seq):
 def isNumber(seq):
     #return operator.isNumberType(seq)
     if isinstance(seq,bool): return False
-    try: return float(seq)
+    try: 
+        float(seq)
+        return True
     except: return False
     
 def isNone(seq):
