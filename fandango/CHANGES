@@ -1,3 +1,16 @@
+July 2012 - 9.10
+-----------------------
+__init__::
+ more tango.* methods available at fandango
+arrays::
+ improved arguments names to avoid confussions
+device::
+ TangoEval: storing exceptions as last_value
+functional::
+ iPipe,iPiped and many | bash-pipes-like decorators/methods
+tango::
+ bug solved in get_devices_properties
+
 June 2012 - 9.9
 -----------------------
 .qt migrated to taurus
@@ -20,6 +33,8 @@ TangoEval: patched bug in FIND()
 functional: small bugs solved
 dynamic: problems with state/status generation solved
 dynamic: ATTRIBUTES added to _locals
+
+
 
 April 2012 - 9.6
 -----------------------
