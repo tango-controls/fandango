@@ -128,6 +128,7 @@ def self_locked(func,reentrant=True):
     #lock_fun.__name__ = func.__name__
     #lock_fun.__doc__ = func.__doc__
     return lock_fun
+    
 
 ###############################################################################
 
