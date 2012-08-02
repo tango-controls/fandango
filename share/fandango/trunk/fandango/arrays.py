@@ -206,13 +206,12 @@ class CSVArray:
         self.filename = None
         self.xoffset = offset
         self.yoffset = 0
-        self.comment = None
+        self.comment = comment
         self.dialect = None
         self.header = header
         self.labels = labels
         self.filename = filename
         if filename is not None: self.load(filename)
-        self.comment=comment
         return
        
     def __str__(self):
@@ -274,7 +273,7 @@ class CSVArray:
                     if i<=self.header: 
                         self.header-=1
                         #print 'header updated to %d'%self.header
-                    if i<=self.xoffset: 
+                    if i<self.xoffset: 
                         self.xoffset-=1
                         #print 'xoffset updated to %d'%self.xoffset
                 i=i+1
@@ -355,15 +354,16 @@ class CSVArray:
     ###########################################################################
       
     #@Catched
-    def get(self,x=None,y=None,head=None,distinct=False,xsubset=[],ysubset=[]):
+    def get(self,x=None,y=None,head=None,row=None,column=None,distinct=False,xsubset=[],ysubset=[]):
         """
         def get(self,x=None,y=None,head=None,distinct=False):
         """
         trace=False
         result = []
+        if x is None: x = row
+        head = head or column
         #if isinstance(y,basestring): head=y
-        if type(y)==type('y'): 
-            head,y = y,None
+        if type(y)==type('y'): head,y = y,None
         if head: y = self.colByHead(head)
 
         ##Getting row/column/cell using 'axxis is None' as a degree of freedom
@@ -403,11 +403,11 @@ class CSVArray:
         if trace: print 'Values are ',values
         return values
     
-    def getd(self,x):
+    def getd(self,row):
         """This method returns a line as a dictionary using the headers as keys"""
         d = {}
         Hrow = self.rows[self.header or 0]
-        line = self.get(x=x)
+        line = self.get(x=row)
         for i in range(len(line)): d[Hrow[i]]=line[i]
         return d
     
