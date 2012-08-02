@@ -58,7 +58,7 @@ except: print 'Unable to import arrays module'
 #except: print 'Unable to import db module'    
 
 try:
-    from tango import get_device,get_database,ProxiesDict,find_devices,find_attributes
+    from tango import get_device,get_database,ProxiesDict,find_devices,find_attributes,get_matching_devices,get_matching_attributes
     try:
         from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand,ComposersDict
     except: print 'Unable to import fandango.device module'    
