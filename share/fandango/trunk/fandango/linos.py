@@ -34,7 +34,7 @@ def shell_command(*commands, **keywords):
     if len(commands)>1:
         for comm in commands[1:]:
             ps = subprocess.Popen(comm,shell=True,stdin=process[-1].stdout,stdout=subprocess.PIPE)
-            process.append(ps)
+            process.append(ps) #comm1 | comm2 | comm3 > result
     result = process[-1].communicate() 
     result = (result and len(result)>=1 and result[0]) or None #process returns a tuple, being stdout the first field
     
