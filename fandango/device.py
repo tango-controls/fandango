@@ -566,17 +566,21 @@ class TangoEval(object):
         self.trace('>'*80)
         self.trace('eval(): variables in formula are %s' % variables)
         source = self.formula #It will be modified on each iteration
+        targets = [(device + (attribute and '/%s'%attribute) + (what and '.%s'%what),device,attribute,what) for device,attribute,what in variables]
         self.last.clear()
-        for device,attribute,what in variables:
-            target = device + (attribute and '/%s'%attribute) + (what and '.%s'%what)
+        #self.last.update(dict((v[0],'') for v in targets))
+        for target,device,attribute,what in targets:
             var_name = self.parse_tag(target)
             self.trace('\t%s => %s'%(target,var_name))
-            #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
-            self.previous[var_name] = previous.get(target,self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise))
-            self.previous.pop(target,None)
-            self.last[target] = self.previous[var_name] #Used from alarm messages
-            source = source.replace(target,var_name,1)
-
+            try:
+                #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
+                self.previous[var_name] = previous.get(target,self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise))
+                self.previous.pop(target,None)
+                source = source.replace(target,var_name,1)
+                self.last[target] = self.previous[var_name] #Used from alarm messages
+            except Exception,e:
+                self.last[target] = e
+                raise e
         self.trace('formula = %s' % (source))
         self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
         self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self._locals.items() if k not in self._defaults))
