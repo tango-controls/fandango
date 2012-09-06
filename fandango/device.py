@@ -348,7 +348,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         while not self.Event.isSet():
             serverAttributes = [a for a,v in self.ExternalAttributes.items() if isinstance(v,fakeAttributeValue)]
             for aname in serverAttributes:
-                if self.Event.isSet(): break                
+                if self.Event.isSet(): break
                 attr = self.ExternalAttributes[aname]
                 device,attribute = aname.rsplit('/',1)
                 self.debug('====> updating values from %s(%s.%s)'%(type(attr.parent),device,attribute))
@@ -428,14 +428,16 @@ class TangoEval(object):
     All tango-like variables are parsed.
     Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
     """
-    def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None):
+    def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None, cache=0):
         self.formula = formula
         self.variables = []
         self.timeout = timeout
         self.proxies = proxies or dicts.defaultdict_fromkey(tau.Device) if USE_TAU else ProxiesDict()
         self.attributes = attributes or dicts.defaultdict_fromkey(tau.Attribute if USE_TAU else PyTango.AttributeProxy)
-        self.previous = dicts.CaselessDict()
-        self.last = dicts.CaselessDict()
+        self.previous = dicts.CaselessDict() #Keeps last values for each variable
+        self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
+        self.cache_depth = cache
+        self.cache = dicts.CaselessDefaultDict(lambda k:list()) if self.cache_depth else None#Keeps [cache]
         self.result = None
         self._trace = trace
         self._defaults = dict([(str(v),v) for v in PyTango.DevState.values.values()]+[(str(q),q) for q in PyTango.AttrQuality.values.values()])
@@ -490,9 +492,9 @@ class TangoEval(object):
         no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
         #redev = '(?:^|[^/a-zA-Z0-9_])(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
         redev = '(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)?' #Matches attribute and extension
+        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta))?)?' #Matches attribute and extension
         retango = redev+reattr#+'(?!/)'
-        regexp = no_quotes + retango + no_quotes #Excludes attr_names between quotes
+        regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods
         #self.trace( regexp)
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
         
@@ -503,6 +505,10 @@ class TangoEval(object):
         variables = [s for s in re.findall(regexp,formula)]
         self.trace('parse_variables(%s): %s'%(formula,variables))
         return variables
+        
+    def get_vtime(self,value):
+        #Gets epoch for a Tango value
+        return getattr(value.time,'tv_sec',value.time)
         
     def read_attribute(self,device,attribute,what='value',_raise=True, timeout=None):
         """
@@ -522,14 +528,21 @@ class TangoEval(object):
                 #attr_list = [a.name.lower()  for a in dp.attribute_list_query()]
                 #if attribute.lower() not in attr_list: #raise Exception,'TangoEval_AttributeDoesntExist_%s'%attribute
             value = self.attributes[aname].read()
-            value = value if what=='all' else (False if what=='exception' else getattr(value,what))
+            if self.cache_depth and not any(self.get_vtime(v)==self.get_vtime(value) for v in self.cache[aname]):
+                while len(self.cache[aname])>=self.cache_depth: self.cache[aname].pop(-1)
+                self.cache[aname].insert(0,value)
+            if what == 'all': pass
+            elif what == 'time': value = self.get_vtime(value)
+            elif what == 'exception': value = False
+            else: value = getattr(value,what)
             self.trace('Read %s.%s = %s' % (aname,what,value))
         except Exception,e:
-            if _raise: #and attribute.lower() in ['','state']:
+            if _raise:
                 raise e
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return True
             self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
+            #print traceback.format_exc()
             value = None
         return value
                 
@@ -538,7 +551,7 @@ class TangoEval(object):
             if not hasattr(dct,'keys'): dct = dict(dct)
             self._locals.update(dct)
             self.trace('update_locals(%s)'%dct.keys())
-            self._locals['now'] = time.time()
+        self._locals['now'] = time.time()
         return self._locals
             
     def parse_tag(self,target,wildcard='_'):
@@ -569,14 +582,18 @@ class TangoEval(object):
         targets = [(device + (attribute and '/%s'%attribute) + (what and '.%s'%what),device,attribute,what) for device,attribute,what in variables]
         self.last.clear()
         #self.last.update(dict((v[0],'') for v in targets))
-        for target,device,attribute,what in targets:
+        ## NOTE!: It is very important to keep the same order in which expressions were extracted
+        for target,device,attribute,what in targets: 
             var_name = self.parse_tag(target)
             self.trace('\t%s => %s'%(target,var_name))
             try:
                 #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
-                self.previous[var_name] = previous.get(target,self.read_attribute(device,attribute or 'State',what or 'value',_raise=_raise))
+                self.previous[var_name] = previous.get(target,self.read_attribute(device,attribute or 'State',what if what and what!='delta' else 'value',_raise=_raise))
+                if what=='delta':
+                    cache = self.cache.get((device+'/'+attribute).lower())
+                    self.previous[var_name] = 0 if (not self.cache_depth or not cache) else (cache[0].value-cache[-1].value)
                 self.previous.pop(target,None)
-                source = source.replace(target,var_name,1)
+                source = source.replace(target,var_name,1) #Every occurrence of the attribute is managed separately, read_attribute already uses caches within polling intervals
                 self.last[target] = self.previous[var_name] #Used from alarm messages
             except Exception,e:
                 self.last[target] = e
