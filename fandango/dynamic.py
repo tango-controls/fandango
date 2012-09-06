@@ -409,19 +409,24 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.info('Out of check_polled_attributes ...')
         
     def attribute_polling_report(self):
-        print('-'*80)
+        self.debug('\n'+'-'*80)
         now = time.time()
         self._cycle_start = now-self._cycle_start
+        if 'POLL' in self.dyn_values: self.debug('dyn_values[POLL] = %s ; locals[POLL] = %s' % (self.dyn_values['POLL'].value,self._locals['POLL']))
         self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
-        print 'Attribute\ttype\tinterval\tread_time\teval_time\tcpu'
+        print '%16s\t\tvalue\ttype\tinterval\tread_time\teval_time\tcpu'%'Attribute'
         print '-'*80
         for t,key in reversed(sorted((v,k) for k,v in self._read_times.items())):
-            print('%s\t%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
-                type(self.dyn_values[key].value if key in self.dyn_values else None).__name__,
+            value = (self.dyn_values[key].value if key in self.dyn_values else 'NotKept')
+            value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
+            print('%16s\t\t%s\t%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
+                value,
+                type(value).__name__,
                 int(1e3*self._last_period[key]),
                 self._read_times[key],
                 self._eval_times[key],
                 100*self._eval_times[key]/(self._total_usage or 1.)))
+        print ''
         self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
         self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/(sum(self._read_times.values()) or 1)))
         if False: #GARBAGE_COLLECTION:
@@ -683,6 +688,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         aname = attr.get_name()
         tstart=time.time()
         keep = aname in self.dyn_values and self.dyn_values[aname].keep or self.check_attribute_events(aname)
+        self.debug('>'*80)
         self.debug("DynamicDS("+self.get_name()+")::read_dyn_atr("+attr.get_name()+"), entering at "+time.ctime()+"="+str(tstart)+"...")
         try:
             if keep and self.KeepTime and self._last_read.get(aname,0) and time.time()<(self._last_read[aname]+(self.KeepTime/1e3)):
@@ -719,9 +725,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.debug('DynamicDS('+self.get_name()+").read_dyn_attr("+aname+")="+text_result+
                     ", ellapsed %1.2e"%(self._eval_times[aname])+" seconds.\n")
                     #", finished at "+time.ctime(now)+"="+str(now)+", timestamp is %s"%str(date)+", difference is "+str(now-date))
-            if (aname=='POLL' if 'POLL' in self.dyn_values else 
-                (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==self.dyn_values.keys()[-1])
-                ):
+            if (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==sorted(self.dyn_values.keys())[-1]):
                 self.attribute_polling_report()
         except Exception, e:           
             now=time.time()
@@ -781,12 +785,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if self.dyn_values[aname].dependencies is None:
                     self.debug("In evalAttr ... setting dependencies")
                     self.dyn_values[aname].dependencies = set()
+                    a = aname.lower().strip()
+                    fs = (formula+'\n'+self.dyn_qualities.get(a,'')).lower()
                     for k,v in self.dyn_values.items():
-                        found = fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula)
-                        if found and k.lower().strip()!=aname.lower().strip():
-                            self.dyn_values[aname].dependencies.add(k)
+                        ks = k.lower().strip()
+                        if a==ks: continue
+                        if ks in fun.re.split("[^'\"_0-9a-zA-Z]",fs): #fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula):
+                            self.dyn_values[aname].dependencies.add(k) #Dependencies are case sensitive
                             self.dyn_values[k].keep = True
-                            
                 #Updating Last Attribute Values
                 if self.dyn_values[aname].dependencies:
                     now = time.time()
@@ -844,6 +850,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if keep: 
                     old = self.dyn_values[aname].value
                     self.dyn_values[aname].update(value,date,quality)
+                    self._locals[aname] = value
                     (self.debug if self.KeepAttributes[0] in ('yes','true') else self.info)('evalAttr(%s): Value will be kept for later reuse' % (aname))
                     #Updating state if needed:
                     try:
@@ -860,7 +867,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             if self.trace:
                 print '-'*80
                 print '\n'.join(['DynamicDS_evalAttr(%s)_WrongFormulaException:'%aname,'\t"%s"'%formula,str(traceback.format_exc())])
-                print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
                 print '\n'.join([str(e.args[0])]) + '\n'+'*'*80
                 print '-'*80
             #PyTango.Except.throw_exception('DynamicDS_evalAttr_WrongFormula','%s is not a valid expression!'%formula,str(e))
@@ -868,8 +874,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             raise e#Exception,';'.join([err.origin,err.reason,err.desc])
             #PyTango.Except.throw_exception(str(err.reason),str(err.desc),str(err.origin))
         except Exception,e:
-            print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,str(e)])
-            print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
+            if False: #self.trace:
+                print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,str(e)])
+                #print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
+                print traceback.format_exc()
             raise e#Exception,'DynamicDS_eval(%s): %s'%(formula,traceback.format_exc())
             #PyTango.Except.throw_exception('DynamicDS_evalAttr_WrongFormula','%s is not a valid expression!'%formula,str(traceback.format_exc()))
         finally:
@@ -1064,9 +1072,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def get_quality_for_attribute(self,aname,attr_value):
         self.debug('In get_quality_for_attribute(%s,%s)' % (aname,shortstr(attr_value,15)[:10]))
+        formula = self.dyn_qualities.get(aname.lower()) or 'Not specified'
         try:
             if aname.lower() in self.dyn_qualities:
-                formula = self.dyn_qualities[aname.lower()]
                 self._locals['VALUE'] = getattr(attr_value,'value',attr_value)
                 self._locals['DEFAULT'] = getattr(attr_value,'quality',PyTango.AttrQuality.ATTR_VALID)
                 quality = eval(formula,{},self._locals) or PyTango.AttrQuality.ATTR_VALID
@@ -1075,7 +1083,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.debug('\t%s.quality = %s'%(aname,quality))
             return quality
         except Exception,e:
-            self.error('Unable to generate quality for attribute %s: %s'%(aname,traceback.format_exc()))
+            self.error('Unable to generate quality for attribute %s: %s\n%s'%(aname,formula,traceback.format_exc()))
             return PyTango.AttrQuality.ATTR_VALID
 
     def get_date_for_attribute(self,aname,value):
