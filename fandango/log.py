@@ -70,7 +70,7 @@ def shortstr(s,max_len=144):
         s = s[:max_len-3]+'...'
     return s
     
-def except2str(e=None,max_len=5*80):
+def except2str(e=None,max_len=7.5*80):
     if e is None: e = traceback.format_exc()
     e = str(e)
     if 'desc=' or 'desc =' in e:
