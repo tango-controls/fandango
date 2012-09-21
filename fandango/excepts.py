@@ -78,7 +78,7 @@ import contextlib
 from fandango import log
 import fandango.functional as fun
 
-def trial(tries,excepts=None,args=None,kwargs=None):
+def trial(tries,excepts=None,args=None,kwargs=None,return_exception=False):
     """ This method executes a try,except clause in a single line
     :param tries: may be a callable or a list of callables
     :param excepts: it can be a callable, a list of callables or a map of {ExceptionType:[callables]}
@@ -99,7 +99,8 @@ def trial(tries,excepts=None,args=None,kwargs=None):
                 if candidates: excepts = excepts[candidates[0]]
                 else: excepts = excepts.get('') or excepts.get(None) or []
         excepts = fun.toSequence(excepts)
-        [x(e) for x in excepts if fun.isCallable(x)]
+        vals = [x(e) for x in excepts if fun.isCallable(x)]
+        if return_exception: return vals
 
 def decorator_with_args(decorator):
     '''
