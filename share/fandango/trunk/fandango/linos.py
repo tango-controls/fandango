@@ -259,21 +259,32 @@ def timefun(fun):
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
 
-def sysargs_to_dict(defaults=[]):
+def sysargs_to_dict(args=None,defaults=[],trace=True):
     ''' 
     It parses the command line arguments into an understandable dict
     defaults is the list of anonymous arguments to accept
-    '''
-    i,n,result = 0,0,{}
-    defargs,args = [],sys.argv[1:]
     
-    ##First, default arguments (anonymous) are parsed
-    while i<min((len(args),len(defaults))) and not (args[i].startswith('-') or '=' in args[i]): i+=1
-    if i: defargs,args = args[:i],args[i:]
-    [result.update(((defaults[i],a),)) for i,a in enumerate(defargs) if a]
-        
-    while n<len(args):
-        a = args[n]
+    > command --option=value --parameter VALUE default_arg1 default_arg2
+    '''
+    if args is None: args = sys.argv[1:]
+    if trace: print 'sysargs_to_dict(%s,%s)'%(args,defaults)
+    result,defargs,vargs = {},[],[]
+    
+    ##Separate parameter/options and default arguments
+    [(vargs if ('=' in a or a.startswith('-') or (i and '-' in args[i-1] and '=' not in args[-1])) else defargs).append(a) for i,a in enumerate(args)]
+    #for i,a in enumerate(args):
+        #if ('=' in a or a.startswith('-') or (i and args[i-1].startswith('-') and '=' not in args[-1])):
+            #print 'adding varg %s'%a
+            #vargs.append(a)
+        #else:
+            #defargs.append(a)
+    if not defaults:
+        if not vargs and defargs: #Arguments do not parse
+            return sysargs_to_dict(None,args) #Defaulting to sys.argv
+    else:
+        if len(defaults)==1: result[defaults[0]] = defargs[0] if len(defargs)==1 else (defargs or None)
+        else: [result.update(((defaults[i],a),)) for i,a in enumerate(defargs) if a]
+    for n,a in enumerate(vargs):
         if '=' in a: #argument like [-]ARG=VALUE
             while a.startswith('-'): a = a[1:]
             if a: result[a.split('=',1)[0]] = a.split('=',1)[1]
@@ -283,7 +294,8 @@ def sysargs_to_dict(defaults=[]):
             if (n+1)<len(args) and not args[n+1].startswith('-'): # --OPTION VALUE
                 result[a],n = args[n+1],n+1 
             else: result[a]=True # --OPTION for option=True
-        n+=1
+    
+    if trace: print result
     return result
 
 def arg_to_bool(arg):
