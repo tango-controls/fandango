@@ -65,21 +65,23 @@ class QCustomTabWidget(Qt.QWidget):
     def addTab(self,widget,label,icon=None,width=50,height=60):
         print '-'*80
         print 'Adding %s tab to QCustomTabWidget(%d)'%(label,self.count())
-        if label in self.buttons: raise Exception('Button(%s) already exists!'%label)
-        if icon is None and self.icon_builder is not None: 
-            try: icon = self.icon_builder(label)
-            except: 
-                print 'Unable to get icon widget'
-                print traceback.format_exc()
-        button = QCustomPushButton(label,icon,parent=self.buttonFrame)
-        button.setCheckable(True)
-        self.buttons[label] = button
-        self.widgets[label] = widget
-        if width and height: button.setMinimumSize(width,height)
-        self.buttonGroup.addButton(button)
-        self.buttonFrame.layout().addWidget(button)
-        self.stackWidget.addWidget(widget)
-        self.connect(button,Qt.SIGNAL("pressed()"),lambda w=widget,l=label:self.setCurrentWidget(w,l))
+        if label in self.buttons: 
+            print ('======> Button(%s) already exists!,\n\t %s rejected!!'%(label,widget))
+        else:
+            if icon is None and self.icon_builder is not None: 
+                try: icon = self.icon_builder(label)
+                except: 
+                    print 'Unable to get icon widget'
+                    print traceback.format_exc()
+            button = QCustomPushButton(label,icon,parent=self.buttonFrame)
+            button.setCheckable(True)
+            self.buttons[label] = button
+            self.widgets[label] = widget
+            if width and height: button.setMinimumSize(width,height)
+            self.buttonGroup.addButton(button)
+            self.buttonFrame.layout().addWidget(button)
+            self.stackWidget.addWidget(widget)
+            self.connect(button,Qt.SIGNAL("pressed()"),lambda w=widget,l=label:self.setCurrentWidget(w,l))
         
     def insertTab(self,index,page,label): return self.addTab(page,label)
     def insertTab(self,index,page,icon,label): return self.addTab(page,label,icon)
@@ -313,7 +315,21 @@ class TauColorComponent(taurusbase.TaurusBaseComponent):
     def getModelClass(self):
         return TaurusAttribute
         
-    
+from taurus.qt import Qt
+from taurus.qt.qtgui.container import TaurusWidget
+
+class NullWidget(TaurusWidget):
+    def __init__(self,*args):
+        TaurusWidget.__init__(self,*args)
+        self.setVisible(False)
+
+    def show(self):
+        self.hide()
+
+    def Input(self,value):
+        print 'In NullWidget.setInput(%s)'%value
+        self.emit(Qt.SIGNAL('Output'), value or 'sys/database/2')
+
 #try:
     #from tau.widget.utils.emitter import modelSetter,TauEmitterThread,SingletonWorker
 #except:
