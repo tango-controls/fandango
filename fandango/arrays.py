@@ -41,11 +41,98 @@ import csv
 import sys
 import re
 import operator
+import functional as fun
+from .dicts import SortedDict
 
 __all__ = ['Grid','CSVArray','tree2table']
 
 #from excepts import *
 #from ExceptionWrapper import *
+
+def dict2array(dct):
+    """ Converts a dictionary in a table of data, lists are unnested columns """
+    data,table = {},[]
+    data['nrows'],data['ncols'] = 0,2 if fun.isDictionary(dct) else 1
+    def expand(d,level):#,nrows=nrows,ncols=ncols):
+        #self.debug('\texpand(%s(%s),%s)'%(type(d),d,level))
+        for k,v in sorted(d.items() if hasattr(d,'items') else d):
+            zero = data['nrows']
+            data[(data['nrows'],level)] = k
+            if fun.isDictionary(v): 
+                data['ncols']+=1
+                expand(v,level+1)
+            else:
+                if not fun.isSequence(v): v = [v]
+                for t in v:
+                    data[(data['nrows'],level+1)] = t
+                    data['nrows']+=1
+            #for i in range(zero+1,nrows): data[(i,level)] = None
+    expand(dct,0)
+    [table.append([]) for r in range(data.pop('nrows'))]
+    [table[r].append(None) for c in range(data.pop('ncols')) for r in range(len(table))]
+    for coord,value in data.items(): table[coord[0]][coord[1]] = value
+    return table
+
+def array2dict(table):
+    """ Converts a table in a dictionary of left-to-right nested date, unnested columns are lists"""
+    nrows,ncols = len(table),len(table[0])
+    r,c = 0,0
+    def expand(r,c,end):
+        #self.debug('expand(%s,%s,%s)'%(r,c,end))
+        i0,t0 = r,table[r][c]
+        if t0 is None: return None
+        if c+1<ncols and table[r][c+1]:
+            d = SortedDict()
+            keys = []
+            new_end = r+1
+            for i in range(r+1,end+1):
+                t = table[i][c] if i<end else None
+                if t or i>=end: 
+                    keys.append((i0,t0,new_end)) #start,name,stop for each key
+                    t0,i0 = t,i
+                new_end = i+1
+            for i,key,new_end in keys:
+                d[key] = expand(i,c+1,new_end)
+            #self.debug('expand(%s to %s,%s): %s'%(r,end,c,d))
+            return d
+        else:
+            d = [table[i][c] for i in range(r,end)]
+            #self.debug('expand(%s to %s,%s): %s'%(r,end,c,d))
+            return d
+    data = expand(0,0,nrows)
+    return data
+
+def tree2table(tree):
+    """
+    tree2table is different from dict2array, because allows list=row instead list=column
+    {A:{AA:{1:{}},AB:{2:{}}},B:{BA:{3:{}},BB:{4:{}}}}
+    should be represented like
+    A    AA 1
+        AB    2
+    B    BA 3
+        BB    4
+    """
+    from collections import deque
+    if not isinstance(tree,dict): #The tree arrived to a leave
+        if any(map(isinstance,2*[tree],(list,tuple))): return [tree]
+        else: return [(tree,)]
+    result = []
+    for k in sorted(tree.keys()): #K=AA; v = {1:{}}
+        v = tree[k]
+        #print '%s:%s' % (k,v)
+        if not v:
+            #print '%s is empty' % k
+            result.append([k])
+        else:
+            _lines = tree2table(v)
+            #print 'tree2table(%s): tree2table(v) returned: %s' % (k,_lines)
+            lines = [deque(dq) for dq in _lines]
+            lines[0].appendleft(k)
+            [line.appendleft('') for line in lines[1:]]
+            [result.append(list(line)) for line in lines]
+    #print 'result: tree2table(tree) returned: %s' % (result)
+    return result
+        
 
 class Grid(dict):
     """ Sat May 28 13:07:53 CEST 2005
@@ -187,13 +274,13 @@ class TimedQueue(list):
     pass
 
 
-class CSVArray:
+class CSVArray(object):
       
     def size(self):
         return (len(self.rows)-self.xoffset, len(self.cols)-self.yoffset)
     
     #@Catched
-    def __init__(self,filename=None,header=None,labels=None,comment=None,offset=0):
+    def __init__(self,filename=None,header=None,labels=None,comment=None,offset=0,trace=False):
         """
         @param[in] filename file to load
         @param[in] header row to use as column headers
@@ -211,6 +298,7 @@ class CSVArray:
         self.header = header
         self.labels = labels
         self.filename = filename
+        self.trace = trace
         if filename is not None: self.load(filename)
         return
        
@@ -239,9 +327,8 @@ class CSVArray:
             if not delimiter:
                 index = header
                 sample = flines[index]
-                #print 'Dialect read from sample line (%d): %s' % (index,sample)
                 self.dialect = csv.Sniffer().sniff(sample)
-                print 'Dialect extracted is %s'%(str(self.dialect.__dict__))
+                if self.trace: print 'Dialect extracted is %s'%(str(self.dialect.__dict__))
                 readed = [r for r in csv.reader(flines, self.dialect)]
             else:
                 readed = [ r for r in csv.reader(flines, delimiter=delimiter)]
@@ -269,15 +356,12 @@ class CSVArray:
                         rows.append(row2)                        
                 #Correcting initial header and offset when previous lines are being erased
                 else: #The row is discarded
-                    #print 'removing line %d'%i
                     if i<=self.header: 
                         self.header-=1
-                        #print 'header updated to %d'%self.header
                     if i<self.xoffset: 
                         self.xoffset-=1
-                        #print 'xoffset updated to %d'%self.xoffset
                 i=i+1
-            #print 'Header line is %d: %s' % (len(rows[self.header]),rows[self.header])
+            if self.trace: print 'Header line is %d: %s' % (len(rows[self.header]),rows[self.header])
             ncols = max(len(row) for row in rows) if rows else 0
             for i in range(len(rows)):
                 while len(rows[i])<ncols:
@@ -289,7 +373,7 @@ class CSVArray:
 
         del self.rows; del self.cols
         self.rows=rows;self.cols=cols; self.nrows=len(rows); self.ncols=len(cols)
-        print 'CSVArray initialized as a ',self.nrows,'x',self.ncols,' matrix'
+        if self.trace: print 'CSVArray initialized as a ',self.nrows,'x',self.ncols,' matrix'
     
     #@Catched
     def save(self,filename=None):
@@ -300,7 +384,7 @@ class CSVArray:
         fl = open(self.filename,'w')
         writer = csv.writer(fl,delimiter='\t')
         writer.writerows(self.rows);
-        print 'CSVArray written as a ',self.nrows,'x',self.ncols,' matrix'
+        if self.trace: print 'CSVArray written as a ',self.nrows,'x',self.ncols,' matrix'
         fl.close()
         
     #@Catched
@@ -312,7 +396,7 @@ class CSVArray:
         """def resize(self, x(rows), y(columns)):
         TODO: This method seems quite buggy, a refactoring should be done
         """
-        #print 'CSVArray.resize(',x,',',y,'), actual size is (%d,%d)' % (self.nrows,self.ncols)
+        if self.trace: print 'CSVArray.resize(',x,',',y,'), actual size is (%d,%d)' % (self.nrows,self.ncols)
         if len(self.rows)!=self.nrows: print 'The Size of the Array has been corrupted!'
         if len(self.cols)!=self.ncols: print 'The Size of the Array has been corrupted!'
         
@@ -345,8 +429,8 @@ class CSVArray:
         self.ncols = y
         if len(self.cols)!=self.ncols: print 'The Size of the Array Columns has been corrupted!'
         
-        #print 'CSVArray.rows dimension is now ',len(self.rows),'x',max([len(r) for r in self.rows])
-        #print 'CSVArray.cols dimension is now ',len(self.cols),'x',max([len(c) for c in self.cols])
+        if self.trace: print 'CSVArray.rows dimension is now ',len(self.rows),'x',max([len(r) for r in self.rows])
+        if self.trace: print 'CSVArray.cols dimension is now ',len(self.cols),'x',max([len(c) for c in self.cols])
         return x,y
         
     ###########################################################################
@@ -358,7 +442,6 @@ class CSVArray:
         """
         def get(self,x=None,y=None,head=None,distinct=False):
         """
-        trace=False
         result = []
         if x is None: x = row
         head = head or column
@@ -369,16 +452,16 @@ class CSVArray:
         ##Getting row/column/cell using 'axxis is None' as a degree of freedom
         if y is None: #Returning a row
             x = x or 0
-            if trace: print 'Getting the row ',x
+            if self.trace: print 'Getting the row ',x
             result = self.rows[self.xoffset+x][self.yoffset:]
         elif x is None: #Returning a column
-            if trace: print 'Getting the column ',y
+            if self.trace: print 'Getting the column ',y
             result = self.cols[self.yoffset+y][self.xoffset:]
         else: #Returning a single Cell
             result = self.rows[self.xoffset+x][self.yoffset+y]
 
-        if trace and xsubset: print 'using xsubset ',xsubset
-        if trace and ysubset: print 'using ysubset ',ysubset
+        if self.trace and xsubset: print 'using xsubset ',xsubset
+        if self.trace and ysubset: print 'using ysubset ',ysubset
         
         if not distinct: 
             #if getting a column and theres an xsubset ... prune the rows not in xsubset
@@ -386,7 +469,7 @@ class CSVArray:
             if y is None and ysubset: result = [result[i] for i in ysubset]
             return result
 
-        if trace: print 'Getting only distinct values from ',['%d:%s'%(i,result[i]) for i in range(len(result))]
+        if self.trace: print 'Getting only distinct values from ',['%d:%s'%(i,result[i]) for i in range(len(result))]
         ## DISTINCT VALUES, returns a dictionary with the distinct values (initialized with first match)
         #values={result[0]:[0]} #Doesn't add self.xoffset here, it has been done before!
         values={}
@@ -400,7 +483,7 @@ class CSVArray:
                 values[result[i]]=[i]
             else:
                 values[result[i]].append(i)
-        if trace: print 'Values are ',values
+        if self.trace: print 'Values are ',values
         return values
     
     def getd(self,row):
@@ -427,7 +510,7 @@ class CSVArray:
         """
         def set(self,x,y,val):
         """
-        #print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
+        if self.trace: print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
         val = val if type(val) in [int,long,float] else (val or '')
         if x is None or x<0:
            #Setting a column
@@ -469,7 +552,7 @@ class CSVArray:
         else:
             Hrow = self.rows[header]
         if head not in Hrow:
-            print 'colByHead: Head="',head,'" does not exist in: %s'%Hrow
+            if self.trace: print 'colByHead: Head="',head,'" does not exist in: %s'%Hrow
             return None
         return Hrow.index(head)
         
@@ -483,7 +566,7 @@ class CSVArray:
         By default this method adds new values to a column only when the previous column remains unchanged
         To force all the values to be filled set previous=True
         """
-        #print 'CSVArray.fill(%s,%s,%s)'%tuple(str(s) for s in [y,head,previous])
+        if self.trace: print 'CSVArray.fill(%s,%s,%s)'%tuple(str(s) for s in [y,head,previous])
         if type(y) is str: head,y =  y,None
         c = y if y in range(self.ncols+1) else self.colByHead(head)
         column = self.get(y=c)
@@ -534,7 +617,7 @@ class CSVArray:
         and converts it into a grid like level0 \t level1 \t level2
         WARNING!: This method deletes the actual content of the array!
         """
-        print 'WARNING!: updateFromTree deletes the actual content of the array!'
+        if self.trace: print 'WARNING!: updateFromTree deletes the actual content of the array!'
         table = tree2table(tree)
         self.resize(1,1)
         self.resize(len(table),max(len(line) for line in table))
@@ -558,33 +641,3 @@ class CSVArray:
             #print r,':','\t'.join([self.cols[c][r] for c in range(len(self.cols))])
     
     pass #END OF CSVARRAY
-
-def tree2table(tree):
-    """
-    {A:{AA:{1:{}},AB:{2:{}}},B:{BA:{3:{}},BB:{4:{}}}}
-    should be represented like
-    A    AA 1
-        AB    2
-    B    BA 3
-        BB    4
-    """
-    from collections import deque
-    if not isinstance(tree,dict): #The tree arrived to a leave
-        if any(map(isinstance,2*[tree],(list,tuple))): return [tree]
-        else: return [(tree,)]
-    result = []
-    for k in sorted(tree.keys()): #K=AA; v = {1:{}}
-        v = tree[k]
-        #print '%s:%s' % (k,v)
-        if not v:
-            #print '%s is empty' % k
-            result.append([k])
-        else:
-            _lines = tree2table(v)
-            #print 'tree2table(%s): tree2table(v) returned: %s' % (k,_lines)
-            lines = [deque(dq) for dq in _lines]
-            lines[0].appendleft(k)
-            [line.appendleft('') for line in lines[1:]]
-            [result.append(list(line)) for line in lines]
-    #print 'result: tree2table(tree) returned: %s' % (result)
-    return result
