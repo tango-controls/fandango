@@ -89,6 +89,12 @@ def last(seq,MAX=1000):
             return n
     return
         
+def randomize(seq):
+    import random
+    done,result = list(range(len(seq))),[]
+    while done: result.append(seq[done.pop(random.randrange(len(done)))])
+    return result
+        
 def avg(seq):
     seq = [s for s in seq if seq is not None]
     return sum(seq)/len(seq)
@@ -107,7 +113,7 @@ def isTrue(arg):
     """ Returns True if arg is not None, not False and not an empty iterable. """
     if hasattr(arg,'__len__'): return len(arg)
     else: return arg
-    
+
 def join(*seqs):
     """ It returns a list containing the objects of all given sequences. """
     if len(seqs)==1 and isSequence(seqs[0]):
@@ -118,6 +124,16 @@ def join(*seqs):
         else: result.append(seq)
     #    result += list(seq)
     return result
+        
+def djoin(a,b):
+    """ This method merges dictionaries and/or lists """
+    if not any(map(isDictionary,(a,b))): return join(a,b)
+    other,dct = sorted((a,b),key=isDictionary) 
+    if not isDictionary(other): 
+        other = dict.fromkeys(other if isSequence(other) else [other,])
+    for k,v in other.items():
+        dct[k] = v if not k in dct else djoin(dct[k],v)
+    return dct
         
 def splitList(seq,split):
     """splits a list in lists of 'split' size"""
@@ -216,6 +232,11 @@ def searchCl(exp,seq,terminate=False):
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
 
+def replaceCl(exp,repl,seq):
+    """ Replaces caseless expression exp by repl in string seq """
+    return re.sub(exp.lower(),repl.lower(),seq.lower())
+clsub = replaceCl
+
 def sortedRe(iterator,order):
     """ Returns a list sorted using regular expressions. 
         order = list of regular expressions to match ('[a-z]','[0-9].*','.*')
@@ -306,7 +327,7 @@ def isString(seq):
     
 def isRegexp(seq):
     """ This function is just a hint, use it with care. """
-    RE = r'.^$*+?{[]\|()'
+    RE = r'^$*+?{[]\|()'
     return anyone(c in RE for c in seq)
     
 def isNumber(seq):
@@ -353,6 +374,13 @@ def isIterable(seq):
     """ It includes dicts and listlikes but not strings """
     return hasattr(seq,'__iter__') and not isString(seq)
 
+def isNested(seq,strict=False):
+    if not isIterable(seq) or not len(seq): return False
+    child = seq[0] if isSequence(seq) else seq.values()[0]
+    if not strict and isIterable(child): return True
+    if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
+    return False
+
 ###############################################################################
 
 def str2int(seq):
@@ -375,6 +403,16 @@ def toList(val,default=[],check=isSequence):
     else:
         return val
 toSequence = toList
+
+def toString(val):
+    if hasattr(val,'text'):
+        try: return val.text()
+        except: return val.text(0)
+    else:
+        return str(val)
+
+def toStringList(seq):
+    return map(toString,seq)
 
 def str2list(s,separator=''): 
     return map(str.strip,s.split(separator) if separator else s.split())
