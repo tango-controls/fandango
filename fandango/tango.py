@@ -147,7 +147,7 @@ def parse_db_command_array(data,keys=1,depth=2):
         dict.update([(k,v)])
     return dict
 
-def get_attribute_label(target,use_db=False):
+def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
     if not use_db: #using AttributeProxy
         if attr.lower() in ('state','status'): 
@@ -170,23 +170,6 @@ def set_attribute_label(target,label='',unit=''):
 def get_device_started(target):
     """ Returns device started time """
     return get_database_device().DbGetDeviceInfo(target)[-1][5]
-    
-def get_device_labels(target,filters='',brief=True):
-    """
-    Returns an {attr:label} dict for all attributes of this device 
-    Filters will be a regular expression to apply to attr or label.
-    If brief is True (default) only those attributes with label are returned.
-    This method works offline, does not need device to be running
-    """
-    labels = {}
-    d = get_device(target)
-    db = get_database()
-    attrlist = db.get_device_attribute_list(target,filters) if brief else d.get_attribute_list()
-    for a in attrlist:
-        l = get_attribute_label(target+'/'+a,use_db=True) if brief else d.get_attribute_config(a).label
-        if (not filters or any(map(fun.matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
-            labels[a] = l
-    return labels
         
 def get_devices_properties(expr,properties,hosts=[],port=10000):
     """get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])"""
@@ -195,6 +178,63 @@ def get_devices_properties(expr,properties,hosts=[],port=10000):
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
     else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
     return dict(('/'.join((host,d)),db.get_device_property(d,properties.keys())) for host,db in tango_dbs.items() for d in get_devs(db,expr))
+    
+def get_device_for_alias(alias):
+    try: return get_database().get_device_alias(alias)
+    except Exception,e:
+        if 'no device found' in str(e).lower(): return None
+        return None #raise e
+
+def get_alias_for_device(dev):
+    try: return get_database().get_alias(dev) #.get_database_device().DbGetDeviceAlias(dev)
+    except Exception,e:
+        if 'no alias found' in str(e).lower(): return None
+        return None #raise e
+
+def get_alias_dict(exp='*'):
+    tango = get_database()
+    return dict((k,tango.get_device_alias(k)) for k in tango.get_device_alias_list(exp))
+
+def get_real_name(dev,attr=None):
+    """
+    It translate any device/attribute string by name/alias/label
+    """
+    if fandango.isString(dev):
+        if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): dev,attr = dev.rsplit('/',1)
+        if '/' not in dev: dev = get_device_for_alias(dev)
+        if attr is None: return dev
+    for a in get_device_attributes(dev):
+        if fandango.matchCl(attr,a): return (dev+'/'+a)
+        if fandango.matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
+    return None
+
+def get_device_commands(dev):
+    return [c.cmd_name for c in get_device(dev).command_list_query()]
+
+def get_device_attributes(dev,expressions='*'):
+    """ Given a device name it returns the attributes matching any of the given expressions """
+    expressions = map(fun.toRegexp,fun.toList(expressions))
+    al = (get_device(dev) if fandango.isString(dev) else dev).get_attribute_list()
+    result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
+    return result
+        
+def get_device_labels(target,filters='',brief=True):
+    """
+    Returns an {attr:label} dict for all attributes of this device 
+    Filters will be a regular expression to apply to attr or label.
+    If brief is True (default) only those attributes with label are returned.
+    This method works offline, does not need device to be running
+    """
+    labels = {}
+    if fandango.isString(target): d = get_device(target)
+    else: d,target = target,target.name()
+    db = get_database()
+    attrlist = db.get_device_attribute_list(target,filters) if brief else d.get_attribute_list()
+    for a in attrlist:
+        l = get_attribute_label(target+'/'+a,use_db=True) if brief else d.get_attribute_config(a).label
+        if (not filters or any(map(fun.matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
+            labels[a] = l
+    return labels
 
 def get_matching_device_attribute_labels(device,attribute):
     """ To get all gauge port labels: get_matching_device_attribute_labels('*vgct*','p*') """
@@ -338,17 +378,7 @@ def get_matching_devices(expressions,limit=0,exported=False):
     return result[:limit] if limit else result
         
 find_devices = get_matching_devices
-
-def get_device_commands(dev):
-    return [c.cmd_name for c in get_device(dev).command_list_query()]
-
-def get_device_attributes(dev,expressions='*'):
-    """ Given a device name it returns the attributes matching any of the given expressions """
-    expressions = map(fun.toRegexp,fun.toList(expressions))
-    al = get_device(dev).get_attribute_list()
-    result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
-    return result
-
+    
 def get_matching_attributes(expressions,limit=0):
     """ 
     Returns all matching device/attribute pairs. 
