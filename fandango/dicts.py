@@ -241,9 +241,6 @@ class ThreadDict(dict):
         if default is False: return dict.get(self,key)
         else: return dict.get(self,key,default)
     
-    #__getitem__ = self_locked(dict.__getitem__)
-    #__setitem__ = self_locked(dict.__setitem__)
-    
     @self_locked
     def __delitem__(self, key):
         return dict.__delitem__(self, key)
@@ -255,17 +252,10 @@ class ThreadDict(dict):
     @self_locked
     def __iter__(self):
         return dict.__iter__(self)
-        
-    #__delitem__ = self_locked(dict.__delitem__)
-    #__contains__ = self_locked(dict.__contains__)
-    #__iter__ = self_locked(dict.__iter__)
-    #pop = self_locked(dict.pop)
     
     @self_locked
     def pop(self, key):
         return dict.pop(self, key)
-    
-
     
     @self_locked
     def __str__(self):
@@ -273,20 +263,6 @@ class ThreadDict(dict):
     @self_locked
     def __repr__(self):
         return "{\n" +"\n,".join(["'"+str(k)+"'"+":"+"'"+str(v)+"'" for k,v in zip(dict.keys(self),dict.values(self))])+ "\n}"      
-    #__str__ = self_locked(dict.__str__)
-    #__repr__ = self_locked(dict.__repr__)
-    
-    #get = self_locked(dict.get)
-    #has_key = self_locked(dict.has_key)
-    #update = self_locked(dict.update)
-    #copy = self_locked(dict.copy)
-    
-    #keys = self_locked(dict.keys)
-    #values = self_locked(dict.values)
-    #items = self_locked(dict.items)
-    #iterkeys = self_locked(dict.iterkeys)
-    #itervalues = self_locked(dict.itervalues)   
-    #iteritems = self_locked(dict.iteritems) 
 
 class defaultdict_fromkey(collections.defaultdict):
     """ Creates a dictionary with a default_factory function that creates new elements using key as argument.
@@ -478,6 +454,14 @@ class SortedDict(dict):
 ##################################################################################################
 
 from collections import defaultdict
+
+def reversedict(dct,key=None,default=None):
+    #it just exchanges keys/values in a dictionary
+    if key is None: return dict((v,k) for k,v in dct.items())
+    for k,v in dct.items():
+        if v == key: return k
+    return default
+
 class ReversibleDict(object):#dict):
     """  Dictionary that searches in both directions within a list of tuples acting like a nested dictionary.
      * Negative indexes and levels are used to reverse the direction of key,values retrieval (i>=0: left-to-right; i<0: rigth-to-left)
@@ -509,7 +493,7 @@ class ReversibleDict(object):#dict):
         """
         table,subset,index = table or [], subset or (), index or [] #There are strange problems if persistent types are used as __init__ arguments!?!
         if isinstance(table,ReversibleDict): table = table.data()
-        elif isinstance(table,dict): table = table.items()
+        elif hasattr(table,'items'): table = [t for t in table.items()] #Updating from a dictionary
         #Attributes persistent
         self._depth = table and len(table[0]) or 0
         self._table = table or []
@@ -520,6 +504,13 @@ class ReversibleDict(object):#dict):
         #Attributes that changed in sub-instances
         self._level = level #It's always positive!
         self._subset = subset
+        
+    def update(self, other):
+        if not other: return
+        if hasattr(other,'iteritems'):
+            [self.set(*t) for t in other.iteritems()]
+        else:
+            [self.set(*t) for t in other]
         
     #def __new__(klass,*args):
         #return klass(*args)
@@ -754,13 +745,6 @@ class ReversibleDict(object):#dict):
         else: 
             if self._trace: print 'Adding a new line ...'
             self._table.append((key,)+value)
-
-    def update(self, other):
-        if not other: return
-        if hasattr(other,'iteritems'):
-            [self.set(*t) for t in other.iteritems()]
-        else:
-            [self.set(*t) for t in other]
 
     def __del__(self):
         del self._table
