@@ -1,3 +1,12 @@
+
+device: TangoEval added cache and delta evaluation.
+tango: bug solved in get_devices_properties, methods for getting/setting alias, translate labes and alias,  
+qt: added NullWidget, getApplication, QColorDictionary, 
+objects: added load_module
+functional: added methods: randomize, djoin/isNested, replaceCl,  toString/ToStringList
+dicts: added reversedict
+arrays: added dict2array,array2dict, tree2table methods
+
 July 2012 - 9.10
 -----------------------
 __init__::
