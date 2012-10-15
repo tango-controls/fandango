@@ -45,6 +45,7 @@ from functional import *
 from operator import isCallable
 import Queue
 import functools
+
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
 
@@ -52,6 +53,10 @@ except: pass
 
 def dirModule(module):
     return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
+
+def loadModule(source,modulename=None):
+    from imp import load_source
+    return load_source(modulename or replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),source)
 
 def dirClasses(module,owned=False):
     v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
