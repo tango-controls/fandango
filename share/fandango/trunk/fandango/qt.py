@@ -2,8 +2,11 @@
 from PyQt4 import Qt,QtCore,QtGui
 import Queue,traceback,time
 from functools import partial
+import fandango
 from functional import isString
 from fandango.log import Logger,shortstr
+from fandango.dicts import SortedDict
+from fandango.objects import Singleton
 
 def getStateLed(model):
     from taurus.qt.qtgui.display import TaurusStateLed
@@ -11,6 +14,79 @@ def getStateLed(model):
     led.setModel(model)
     print 'In TaurusStateLed.setModel(%s)'%model
     return led
+
+def getApplication(args=None):
+    app = Qt.QApplication.instance()
+    return app or Qt.QApplication(args or [])
+
+class QColorDictionary(SortedDict,Singleton):
+    """
+    Returns a {name:QColor} dictionary; 
+    if sorted tries to sort by color difference
+    """
+    def __init__(self,sort = False):
+        SortedDict.__init__(self)
+        colors = {}
+        last = SortedDict()
+        for n in Qt.QColor.colorNames():
+            c = Qt.QColor(n)
+            rgb = c.getRgb()[:3]
+            if not sum(rgb): last['black'] = c
+            elif sum(rgb)==255*3: last['white'] = c
+            elif not any(v.getRgb()[:3]==c.getRgb()[:3] for v in colors.values()):
+                colors[n] = c
+            else: last[n] = c
+        if sorted:
+            self.distances = {}
+            dark = [(n,colors.pop(n)) for n in colors.keys() if max(colors[n].getRgb()[:3])<.25*(255*3)]
+            light = [(n,colors.pop(n)) for n in colors.keys() if min(colors[n].getRgb()[:3])>.75*(255*3)]
+            self.update(
+                sorted(
+                    ((n,colors.pop(n)) for n in colors.keys() if all(c in (0,255) for c in colors[n].getRgb()[:3])),
+                    key=(lambda t:sum(t[1].getRgb()[:3]))
+                    )
+                )
+            #self.update([(n,colors.pop(n)) for n in colors.keys() if all(c in colors[n].getRgb()[:3] for c in (0,255))])
+            #for inc in range(0,255/2):
+                #self.update([(n,colors.pop(n)) for n in colors.keys() if any(c in colors[n].getRgb() for c in (0+inc,255-inc))])
+                #if not colors: break
+            #for n,color in sorted(colors,key=lambda t: -self.get_diff_code(t[1])): self[n] = color
+            x = len(colors)
+            for i in range(x):
+                n = sorted(colors.items(),key=lambda t: -self.get_diff_code(*t))[0][0]
+                self[n] = colors.pop(n)
+            self.update(light)
+            self.update(dark)
+            self.update(last)
+        else:
+            self.update(sorted(colors.items()))
+            self.update(last)
+    def show(self):
+        getApplication()
+        self.widget = Qt.QScrollArea()
+        w = Qt.QWidget()
+        w.setLayout(Qt.QVBoxLayout())
+        for n,c in self.items():
+            l = Qt.QLabel('%s: %s, %s'%(n,str(c.getRgb()[:3]),self.distances.get(n,None)))
+            l.setStyleSheet('QLabel { background-color: rgba(%s) }'%(','.join(str(x) for x in c.getRgb())))
+            w.layout().addWidget(l)
+        self.widget.setWidget(w)
+        self.widget.show()
+    def get_rgb_normalized(self,color):
+        rgb = color.getRgb()[:3]
+        average = fandango.avg(rgb)
+        return tuple((c-average) for c in rgb)
+    def get_diff_code(self,name,color):
+        #get_avg_diff = lambda seq: (abs(seq[0]-seq[1])+abs(seq[1]-seq[2])+abs(seq[2]-seq[0]))/3.
+        #return get_avg_diff(color.getRgb())
+        NValues = 15
+        MinDiff = 50
+        self.distances[name] = [sum((abs(x-y) if abs(x-y)>MinDiff else 0) 
+            #for x,y in zip(self.get_rgb_normalized(color),self.get_rgb_normalized(k)))
+            for x,y in zip(color.getRgb()[:3],k.getRgb()[:3]))  
+                for k in self.values()[-NValues:]]
+        return sum(self.distances[name]) if not any(d<MinDiff*1.5 for d in self.distances[name]) else 0
+        
 
 class QCustomPushButton(Qt.QPushButton):
     def __init__(self,label,widget=None,parent=None):
