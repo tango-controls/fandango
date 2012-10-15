@@ -51,10 +51,10 @@ import MySQLdb,sys
 class FriendlyDB(log.Logger):
     """ Class for managing the direct access to the database
     """   
-    def __init__(self,db_name,host='',user='',passwd='',autocommit=True):
+    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,loglevel='DEBUG'):
         """ Initialization of MySQL connection """
         self.call__init__(log.Logger,self.__class__.__name__,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
-        self.setLogLevel('DEBUG')
+        self.setLogLevel(loglevel)
         #def __init__(self,api,db_name,user='',passwd='', host=''):
         #if not api or not database:
             #self.error('ArchivingAPI and database are required arguments for ArchivingDB initialization!')
