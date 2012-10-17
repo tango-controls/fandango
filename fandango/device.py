@@ -459,6 +459,7 @@ class TangoEval(object):
         self.trace('timeout: %s'%timeout)
         
     def parse_formula(self,formula,_locals=None):
+        """ This method just removes comments and expands FIND() searches in the formula; no tango check, no value replacement """
         _locals = _locals or {}
         _locals.update(self._locals)
         if '#' in formula:
@@ -491,8 +492,8 @@ class TangoEval(object):
         no_alnum = '[^a-zA-Z0-9-_]'
         no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
         #redev = '(?:^|[^/a-zA-Z0-9_])(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        redev = '(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta))?)?' #Matches attribute and extension
+        redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all))?)?' #Matches attribute and extension
         retango = redev+reattr#+'(?!/)'
         regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods
         #self.trace( regexp)
@@ -537,10 +538,10 @@ class TangoEval(object):
             else: value = getattr(value,what)
             self.trace('Read %s.%s = %s' % (aname,what,value))
         except Exception,e:
-            if _raise:
-                raise e
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return True
+            elif _raise:
+                raise e
             self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
             #print traceback.format_exc()
             value = None
@@ -588,7 +589,12 @@ class TangoEval(object):
             self.trace('\t%s => %s'%(target,var_name))
             try:
                 #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
-                self.previous[var_name] = previous.get(target,self.read_attribute(device,attribute or 'State',what if what and what!='delta' else 'value',_raise=_raise))
+                self.previous[var_name] = previous.get(target,
+                    self.read_attribute(device,
+                        attribute or 'State',
+                        what if what and what!='delta' else 'value',
+                        _raise=_raise if not any(d==device and a==attribute and w=='exception' for t,d,a,w in targets) else False
+                        ))
                 if what=='delta':
                     cache = self.cache.get((device+'/'+attribute).lower())
                     self.previous[var_name] = 0 if (not self.cache_depth or not cache) else (cache[0].value-cache[-1].value)
