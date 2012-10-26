@@ -75,7 +75,7 @@ except:
     print traceback.format_exc()
 
 try:
-    from objects import Object,Singleton,SingletonMap,Struct,Property
+    from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
 except: 
     import traceback
     print traceback.format_exc()
