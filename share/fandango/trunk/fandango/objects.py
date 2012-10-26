@@ -76,8 +76,32 @@ class Struct(object):
         return self.__repr__().replace('\n','').replace('\t','')
     pass
         
-def Property(fget=None,fset=None,fdel=None,doc=None):
-    """ It makes easier to declare name independent property's (descriptors) by using template methods like:
+def _fget(self,var):
+    return getattr(self,var)
+def _fset(self,value,var):
+    setattr(self,var,value)
+def _fdel(self,var):
+    delattr(self,var)
+def make_property(var,fget=_fget,fset=_fset,fdel=_fdel):
+    """ This Class is in Beta, not fully implemented yet"""
+    return property(partial(fget,var=var),partial(fset,var=var),partial(fdel,var=var),doc='%s property'%var)
+
+#class NamedProperty(property):
+    #"""
+    #"""
+    #def __init__(self,name,fget=None,fset=None,fdel=None):
+        #self.name = name
+        #mname = '%s%s'%(name[0].upper(),name[1:])
+        #lname = '%s%s'%(name[0].lower(),name[1:])
+        #property.__init__(fget,fset,fdel,doc='NamedProperty(%s)'%self._name)
+    #def get_attribute_name(self):
+        #return '_%s'self.name
+    
+def NamedProperty(name,fget=None,fset=None,fdel=None):#,doc=None):
+    """ 
+    This Class is in Beta, not fully implemented yet
+    
+    It makes easier to declare name independent property's (descriptors) by using template methods like:
     
     def fget(self,var): # var is the identifier of the variable
         return getattr(self,var)    
@@ -88,7 +112,7 @@ def Property(fget=None,fset=None,fdel=None,doc=None):
         
     MyObject.X = Property(fget,fset,fdel,'X')        
     """
-    return property(partial(fget,var=doc) if fget else None,partial(fset,var=doc) if fset else None,partial(fdel,var=doc) if fdel else None,doc=doc)
+    return property(partial(fget,var=name) if fget else None,partial(fset,var=name) if fset else None,partial(fdel,var=name) if fdel else None,doc=name)
     
 import threading
 __lock__ = threading.RLock()
