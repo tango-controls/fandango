@@ -54,6 +54,7 @@ from fandango import functional as fun
 from log import Logger,except2str
 from excepts import *
 from callbacks import *
+import fandango.tango as tango
 from tango import * #USE_TAU imported here
 from objects import Object,Struct
 from dicts import CaselessDefaultDict,CaselessDict
@@ -248,7 +249,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         neighbours = self.get_devs_in_server()
         self.info('In subscribe_external_attributes(%s,%s): Devices in the same server are: %s'%(device,attributes,neighbours.keys()))
         if not hasattr(self,'ExternalAttributes'): self.ExternalAttributes = CaselessDict()
-        if not hasattr(self,'PollingCycle'): self.PollingCycle = 5000
+        if not hasattr(self,'PollingCycle'): self.PollingCycle = 3000
         if not hasattr(self,'last_event_received'): self.last_event_received = 0
         device = device.lower()
         deviceObj = neighbours.get(device,None)
@@ -282,7 +283,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
             if hasattr(self,'UpdateAttributesThread'):
                 self.UpdateAttributesThread.join(getattr(self,'PollingCycle',3000.))            
             if USE_TAU: 
-                from tau import Attribute
+                from taurus import Attribute
                 for at in self.ExternalAttributes.values():
                     if isinstance(at,Attribute):
                         at.removeListener(self.event_received)
@@ -296,7 +297,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None:
             if USE_TAU: 
-                from tau import Device
+                from taurus import Device
                 Device(device).write_attribute(attribute,data)
             else:
                 aname = str(device+'/'+attribute).lower()
@@ -329,7 +330,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None: 
             if USE_TAU:
-                from tau import Device
+                from taurus import Device
                 return Device(device).command_inout(target,argin)
             else:
                 PyTango.DeviceProxy(device).command_inout(target,argin)
