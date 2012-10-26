@@ -392,7 +392,7 @@ class TauColorComponent(taurusbase.TaurusBaseComponent):
         return TaurusAttribute
         
 from taurus.qt import Qt
-from taurus.qt.qtgui.container import TaurusWidget
+from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 
 class NullWidget(TaurusWidget):
     def __init__(self,*args):
