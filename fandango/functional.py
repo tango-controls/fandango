@@ -35,7 +35,13 @@
 ###########################################################################
 """
 
+__doc__ = """
+fandango.functional::
+    contains functional programming methods for python, it should use only python main library methods and not be dependent of any other module
+"""
+
 import re
+import random
 import time,datetime
 
 from operator import isCallable
@@ -90,10 +96,12 @@ def last(seq,MAX=1000):
     return
         
 def randomize(seq):
-    import random
     done,result = list(range(len(seq))),[]
     while done: result.append(seq[done.pop(random.randrange(len(done)))])
     return result
+    
+def randpop(seq): 
+    return seq.pop(random.randrange(len(seq)))
         
 def avg(seq):
     seq = [s for s in seq if seq is not None]
