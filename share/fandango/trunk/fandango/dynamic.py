@@ -246,7 +246,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if self.useDynStates:
             self.warning('useDynamicStates is set, disabling automatic State generation by attribute config.'+
                     'States fixed with set/get_state will continue working.')
-            self.State=self.rawState      
+            self.State = self.rawState
+            self.dev_state = self.rawState
         self.call__init__('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
 
     def delete_device(self):
@@ -421,7 +422,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
             print('%16s\t\t%s\t%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
                 value,
-                type(value).__name__,
+                type(value).__name__ if value is not None else '...',
                 int(1e3*self._last_period[key]),
                 self._read_times[key],
                 self._eval_times[key],
@@ -1129,8 +1130,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 #------------------------------------------------------------------------------------------------------
 
     def rawState(self):
+        self.debug('In DynamicDS.rawState(), overriding attribute-based State.')
         state = self.get_state()
-        self.debug('In DynamicDS.State()='+str(state)+', overriding attribute-based State.')
+        self.debug('In DynamicDS.State()='+str(state))
         return state
 
     def set_state(self,state):
@@ -1685,5 +1687,6 @@ class DynamicAttribute(object):
 #l.__delattr__       l.__getattribute__  l.__imul__          l.__mul__           l.__reversed__      l.append            l.remove
 #l.__delitem__       l.__getitem__       l.__init__          l.__ne__            l.__rmul__          l.count             l.reverse
 #l.__delslice__      l.__getslice__      l.__iter__          l.__new__           l.__setattr__       l.extend            l.sort
+
 
 
