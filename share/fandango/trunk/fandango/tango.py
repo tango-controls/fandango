@@ -52,7 +52,7 @@ from PyTango import AttrQuality
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
-#tau imports, here USE_TAU is defined for all fandango
+#taurus imports, here USE_TAU is defined for all fandango
 try:
     assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
     try: 
@@ -85,7 +85,7 @@ def get_database():
     global TangoDatabase
     if TangoDatabase is None:
         try: 
-            TangoDatabase = USE_TAU and tau.Database() or PyTango.Database()
+            TangoDatabase = USE_TAU and taurus.Database() or PyTango.Database()
         except: pass
     return TangoDatabase
 
@@ -107,7 +107,7 @@ def get_database_device():
     return TangoDevice
 
 try:
-    #TangoDatabase = USE_TAU and tau.core.TauManager().getFactory()().getDatabase() or PyTango.Database()
+    #TangoDatabase = USE_TAU and taurus.core.TaurusManager().getFactory()().getDatabase() or PyTango.Database()
     TangoDatabase = get_database()
     TangoDevice = get_database_device()
 except: pass
