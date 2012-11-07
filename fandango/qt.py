@@ -406,16 +406,8 @@ class NullWidget(TaurusWidget):
         print 'In NullWidget.setInput(%s)'%value
         self.emit(Qt.SIGNAL('Output'), value or 'sys/database/2')
 
-#try:
-    #from tau.widget.utils.emitter import modelSetter,TauEmitterThread,SingletonWorker
-#except:
-    #import traceback
-    #print 'Unable to load TauEmitterThread from tau.widget.utils'
-    #print traceback.format_exc()
-    
-    
 #############################################################################################
-## DO NOT EDIT THIS CLASS HERE, THE ORIGINAL ONE IS IN tau.widget.utils.emitter!!!
+## DO NOT EDIT THIS CLASS HERE, THE ORIGINAL ONE IS IN taurus utils emitter!!!
 #############################################################################################
 
 def modelSetter(obj,model):
