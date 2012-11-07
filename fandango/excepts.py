@@ -156,6 +156,9 @@ def getPreviousExceptions(limit=0):
         print 'Aaaargh!'
         return traceback.format_exc()
     
+class RethrownException(Exception):
+    pass
+    
 try:
     import PyTango
 
