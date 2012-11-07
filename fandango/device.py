@@ -73,7 +73,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     It allows to use call__init__(self, klass, *args, **kw) to avoid multiple inheritance from same parent problems.
     Therefore, use self.call__init__(PyTango.Device_4Impl,cl,name) instead of PyTango.Device_4Impl.__init__(self,cl,name)
     
-    It also allows to connect several devices within the same server or not usint tau.core
+    It also allows to connect several devices within the same server or not usint taurus.core
     """
 
     ##@name State Machine methods
@@ -409,7 +409,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         This method manages the events received from external attributes.
         This method must be overriden in child classes.
         """
-        #self.info,debug,error,warning should not be used here to avoid conflicts with tau.core logging
+        #self.info,debug,error,warning should not be used here to avoid conflicts with taurus.core logging
         def log(prio,s): print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
         self.last_event_received = time.time()
         log('info','In Dev4Tango.event_received(%s(%s),%s,%s) at %s'%(type(source).__name__,source,fakeEventType[type_],type(attr_value).__name__,self.last_event_received))
@@ -433,8 +433,8 @@ class TangoEval(object):
         self.formula = formula
         self.variables = []
         self.timeout = timeout
-        self.proxies = proxies or dicts.defaultdict_fromkey(tau.Device) if USE_TAU else ProxiesDict()
-        self.attributes = attributes or dicts.defaultdict_fromkey(tau.Attribute if USE_TAU else PyTango.AttributeProxy)
+        self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if USE_TAU else ProxiesDict()
+        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if USE_TAU else PyTango.AttributeProxy)
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
         self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
         self.cache_depth = cache
