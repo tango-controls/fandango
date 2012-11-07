@@ -110,23 +110,16 @@ import fandango.device
 USE_STATIC_METHODS = getattr(PyTango,'__version_number__',0)<722
 #print 'PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS)
 
-try: 
+try:
     #raise Exception('no-taurus')
     import taurus
     USE_TAU = True
     TAU = taurus
     EVENT_TYPE = taurus.core.TaurusEventType
     TAU_LOGGER = taurus.core.util.Logger
-except:
-    try:
-        import tau
-        USE_TAU = True
-        TAU = tau
-        EVENT_TYPE = tau.core.TauEventType
-        TAU_LOGGER = tau.core.utils.Logger
-    except: 
-        print 'Unable to import tau'
-        USE_TAU=False
+except: 
+    print 'Unable to import taurus'
+    USE_TAU=False
 
 
 import os
@@ -417,7 +410,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
         print '%16s\t\tvalue\ttype\tinterval\tread_time\teval_time\tcpu'%'Attribute'
         print '-'*80
-        for t,key in reversed(sorted((v,k) for k,v in self._read_times.items())):
+        for t,key in list(reversed(sorted((v,k) for k,v in self._read_times.items())))[:15]:
             value = (self.dyn_values[key].value if key in self.dyn_values else 'NotKept')
             value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
             print('%16s\t\t%s\t%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
@@ -740,7 +733,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             #last_exc = '\n'.join([str(e)]*4)
             last_exc = str(e)
             self.error('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
-            print traceback.format_exc()
+            if not isinstance(e,RethrownException): print traceback.format_exc()
             raise Exception('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
             #PyTango.Except.throw_exception('DynamicDS_read_dyn_attr_Exception',str(e),last_exc)
     
@@ -806,7 +799,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         v = self.dyn_values[k]
                         if k.lower().strip()!=aname.lower().strip() and isinstance(v.value,Exception): 
                             self.warning('evalAttr(%s): An exception is rethrowed from attribute %s'%(aname,k))
-                            raise v.value #Exceptions are passed to dependent attributes
+                            raise RethrownException(v.value) #Exceptions are passed to dependent attributes
                         else: self._locals[k]=v.value #.value 
             else:
                 self.debug("In evalAttr ... updating locals from dyn_values")
@@ -1135,10 +1128,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.debug('In DynamicDS.State()='+str(state))
         return state
 
-    def set_state(self,state):
+    def set_state(self,state,push=False):
         self._locals['STATE']=state
         try:
-            if self.check_attribute_events('state'): 
+            if push and self.check_attribute_events('state'): 
                 self.info('DynamicDS(%s.check_state(): pushing new state event'%(self.get_name()))
                 try: self.push_change_event('State',state,time.time(),PyTango.AttrQuality.ATTR_VALID)
                 except Exception,e: self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
@@ -1146,7 +1139,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.warning('DynamicDS.check_attribute_events(State=%s) failed!: %s'%(state,e))
         DynamicDS.get_parent_class(self).set_state(self,state)
 
-    def check_state(self,set_state=True):
+    def check_state(self,set_state=True,current=None):
         '''    The thread automatically close if there's no activity for 5 minutes,
             an always_executed_hook call or a new event will restart the thread.
         '''
@@ -1158,7 +1151,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.state_lock.acquire()
             if self.dyn_states:
                 self.debug('In DynamicDS.check_state()')
-                old_state = self.get_state()
+                old_state = self.get_state() if current is None else current
                 ## @remarks: the device state is not changed if none of the DynamicStates evaluates to True
                 #self.set_state(PyTango.DevState.UNKNOWN)
                 self.last_state_exception = ''
@@ -1177,10 +1170,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         if self.TangoStates[nstate]!= old_state:
                             self.info('DynamicDS(%s.check_state(): New State is %s := %s'%(self.get_name(),nstate,formula))
                             if set_state:
-                                self.set_state(self.TangoStates[nstate])
-                                if self.check_attribute_events('state'):
-                                    self.info('DynamicDS(%s.check_state(): pushing new state event'%(self.get_name()))
-                                    self.push_change_event('State',self.TangoStates[nstate],time.time(),PyTango.AttrQuality.ATTR_VALID)
+                                self.set_state(self.TangoStates[nstate],push=True)
                         break
         
         except Exception,e:
