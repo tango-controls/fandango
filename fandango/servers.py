@@ -180,7 +180,9 @@ class TServer(Object):
 ####################################################################################################################
 
 class ServersDict(CaselessDict,Object):
-    ''' Dictionary that contains list of servers and allows to select/start/stop them by host, class or devices
+    ''' 
+    Dictionary of TServer classes indexed by server/instance names and loaded using wildcard expressions.
+    Provides Jive/Astor functionality to a list of servers and allows to select/start/stop them by host, class or devices
     Its purpose is to allow generic start/stop of lists of Tango DeviceServers.
     This methods of selection provide new ways of search apart of Jive-like selection.
        
@@ -188,25 +190,31 @@ class ServersDict(CaselessDict,Object):
     
     @par Usage:
     <pre>
-    astor = ServersDict()
+    from fandango import Astor
+    astor = Astor()
     astor.load_by_name('snap*')
+    astor.keys()
+      ['snapmanager/1', 'snaparchiver/1', 'snapextractor/1']
+    server = astor['snaparchiver/1']
     server.get_device_list()
         ['dserver/snaparchiver/1', 'archiving/snaparchiver/1']
-    astor['snaparchiver/1'].get_all_states()
+    astor.states()
+    server.get_all_states()
         dserver/snaparchiver/1: ON
         archiving/snaparchiver/1: ON
      astor.get_device_host('archiving/snaparchiver/1')
         palantir01
      astor.stop_servers('snaparchiver/1')
+     astor.stop_all_servers()
      astor.start_servers('snaparchiver/1','palantir01',wait=1000)
      astor.set_server_level('snaparchiver/1','palantir01',4)
-     
+
      #Setting the polling of a device:
      server = astor['PySignalSimulator/bl11']
      for dev_name in server.get_device_list():
          dev = server.get_device(dev_name)
          attrs = dev.get_attribute_list()
-         [dev.poll_attribute(attr,3000) for attr in attrs]
+         [dev.poll_attribute(attr,3000) for attr in attrs] 
      </pre>
     '''
     def __init__(self,pattern='',klass='',devs_list='',servers_list='',hosts='',loadAll=False,log='WARNING',logger=None,tango_host=''):
