@@ -1,11 +1,15 @@
 October 2012 9.12
 
-dynamic: DynamicDS reimplements dev_state so NO LONGER ATTRIBUTE QUALITIES AFFECT STATE!
- You can override this behavior in child classes by setting useDynStates=False in the __init__ call
-tau dependency removed
+dynamic: 
+ * DynamicDS reimplements dev_state so NO LONGER ATTRIBUTE QUALITIES AFFECT STATE!
+ * You can override this behavior in child classes by setting useDynStates=False in the __init__ call
+ * tau dependency removed
+ * added push arg to set_state to enable/disable event pushing on purpose
 objects: Property replaced by NamedProperty to avoid ambiguity
 functional: added randpop(sequence)
-device: Using taurus instead of taudev_state() overriden to not have State() calls triggering read_attribute() for every attribute that has a quality config.
+device: Using taurus instead of tau
+device: dev_state() overriden to not have State() calls triggering read_attribute() for every attribute that has a quality config.
+excepts: Added RethrownException call, to know in DynamicDS when an exception has been already catched
 
 
 October 2012 9.11
