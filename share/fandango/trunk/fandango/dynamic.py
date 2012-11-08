@@ -1143,15 +1143,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         '''    The thread automatically close if there's no activity for 5 minutes,
             an always_executed_hook call or a new event will restart the thread.
         '''
-        state = self.get_state()
+        new_state = self.get_state()
         try:
             if self.state_lock.locked(): 
                 self.debug('In DynamicDS.check_state(): lock already acquired')
-                return state
+                return new_state
             self.state_lock.acquire()
             if self.dyn_states:
                 self.debug('In DynamicDS.check_state()')
-                old_state = self.get_state() if current is None else current
+                old_state = new_state if current is None else current
                 ## @remarks: the device state is not changed if none of the DynamicStates evaluates to True
                 #self.set_state(PyTango.DevState.UNKNOWN)
                 self.last_state_exception = ''
@@ -1167,18 +1167,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.info('In DynamicDS.check_state(): %s : %s ==> %s' % (state,value['formula'],result))
                     
                     if result:
-                        if self.TangoStates[nstate]!= old_state:
+                        new_state = self.TangoStates[nstate]
+                        if new_state!= old_state:
                             self.info('DynamicDS(%s.check_state(): New State is %s := %s'%(self.get_name(),nstate,formula))
-                            if set_state:
-                                self.set_state(self.TangoStates[nstate],push=True)
+                            if set_state:self.set_state(new_state,push=True)
                         break
-        
         except Exception,e:
             print traceback.format_exc()
             raise e
         finally:
             if self.state_lock.locked(): self.state_lock.release()
-        return state
+        return new_state
     
     def set_status(self,status,save=True):
         if save: #not any('STATUS' in s for s in self.DynamicStatus): #adds STATUS to locals only if not used in DynamicStatus?
