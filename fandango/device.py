@@ -51,7 +51,7 @@ import PyTango
 #fandango imports
 from fandango import log,excepts,callbacks,tango,objects,dicts,arrays,dynamic
 from fandango import functional as fun
-from log import Logger,except2str
+from log import Logger,except2str,printf
 from excepts import *
 from callbacks import *
 import fandango.tango as tango
@@ -76,6 +76,9 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     It also allows to connect several devices within the same server or not usint taurus.core
     """
 
+    def trace(self,prio,s):
+        printf( '4T.%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s))
+            
     ##@name State Machine methods
     #@{
     
@@ -91,18 +94,19 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     def get_state(self):
         #@Tango6
         #This have been overriden as it seemed not well managed when connecting devices in a same server
+        if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
         return self._state
     
     def dev_state(self):
         #@Tango7
         #This have been overriden to avoid device servers with states managed by qualities
-        return self._state
+        return self.get_state()
     
     def State(self):
         """ State redefinition is required to keep independency between 
         attribute configuration (max/min alarms) and the device State """
         #return self.get_state()
-        return self._state
+        return self.get_state()
     
     # DON'T TRY TO OVERLOAD STATUS(), It doesn't work that way.    
     #def Status(self):
@@ -223,6 +227,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     def get_polled_attrs(self):
         """ Returns a dictionary like {attr_name:period} """
         polled_attrs = {}
+        admin = self.get_admin_device()
         for st in admin.DevPollStatus(name):
             lines = st.split('\n')
             try: polled_attrs[lines[0].split()[-1]]=lines[1].split()[-1]
@@ -251,6 +256,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         if not hasattr(self,'ExternalAttributes'): self.ExternalAttributes = CaselessDict()
         if not hasattr(self,'PollingCycle'): self.PollingCycle = 3000
         if not hasattr(self,'last_event_received'): self.last_event_received = 0
+        if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
         device = device.lower()
         deviceObj = neighbours.get(device,None)
         if USE_TAU and deviceObj is None:
