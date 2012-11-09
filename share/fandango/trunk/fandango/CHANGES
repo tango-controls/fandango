@@ -6,6 +6,7 @@ dynamic:
  * tau dependency removed
  * added push arg to set_state to enable/disable event pushing on purpose
  * Bugs solved in DynamicDS.check_state return value
+device/dynamic: get_polled_attrs moved to tango module
 objects: Property replaced by NamedProperty to avoid ambiguity
 functional: added randpop(sequence)
 device: Using taurus instead of tau
