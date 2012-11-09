@@ -231,8 +231,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._last_period = {}
         self._last_read = {}
         self._read_times = {}
+        self._read_count = fandango.dicts.defaultdict(int)
         self._eval_times = {}
-        self._polled_attr_ = []
+        self._polled_attr_ = {}
         self.GARBAGE = []
 
         self.useDynStates = useDynStates
@@ -274,6 +275,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
     def read_attr_hardware(self,data):
         self.debug("In DynDS::read_attr_hardware()")
+        attrs = self.get_device_attr()
+        read_attrs = [attrs.get_attr_by_ind(d).get_name() for d in data]
+        for a in read_attrs: self._read_count[a]+=1
+        return read_attrs
+        #self.info("read_attr_hardware([%d]=%s)"%(len(data),str(read_attrs)[:80]))        
         ## Edit this code in child classes if needed
         #try:
             #attrs = self.get_device_attr()
@@ -312,7 +318,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 except Exception,e:
                     self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
-                setattr(self,prop if prop!='polled_attr' else '_polled_attr',value)
+                if prop=='polled_attr': self._polled_attr_ = fandango.device.get_polled_attrs(value)
+                else: setattr(self,prop,value)
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
             [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
         return
@@ -334,6 +341,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         except:
             print traceback.format_exc()
             return []
+            
+    def get_polled_attrs(self,load=False):
+        #@TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
+        if load or not getattr(self,'_polled_attr_',None):
+            self._polled_attr_ = fandango.device.get_polled_attrs(self)
+        return self._polled_attr_
 
     def check_polled_attributes(self,db=None,new_attr={},use_admin=False):
         '''
@@ -348,45 +361,26 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         my_name = self.get_name()
         
         new_attr = dict.fromkeys(new_attr,self.DEFAULT_POLLING_PERIOD) if isinstance(new_attr,list) else new_attr
-        props = self._db.get_device_property(my_name,['DynamicAttributes','polled_attr'])
+        dyn_attrs = list(set(map(str.lower,['state','status']+self.dyn_attrs.keys()+new_attr.keys())))
+        pattrs = self.get_polled_attrs()
         npattrs = []
         
-        dyn_attrs = [k.split('=')[0].lower().strip() for k in props['DynamicAttributes'] if k and not k.startswith('#')]
-        dyn_attrs.extend(k.lower() for k in new_attr.keys()) #dyn_attrs will contain both dynamic attributes and new aggregated attributes.
-        dyn_attrs.extend(['state','status'])
-        
-        ## The Admin device server can be used only if the server is already running; NOT at startup!
-        if use_admin: 
-            print 'Getting Util.instance()'
-            admin = PyTango.Util.instance().get_dserver_device()                
-            pattrs = []
-            for st in admin.DevPollStatus(name):
-                lines = st.split('\n')
-                try: pattrs.extend([lines[0].split()[-1],lines[1].split()[-1]])
-                except: pass
-        else:        
-            pattrs = props['polled_attr']
-        
-        #First: propagate all polled_attrs if they appear in the new attribute list
-        for i in range(len(pattrs))[::2]:
-            att = pattrs[i].lower()
-            period = pattrs[i+1]
-            if att in npattrs: 
-                continue #remove duplicated
+        #First: propagate all polled_attrs if they appear in the new attribute list or remove them if don't
+        for att,period in pattrs.items():
+            if att in npattrs: continue #remove duplicated
             elif att.lower() in dyn_attrs: 
                 (npattrs.append(att.lower()),npattrs.append(period))
             else: 
-                self.info('Removing Attribute %s from %s.polled_attr Property' % (pattrs[i],my_name))
+                self.info('Removing Attribute %s from %s.polled_attr Property' % (att,my_name))
                 if use_admin:
                     try: admin.RemObjPolling([name,'attribute',att])
                     except: print traceback.format_exc()
-                
         #Second: add new attributes to the list of attributes to configure; attributes where value is None will not be polled
         for n,v in new_attr.iteritems():
             if n.lower() not in npattrs and v:
                 (npattrs.append(n.lower()),npattrs.append(v))
                 self.info('Attribute %s added to %s.polled_attr Property' % (n,my_name))
-                
+        #Third: apply the new configuration
         if use_admin:
             for i in range(len(npattrs))[::2]:
                 try:
@@ -408,18 +402,26 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._cycle_start = now-self._cycle_start
         if 'POLL' in self.dyn_values: self.debug('dyn_values[POLL] = %s ; locals[POLL] = %s' % (self.dyn_values['POLL'].value,self._locals['POLL']))
         self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
-        print '%16s\t\tvalue\ttype\tinterval\tread_time\teval_time\tcpu'%'Attribute'
-        print '-'*80
-        for t,key in list(reversed(sorted((v,k) for k,v in self._read_times.items())))[:15]:
+        self.info('There were %d attribute readings.'%(sum(self._read_count.values() or [0])))
+        head = '%24s\t\t%10s\t\ttype\tinterval\tread_count\tread_time\teval_time\tcpu'%('Attribute','value')
+        lines = []
+        target = list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_times.items())))[:7]
+        target.extend(list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_count.items())) if t not in target)[:7])
+        for key in target:
             value = (self.dyn_values[key].value if key in self.dyn_values else 'NotKept')
             value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
-            print('%16s\t\t%s\t%s\t%d\t%1.2e\t%1.2e\t%1.2f%%'%(key, 
-                value,
-                type(value).__name__ if value is not None else '...',
-                int(1e3*self._last_period[key]),
-                self._read_times[key],
-                self._eval_times[key],
-                100*self._eval_times[key]/(self._total_usage or 1.)))
+            lines.append('\t'.join([
+                '%24s'%key[:24],
+                '\t%10s'%value[:16],
+                '%s'%type(value).__name__ if value is not None else '...',
+                '%d'%int(1e3*self._last_period[key]),
+                '%d'%self._read_count[key],
+                '%1.2e'%self._read_times[key],
+                '%1.2e'%self._eval_times[key],
+                '%1.2f%%'%(100*self._eval_times[key]/(self._total_usage or 1.))]))
+        print head
+        print '-'*max(len(l)+4*l.count('\t') for l in lines)
+        print '\n'.join(lines)
         print ''
         self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
         self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/(sum(self._read_times.values()) or 1)))
@@ -438,6 +440,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if MEM_CHECK:
             h = HEAPY.heap()
             self.info(str(h))
+        for a in self._read_count: self._read_count[a] = 0
         self._cycle_start = now
         self._total_usage = 0
         self.info('-'*80)
@@ -538,8 +541,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         for s in self.TangoStates if not any(l.startswith(s) for l in self.DynamicStates)]
                 else:
                     self.debug( self.get_name()+".dyn.attr(): Unknown State: %s"%line)
-
-        polled_attrs = set(self._polled_attr_[::2])
+        
+        #Attributes may be added to polling if having Events
+        new_polled_attrs = set(self.get_polled_attrs().keys())
         self.info('In %s.dyn_attr(): inspecting %d attributes ...' %(self.get_name(),len(self.DynamicAttributes)))
         for line in self.DynamicAttributes:
             print '\t%s'%line
@@ -623,8 +627,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 #Setting up change events:
                 if self.check_attribute_events(aname):
                     self._locals[aname] = None
-                    if aname in polled_attrs: self.set_change_event(aname,True,False)
-                    else: polled_attrs.add(aname)
+                    if aname in new_polled_attrs: self.set_change_event(aname,True,False)
+                    else: new_polled_attrs.add(aname)
                 elif self.dyn_values[aname].keep:
                     self._locals[aname] = None
                 
@@ -653,15 +657,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         
         #Setting up state events:
         if self.check_attribute_events('State'): 
-            if 'state' in polled_attrs: 
+            if 'state' in new_polled_attrs: 
                 self.warning('State events will be managed always by polling') 
                 self.set_change_event('State',True,False) #Implemented, don't check conditions to push
-            else: polled_attrs.add('state')
+            else: new_polled_attrs.add('state')
         
         try:
-            self.check_polled_attributes(new_attr=dict.fromkeys(polled_attrs,self.DEFAULT_POLLING_PERIOD))
+            self.check_polled_attributes(new_attr=dict.fromkeys(new_polled_attrs,self.DEFAULT_POLLING_PERIOD))
         except:
-            print 'DynamicDS.dyn_attr( ... ), unable to set polling for (%s): \n%s'%(list(polled_attrs),traceback.format_exc())
+            print 'DynamicDS.dyn_attr( ... ), unable to set polling for (%s): \n%s'%(new_polled_attrs,traceback.format_exc())
         
         print 'DynamicDS.dyn_attr( ... ), finished. Attributes ready to accept request ...'
 
@@ -1568,23 +1572,22 @@ class DynamicAttribute(object):
 
         result = DynamicAttribute()
         result.quality,result.date,result.primeOlder=self.quality,self.date,self.primeOlder
-
-        if op_name == '__nonzero__' and type(value) is list:
-            op_name = '__len__'
-        if hasattr(type(value),op_name): #Be Careful, method from the class and from the instance don't get the same args
+        op_name = '__len__' if op_name == '__nonzero__' and type(value) is list else op_name
+        
+        if op_name in ['__eq__','__lt__','__gt__','__ne__','__le__','__ge__'] and '__cmp__' in dir(value):
+            if op_name is '__eq__': method = lambda s,x: not bool(s.__cmp__(x))
+            if op_name is '__ne__': method = lambda s,x: bool(s.__cmp__(x))
+            if op_name is '__lt__': method = lambda s,x: (s.__cmp__(x)<0)
+            if op_name is '__le__': method = lambda s,x: (s.__cmp__(x)<=0)
+            if op_name is '__gt__': method = lambda s,x: (s.__cmp__(x)>0)
+            if op_name is '__ge__': method = lambda s,x: (s.__cmp__(x)>=0)
+        elif hasattr(type(value),op_name) and hasattr(value,op_name): #Be Careful, method from the class and from the instance don't get the same args
             method = getattr(type(value),op_name)
+            #print 'Got %s from %s: %s'%(op_name,type(value),method)
         #elif op_name in value.__class__.__base__.__dict__:
         #    method = value.__class__.__base__.__dict__[op_name]
         else:
-            if op_name in ['__eq__','__lt__','__gt__','__ne__','__le__','__ge__'] and '__cmp__' in dir(value):
-                if op_name is '__eq__': method = lambda s,x: not bool(s.__cmp__(x))
-                if op_name is '__ne__': method = lambda s,x: bool(s.__cmp__(x))
-                if op_name is '__lt__': method = lambda s,x: (s.__cmp__(x)<0)
-                if op_name is '__le__': method = lambda s,x: (s.__cmp__(x)<=0)
-                if op_name is '__gt__': method = lambda s,x: (s.__cmp__(x)>0)
-                if op_name is '__ge__': method = lambda s,x: (s.__cmp__(x)>=0)
-            else:
-                raise Exception,'DynamicAttribute_WrongMethod%sFor%sType==(%s)'% (op_name,str(type(value)),value)
+            raise Exception,'DynamicAttribute_WrongMethod%sFor%sType==(%s)'% (op_name,str(type(value)),value)
 
         if unary:
             if value is None and op_name in ['__nonzero__','__int__','__float__','__long__','__complex__']: 
@@ -1600,6 +1603,7 @@ class DynamicAttribute(object):
             result.date = min([self.date,other.date]) if self.primeOlder else max([self.date,other.date])
             result.value = method(value,other.value)
         else:
+            #print '%s,%s(%s),%s(%s)' % (method,type(value),value,type(other),other)
             result.value = method(value,other)
         if op_name in ['__nonzero__','__int__','__float__','__long__','__complex__','__index__','__len__','__str__',
                     '__eq__','__lt__','__gt__','__ne__','__le__','__ge__']:
