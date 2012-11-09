@@ -55,7 +55,7 @@ from log import Logger,except2str,printf
 from excepts import *
 from callbacks import *
 import fandango.tango as tango
-from tango import * #USE_TAU imported here
+from tango import * #USE_TAU imported here, get_polled_attrs and other useful methods
 from objects import Object,Struct
 from dicts import CaselessDefaultDict,CaselessDict
 from arrays import TimedQueue
@@ -225,19 +225,16 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         return U.get_dserver_device()
     
     def get_polled_attrs(self):
-        """ Returns a dictionary like {attr_name:period} """
-        polled_attrs = {}
-        admin = self.get_admin_device()
-        for st in admin.DevPollStatus(name):
-            lines = st.split('\n')
-            try: polled_attrs[lines[0].split()[-1]]=lines[1].split()[-1]
-            except: pass
-        return polled_attrs
+        """ 
+        Returns a dictionary like {attr_name:period} 
+        @TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
+        """
+        return tango.get_polled_attrs(self)
             
     def set_polled_attribute(self,name,period,type_='attribute'):
         args = [[period],[self.get_name(),type_,name]]
         admin = self.get_admin_device()
-        if aname in self.get_polled_attrs(): 
+        if name in self.get_polled_attrs(): 
             if period: admin.UpdObjPollingPeriod(args)
             else: admin.RemObjPolling([self.get_name(),type_,name])
         else: admin.AddObjPolling(args)
