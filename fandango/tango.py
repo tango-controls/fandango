@@ -520,13 +520,37 @@ def get_device_host(dev):
     Asks the Database device server about the host of this device 
     """
     return get_device_info(dev).host
-   
-def get_polled_attributes(dev):
-    if isinstance(dev,PyTango.DeviceProxy): dp = dev
-    else: dp = PyTango.DeviceProxy(dev)
-    attrs = dp.get_attribute_list()
-    periods = [(a,dp.get_attribute_poll_period(a)) for a in attrs]
-    return dict((a,p) for a,p in periods if p)
+
+def get_polled_attrs(device,others=None):
+    """ 
+    @TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
+    if a device is passed, it returns the polled_attr property as a dictionary
+    if a list of values is passed, it converts to dictionary
+    others argument allows to get extra property values in a single DB call 
+    """
+    if fun.isSequence(device):
+        return dict(zip(map(str.lower,device[::2]),map(float,device[1::2])))
+    elif isinstance(device,PyTango.DeviceProxy):
+        attrs = device.get_attribute_list()
+        periods = [(a.lower(),int(dp.get_attribute_poll_period(a))) for a in attrs]
+        return dict((a,p) for a,p in periods if p)
+    else:
+        others = others or []
+        if isinstance(device,PyTango.DeviceImpl):
+            db = PyTango.Util.instance().get_database()
+            #polled_attrs = {}
+            #for st in self.get_admin_device().DevPollStatus(device.get_name()):
+                #lines = st.split('\n')
+                #try: polled_attrs[lines[0].split()[-1]]=lines[1].split()[-1]
+                #except: pass
+            #return polled_attrs
+            device = device.get_name()
+        else:
+            db = fandango.get_database()
+        props = db.get_device_property(device,['polled_attr']+others)
+        d = get_polled_attrs(props.pop('polled_attr'))
+        if others: d.update(props)
+        return d
    
 def check_host(host):
     """
