@@ -5,6 +5,7 @@ dynamic:
  * You can override this behavior in child classes by setting useDynStates=False in the __init__ call
  * tau dependency removed
  * added push arg to set_state to enable/disable event pushing on purpose
+ * Bugs solved in DynamicDS.check_state return value
 objects: Property replaced by NamedProperty to avoid ambiguity
 functional: added randpop(sequence)
 device: Using taurus instead of tau
