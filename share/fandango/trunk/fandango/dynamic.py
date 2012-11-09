@@ -398,51 +398,54 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     def attribute_polling_report(self):
         self.debug('\n'+'-'*80)
-        now = time.time()
-        self._cycle_start = now-self._cycle_start
-        if 'POLL' in self.dyn_values: self.debug('dyn_values[POLL] = %s ; locals[POLL] = %s' % (self.dyn_values['POLL'].value,self._locals['POLL']))
-        self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
-        self.info('There were %d attribute readings.'%(sum(self._read_count.values() or [0])))
-        head = '%24s\t\t%10s\t\ttype\tinterval\tread_count\tread_time\teval_time\tcpu'%('Attribute','value')
-        lines = []
-        target = list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_times.items())))[:7]
-        target.extend(list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_count.items())) if t not in target)[:7])
-        for key in target:
-            value = (self.dyn_values[key].value if key in self.dyn_values else 'NotKept')
-            value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
-            lines.append('\t'.join([
-                '%24s'%key[:24],
-                '\t%10s'%value[:16],
-                '%s'%type(value).__name__ if value is not None else '...',
-                '%d'%int(1e3*self._last_period[key]),
-                '%d'%self._read_count[key],
-                '%1.2e'%self._read_times[key],
-                '%1.2e'%self._eval_times[key],
-                '%1.2f%%'%(100*self._eval_times[key]/(self._total_usage or 1.))]))
-        print head
-        print '-'*max(len(l)+4*l.count('\t') for l in lines)
-        print '\n'.join(lines)
-        print ''
-        self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
-        self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/(sum(self._read_times.values()) or 1)))
-        if False: #GARBAGE_COLLECTION:
-            if not gc.isenabled(): gc.enable()
-            gc.collect()
-            grb = gc.get_objects()
-            self.info('%d objects in garbage collector, %d objects are uncollectable.'%(len(grb),len(gc.garbage)))
-            try:
-                if self.GARBAGE:
-                    NEW_GARBAGE = [o for o in grb if o not in self.GARBAGE]
-                    self.info('New objects added to garbage are: %s' % ([str(o) for o in NEW_GARBAGE]))
-            except:
-                print traceback.format_exc()
-            self.GARBAGE = grb
-        if MEM_CHECK:
-            h = HEAPY.heap()
-            self.info(str(h))
-        for a in self._read_count: self._read_count[a] = 0
-        self._cycle_start = now
-        self._total_usage = 0
+        try:
+            now = time.time()
+            self._cycle_start = now-self._cycle_start
+            if 'POLL' in self.dyn_values: self.debug('dyn_values[POLL] = %s ; locals[POLL] = %s' % (self.dyn_values['POLL'].value,self._locals['POLL']))
+            self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
+            self.info('There were %d attribute readings.'%(sum(self._read_count.values() or [0])))
+            head = '%24s\t\t%10s\t\ttype\tinterval\tread_count\tread_time\teval_time\tcpu'%('Attribute','value')
+            lines = []
+            target = list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_times.items())))[:7]
+            target.extend(list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_count.items())) if t not in target)[:7])
+            for key in target:
+                value = (self.dyn_values[key].value if key in self.dyn_values else 'NotKept')
+                value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
+                lines.append('\t'.join([
+                    '%24s'%key[:24],
+                    '\t%10s'%value[:16],
+                    '%s'%type(value).__name__ if value is not None else '...',
+                    '%d'%int(1e3*self._last_period[key]),
+                    '%d'%self._read_count[key],
+                    '%1.2e'%self._read_times[key],
+                    '%1.2e'%self._eval_times[key],
+                    '%1.2f%%'%(100*self._eval_times[key]/(self._total_usage or 1.))]))
+            print head
+            print '-'*max(len(l)+4*l.count('\t') for l in lines)
+            print '\n'.join(lines)
+            print ''
+            self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
+            self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/(sum(self._read_times.values()) or 1)))
+            if False: #GARBAGE_COLLECTION:
+                if not gc.isenabled(): gc.enable()
+                gc.collect()
+                grb = gc.get_objects()
+                self.info('%d objects in garbage collector, %d objects are uncollectable.'%(len(grb),len(gc.garbage)))
+                try:
+                    if self.GARBAGE:
+                        NEW_GARBAGE = [o for o in grb if o not in self.GARBAGE]
+                        self.info('New objects added to garbage are: %s' % ([str(o) for o in NEW_GARBAGE]))
+                except:
+                    print traceback.format_exc()
+                self.GARBAGE = grb
+            if MEM_CHECK:
+                h = HEAPY.heap()
+                self.info(str(h))
+            for a in self._read_count: self._read_count[a] = 0
+            self._cycle_start = now
+            self._total_usage = 0
+        except:
+            self.error('DynamicDS.attribute_polling_report() failed!\n%s'%traceback.format_exc())
         self.info('-'*80)
         
     def check_attribute_events(self,aname,poll=False):
