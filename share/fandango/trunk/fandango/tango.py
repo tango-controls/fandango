@@ -310,7 +310,7 @@ def parse_labels(text):
             labels = [(e,e) for e in exprs]  
         return labels
         
-def parse_tango_model(name):
+def parse_tango_model(name,use_tau=False):
     """
     {'attributename': 'state',
     'devicename': 'bo01/vc/ipct-01',
@@ -321,7 +321,7 @@ def parse_tango_model(name):
     values = {'scheme':'tango'}
     values['host'],values['port'] = os.getenv('TANGO_HOST').split(':',1)
     try:
-        if not USE_TAU: raise Exception('NotTau')
+        if not use_tau or not USE_TAU: raise Exception('NotTau')
         from taurus.core import tango as tctango
         from taurus.core import AttributeNameValidator,DeviceNameValidator
         validator = {tctango.TangoDevice:DeviceNameValidator,tctango.TangoAttribute:AttributeNameValidator}
@@ -334,7 +334,10 @@ def parse_tango_model(name):
             values['devicename'] = '/'.join([s for s in gd['device'].split('/') if ':' not in s])
             if gd.get('attribute'): values['attributename'] = gd['attribute']
             if gd.get('host'): values['host'],values['port'] = gd['host'].split(':',1)
-    return values if 'devicename' in values else None
+    if 'devicename' not in values: return None
+    values['device'] = values['devicename']
+    if 'attributename' in values: values['attribute'] = values['attributename']
+    return values
 
 import fandango.objects
 class get_all_devices(fandango.objects.SingletonMap):
