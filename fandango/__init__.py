@@ -46,7 +46,7 @@ Several modules included are used in Tango Device Server projects, like @link dy
 import traceback
 
 try: 
-    from servers import ServersDict,Astor,ProxiesDict
+    from servers import ServersDict,Astor,ProxiesDict,ComposersDict
 except: print 'Unable to import servers module'
 
 try: 
@@ -60,7 +60,7 @@ except: print 'Unable to import arrays module'
 try:
     from tango import get_device,get_database,ProxiesDict,find_devices,find_attributes,get_matching_devices,get_matching_attributes
     try:
-        from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand,ComposersDict
+        from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand
     except: print 'Unable to import fandango.device module'    
 except: print 'Unable to import fandango.tango module'
     
