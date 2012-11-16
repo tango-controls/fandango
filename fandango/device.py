@@ -802,6 +802,20 @@ class ComposersDict(ServersDict):
                 )
         return result
     
+    def read_attribute(self,attribute):
+        #Returns a PyTango.AttributeValue
+        dev,attr = attribute.rsplit('/',1)
+        v = self.proxies[dev].read_attribute(attr)
+        return v
+    
+    def read_attribute_value(self,attribute):
+        #Returns python value or Exception
+        try:
+            v = self.read_attribute(attribute)
+            return getattr(v,'value',v)
+        except Exception,e:
+            return e
+    
     def get_formula(self,attribute):
         return self.attributes.get(attribute)
     
