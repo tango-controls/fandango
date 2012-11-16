@@ -832,5 +832,85 @@ class ServersDict(CaselessDict,Object):
     ## @}
 Astor = ServersDict
     
+###############################################################################
+# Composers / DynamicAttributes manager
+
+class ComposersDict(ServersDict):
+    def load_attributes(self):
+        """Loads device/attribute formulas from the database"""
+        from . import dicts
+        if not hasattr(self,'attributes'): self.attributes = dicts.CaselessDict()
+        self.attributes.clear()
+        for d in self.get_all_devices():
+            attrs = self.db.get_device_property(d,['DynamicAttributes'])['DynamicAttributes']
+            if not attrs: attrs = self.db.get_device_property(d,['AlarmList'])['AlarmList']
+            for l in attrs:
+                l = l.split('#')[0].strip()
+                if not l: continue
+                elif '=' in l: self.attributes[d+'/'+l.split('=')[0].strip()] = l.split('=',1)[-1].strip()
+                elif ':' in l: self.attributes[d+'/'+l.split(':')[0].strip()] = l.split(':',1)[-1].strip()
+        return #self.attributes
+                
+    def get_attributes(self,device=None,attribute=None):
+        """Both device and attribute are regexps"""
+        getattr(self,'attributes',self.load_attributes())
+        result = sorted(n for n,f in self.attributes.items() if 
+                    (not device or fun.matchCl(device,n.rsplit('/',1)[0],terminate=True)) and
+                    (not attribute or fun.matchCl(attribute,n.rsplit('/',1)[-1],terminate=True))
+                )
+        return result
     
+    def read_attribute(self,attribute):
+        #Returns a PyTango.AttributeValue
+        dev,attr = attribute.rsplit('/',1)
+        v = self.proxies[dev].read_attribute(attr)
+        return v
+    
+    def read_attribute_value(self,attribute):
+        #Returns python value or Exception
+        try:
+            v = self.read_attribute(attribute)
+            return getattr(v,'value',v)
+        except Exception,e:
+            return e
+    
+    def get_formula(self,attribute):
+        return self.attributes.get(attribute)
+    
+    def get_property(self,*args):
+        """ get_property(property) or get_property(device_regexp,property) """
+        property = args[-1]
+        devs = self.get_all_devices()
+        if len(args)==2: devs = [d for d in devs if fandango.matchCl(args[0],d)]
+        return dict((d,self.db.get_device_property(d,[property])[property]) for d in devs)
+        
+    def set_property(self,*args):
+        """ set_property(property,value) or set_property(device_regexp,property,value) """
+        property,value = args[-2:]
+        devs = self.get_all_devices()
+        if len(args)==3: devs = [d for d in devs if fandango.matchCl(args[0],d)]
+        return [(d,self.db.put_device_property(d,{property:value}))[0] for d in devs]
+        
+    def set_formula(self,attribute,formula,update=False):
+        dev,attr = attribute.rsplit('/',1)
+        new,prop = [],self.db.get_device_property(dev,['DynamicAttributes'])['DynamicAttributes']
+        found = False
+        for p in prop:
+            if not attr.lower() == p.split('=')[0].strip().lower(): 
+                new.append(p)
+            else:
+                attr = p.split('#',1)[0].split('=')[0].strip()
+                comment = p.split('#',1)[-1] if '#' in p else ''
+                new.append('%s=%s%s'%(attr,formula,'#'+comment if comment and '#' not in formula else ''))
+                found = True
+        if found: 
+            self.db.put_device_property(dev,{'DynamicAttributes':new})
+            if update:
+                try:
+                    self.proxies[dev].ping()
+                    self.proxies[dev].updateDynamicAttributes()
+                except Exception,e:
+                    print e
+                    return e
+        return found    
     
