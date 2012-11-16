@@ -6,12 +6,16 @@ dynamic:
  * tau dependency removed
  * added push arg to set_state to enable/disable event pushing on purpose
  * Bugs solved in DynamicDS.check_state return value
+ * Added DynamicAttribute.peak recording
+ * Solved bug when calling ATTR() to read an static attribute
 device/dynamic: get_polled_attrs moved to tango module
 objects: Property replaced by NamedProperty to avoid ambiguity
 functional: added randpop(sequence)
+tango: removed taurus dependency for parse_tango_model
 device: Using taurus instead of tau
 device: dev_state() overriden to not have State() calls triggering read_attribute() for every attribute that has a quality config.
 device: lazy _state initialization to prevent bugs when subscribe_attributes is called too early in init_device()
+device: ComposersDict moved to servers module
 excepts: Added RethrownException call, to know in DynamicDS when an exception has been already catched
 
 
