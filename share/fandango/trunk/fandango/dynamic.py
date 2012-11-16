@@ -100,6 +100,7 @@ import inspect
 from PyTango import AttrQuality
 from PyTango import DevState
 from excepts import *
+import fandango.tango as tango
 from fandango.objects import self_locked
 from fandango.dicts import SortedDict,CaselessDefaultDict
 from fandango.log import Logger,shortstr
@@ -779,7 +780,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             except: 
                 self.warning('DynamicDS.evalAttr: %s doesnt match any Attribute name, trying to evaluate ...'%aname)
                 formula,compiled=aname,None
-
         try:
             #Checking attribute dependencies
             if self.CheckDependencies and aname in self.dyn_values:
@@ -913,7 +913,25 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def getAttr(self,aname):
         """Evaluates an attribute and returns its Read value."""
-        return self.evalAttr(aname)
+        al = aname.lower()
+        if al=='state': 
+            value = self.get_state()
+        elif al=='status': 
+            value = self.get_status()
+        elif al in map(str.lower,self.dyn_values.keys()):
+            value = self.evalAttr(aname)
+        else:
+            #Getting an Static attribute that match:
+            method = getattr(self,'read_%s'%aname,getattr(self,'read_%s'%al,None))
+            if method is not None:
+                self.warning('DynamicDS.getAttr: %s is an static attribute ...'%aname)
+                attr = tango.fakeAttributeValue(aname)
+                method(attr)
+                value = attr.value
+            else:
+                self.warning('DynamicDS.getAttr: %s doesnt match any Attribute name, trying to evaluate ...'%aname)
+                value = None
+        return value
 
     def setAttr(self,aname,VALUE):
         """Evaluates the WRITE part of an Attribute, passing a VALUE."""
@@ -960,7 +978,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
         :returns: Attribute value or None
         """
-        device,aname = ('/' not in aname) and (None,aname) or aname.count('/')==2 and (aname,'State') or aname.rsplit('/',1)
+        params = tango.parse_tango_model(aname)
+        device,aname = (params.get('device',None),params.get('attribute',None)) if params else ('',aname)
         self.debug("DynamicDS(%s)::getXAttr(%s): ..."%(device or self.get_name(),aname))
         result = default #Returning an empty list because it is a False iterable value that can be converted to boolean (and False or None cannot be converted to iterable)
         try:
@@ -1522,6 +1541,7 @@ class DynamicAttribute(object):
 
     def __init__(self,value=None,date=0.,quality=AttrQuality.ATTR_VALID):
         self.value=value
+        self.peak=(value,0)
         self.forced=None
         self.date=date
         self.quality=quality
@@ -1546,6 +1566,10 @@ class DynamicAttribute(object):
         self.value=value
         self.date=date
         self.quality=quality
+        try: 
+            if self.value>=self.peak[0]:
+                self.peak = (value,date)
+        except: pass
 
     def __add__(self,other):
         result = DynamicAttribute()
