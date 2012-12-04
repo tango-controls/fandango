@@ -178,9 +178,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         )
         
         ##Local variables and methods to be bound for the eval methods
-        self._globals=globals().copy()
+        self._globals={} #globals().copy()
         if _globals: self._globals.update(_globals)
-        self._locals={'self':self}
+        self._locals = {}
+        self._locals['self'] = self
         self._locals['Attr'] = lambda _name: self.getAttr(_name)
         self._locals['ATTR'] = lambda _name: self.getAttr(_name)
         self._locals['XAttr'] = lambda _name,default=None: self.getXAttr(_name,default=default)
@@ -896,7 +897,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #Attr = lambda a: self.dyn_values[a].value
         t = time.time()-self.time0
         for k,v in self.dyn_values.items(): self._locals[k]=v#.value #Updating Last Attribute Values
-        __locals=locals().copy() #Low priority: local variables
+        #__locals=locals().copy() #Low priority: local variables
+        __locals = {}
         __locals.update(self._locals) #Second priority: object statements
         __locals.update(_locals) #High Priority: variables passed as argument
         __locals.update(
@@ -938,18 +940,27 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.evalAttr(aname,WRITE=True,VALUE=VALUE)
         
     def event_received(self,source,type_,attr_value):
-        def log(prio,s): print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
+        def log(prio,s,obj=self): #,level=self.log_obj.level): 
+            if obj.getLogLevel(prio)>=obj.log_obj.level:
+                print '%s(%s) %s %s: %s' % (prio.upper(),(obj.getLogLevel(prio),obj.log_obj.level),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),obj.get_name(),s)
+        #def log(prio,s): 
+            #print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
         if type_ == EVENT_TYPE.Config:
-            log('debug','In DynamicDS.event_received(%s(%s),%s,%s(%s)): Not Implemented!'%(
-                type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__,getattr(attr_value,'value',attr_value))
-                )
+            if 'Error'==fakeEventType[type_]:
+                    log('error','Error received from %s: %s'%(source, attr_value))
+            else: 
+                log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Not Implemented!'%(
+                    type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
+                    ))
         else:
             log('info','In DynamicDS.event_received(%s(%s),%s,%s)'%(
                 type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__)
                 )
             try:
-                full_name = source.getFullName() #.get_full_name()
-                if self._external_listeners[full_name]:
+                full_name = source.getFullName().lower() #.get_full_name()
+                if full_name not in self._external_listeners:
+                    self.info('No events associated to %s'%full_name)
+                elif self._external_listeners[full_name]:
                     log('info','\t%s.listeners: %s'%(full_name,self._external_listeners[full_name]))
                     for aname in self._external_listeners[full_name]:
                         if self._locals['ATTRIBUTE'] == aname:
@@ -990,7 +1001,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     result = wvalue
                 else: result = self.getAttr(aname)
             else:
-                devs_in_server = self.myClass.get_devs_in_server()
+                devs_in_server = self.myClass and self.myClass.get_devs_in_server() or []
                 if device in devs_in_server:
                     self.debug('getXAttr accessing a device in the same server ... using getAttr')
                     if aname.lower()=='state': result = devs_in_server[device].get_state()
@@ -1001,8 +1012,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     else: result = devs_in_server[device].getAttr(aname)
                 else:
                     full_name = (device or self.get_name())+'/'+aname
-                    self.debug('getXAttr calling a proxy to %s' % full_name)
                     if full_name not in self._external_attributes:
+                        self.debug('%s.getXAttr: creating %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if USE_TAU else 'PyTango',full_name))
                         if USE_TAU: 
                             a = TAU.Attribute(full_name)
                             #full_name = a.getFullName() #If the host is external it must be specified in the formula
@@ -1010,11 +1021,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             self._external_attributes[full_name].changePollingPeriod(self.DEFAULT_POLLING_PERIOD)
                             if len(self._external_attributes) == 1: TAU_LOGGER.disableLogOutput()
                             if self._locals.get('ATTRIBUTE') and self.check_attribute_events(self._locals.get('ATTRIBUTE')):
+                                #If Attribute has events evalAttr() will be called at every event_received
+                                #If there's no events, then will be not necessary
                                 self.info('\t%s.addListener(%s)'%(full_name,self._locals['ATTRIBUTE']))
                                 if a.getFullName() not in self._external_listeners: self._external_listeners[a.getFullName()]=set()
                                 self._external_listeners[a.getFullName()].add(self._locals['ATTRIBUTE'])
                             self._external_attributes[full_name].addListener(self.event_received)
                         else: self._external_attributes[full_name] = PyTango.AttributeProxy(full_name)
+                    else:
+                        self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if USE_TAU else 'PyTango',full_name))
                     if write: 
                         self._external_attributes[full_name].write(wvalue)
                         result = wvalue
@@ -1034,7 +1049,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 
         #Check added to prevent exceptions due to empty arrays
         if hasattr(result,'__len__') and not len(result):
-            result = default if hasattr(default,'__len__') else []        
+            result = default if hasattr(default,'__len__') else []
         elif result is None:
             result = default
         self.debug('Out of getXAttr()')
@@ -1541,7 +1556,8 @@ class DynamicAttribute(object):
 
     def __init__(self,value=None,date=0.,quality=AttrQuality.ATTR_VALID):
         self.value=value
-        self.peak=(value,0)
+        self.max_peak=(value if not hasattr(value,'__len__') else None,0)
+        self.min_peak=(value if not hasattr(value,'__len__') else None,0)
         self.forced=None
         self.date=date
         self.quality=quality
@@ -1567,8 +1583,11 @@ class DynamicAttribute(object):
         self.date=date
         self.quality=quality
         try: 
-            if self.value>=self.peak[0]:
-                self.peak = (value,date)
+            if value is not None and not hasattr(value,'__len__') and not isinstance(value,Exception):
+                if self.max_peak[0] is None or self.value>self.max_peak[0]:
+                    self.max_peak = (value,date)
+                if self.min_peak[0] is None or self.value<self.min_peak[0]:
+                    self.min_peak = (value,date)
         except: pass
 
     def __add__(self,other):
