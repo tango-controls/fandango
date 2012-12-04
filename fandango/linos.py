@@ -55,7 +55,8 @@ def get_cpu(pid):
     """ Uses ps to get the CPU usage of a process by PID ; it will trigger exception of PID doesn't exist """
     return float(linos.shell_command('ps h -p %d -o pcpu'%pid))
         
-def get_process_pid(include,exclude='grep|screen'):
+def get_process_pid(include='',exclude='grep|screen'):
+    if not include: return os.getpid()
     include = include.replace(' ','.*')
     exclude = exclude.replace(' ','.*')
     ps = shell_command('ps ax | grep -E "%s"'%include+(' | grep -viE "%s"'%exclude if exclude else ''))
