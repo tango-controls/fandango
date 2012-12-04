@@ -49,6 +49,98 @@ __all__ = ['Grid','CSVArray','tree2table']
 #from excepts import *
 #from ExceptionWrapper import *
 
+###############################################################################
+
+from fandango.functional import reldiff,absdiff,seqdiff
+MAX_DATA_SIZE = 2*1024
+
+def decimator(data,min_inc=.05,min_rel=None,max_size=MAX_DATA_SIZE,max_iter=1000):
+    ##THAT WAS A REALLY GOOD ONE!
+    start,count = len(data),0
+    while len(data)>max_size and count<max_iter:
+        d = []
+        for i,t in enumerate(data[:-1]):
+            if not d or i>=(len(data)-2): d.append((t[0],t[1]))
+            elif abs(t[1])<min_inc and xor(abs(d[-1][1])>min_inc,abs(data[i+1][1])>min_inc):
+                d.append((t[0],0)) #zeroing
+            elif abs(d[-1][1]-t[1])>min_inc or abs(t[1]-data[i+1][1])>min_inc:
+                # if min_inc is not None else min_rel*max((d[-1][1],t[1],min_inc or min_rel))):
+                d.append((t[0],t[1]))
+        data = d
+        min_inc = min_inc*1.5
+        count += 1
+    if count>=max_iter: print('Unable to decimate data!')
+    print('\t[%d] -> [%d] in %d iterations, inc = %s'%(start,len(data),count,min_inc))
+    return data
+    
+def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
+    """ It will remove all values from a list that doesn't provide information.
+    In a set of X consecutive identical values it will remove all except the first and the last.
+    :param seq: a list of (timestamp,value) values
+    """
+    if len(seq)<3: return seq
+    if len(seq[0])<2: return seq
+    import __builtin__
+    cmp = cmp or __builtin__.cmp
+    pops = pops if pops is not None else []
+    while pops: pops.pop() 
+    x0,x1,x2 = seq[0],seq[1],seq[2]
+    raise 'BAD! this method should check changes from last value inserted instead of continuous pairs!'
+    
+    for i in range(len(seq)-2):
+        #if (seq[i+2][0]-seq[i][0])<keeptime and not cmp(seq[i][1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
+        if not cmp(seq[i][1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
+            pops.append(i+1)
+    for i in reversed(pops):
+        seq.pop(i)
+    return seq
+
+def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fixed_time=0,logger=None):
+    """ 
+    Decimates a [(time,numeric value)] buffer by size/rate/increment/time
+    Repeated values are always decimated.
+    keep_nones forces value-to-None steps to be kept
+    fixed_size: smaller increments of data will be pruned until fitting in a fixed_size array
+    fixed_inc: keeps all values with an absolute increment above fixed_inc; overrides fixed_size
+    fixed_step keeps some random values by order, overrides fixed_inc and fixed_size
+    fixed_time keeps some time-fixed values; it takes preference over the rest
+    """
+    
+    raise 'BAD! this method should check changes from last value inserted instead of continuous pairs!'
+    
+    t0 = time.time()
+    buff,nones,fixed = [],[],[0,len(data)-1]
+    for i in range(1,len(data)-1):
+        #v is the data to check, using previous and later values
+        u,v,w = data[i-1][1],data[i][1],data[i+1][1]
+        if u == v == w: continue
+        if fixed_time and (data[i][0]-data[i-1][0])>=fixed_time:
+            fixed.append(i)
+        elif None not in (u,v,w): 
+            if fixed_rate and not i%fixed_rate: 
+                fixed.append(i) #It would help to keep shape around slowly changing curves (e.g. parabollic)
+            elif fixed_inc or fixed_size:
+                diff = max((abs(u-v),abs(w-v)))
+                if fixed_inc and diff>fixed_inc: fixed.append(i)
+                else: buff.append((diff,i))
+            else:
+                fixed.append(i)
+        elif keep_nones:
+            if v is None:
+                #Double "if" is not trivial!
+                if (u is not None or w is not None): nones.append(i)
+            #value-to-None-to-value steps
+            elif u is None or w is None: fixed.append(i)
+    if fixed_size: 
+        bsize = int(fixed_size-len(nones)-len(fixed))
+        buff = [t[1] for t in sorted(buff)[-bsize:]]
+    new_data = [data[i] for i in sorted(buff+nones+fixed)]
+    if logger: logger.debug('data[%d] -> buff[%d],nones[%d],fixed[%d]; %f seconds'%(
+            len(data),len(buff),len(nones),len(fixed),(time.time()-t0)))
+    return new_data    
+    
+###############################################################################
+
 def dict2array(dct):
     """ Converts a dictionary in a table of data, lists are unnested columns """
     data,table = {},[]
@@ -133,6 +225,7 @@ def tree2table(tree):
     #print 'result: tree2table(tree) returned: %s' % (result)
     return result
         
+###############################################################################
 
 class Grid(dict):
     """ Sat May 28 13:07:53 CEST 2005
