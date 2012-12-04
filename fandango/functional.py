@@ -113,6 +113,39 @@ def xor(A,B):
     """
     return (A and not B) or (not A and B)
 
+def reldiff(x,y,floor=None): 
+    """
+    Checks relative (%) difference <floor between x and y
+    floor would be a decimal value, e.g. 0.05
+    """
+    d = x-y
+    if not d: return 0
+    ref = x or y
+    d = float(d)/ref
+    return d if not floor else (0,d)[abs(d)>=floor]
+    #return 0 if x*(1-r)<y<x*(1+r) else -1
+
+def absdiff(x,y,floor=0.01):
+    """
+    Checks absolute difference <floor between x and y
+    floor would be a decimal value, e.g. 0.05
+    """
+    d = x-y
+    if not d: return 0
+    return d if not floor else (0,d)[abs(d)>=floor]
+    #return 0 if x-r<y<x+r else -1
+
+def seqdiff(x,y,method=reldiff,floor=None):
+    """
+    Being x and y two arrays it checks (method) difference <floor between the elements of them.
+    floor would be a decimal value, e.g. 0.05
+    """
+    if not floor:
+        d = any(method(v,w) for v,w in zip(x,y))
+    else:
+        d = any(method(v,w,floor) for v,w in zip(x,y))
+    return d
+
 def notNone(arg,default=None):
     """ Returns arg if not None, else returns default. """
     return [arg,default][arg is None]
