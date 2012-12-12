@@ -699,7 +699,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.debug('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),shortstr(v.value)))
                 return attr.set_value_date_quality(v.value,v.date,v.quality)
         except Exception,e:
-            self.warning('Unable to reload Kept values, %s'%str(e))
+            self.warning('Unable to reload %s kept values, %s'%(aname,str(e)))
         try:
             result = self.evalAttr(aname)
             quality = getattr(result,'quality',self.get_quality_for_attribute(aname,result))
