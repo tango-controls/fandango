@@ -394,6 +394,23 @@ class TauColorComponent(taurusbase.TaurusBaseComponent):
 from taurus.qt import Qt
 from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 
+class QSignalHook(Qt.QObject):
+    """
+    Class initialized with a transformation function.
+    For every setModel(model) it will emit a modelChanged(function(model))
+    """
+    __pyqtSignals__ = ("modelChanged",)
+    def __init__(self,function):
+        Qt.QObject.__init__(self)
+        self._model = None
+        self._new_model = None
+        self.function = function
+        
+    def setModel(self,model):
+        self._model = model
+        self._new_model = self.function(model) if self.function is not None else model
+        self.emit(Qt.SIGNAL("modelChanged"), self._new_model)
+
 class NullWidget(TaurusWidget):
     def __init__(self,*args):
         TaurusWidget.__init__(self,*args)
