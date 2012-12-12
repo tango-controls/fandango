@@ -84,11 +84,15 @@ def except2str(e=None,max_len=int(7.5*80)):
     return result or e[:max_len]
     
 class FakeLogger():
-    def trace(self,s):print s
-    def debug(self,s):print s
-    def info(self,s):print s
-    def warning(self,s):print s
-    def error(self,s):print s
+    _instances = []
+    def __init__(self,header='',keep=False):
+        self.header = '%s: '%header if header else ''
+        if keep: self._instances.append(self)
+    def trace(self,s):print 'TRACE\t'+self.header+s
+    def debug(self,s):print 'DEBUG\t'+self.header+s
+    def info(self,s):print 'INFO\t'+self.header+s
+    def warning(self,s):print 'WARNING\t'+self.header+s
+    def error(self,s):print 'ERROR\t'+self.header+s
     
 class Logger(Object):
     root_inited    = False
