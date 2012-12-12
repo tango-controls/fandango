@@ -86,7 +86,7 @@ try:
 except: print 'Unable to import linos module'
 
 try:
-    from log import printf,Logger,LogFilter,shortstr,except2str
+    from log import printf,Logger,LogFilter,shortstr,except2str,FakeLogger
 except: print 'Unable to import log module'
 
 try:
