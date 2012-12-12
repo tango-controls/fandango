@@ -1,13 +1,16 @@
+web: added jqueryPlot generation
+
 December 2012 010.1
 
 arrays: added decimate_custom / decimate_array methods
 functional: added reldiff,absdiff,seqdiff
 linos: enabled get_proces_pid to get pid of owner process
-web: added jqueryPlot generation
 dynamic:
  - exceptions always kept for all attributes
  - globals/locals removed from evalState and scope searching for memory leaks (although seems not related)
  - max_peak/min_peak
+log: added headers and persistence to FakeLogger
+qt: Added QSignalHook class to be used in taurusgui or other qt gui's that need signal redirection.
 
 November 2012 10.00
 
