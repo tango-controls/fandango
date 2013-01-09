@@ -74,8 +74,10 @@ def decimator(data,min_inc=.05,min_rel=None,max_size=MAX_DATA_SIZE,max_iter=1000
     return data
     
 def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
-    """ It will remove all values from a list that doesn't provide information.
+    """ 
+    It will remove all values from a list that doesn't provide information.
     In a set of X consecutive identical values it will remove all except the first and the last.
+    A custom compare method can be passed as argument
     :param seq: a list of (timestamp,value) values
     """
     if len(seq)<3: return seq
@@ -85,12 +87,12 @@ def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
     pops = pops if pops is not None else []
     while pops: pops.pop() 
     x0,x1,x2 = seq[0],seq[1],seq[2]
-    raise 'BAD! this method should check changes from last value inserted instead of continuous pairs!'
     
     for i in range(len(seq)-2):
         #if (seq[i+2][0]-seq[i][0])<keeptime and not cmp(seq[i][1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
-        if not cmp(seq[i][1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
+        if not cmp(x0[1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
             pops.append(i+1)
+        else: x0 = seq[i+1]
     for i in reversed(pops):
         seq.pop(i)
     return seq
@@ -106,31 +108,50 @@ def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fi
     fixed_time keeps some time-fixed values; it takes preference over the rest
     """
     
-    raise 'BAD! this method should check changes from last value inserted instead of continuous pairs!'
-    
     t0 = time.time()
-    buff,nones,fixed = [],[],[0,len(data)-1]
+    if hasattr(data[0],'value'):
+        get_value = lambda v: v.value
+        get_time = lambda t: hasattr(t.time,'tv_sec') and (t.time.tv_sec+1e-6*t.time.tv_usec) or t.time
+    else:
+        get_value = lambda t: t[1]
+        get_time = lambda t: t[0]
+
+    last,last_slope,buff,nones,fixed = data[0],0,[],[],[0,len(data)-1]
     for i in range(1,len(data)-1):
         #v is the data to check, using previous and later values
-        u,v,w = data[i-1][1],data[i][1],data[i+1][1]
+        u,v,w = get_value(data[i-1]),get_value(data[i]),get_value(data[i+1])
         if u == v == w: continue
-        if fixed_time and (data[i][0]-data[i-1][0])>=fixed_time:
+        if fixed_time and max((get_time(data[i])-get_time(data[i-1]),get_time(data[i])-get_time(last)))>=fixed_time:
             fixed.append(i)
+            last = data[i]
         elif None not in (u,v,w): 
             if fixed_rate and not i%fixed_rate: 
                 fixed.append(i) #It would help to keep shape around slowly changing curves (e.g. parabollic)
+                last = data[i]
             elif fixed_inc or fixed_size:
-                diff = max((abs(u-v),abs(w-v)))
-                if fixed_inc and diff>fixed_inc: fixed.append(i)
-                else: buff.append((diff,i))
+                slope = (u-v)>0
+                if slope!=last_slope:
+                    last_slope,last = slope,data[i]
+                diff = max((abs(u-v),abs(w-v),abs(get_value(last)-v)))
+                if fixed_inc and diff>fixed_inc: 
+                    fixed.append(i)
+                    last = data[i]
+                else: 
+                    buff.append((diff,i))
+                    last = data[i]
             else:
                 fixed.append(i)
+                last = data[i]
         elif keep_nones:
             if v is None:
                 #Double "if" is not trivial!
-                if (u is not None or w is not None): nones.append(i)
+                if (u is not None or w is not None): 
+                    nones.append(i)
+                    last = data[i]
             #value-to-None-to-value steps
-            elif u is None or w is None: fixed.append(i)
+            elif u is None or w is None: 
+                fixed.append(i)
+                last = data[i]
     if fixed_size: 
         bsize = int(fixed_size-len(nones)-len(fixed))
         buff = [t[1] for t in sorted(buff)[-bsize:]]
