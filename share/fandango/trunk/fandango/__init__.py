@@ -45,72 +45,62 @@ Several modules included are used in Tango Device Server projects, like @link dy
 """
 import traceback
 
-try: 
-    from servers import ServersDict,Astor,ProxiesDict,ComposersDict
-except: print 'Unable to import servers module'
-
+try:
+    from functional import *
+except: print 'Unable to import functional module'
+try:
+    from log import printf,Logger,LogFilter,shortstr,except2str,FakeLogger
+except: print 'Unable to import log module'
+try:
+    from excepts import trial,getLastException,getPreviousExceptions,ExceptionWrapper,Catched,Catched2
+except: print 'Unable to import excepts module'
+try:
+    from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
+except: 
+    print 'Unable to import objects module'
+try:
+    from linos import shell_command,ping,sysargs_to_dict,listdir
+except: print 'Unable to import linos module'
 try: 
     from arrays import CSVArray
 except: print 'Unable to import arrays module'
-
-#try:
-    #from db import FriendlyDB
-#except: print 'Unable to import db module'    
-
-try:
-    from tango import get_device,get_database,ProxiesDict,find_devices,find_attributes,get_matching_devices,get_matching_attributes
-    try:
-        from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand
-    except: print 'Unable to import fandango.device module'    
-except: print 'Unable to import fandango.tango module'
-    
 try:
     from dicts import ThreadDict,CaselessDict,ReversibleDict,CaselessDefaultDict,DefaultThreadDict,Enumeration,SortedDict,CaselessList
 except: print 'Unable to import dicts module'
 
 try:
-    from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute,DynamicDSTypes,CreateDynamicCommands
-except: 
-    print 'Unable to import dynamic module'
-    print traceback.format_exc()
-
-try:
-    from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
-except: 
-    import traceback
-    print traceback.format_exc()
-    print 'Unable to import objects module'
-
-try:
-    from linos import shell_command,ping,sysargs_to_dict,listdir
-except: print 'Unable to import linos module'
-
-try:
-    from log import printf,Logger,LogFilter,shortstr,except2str,FakeLogger
-except: print 'Unable to import log module'
-
-try:
-    from excepts import trial,getLastException,getPreviousExceptions,ExceptionWrapper,Catched,Catched2
-except: print 'Unable to import excepts module'
-
-try:
-    from functional import *
-except: print 'Unable to import functional module'
-
-try:
-    from interface import FullTangoInheritance,NewTypeInheritance
-except: print 'Unable to import interface module'
-
-try:
     from threads import WorkerProcess,WorkerThread,SingletonWorker
 except: print 'Unable to import threads module'
 
-#try: import web
-#except: print 'Unable to import fandango.web module'
-#try: import qt
-#except: print 'Unable to import fandango.qt module'
+#TANGO related modules
+try:
+    from tango import get_device,get_database,ProxiesDict,find_devices,find_attributes,get_matching_devices,get_matching_attributes
+    try: 
+        from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand
+    except Exception,e: raise Exception('fandango.device: %s'%e)
+    try: 
+        from servers import ServersDict,Astor,ProxiesDict,ComposersDict
+    except Exception,e: raise Exception('fandango.servers: %s'%e)
+    try: 
+        from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute,DynamicDSTypes,CreateDynamicCommands
+    except Exception,e: raise Exception('fandango.dynamic: %s'%e)
+    try: 
+        from interface import FullTangoInheritance,NewTypeInheritance
+    except Exception,e: raise Exception('fandango.interface: %s'%e)
+except Exception,e: 
+    print 'Unable to import fandango.*tango modules: %s'%e
+    #print traceback.format_exc()
 
-RELEASE = (9,5,0)
+#OTHER fancy modules
+if False:
+    try: import web
+    except: print 'Unable to import fandango.web module'
+    try: import qt
+    except: print 'Unable to import fandango.qt module'
+    try: from db import FriendlyDB
+    except: print 'Unable to import db module'
+
+RELEASE = (10,1,1)
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
 #print 'module reloaded'
