@@ -42,21 +42,16 @@ This module is used to have all those classes used inside DeviceServers or to co
 and are not part of the Astor api (ServersDict)
 """
 
-#python imports
-import os,threading,traceback
-
 #pytango imports
 import PyTango
 
 #fandango imports
-from fandango import log,excepts,callbacks,tango,objects,dicts,arrays,dynamic
-from fandango import functional as fun
+import functional as fun
 from log import Logger,except2str,printf
 from excepts import *
 from callbacks import *
-import fandango.tango as tango
+import tango #Double import to avoid ambiguous naming of some methods
 from tango import * #USE_TAU imported here, get_polled_attrs and other useful methods
-from objects import Object,Struct
 from dicts import CaselessDefaultDict,CaselessDict
 from arrays import TimedQueue
 from dynamic import DynamicDS,USE_STATIC_METHODS
@@ -208,15 +203,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         """
         MyClass = MyClass or self.get_device_class()
         if not hasattr(MyClass,'_devs_in_server'):
-            MyClass._devs_in_server = {} #This dict will keep an access to the class objects instantiated in this Tango server
-        if not MyClass._devs_in_server:
-            U = PyTango.Util.instance()
-            for klass in U.get_class_list():
-                print 'Getting devices from %s' % str(klass)
-                for dev in U.get_device_list_by_class(klass.get_name()):
-                    #if isinstance(dev,DynamicDS):
-                    print '\tAdding device %s'%dev.get_name()
-                    MyClass._devs_in_server[dev.get_name().lower()]=dev
+            MyClass._devs_in_server = tango.get_internal_devices()
         return MyClass._devs_in_server
                     
     def get_admin_device(self):
@@ -253,6 +240,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         if not hasattr(self,'PollingCycle'): self.PollingCycle = 3000
         if not hasattr(self,'last_event_received'): self.last_event_received = 0
         if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
+        if not hasattr(self,'events_error'): self.events_error = ''
         device = device.lower()
         deviceObj = neighbours.get(device,None)
         if USE_TAU and deviceObj is None:
@@ -349,61 +337,79 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     def update_external_attributes(self):
         """ This thread replaces TauEvent generation in case that the attributes are read from a device within the same server. """
         while not self.Event.isSet():
-            serverAttributes = [a for a,v in self.ExternalAttributes.items() if isinstance(v,fakeAttributeValue)]
-            for aname in serverAttributes:
-                if self.Event.isSet(): break
-                attr = self.ExternalAttributes[aname]
-                device,attribute = aname.rsplit('/',1)
-                self.debug('====> updating values from %s(%s.%s)'%(type(attr.parent),device,attribute))
-                event_type = fakeEventType.lookup['Periodic']
-                try:
-                    if attr.parent is None: attr.parent = PyTango.DeviceProxy(device)
-                    if attr.name.lower()=='state': 
-                        if isinstance(attr.parent,PyTango.DeviceProxy): attr.set_value(attr.parent.state())
-                        elif hasattr(attr.parent,'last_state'): attr.set_value(attr.parent.last_state)
-                        else: attr.set_value(attr.parent.get_state())
-                    else: 
-                        if isinstance(attr.parent,PyTango.DeviceProxy):
-                            self.info('Dev4Tango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
-                            is_allowed = True
-                            #val = lambda obj,val: setattr(val,'value',obj.read_attribute(val.name))
-                            #method(attr.parent,attr)
-                            val = attr.parent.read_attribute(attr.name)
-                            attr.set_value_date_quality(val.value,val.date,val.quality)
-                        else:
-                            f = [s for s in dir(attr.parent) if s.lower()=='is_%s_allowed'%attr.name.lower()]
-                            if not f: is_allowed = True
-                            else:
-                                self.info('Dev4Tango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
-                                is_allowed = getattr(attr.parent,f[0])(PyTango.AttReqType.READ_REQ)
-                            if is_allowed:
-                                methods = [c for c in dir(attr.parent) if c.lower()=='read_%s'%attr.name.lower()]
-                                if not methods: 
-                                    if isinstance(attr.parent,DynamicDS): 
-                                        self.info('Dev4Tango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
-                                        if attr.parent.myClass:
-                                            attr.parent.myClass.DynDev = attr.parent
-                                            if USE_STATIC_METHODS: attr.parent.read_dyn_attr(attr.parent,attr)
-                                            else: attr.parent.read_dyn_attr(attr)
-                                        else: self.warning('\t%s is a dynamic device not initialized yet.'%attr.device)
-                                    else:
-                                        self.error('%s.read_%s method not found!!!\n%s'%(device,attr.name,[d for d in dir(attr.parent) if not a.startswith('_')]))
-                                else: 
-                                    self.info('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,attr.name))
-                                    getattr(attr.parent,methods[0])(attr)
-                            else:
-                                self.info('%s.read_%s method is not allowed!!!'%(device,attr.name))
-                                event_type = fakeEventType.lookup['Error']
+            waittime = 3.
+            try:
+                serverAttributes = [a for a,v in self.ExternalAttributes.items() if isinstance(v,fakeAttributeValue)]
+                waittime = 1e-3*self.PollingCycle/(len(serverAttributes)+1)
+                for aname in serverAttributes:
+                    try:
+                        if self.Event.isSet():
+                            self.events_error = 'Thread finished by Event.set()'
+                            break
+                        attr = self.ExternalAttributes[aname]
+                        device,attribute = aname.rsplit('/',1)
+                        self.debug('====> updating values from %s(%s.%s)'%(type(attr.parent),device,attribute))
+                        event_type = fakeEventType.lookup['Periodic']
+                        #if attr.parent is None: attr.parent = PyTango.DeviceProxy(device)
+                        #if attr.name.lower()=='state': 
+                            #if isinstance(attr.parent,PyTango.DeviceProxy): attr.set_value(attr.parent.state())
+                            #elif hasattr(attr.parent,'last_state'): attr.set_value(attr.parent.last_state)
+                            #else: attr.set_value(attr.parent.get_state())
+                        #else: 
+                            #if isinstance(attr.parent,PyTango.DeviceProxy):
+                                #self.info('Dev4Tango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
+                                #is_allowed = True
+                                #val = attr.parent.read_attribute(attr.name)
+                                #attr.set_value_date_quality(val.value,val.date,val.quality)
+                            #else:
+                                #f = [s for s in dir(attr.parent) if s.lower()=='is_%s_allowed'%attr.name.lower()]
+                                #if not f: is_allowed = True
+                                #else:
+                                    #self.info('Dev4Tango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
+                                    #is_allowed = getattr(attr.parent,f[0])(PyTango.AttReqType.READ_REQ)
+                                #if is_allowed:
+                                    #methods = [c for c in dir(attr.parent) if c.lower()=='read_%s'%attr.name.lower()]
+                                    #if not methods: 
+                                        #if isinstance(attr.parent,DynamicDS): 
+                                            #self.info('Dev4Tango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
+                                            #if attr.parent.myClass:
+                                                #attr.parent.myClass.DynDev = attr.parent
+                                                #if USE_STATIC_METHODS: attr.parent.read_dyn_attr(attr.parent,attr)
+                                                #else: attr.parent.read_dyn_attr(attr)
+                                            #else: self.warning('\t%s is a dynamic device not initialized yet.'%attr.device)
+                                        #else:
+                                            #self.error('%s.read_%s method not found!!!\n%s'%(device,attr.name,[d for d in dir(attr.parent) if not a.startswith('_')]))
+                                    #else: 
+                                        #self.info('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,attr.name))
+                                        #getattr(attr.parent,methods[0])(attr)
+                                #else:
+                                    #self.info('%s.read_%s method is not allowed!!!'%(device,attr.name))
+                                    #event_type = fakeEventType.lookup['Error']
+                                
+                        try:
+                            attr.read(cache=False)
+                        except:
+                            event_type = fakeEventType.lookup['Error']
+                            self.events_error = traceback.format_exc()
+                            print self.events_error
                             
-                    self.info('Sending fake event: %s/%s = %s(%s)' % (device,attr.name,event_type,attr.value))
-                    self.event_received(device+'/'+attr.name,event_type,attr)
-                except: 
-                    print 'Exception in %s.update_attributes(%s): \n%s' % (self.get_name(),attr.name,traceback.format_exc())                
-                
-                self.Event.wait(1e-3*(self.PollingCycle/len(serverAttributes)))                    
-                #End of for
+                        self.info('Sending fake event: %s/%s = %s(%s)' % (device,attr.name,event_type,attr.value))
+                        self.event_received(device+'/'+attr.name,event_type,attr)
+                    except: 
+                        self.events_error = traceback.format_exc()
+                        print 'Exception in %s.update_attributes(%s): \n%s' % (self.get_name(),attr.name,self.events_error)
+                    self.Event.wait(waittime)
+                    #End of for
+                self.Event.wait(waittime)
+            except:
+                self.events_error = traceback.format_exc()
+                self.Event.wait(3.)
+                print self.events_error
+                print 'Exception in %s.update_attributes()' % (self.get_name())
             #End of while
         self.info('%s.update_attributes finished')
+        if not self.events_error.replace('None','').strip():
+            self.events_error = traceback.format_exc()
         return         
                       
     def event_received(self,source,type_,attr_value):
@@ -420,360 +426,6 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     ##@}        
         
 
-##############################################################################################################
-## Tango formula evaluation
-import dicts
-
-class TangoEval(object):
-    """ 
-    Class for Tango formula evaluation
-    Class with methods copied from PyAlarm 
-    All tango-like variables are parsed.
-    Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
-    """
-    def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None, cache=0):
-        self.formula = formula
-        self.variables = []
-        self.timeout = timeout
-        self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if USE_TAU else ProxiesDict()
-        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if USE_TAU else PyTango.AttributeProxy)
-        self.previous = dicts.CaselessDict() #Keeps last values for each variable
-        self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
-        self.cache_depth = cache
-        self.cache = dicts.CaselessDefaultDict(lambda k:list()) if self.cache_depth else None#Keeps [cache]
-        self.result = None
-        self._trace = trace
-        self._defaults = dict([(str(v),v) for v in PyTango.DevState.values.values()]+[(str(q),q) for q in PyTango.AttrQuality.values.values()])
-        self._defaults['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
-        self._defaults['time'] = time
-        self._locals = dict(self._defaults) #Having 2 dictionaries to reload defaults when needed
-        
-        if self.formula and launch: 
-            self.eval()
-            if not self._trace: 
-                print 'TangoEval: result = %s' % self.result
-        return
-            
-    def trace(self,msg):
-        if self._trace: print 'TangoEval: %s'%str(msg)
-        
-    def set_timeout(self,timeout):
-        self.timeout = int(timeout)
-        self.trace('timeout: %s'%timeout)
-        
-    def parse_formula(self,formula,_locals=None):
-        """ This method just removes comments and expands FIND() searches in the formula; no tango check, no value replacement """
-        _locals = _locals or {}
-        _locals.update(self._locals)
-        if '#' in formula:
-            formula = formula.split('#',1)[0]
-        if ':' in formula and not re.match('^',redev):
-            tag,formula = formula.split(':',1)            
-        if _locals and '$(' in formula: #explicit replacement of env variables if $() used
-            for l,v in _locals.items():
-                formula = formula.replace('$(%s)'%str(l),str(v))
-        findables = re.findall('FIND\(([^)]*)\)',formula)
-        for target in findables:
-            res = str(sorted(d.lower() for d in get_matching_attributes([target.replace('"','').replace("'",'')])))
-            formula = formula.replace("FIND(%s)"%target,res.replace('"','').replace("'",''))
-            self.trace('Replacing with results for %s ...%s'%(target,res))
-        return formula
-        
-    def parse_variables(self,formula,_locals=None):
-        ''' This method parses attributes declarated in formulas with the following formats:
-        TAG1: dom/fam/memb/attrib >= V1 #A comment
-        TAG2: d/f/m/a1 > V2 and d/f/m/a2 == V3
-        TAG3: d/f/m.quality != QALARM #Another comment
-        TAG4: d/f/m/State ##A description?, Why not
-        :return: 
-            - a None value if the alarm is not parsable
-            - a list of (device,attribute,value/time/quality) tuples
-        '''            
-        #operators = '[><=][=>]?|and|or|in|not in|not'
-        #l_split = re.split(operators,formula)#.replace(' ',''))
-        alnum = '[a-zA-Z0-9-_]+'
-        no_alnum = '[^a-zA-Z0-9-_]'
-        no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-        #redev = '(?:^|[^/a-zA-Z0-9_])(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all))?)?' #Matches attribute and extension
-        retango = redev+reattr#+'(?!/)'
-        regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods
-        #self.trace( regexp)
-        idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
-        
-        formula = self.parse_formula(formula,_locals)
-        
-        ##@var all_vars list of tuples with (device,/attribute) name matches
-        #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
-        variables = [s for s in re.findall(regexp,formula)]
-        self.trace('parse_variables(%s): %s'%(formula,variables))
-        return variables
-        
-    def get_vtime(self,value):
-        #Gets epoch for a Tango value
-        return getattr(value.time,'tv_sec',value.time)
-        
-    def read_attribute(self,device,attribute,what='value',_raise=True, timeout=None):
-        """
-        Executes a read_attribute and returns the value requested
-        :param _raise: if attribute is empty or 'State' exceptions will be rethrown
-        """
-        self.trace('read_attribute(%s/%s.%s)'%(device,attribute,what))
-        timeout = timeout or self.timeout
-        aname = (device+'/'+attribute).lower()
-        try:
-            if aname not in self.attributes:
-                dp = self.proxies[device]
-                try: dp.set_timeout_millis(timeout)
-                except: self.trace('unable to set %s proxy timeout to %s ms: %s'%(device,timeout,except2str()))
-                dp.ping()
-                # Disabled because we want DevFailed to be triggered
-                #attr_list = [a.name.lower()  for a in dp.attribute_list_query()]
-                #if attribute.lower() not in attr_list: #raise Exception,'TangoEval_AttributeDoesntExist_%s'%attribute
-            value = self.attributes[aname].read()
-            if self.cache_depth and not any(self.get_vtime(v)==self.get_vtime(value) for v in self.cache[aname]):
-                while len(self.cache[aname])>=self.cache_depth: self.cache[aname].pop(-1)
-                self.cache[aname].insert(0,value)
-            if what == 'all': pass
-            elif what == 'time': value = self.get_vtime(value)
-            elif what == 'exception': value = False
-            else: value = getattr(value,what)
-            self.trace('Read %s.%s = %s' % (aname,what,value))
-        except Exception,e:
-            if isinstance(e,PyTango.DevFailed) and what=='exception':
-                return True
-            elif _raise:
-                raise e
-            self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
-            #print traceback.format_exc()
-            value = None
-        return value
-                
-    def update_locals(self,dct=None):
-        if dct:
-            if not hasattr(dct,'keys'): dct = dict(dct)
-            self._locals.update(dct)
-            self.trace('update_locals(%s)'%dct.keys())
-        self._locals['now'] = time.time()
-        return self._locals
-            
-    def parse_tag(self,target,wildcard='_'):
-        return target.replace('/',wildcard).replace('-',wildcard).replace('.',wildcard).replace(':',wildcard).replace('_',wildcard).lower()
-    
-    def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
-        ''' 
-        Evaluates the given formula.
-        Previous can be used to add extra local values, or predefined values for attributes ({'a/b/c/d':1} that would override its reading
-        Any variable in locals is evaluated or explicitly replaced in the formula if appearing with brackets (e.g. FIND({VARNAME}/*/*))
-        :param _raise: if attribute is empty or 'State' exceptions will be rethrown
-        '''
-        self.formula = (formula or self.formula).strip()
-        previous = previous or {}
-        _locals = _locals or {}
-        for x in ['or','and','not','in','is','now']: #Check for case-dependent operators
-            self.formula = self.formula.replace(' '+x.upper()+' ',' '+x+' ')
-        self.formula = self.formula.replace(' || ',' or ')
-        self.formula = self.formula.replace(' && ',' and ')
-        self.update_locals(_locals)
-        #self.previous.update(previous or {}) #<<< Values passed as eval locals are persistent, do we really want that?!?
-        
-        self.formula = self.parse_formula(self.formula) #Replacement of FIND(...), env variables and comments.
-        variables = self.parse_variables(self.formula)
-        self.trace('>'*80)
-        self.trace('eval(): variables in formula are %s' % variables)
-        source = self.formula #It will be modified on each iteration
-        targets = [(device + (attribute and '/%s'%attribute) + (what and '.%s'%what),device,attribute,what) for device,attribute,what in variables]
-        self.last.clear()
-        #self.last.update(dict((v[0],'') for v in targets))
-        ## NOTE!: It is very important to keep the same order in which expressions were extracted
-        for target,device,attribute,what in targets: 
-            var_name = self.parse_tag(target)
-            self.trace('\t%s => %s'%(target,var_name))
-            try:
-                #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
-                self.previous[var_name] = previous.get(target,
-                    self.read_attribute(device,
-                        attribute or 'State',
-                        what if what and what!='delta' else 'value',
-                        _raise=_raise if not any(d==device and a==attribute and w=='exception' for t,d,a,w in targets) else False
-                        ))
-                if what=='delta':
-                    cache = self.cache.get((device+'/'+attribute).lower())
-                    self.previous[var_name] = 0 if (not self.cache_depth or not cache) else (cache[0].value-cache[-1].value)
-                self.previous.pop(target,None)
-                source = source.replace(target,var_name,1) #Every occurrence of the attribute is managed separately, read_attribute already uses caches within polling intervals
-                self.last[target] = self.previous[var_name] #Used from alarm messages
-            except Exception,e:
-                self.last[target] = e
-                raise e
-        self.trace('formula = %s' % (source))
-        self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
-        self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self._locals.items() if k not in self._defaults))
-        self.result = eval(source,dict(self.previous),self._locals)
-        self.trace('result = %s' % self.result)
-        return self.result
-    pass
-        
-##############################################################################################################
-## Tango Command executions
-
-class TangoCommand(object):
-    """
-    This class encapsulates a call to a Tango Command, it manages asynchronous commands in a background thread or process.
-    It also allows to setup a "feedback" condition to validate that the command has been executed.
-    
-    The usage would be like::
-    
-      tc = TangoCommand('move',DeviceProxy('just/a/motor'),asynch=True,process=False)
-      
-      #In this example the value of the command will be returned once the state will change
-      result = tc(args,feedback='state',expected=PyTango.DevState.MOVING,timeout=10000)
-      
-      #In this other example, it will be the value of the state what will be returned
-      result = tc(args,feedback='state',timeout=10000)
-      
-    :param command: the name of a tango command; or a callable
-    :param device: a device that can be an string, a DeviceProxy or a TaurusDevice
-    :param timeout: when using asynchronous commands default timeout can be overriden
-    :param feedback: attribute, command or callable to be executed
-    :param expected: if not None, value that feedback must have to consider the command successful
-    :param wait: time to wait for feedback (once command has been executed)
-    :param asynch: to perform the wait in a different thread instead of blocking
-    :param process: whether to use a different process to execute the command (if CPU intensive or trhead-blocking)
-    :
-    """
-    
-    class CommandException(Exception): pass
-    class CommandTimeout(Exception): pass
-    class BadResult(Exception): pass
-    class BadFeedback(Exception): pass
-    Proxies = ProxiesDict()
-    
-    def __init__(self,command,device=None,timeout=None,feedback=None,expected=None,wait=3.,asynch=True,process=False):
-        
-        self.device = device
-        self.proxy = TangoCommand.Proxies[self.device]
-        if isinstance(command,basestring):
-            if '/' in command:
-                d,self.command = command.rsplit('/',1)
-                if not self.device: self.device = d
-            else: self.command = command
-            self.info = self.proxy.command_query(self.command)
-        else: #May be a callable
-            self.command,self.info = command,None
-            
-        self.timeout = timeout or 3.
-        self.feedback = feedback and self._parse_feedback(feedback)
-        self.expected = expected
-        self.wait = wait
-        self.asynch = asynch
-        self.process = process
-        
-        self.event = threading.Event()
-        if process:
-            import fandango.threads
-            self.process = fandango.threads.WorkerThread(device+'/'+command,process=True)
-        else:
-            self.process = None
-        pass
-        
-    def trace(self,msg,severity='DEBUG'):
-        print '%s %s fandango.TangoCommand: %s'%(severity,time.ctime(),msg)
-    
-    def _parse_feedback(self,feedback):
-        if fun.isCallable(feedback):
-            self.feedback = feedback
-        elif isinstance(feedback,basestring):
-            if '/' in feedback:
-                device,target = feedback.rsplit('/',1) if feedback.count('/')>=(4 if ':' in feedback else 3) else (feedback,state)
-            else:
-                device,target = self.device,feedback
-            proxy = TangoCommand.Proxies[device]
-            attrs,comms = proxy.get_attribute_list(),[cmd.cmd_name for cmd in proxy.command_list_query()]
-            if fun.inCl(target,comms):
-                self.feedback = (lambda d=device,c=target: TangoCommand.Proxies[d].command_inout(c))
-            elif fun.inCl(target,attrs):
-                self.feedback = (lambda d=device,a=target: TangoCommand.Proxies[d].read_attribute(a).value)
-            else:
-                raise TangoCommand.CommandException('UnknownFeedbackMethod_%s'%feedback)
-        return self.feedback
-
-    def __call__(self,*args,**kwargs):
-        self.execute(*args,**kwargs)
-    
-    def execute(self,args=None,timeout=None,feedback=None,expected=None,wait=None,asynch=None):
-        self.trace('%s/%s(%s)'%(self.device,self.command,args or ''))
-        #args = (args or []) #Not convinient
-        timeout = fun.notNone(timeout,self.timeout)
-        if feedback is not None:
-            feedback = self._parse_feedback(feedback)
-        else:
-            feedback = self.feedback
-        expected = fun.notNone(expected,self.expected)
-        wait = fun.notNone(wait,self.wait)
-        asynch = fun.notNone(asynch,self.asynch)
-        t0 = time.time()
-        result = None
-        
-        if fun.isString(self.command):
-            if not asynch:
-                if args: result = self.proxy.command_inout(self.command,args)
-                else: result = self.proxy.command_inout(self.command)
-            else:
-                self.trace('Using asynchronous commands')
-                if args: cid = self.proxy.command_inout_asynch(self.command,args)
-                else: cid = self.proxy.command_inout_asynch(self.command)
-                while timeout > (time.time()-t0):
-                    self.event.wait(.025)
-                    try: 
-                        result = self.proxy.command_inout_reply(cid)
-                        break
-                    except PyTango.DevFailed,e:
-                        if 'AsynReplyNotArrived' in str(e): 
-                            pass
-                        #elif any(q in str(e) for q in ('DeviceTimedOut','BadAsynPollId')):
-                        else:
-                            #BadAsynPollId is received once the command is discarded
-                            raise TangoCommand.CommandException(str(e).replace('\n','')[:100])
-        elif fun.isCallable(self.command):
-            result = self.command(args)
-            
-        t1 = time.time()
-        if t1 > (t0+self.timeout): 
-            raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
-        if feedback is not None:
-            self.trace('Using feedback: %s'%feedback)
-            tt,tw = min((timeout,(t1-t0+wait))),max((0.025,wait/10.))
-            now,got = t1,None
-            while True:
-                self.event.wait(tw)
-                now = time.time()
-                got = type(expected)(feedback())
-                if not wait or expected is None or got==expected:
-                    self.trace('Feedback (%s) obtained after %s s'%(got,time.time()-t0))
-                    break
-                if now > (t0+timeout):
-                    raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
-                if now > (t1+wait):
-                    break
-            if expected is None:
-                return got
-            elif got==expected:
-                self.trace('Result (%s,%s==%s) verified after %s s'%(result,got,expected,time.time()-t0))
-                return (result if result is not None else got)
-            else:
-                raise TangoCommand.BadFeedback('%s!=%s'%(got,expected))
-        elif expected is None or result == expected:
-            self.trace('Result obtained after %s s'%(time.time()-t0))
-            return result
-        else:
-            raise TangoCommand.BadResult(str(result))
-        if self.timeout < time.time()-t0: 
-            raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
-        return result
-    
-   
 ##############################################################################################################
 ## DevChild ... DEPRECATED and replaced by Dev4Tango + TAU
 
