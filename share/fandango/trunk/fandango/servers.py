@@ -808,6 +808,7 @@ class ServersDict(CaselessDict,Object):
         host = host.split('.')[0].strip() or 'localhost' if mode else ''
         level = int(level) if level else 0
         dbserver = self.get_db_device()
+        print 'ServersDict.set_server_level(%s,%s,%s)'%(server_name,host,level)
         dbserver.DbPutServerInfo([str(s) for s in (server_name,host,mode,level)])
         if server_name in self: self[server_name].update_level(host,level)
         if host: self.proxies['tango/admin/%s'%host].UpdateServersInfo()
