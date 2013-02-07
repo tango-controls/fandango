@@ -42,7 +42,7 @@ import sys
 import re
 import operator
 import functional as fun
-from .dicts import SortedDict
+from fandango.dicts import SortedDict
 
 __all__ = ['Grid','CSVArray','tree2table']
 
