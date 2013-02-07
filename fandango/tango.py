@@ -650,7 +650,7 @@ def read_internal_attribute(device,attribute):
     if fun.isString(device):
         device = get_internal_devices().get(device,PyTango.DeviceProxy(device))
     attr = attribute if isinstance(attribute,fakeAttributeValue) else fakeAttributeValue(name=attribute,parent=device)
-    isProxy, isDyn = isinstance(attr.parent,PyTango.DeviceProxy),isinstance(attr.parent,dynamic.DynamicDS)
+    isProxy, isDyn = isinstance(attr.parent,PyTango.DeviceProxy),hasattr(attr.parent,'read_dyn_attr')
     aname = attr.name.lower()
     if aname=='state': 
         if isProxy: attr.set_value(attr.parent.state())
