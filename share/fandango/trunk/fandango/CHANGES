@@ -7,6 +7,9 @@ device/tango: TangoEval/TangoCommand moved from device to tango modules
 device: update_attributes thread refactored, Dev4Tango.events_error added
 tango.fakeAttributeValue: solved bug in set_date and added read/throw_exception methods
 tango: added read_internal_attribute/get_internal_devices methods
+read_internal_attributes: any class with read_dyn_attr method will be
+considered dynamic
+dynamic: solved bug when receiving config/error events
 tests: added pycheck for modules
 linos: solved bug in get_file_sizesolved bug in get_file_size
 
