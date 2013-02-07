@@ -97,8 +97,8 @@ def file_exists(path):
     except:
         return False
 
-def file_size(path):
-    os.stat(path)[stat.ST_SIZE]
+def get_file_size(path):
+    return os.stat(path)[stat.ST_SIZE]
 
 def listdir(folder,mask='.*',files=False,folders=False):
     try:
