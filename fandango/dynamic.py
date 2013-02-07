@@ -946,7 +946,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #def log(prio,s): 
             #print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
         if type_ == EVENT_TYPE.Config:
-            if 'Error'==fakeEventType[type_]:
+            if 'Error'==tango.fakeEventType[type_]:
                     log('error','Error received from %s: %s'%(source, attr_value))
             else: 
                 log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Not Implemented!'%(
