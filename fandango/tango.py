@@ -669,7 +669,7 @@ def read_internal_attribute(device,attribute):
                 if s.lower()=='is_%s_allowed'%aname: allow_method = s
                 if s.lower()=='read_%s'%aname: read_method = s
             print ('fandango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
-            is_allowed = (not allow_method) or getattr(attr.parent,f[0])(PyTango.AttReqType.READ_REQ)
+            is_allowed = (not allow_method) or getattr(attr.parent,allow_method)(PyTango.AttReqType.READ_REQ)
             if not is_allowed:
                 attr.throw_exception('%s.read_%s method is not allowed!!!'%(device,aname))
             elif not read_method:
@@ -694,7 +694,7 @@ def read_internal_attribute(device,attribute):
                 msg = ('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,aname))
                 print msg
                 try:
-                    getattr(attr.parent,methods[0])(attr)
+                    getattr(attr.parent,read_method)(attr)
                     print '%s = %s' % (attr.name,attr.value)
                     attr.error = ''
                 except:
