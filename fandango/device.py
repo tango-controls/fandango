@@ -389,6 +389,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                         try:
                             attr.read(cache=False)
                         except:
+                            print '#'*80
                             event_type = fakeEventType.lookup['Error']
                             self.events_error = traceback.format_exc()
                             print self.events_error
