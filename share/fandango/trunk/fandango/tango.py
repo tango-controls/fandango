@@ -645,21 +645,22 @@ def read_internal_attribute(device,attribute):
     device must be a DevImpl object or string, attribute must be an string
     the method will return a fakeAttributeValue object
     """
+    print 'read_internal_attribute(%s,%s)'%(device,attribute)
     import dynamic
     if fun.isString(device):
         device = get_internal_devices().get(device,PyTango.DeviceProxy(device))
-    isProxy, isDyn = isinstance(attr.parent,PyTango.DeviceProxy),isinstance(attr.parent,dynamic.DynamicDS)
-    
     attr = attribute if isinstance(attribute,fakeAttributeValue) else fakeAttributeValue(name=attribute,parent=device)
+    isProxy, isDyn = isinstance(attr.parent,PyTango.DeviceProxy),isinstance(attr.parent,dynamic.DynamicDS)
     aname = attr.name.lower()
-        
     if aname=='state': 
         if isProxy: attr.set_value(attr.parent.state())
         elif hasattr(attr.parent,'last_state'): attr.set_value(attr.parent.last_state)
         else: attr.set_value(attr.parent.get_state())
+        print '%s = %s' % (attr.name,attr.value)
+        attr.error = ''
     else: 
         if isProxy:
-            #self.info('Dev4Tango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
+            print ('fandango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
             val = attr.parent.read_attribute(attr.name)
             attr.set_value_date_quality(val.value,val.date,val.quality)
         else:
@@ -667,13 +668,13 @@ def read_internal_attribute(device,attribute):
             for s in dir(attr.parent):
                 if s.lower()=='is_%s_allowed'%aname: allow_method = s
                 if s.lower()=='read_%s'%aname: read_method = s
-            #self.info('Dev4Tango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
+            print ('fandango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
             is_allowed = (not allow_method) or getattr(attr.parent,f[0])(PyTango.AttReqType.READ_REQ)
             if not is_allowed:
                 attr.throw_exception('%s.read_%s method is not allowed!!!'%(device,aname))
             elif not read_method:
                 if isDyn: 
-                    #self.info('Dev4Tango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
+                    print ('fandango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
                     if not attr.parent.myClass:
                         attr.throw_exception('\t%s is a dynamic device not initialized yet.'%attr.device)
                     else:
@@ -682,6 +683,7 @@ def read_internal_attribute(device,attribute):
                             attr.parent.myClass.DynDev = attr.parent
                             if dynamic.USE_STATIC_METHODS: attr.parent.read_dyn_attr(attr.parent,attr)
                             else: attr.parent.read_dyn_attr(attr)
+                            print '%s = %s' % (attr.name,attr.value)
                             attr.error = ''
                         except:
                             attr.throw_exception()
@@ -690,8 +692,10 @@ def read_internal_attribute(device,attribute):
             else: 
                 #Returning valid values
                 msg = ('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,aname))
+                print msg
                 try:
                     getattr(attr.parent,methods[0])(attr)
+                    print '%s = %s' % (attr.name,attr.value)
                     attr.error = ''
                 except:
                     attr.throw_exception()
@@ -752,12 +756,14 @@ class fakeAttributeValue(object):
     
     def read(self,cache=True):
         #Method to emulate AttributeProxy returning an AttributeValue
+        print 'fakeAttributeValue(%s).read(%s)'%(self.name,cache)
         if not cache:
-            return read_internal_attribute(self.parent,self.name)
+            return read_internal_attribute(self.parent,self) #it's important to pass self as argument so values will be kept
         return self 
     
-    def throw_exception(self,msg):
-        self.error = txt or traceback.format_exc()
+    def throw_exception(self,msg=''):
+        self.error = msg or traceback.format_exc()
+        print 'fakeAttributeValue(%s).throw_exception(%s)'%(self.name,self.error)
         #event_type = fakeEventType.lookup['Error']
         self.set_value(None)
         self.set_quality(PyTango.AttrQuality.ATTR_INVALID)
