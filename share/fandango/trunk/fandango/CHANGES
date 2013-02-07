@@ -1,4 +1,15 @@
-web: added jqueryPlot generation
+February 2012; 10.2
+-------------------------------------------------
+web: adding jqueryPlot generation (still in progress)
+init: loading of modules refactored
+arrays: decimate* methods enabled
+device/tango: TangoEval/TangoCommand moved from device to tango modules
+device: update_attributes thread refactored, Dev4Tango.events_error added
+tango.fakeAttributeValue: solved bug in set_date and added read/throw_exception methods
+tango: added read_internal_attribute/get_internal_devices methods
+tests: added pycheck for modules
+linos: solved bug in get_file_sizesolved bug in get_file_size
+
 
 December 2012 010.1
 
