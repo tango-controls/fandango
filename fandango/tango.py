@@ -688,7 +688,7 @@ def read_internal_attribute(device,attribute):
                         except:
                             attr.throw_exception()
                 else:
-                    attr.throw_exception('%s.read_%s method not found!!!\n%s'%(device,aname,[d for d in dir(attr.parent) if not d.startswith('_')]))
+                    attr.throw_exception('%s.read_%s method not found!!!'%(device,aname,[d for d in dir(attr.parent)]))
             else: 
                 #Returning valid values
                 msg = ('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,aname))
