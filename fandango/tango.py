@@ -174,7 +174,7 @@ def get_device_attributes(dev,expressions='*'):
     result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
     return result
         
-def get_device_labels(target,filters='',brief=True):
+def get_device_labels(target,filters='*',brief=True):
     """
     Returns an {attr:label} dict for all attributes of this device 
     Filters will be a regular expression to apply to attr or label.
