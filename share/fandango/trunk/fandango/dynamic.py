@@ -150,7 +150,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
-        self.setLogLevel('WARNING')
+        self.setLogLevel('INFO')
         self.warning( ' in DynamicDS.__init__ ...')
         self.trace=False
 
@@ -358,7 +358,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         therefore new_attr must be used to add to the valid attributes any attribute added by subclasses
         Polling configuration configured through properties has preference over the hard-coded values.
         '''
-        self.info('In check_polled_attributes(%s)'%new_attr)
+        self.warning('In check_polled_attributes(%s)'%new_attr)
         self._db = getattr(self,'_db',None) or PyTango.Database()
         my_name = self.get_name()
         
@@ -366,6 +366,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         dyn_attrs = list(set(map(str.lower,['state','status']+self.dyn_attrs.keys()+new_attr.keys())))
         pattrs = self.get_polled_attrs()
         npattrs = []
+        self.info('Already polled: %s'%pattrs)
         
         #First: propagate all polled_attrs if they appear in the new attribute list or remove them if don't
         for att,period in pattrs.items():
