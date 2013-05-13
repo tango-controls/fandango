@@ -189,7 +189,7 @@ class ThreadDict(dict):
     @self_locked
     def get_timewait(self): return self.timewait
     @self_locked
-    def set_timewait(self,value): self.timewait=value    
+    def set_timewait(self,value): self.timewait=value
     
     @self_locked
     def append(self,key,value=None,period=0): #period=0 means that attribute will be updated always
