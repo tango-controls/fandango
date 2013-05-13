@@ -42,6 +42,7 @@ fandango.functional::
 
 import re
 import random
+import math
 import time,datetime
 
 from operator import isCallable
@@ -95,6 +96,19 @@ def last(seq,MAX=1000):
             return n
     return
         
+max = max
+min = min
+        
+def avg(seq):
+    if not bool(seq) or not len(seq): return 0
+    seq = [float(s) for s in seq if s is not None]
+    return sum(seq)/len(seq)
+
+def rms(seq):
+    if not bool(seq) or not len(seq): return 0
+    seq = [float(s)**2 for s in seq if s is not None]
+    return math.sqrt(sum(seq)/float(len(seq)))
+    
 def randomize(seq):
     done,result = list(range(len(seq))),[]
     while done: result.append(seq[done.pop(random.randrange(len(done)))])
@@ -102,11 +116,11 @@ def randomize(seq):
     
 def randpop(seq): 
     return seq.pop(random.randrange(len(seq)))
-        
-def avg(seq):
-    seq = [s for s in seq if seq is not None]
-    return sum(seq)/len(seq)
-        
+    
+def floor(x,unit=1):
+    """ Returns greatest multiple of 'unit' below 'x' """
+    return unit*int(x/unit)
+    
 def xor(A,B):
     """Returns (A and not B) or (not A and B);
     the difference with A^B is that it works also with different types and returns one of the two objects..
