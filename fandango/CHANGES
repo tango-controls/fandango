@@ -1,3 +1,11 @@
+May 2013; 10.3
+-------------------------------------------------
+dynamic: logging, investigating issues with default-polled attributes
+arrays: added filter_array methods
+functional: added some methods like rms (root mean square) or floor
+tango: added default args to get_device_labels
+linos: new methods to send mail, get memory usage, folders and links
+
 February 2012; 10.2
 -------------------------------------------------
 web: adding jqueryPlot generation (still in progress)
@@ -12,6 +20,8 @@ considered dynamic
 dynamic: solved bug when receiving config/error events
 tests: added pycheck for modules
 linos: solved bug in get_file_sizesolved bug in get_file_size
+linos: added methods to get memory usage in a machine
+tango: added get_server_pid method to be runable locally
 
 
 December 2012 010.1
