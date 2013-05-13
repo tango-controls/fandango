@@ -43,8 +43,49 @@ def shell_command(*commands, **keywords):
     elif split: return result.split('\n')
     else: return result
     
+def sendmail(subject,text,receivers,attachments=None,trace=False):
+    if '\n' in text and '\\n' not in text:
+        text = text.replace('\n','\\n')
+    attachments = attachments and ' '.join('-a %s'%a for a in attachments) or ''
+    receivers = ' '.join(receivers)
+    command = 'echo -e "'+text+'" '
+    command += '| mail -s "%s" ' % subject
+    #command += '-S from=%s ' % self.FromAddress #'-r %s ' % (self.FromAddress)
+    #command += (MAIL_RECEIVER if fandango.isString(MAIL_RECEIVER) else ','.join(MAIL_RECEIVER))
+    command += attachments + ' ' + receivers
+    if trace: print(command.rsplit('|',1)[-1])
+    os.system(command)
+
 ################################################################################3
 # Processes methods
+
+
+def get_memstats(units='m'):
+    """
+    This method returns mem stats in Megabytes
+    Remember that in linux buffers and cached memory should be considered FREE
+    Dictionary returned is like:
+    {   'buffers': '6',
+        'cached': '557',
+        'free': '16',
+        'shared': '0',
+        'total': '1002',
+        'used': '986'
+        }
+    """
+    txt = shell_command('free -%s'%units)
+    txt = txt.split('\n')
+    memstats = dict(zip(txt[0].strip().split(),map(int,txt[1].strip().split()[1:])))
+    return memstats
+
+def get_free_memory(units='m'):
+    stats = get_memstats(units)
+    return stats['buffers']+stats['cached']+stats['free']
+
+def get_memory_usage():
+    stats = get_memstats()
+    mfree = float(stats['buffers']+stats['cached']+stats['free'])
+    return 1-(mfree/stats['total'])
 
 def get_memory(pid,virtual=False):
     """This function uses '/proc/pid/status' to get the memory consumption of a process """
@@ -89,6 +130,10 @@ import os,stat,time
 
 def is_dir(path):
     return stat.S_ISDIR(os.stat(path)[stat.ST_MODE])
+
+def is_link(path):
+    mode  = os.lstat(path).st_mode
+    return stat.S_ISLNK(mode)
 
 def file_exists(path):
     try: 
@@ -169,6 +214,27 @@ def diffdir(origin,destination,caseless=False,checksize=True):
         if not (n in fs) and (not caseless or not n.lower() in lfs):
             print '>> %s/%s not in %s'%(destination,n,origin)
     return missing
+        
+def findfolders(target='',parent='',filter_=True,printout = False):
+    import os,fandango,stat,re,sys
+    result = []
+    if not parent: parent = os.getcwd()
+    
+    if filter_:
+        filter_folders = lambda fs: [f for f in fs if f not in '.svn tags branches'.split() and (f.count('/')<6 or not f in 'trunk xpand doc'.split())]
+    else: filter_folders = lambda fs: fs
+    
+    def get_folders(path):
+        folders = ['%s/%s'%(path,f) for f in filter_folders(linos.listdir(path,folders=True)) if not stat.S_ISLNK(os.lstat('%s/%s'%(path,f)).st_mode)]
+        for f in folders:
+            folders.extend(get_folders(f))
+        return folders
+    
+    for f in get_folders():
+        if not target or target.lower() in f.lower():
+            if printout: print f
+            result.append(f)
+    return result
 
 ################################################################################3
 # Kde methods        
