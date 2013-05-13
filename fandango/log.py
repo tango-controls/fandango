@@ -103,10 +103,10 @@ class Logger(Object):
     Debug    = logging.DEBUG
     
     def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,level='INFO',max_len=0):
+        self.max_len = max_len
         self.call__init__(Object)
         self._ForcePrint    = use_print
         self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
-        self.max_len = max_len
         
         if not Logger.root_inited:
             #print 'log format is ',format
