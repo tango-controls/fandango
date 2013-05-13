@@ -52,6 +52,11 @@ except: pass
 
 ###############################################################################
 
+_EVENT = threading.Event()
+
+def wait(seconds):
+    _EVENT.wait(seconds)
+    
 class FakeLock(object):
     """ Just for debugging, can replace a Lock when debugging a deadLock issue. """
     def acquire(self):pass
