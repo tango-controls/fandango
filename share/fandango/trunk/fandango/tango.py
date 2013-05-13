@@ -525,6 +525,16 @@ def reduce_distinct(group1,group2):
 ########################################################################################
 ## Methods for checking device/attribute availability
    
+    
+def get_server_pid(server):
+    try:
+        return get_device_info('dserver/'+server).PID
+    except:
+        print 'failed to use server Admin, using OS'
+        pid = fandango.linos.get_process_pid(server.replace('/','.py '))
+        if not pid: pid = fandango.linos.get_process_pid(server.replace('/',' '),exclude='javaArch|grep|screen|0:00')
+        return pid    
+
 def check_host(host):
     """
     Pings a hostname, returns False if unreachable
