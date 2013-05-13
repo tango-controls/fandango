@@ -158,7 +158,90 @@ def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fi
     new_data = [data[i] for i in sorted(buff+nones+fixed)]
     if logger: logger.debug('data[%d] -> buff[%d],nones[%d],fixed[%d]; %f seconds'%(
             len(data),len(buff),len(nones),len(fixed),(time.time()-t0)))
-    return new_data    
+    return new_data
+
+F_LAST = 0 #fill with last value
+F_AVG = 1 #fill with average
+F_NONE = 2 #fill with nones
+F_INT = 3 #linear interpolation
+F_ZERO = 4 #fill with zeroes
+F_NEXT = 5 #fill with next value
+
+def filter_array(data,window=300,method=fun.avg,begin=0,end=0,filling=F_LAST,trace=False):
+    """
+    The array returned will contain @method applied to @data split in @window intervals
+    First interval will be floor(data[0][0],window)+window, containing average of data[t0:t0+window]
+    If begin,end intervals are passed, cut-off and filling methods are applied
+    The value at floor(time) is the value that closes each interval
+    """
+    data = sorted(data) #DATA MUST BE ALWAYS SORTED
+    tfloor = lambda x: fun.floor(x,window)
+    
+    #CUT-OFF; removing data out of interval    
+    #--------------------------------------------------------------------------
+    if not data or (begin and begin>data[-1][0]) or (end and end<data[0][0]): 
+        return []
+    #Using loop instead of list comprehension (50% faster with normally-sorted data than list comprehensions)
+    prev,post = None,None
+    if begin and data and data[0][0]<begin:
+        if data[-1][0]<begin: 
+            prev,data = data[-1],[]
+        else: 
+            i = (i for i,v in enumerate(data) if v[0]>=begin).next()-1
+            prev,data = data[i],data[i+1:]
+    if end and data and data[-1][0]>end:
+        if data[0][0]>end:
+            post,data = data[0],[]
+        else:
+            j = (j for j,v in enumerate(data) if v[0]>end).next()
+            post,data = data[j],data[:j]
+    if trace: print 'prev,post: %s,%s'%(prev,post)
+    
+    if not data:
+        if prev or post:
+            nx = prev and prev[1] or post[1]
+            return [(t,nx) for t in range(tfloor(begin)+window,end,window)]+[(tfloor(end)+window,post and post[1] or nx)]
+        else: return []
+    
+    #Filling initial range with data
+    #--------------------------------------------------------------------------
+    if begin:
+        nx =  prev and prev[1] or data[0][1]
+        ndata = [(tt+window,nx) for tt in range(tfloor(begin),tfloor(data[0][0]),window)]
+        if trace: print 'prev: %s'%str(ndata and ndata[-1])
+    else: 
+        ndata =[]
+    
+    #Inserting averaged data
+    #--------------------------------------------------------------------------
+    i = 0
+    next = []
+    ilast = len(data)-1
+    if trace: print 't0: %s' % (window+tfloor(data[0][0]-1))
+    for t in range(window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window):
+        if i<=ilast:
+            if data[i][0]>t:
+                #Filling "whitespace" with last data
+                nx = (
+                    (filling==F_LAST and ndata and ndata[-1][1]) or
+                    (filling==F_NONE and None) or
+                    (filling==F_ZERO and 0) or
+                    None)
+                ndata.append((t,nx))
+                #print 'whitespace: %s'%str(ndata[-1])
+            else:
+                #Averaging data within interval
+                i0 = i
+                while i<=ilast and data[i][0]<=t: i+=1
+                ndata.append((t,method([v[1] for v in data[i0:i]])))
+                #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
+        else:
+            #Adding data at the end
+            nx = ndata and ndata[-1][1] or None
+            ndata.append((t,nx))
+            #print 'post: %s'%str(ndata[-1])
+
+    return ndata
     
 ###############################################################################
 
