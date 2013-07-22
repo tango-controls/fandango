@@ -55,6 +55,7 @@ from fandango.functional import reldiff,absdiff,seqdiff
 MAX_DATA_SIZE = 2*1024
 
 def decimator(data,min_inc=.05,min_rel=None,max_size=MAX_DATA_SIZE,max_iter=1000):
+    """ This size-focused decimator sequentially iterates until reducing the size of the array """
     ##THAT WAS A REALLY GOOD ONE!
     start,count = len(data),0
     while len(data)>max_size and count<max_iter:
@@ -155,10 +156,14 @@ def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fi
     if fixed_size: 
         bsize = int(fixed_size-len(nones)-len(fixed))
         buff = [t[1] for t in sorted(buff)[-bsize:]]
+    else:
+        buff = [] #[t[1] for t in buff]
     new_data = [data[i] for i in sorted(buff+nones+fixed)]
     if logger: logger.debug('data[%d] -> buff[%d],nones[%d],fixed[%d]; %f seconds'%(
             len(data),len(buff),len(nones),len(fixed),(time.time()-t0)))
     return new_data
+    
+###############################################################################
 
 F_LAST = 0 #fill with last value
 F_AVG = 1 #fill with average
@@ -167,7 +172,26 @@ F_INT = 3 #linear interpolation
 F_ZERO = 4 #fill with zeroes
 F_NEXT = 5 #fill with next value
 
-def filter_array(data,window=300,method=fun.avg,begin=0,end=0,filling=F_LAST,trace=False):
+def average(seq):
+    return fun.avg(seq)
+
+def rms_value(seq):
+    return fun.rms(seq)
+
+def maxdiff(seq,ref):
+    """ Filter that maximizes changes (therefore, noise) """
+    return sorted((fun.absdiff(s,r),s) for s in seq)[-1]
+
+def maxmin(data):
+    """ 
+    Returns timed ((t,max),(t,min)) values from a (t,v) dataset 
+    When used to filter an array the winndow will have to be doubled to allocate both values (or just keep the one with max absdiff from previous).
+    """
+    t = sorted((v,t) for t,v in data)
+    mn,mx = (t[0][1],t[0][0]),(t[-1][1],t[-1][0])
+    return mx,mn
+
+def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,trace=False):
     """
     The array returned will contain @method applied to @data split in @window intervals
     First interval will be floor(data[0][0],window)+window, containing average of data[t0:t0+window]
@@ -233,11 +257,14 @@ def filter_array(data,window=300,method=fun.avg,begin=0,end=0,filling=F_LAST,tra
                 #Averaging data within interval
                 i0 = i
                 while i<=ilast and data[i][0]<=t: i+=1
+                #dd = data[i0:i]
+                #if dd: 
                 ndata.append((t,method([v[1] for v in data[i0:i]])))
                 #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
         else:
             #Adding data at the end
-            nx = ndata and ndata[-1][1] or None
+            if ndata: nx = ndata[-1][1]
+            else: nx = None
             ndata.append((t,nx))
             #print 'post: %s'%str(ndata[-1])
 
