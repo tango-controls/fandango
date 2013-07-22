@@ -611,6 +611,80 @@ class TangoHostChooser(Qt.QWidget):
     
 ###############################################################################
 
+
+class QDropTextEdit(Qt.QTextEdit):
+
+    def setSupportedMimeTypes(self, mimetypes):
+        '''
+        sets the mimeTypes that this widget support 
+        
+        :param mimetypes: (list<str>) list (ordered by priority) of MIME type names
+        '''
+        self._supportedMimeTypes = mimetypes
+        
+    def mimeTypes(self):
+        try: 
+            import taurus
+            import taurus.qt
+            import taurus.qt.qtcore
+            from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
+            self.setSupportedMimeTypes([
+                TAURUS_MODEL_LIST_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_ATTR_MIME_TYPE,
+                TAURUS_MODEL_MIME_TYPE, 'text/plain'])
+        except:
+            import traceback
+            print traceback.format_exc()
+            print 'Unable to import TAURUS MIME TYPES'
+        return self.getSupportedMimeTypes()
+        
+    def getSupportedMimeTypes(self): 
+        return self._supportedMimeTypes
+
+    def addModels(self,models):
+        self.setText(str(self.toPlainText())+'\n'+str(models))
+
+    #In this method is where dropped data is checked
+    def dropEvent(self, event):
+        '''reimplemented to support dropping of modelnames in forms'''
+        print('dropEvent(%s): %s,%s'%(event,event.mimeData(),event.mimeData().formats()))
+        if event.source() is self:
+            print('Internal drag/drop not allowed')
+            return
+        if any(s in event.mimeData().formats() for s in self.mimeTypes()):
+            mtype = self.handleMimeData(event.mimeData(),self.addModels)#lambda m:self.addModels('^%s$'%m))
+            event.acceptProposedAction()
+        else:
+            print('Invalid model in dropped data')
+
+    def handleMimeData(self, mimeData, method):
+        '''Selects the most appropriate data from the given mimeData object
+        (in the order returned by :meth:`getSupportedMimeTypes`) and passes 
+        it to the given method.
+        
+        :param mimeData: (QMimeData) the MIME data object from which the model
+                         is to be extracted
+        :param method: (callable<str>) a method that accepts a string as argument. 
+                       This method will be called with the data from the mimeData object
+        
+        :return: (str or None) returns the MimeType used if the model was
+                 successfully set, or None if the model could not be set
+        '''
+        supported = self.mimeTypes()
+        formats = mimeData.formats()
+        for mtype in supported:
+            if mtype in formats:
+                d = str(mimeData.data(mtype))
+                if d is None: 
+                    return None
+                try:
+                    method(d)
+                    return mtype
+                except:
+                    print('Invalid data (%s) for MIMETYPE=%s'%(repr(d), repr(mtype)))
+                    #self.traceback(taurus.Debug)
+                    return None
+
+
 class QGridTable(Qt.QFrame):#Qt.QFrame):
     """
     This class is a frame with a QGridLayout that emulates some methods of QTableWidget
