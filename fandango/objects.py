@@ -161,6 +161,16 @@ def self_locked(func,reentrant=True):
 
 ###############################################################################
 
+def NewClass(classname,classparent=None,classdict=None):
+    """ 
+    Creates a new class on demand:
+     ReleaseNumber = NewClass('ReleaseNumber',tuple,{'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
+    """
+    if classparent and not isSequence(classparent): classparent = (classparent,)
+    return type(classname,classparent or (object,),classdict or {})
+    
+###############################################################################
+
 class Object(object):
     """
     This class solves some problems when an object inherits from multiple classes
