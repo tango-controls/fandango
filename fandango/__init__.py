@@ -43,7 +43,16 @@ Several modules included are used in Tango Device Server projects, like @link dy
 @brief This module(s) include some PyTango additional classes and methods that are not implemented in the C++/Python API's; it replaces the previous PyTango_utils module
  
 """
-import traceback
+
+import os,traceback
+try:
+    import objects,imp
+    PATH = os.path.dirname(objects.__file__)
+    ReleaseNumber = type('ReleaseNumber',(tuple,),{'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
+    RELEASE = ReleaseNumber(imp.load_source('changelog',PATH+'/CHANGES').RELEASE)
+except: 
+    print traceback.format_exc()
+    print 'Unable to load RELEASE number'
 
 try:
     from functional import *
@@ -74,7 +83,11 @@ except: print 'Unable to import threads module'
 
 #TANGO related modules
 try:
-    from tango import get_device,get_database,ProxiesDict,find_devices,find_attributes,get_matching_devices,get_matching_attributes
+    from tango import get_device,get_database,get_database_device,get_all_devices,get_device_info,\
+        get_alias_for_device,get_device_for_alias, \
+        find_devices,find_attributes,get_matching_devices,get_matching_attributes,\
+        cast_tango_type,parse_tango_model,check_attribute,check_device,except2str,\
+        TangoEval,ProxiesDict,getTangoValue,TangoCommand,fakeEvent,fakeEventType
     try: 
         from device import Dev4Tango,TangoEval,TimedQueue,DevChild,TangoCommand
     except Exception,e: raise Exception('fandango.device: %s'%e)
@@ -99,8 +112,6 @@ if False:
     except: print 'Unable to import fandango.qt module'
     try: from db import FriendlyDB
     except: print 'Unable to import db module'
-
-RELEASE = (10,1,1)
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
 #print 'module reloaded'
