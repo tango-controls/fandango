@@ -100,13 +100,13 @@ max = max
 min = min
         
 def avg(seq):
-    if not bool(seq) or not len(seq): return 0
     seq = [float(s) for s in seq if s is not None]
+    if not bool(seq) or not len(seq): return 0
     return sum(seq)/len(seq)
 
 def rms(seq):
-    if not bool(seq) or not len(seq): return 0
     seq = [float(s)**2 for s in seq if s is not None]
+    if not bool(seq) or not len(seq): return 0
     return math.sqrt(sum(seq)/float(len(seq)))
     
 def randomize(seq):
@@ -394,7 +394,7 @@ def isNumber(seq):
     except: return False
     
 def isNone(seq):
-    return seq is None
+    return seq is None or (isString(seq) and seq.lower().strip() in ('none','null','nan',''))
 
 def isGenerator(seq):
     from types import GeneratorType
@@ -529,6 +529,8 @@ def int2bool(dec,N=16):
 ########################################################################
 
 END_OF_TIME = 1024*1024*1024*2 #Jan 19 04:14:08 2038
+TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
+RAW_TIME = '^([0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
 
 def now():
     return time.time()
@@ -558,23 +560,33 @@ epoch2str = time2str
     
 def str2time(seq,cad=''):
     """ Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format"""
-    t,ms = None,re.match('.*(\.[0-9]+)$',seq)
-    if ms: ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
-    else: ms = 0
-    time_fmts = ([cad] if cad else
-        [('%s%s%s'%(date.replace('-',dash),separator if hour else '',hour)) 
-        for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y','%d-%m-%y','%m-%d-%Y','%m-%d-%y')
-        for dash in ('-','/')
-        for separator in (' ','T')
-        for hour in ('%H:%M','%H:%M:%S','')
-        ])
-    for tf in time_fmts:
-        try:
-            t = time.strptime(seq,tf)
-            break
-        except: pass
-    if t is not None: return time.mktime(t)+ms
-    else: raise Exception('PARAMS_ERROR','date format cannot be parsed!: %s'%str(seq))    
+    seq = str(seq).strip()
+    m = re.match(RAW_TIME,seq) 
+    if m:
+        #Converting from a time(unit) format
+        value,unit = m.groups()
+        try: return float(value)*TIME_UNITS[unit]
+        except: raise Exception('PARAMS_ERROR','time format cannot be parsed!: %s'%seq)
+    else:
+        #Converting from a date format
+        t,ms = None,re.match('.*(\.[0-9]+)$',seq) #Splitting the decimal part
+        if ms: ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
+        else: ms = 0
+        time_fmts = ([cad] if cad else [None]+
+            [('%s%s%s'%(date.replace('-',dash),separator if hour else '',hour)) 
+            for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y','%d-%m-%y','%m-%d-%Y','%m-%d-%y')
+            for dash in ('-','/')
+            for separator in (' ','T')
+            for hour in ('%H:%M','%H:%M:%S','')
+            ])
+        for tf in time_fmts:
+            try:
+                tf = (tf,) if tf else () #tf=None will try default system format
+                t = time.strptime(seq,*tf)
+                break
+            except: pass
+        if t is not None: return time.mktime(t)+ms
+        else: raise Exception('PARAMS_ERROR','date format cannot be parsed!: %s'%str(seq))    
 str2epoch = str2time
 
 def time2gmt(epoch=None):
