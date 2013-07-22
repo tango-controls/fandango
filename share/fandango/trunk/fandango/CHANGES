@@ -1,3 +1,22 @@
+RELEASE = (10,4,0)
+RELEASE_NOTE = "many improvements focused on better TangoEval for alarms"
+
+"""
+July 2013
+-------------------------------------------------
+__init__: Release number moved to CHANGES file
+__init__: Modified to include methods from fandango.tango 
+arrays: solved bug in decimator, added average/rms/max/diff/min methods
+functional: bugs solved in avg/rms methods, better isNone, added TIME_UNITS and RAW_TIME to parse amounts of time in str2time method.
+objects: added NewClass method to simplify new class creation on demand
+qt: Added QDropTextEdit that allows to drag-and-drop text from other widgets (like attribute labels)
+servers: ComposersDict functionality extended
+tango: TangoedValue and getTangoValue expand the functionality of TangoEval returned objects
+tango: TangoEval and other methods have now a use_tau argument to force them taurus-free if necessary.
+tango: TangoEval, bugs solved in FIND ; added CACHE and DEPTH macros and improved get_delta() method.
+tango: added get_device_property, get_domain, get_family, get_member methods
+
+
 May 2013; 10.3
 -------------------------------------------------
 dynamic: logging, investigating issues with default-polled attributes
@@ -400,3 +419,4 @@ Changes on fandango modules:
  * objects: tuple lists added as Struct argument
  * servers: methods for attribute/device matching moved to device module.
  * web: added color tags
+"""
