@@ -892,7 +892,7 @@ class ComposersDict(ServersDict):
         if len(args)==3: devs = [d for d in devs if fandango.matchCl(args[0],d)]
         return [(d,self.db.put_device_property(d,{property:value}))[0] for d in devs]
         
-    def set_formula(self,attribute,formula,update=False):
+    def set_formula(self,attribute,formula,update=True):
         dev,attr = attribute.rsplit('/',1)
         new,prop = [],self.db.get_device_property(dev,['DynamicAttributes'])['DynamicAttributes']
         found = False
@@ -903,15 +903,30 @@ class ComposersDict(ServersDict):
                 attr = p.split('#',1)[0].split('=')[0].strip()
                 comment = p.split('#',1)[-1] if '#' in p else ''
                 new.append('%s=%s%s'%(attr,formula,'#'+comment if comment and '#' not in formula else ''))
+                print new[-1]
                 found = True
-        if found: 
-            self.db.put_device_property(dev,{'DynamicAttributes':new})
-            if update:
-                try:
-                    self.proxies[dev].ping()
-                    self.proxies[dev].updateDynamicAttributes()
-                except Exception,e:
-                    print e
-                    return e
-        return found    
+        if not found:
+            new.append('%s=%s'%(attr,formula))
+            print new[-1]
+            
+        if update: 
+            self.update_attributes(dev,prop)
+            try:
+                return self.proxies[dev].read_attribute(attr).value
+            except Exception,e:
+                print 'Attribute updated but not readable!'
+                return e
+        return False
+        
+    def update_attributes(self,dev,prop=None):
+        if prop is not None: 
+            self.db.put_device_property(dev,{'DynamicAttributes':prop})
+        try:
+            self.proxies[dev].ping()
+            print '%s.updateDynamicAttributes()'%dev
+            self.proxies[dev].updateDynamicAttributes()
+            return len(self.proxies[dev].get_attribute_list())
+        except Exception,e:
+            print e
+            return e
     
