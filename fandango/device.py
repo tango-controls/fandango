@@ -348,7 +348,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                             break
                         attr = self.ExternalAttributes[aname]
                         device,attribute = aname.rsplit('/',1)
-                        self.debug('====> updating values from %s(%s.%s)'%(type(attr.parent),device,attribute))
+                        self.debug('====> updating values from %s(%s.%s) after %s s'%(type(attr.parent),device,attribute,waittime))
                         event_type = fakeEventType.lookup['Periodic']
                         #if attr.parent is None: attr.parent = PyTango.DeviceProxy(device)
                         #if attr.name.lower()=='state': 
