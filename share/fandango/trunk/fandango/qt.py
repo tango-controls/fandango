@@ -3,7 +3,7 @@ from PyQt4 import Qt,QtCore,QtGui
 import Queue,traceback,time
 from functools import partial
 import fandango
-from functional import isString
+from functional import isString,isSequence
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton
@@ -786,11 +786,12 @@ class QDictToolBar(Qt.QToolBar):
         if action: Qt.QObject.connect(qaction,Qt.SIGNAL("triggered()"),action)
         return qaction
     def set_toolbar(self,toolbar):
-        """ The toolbar argument must be a list of ('Name','icon.jpg',action) tuples.
+        """ The toolbar argument must be dictionary {name:(icon,action)} or a list of ('Name','icon.jpg',action) tuples.
         """        
+        if hasattr(toolbar,'items'): toolbar = [(k,v[0],v[1]) for k,v in toolbar.items()]
         for name,icon,action in toolbar:
             print 'Adding action to toolbar: %s,%s,%s'%(name,icon,action)
-            if fun.isSequence(action):
+            if isSequence(action):
                 #Building a sub menu
                 print '\tAdding SubMenu: %s'%action
                 qaction = Qt.QPushButton(name)
