@@ -1,7 +1,14 @@
-RELEASE = (10,4,0)
+RELEASE = (10,4,1)
 RELEASE_NOTE = "many improvements focused on better TangoEval for alarms"
 
 """
+@todo solve pystatecomposer freezing on loose events
+
+August 2013
+-------------------------------------------------
+device: Solved a bug that considered DynamicDS methods always static (they are not in PyTango>7.2.2)
+tango: solved a bug on initialized TangoEval.source
+
 July 2013
 -------------------------------------------------
 __init__: Release number moved to CHANGES file
