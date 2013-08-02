@@ -44,7 +44,7 @@ and are not part of the Astor api (ServersDict)
 
 #pytango imports
 import PyTango
-
+import types
 #fandango imports
 import functional as fun
 from log import Logger,except2str,printf
@@ -308,8 +308,12 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 attr.set_write_value(data)
                 methods = [c for c in dir(deviceObj) if c.lower()==method]
                 if methods: 
-                    if isinstance(deviceObj,DynamicDS): getattr(deviceObj,methods[0])(deviceObj,attr)
-                    else: getattr(deviceObj,methods[0])(attr)
+                    method = getattr(deviceObj,methods[0])
+                    #if isinstance(deviceObj,DynamicDS) and USE_STATIC_METHODS:
+                    if isinstance(method,types.FunctionType): 
+                        #method is staticmethod
+                        method(deviceObj,attr)
+                    else: method(attr)
                 else: raise Exception('AttributeNotFound_%s!'%(device+'/'+attribute))
             else:
                 raise Exception('WriteNotAllowed_%s!'%(device+'/'+attribute))
@@ -350,42 +354,6 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                         device,attribute = aname.rsplit('/',1)
                         self.debug('====> updating values from %s(%s.%s) after %s s'%(type(attr.parent),device,attribute,waittime))
                         event_type = fakeEventType.lookup['Periodic']
-                        #if attr.parent is None: attr.parent = PyTango.DeviceProxy(device)
-                        #if attr.name.lower()=='state': 
-                            #if isinstance(attr.parent,PyTango.DeviceProxy): attr.set_value(attr.parent.state())
-                            #elif hasattr(attr.parent,'last_state'): attr.set_value(attr.parent.last_state)
-                            #else: attr.set_value(attr.parent.get_state())
-                        #else: 
-                            #if isinstance(attr.parent,PyTango.DeviceProxy):
-                                #self.info('Dev4Tango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
-                                #is_allowed = True
-                                #val = attr.parent.read_attribute(attr.name)
-                                #attr.set_value_date_quality(val.value,val.date,val.quality)
-                            #else:
-                                #f = [s for s in dir(attr.parent) if s.lower()=='is_%s_allowed'%attr.name.lower()]
-                                #if not f: is_allowed = True
-                                #else:
-                                    #self.info('Dev4Tango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
-                                    #is_allowed = getattr(attr.parent,f[0])(PyTango.AttReqType.READ_REQ)
-                                #if is_allowed:
-                                    #methods = [c for c in dir(attr.parent) if c.lower()=='read_%s'%attr.name.lower()]
-                                    #if not methods: 
-                                        #if isinstance(attr.parent,DynamicDS): 
-                                            #self.info('Dev4Tango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
-                                            #if attr.parent.myClass:
-                                                #attr.parent.myClass.DynDev = attr.parent
-                                                #if USE_STATIC_METHODS: attr.parent.read_dyn_attr(attr.parent,attr)
-                                                #else: attr.parent.read_dyn_attr(attr)
-                                            #else: self.warning('\t%s is a dynamic device not initialized yet.'%attr.device)
-                                        #else:
-                                            #self.error('%s.read_%s method not found!!!\n%s'%(device,attr.name,[d for d in dir(attr.parent) if not a.startswith('_')]))
-                                    #else: 
-                                        #self.info('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,attr.name))
-                                        #getattr(attr.parent,methods[0])(attr)
-                                #else:
-                                    #self.info('%s.read_%s method is not allowed!!!'%(device,attr.name))
-                                    #event_type = fakeEventType.lookup['Error']
-                                
                         try:
                             attr.read(cache=False)
                         except:
