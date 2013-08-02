@@ -955,6 +955,7 @@ class TangoEval(object):
     
     def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None, cache=0, use_tau = USE_TAU):
         self.formula = formula
+        self.source = ''
         self.variables = []
         self.timeout = timeout
         self.use_tau = use_tau
@@ -972,6 +973,7 @@ class TangoEval(object):
         self._defaults['time'] = time
         self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
+        #self._locals['now'] = time.time() #Updated at execution time
         self._defaults.update((k,v) for k,v in {'get_domain':get_domain,'get_family':get_family,'get_member':get_member,'parse':parse_tango_model}.items())
         #self._defaults.update((k,None) for k in ('os','sys',)) #Updating Not allowed models
         self._locals = dict(self._defaults) #Having 2 dictionaries to reload defaults when needed
