@@ -313,6 +313,26 @@ def toRegexp(exp,terminate=False):
     if terminate and not exp.strip().endswith('$'): exp += '$'
     exp = exp.replace('(?p<','(?P<') #Preventing missing P<name> clausses
     return exp
+    
+def filtersmart(seq,filters):
+    """
+    appies a list of filters to a sequence of strings, 
+    behavior of filters depends on first filter character:
+        '[a-zA-Z0-9] : an individual filter matches all strings that contain it, one matching filter is enough
+        '!' : negate, discards all matching values
+        '+' : complementary, it must match all complementaries and at least a 'normal filter' to be valid
+        '^' : matches string since the beginning (startswith instead of contains)
+        '$' : matches the end of strings
+    """
+    seq = seq if isSequence(seq) else (seq,)
+    filters = filters if isSequence(seq) else (filters,)
+    raw,comp,neg = [],[],[]
+    parse = lambda s: ('.*' if not s.startswith('^') else '')+toRegexp(s)
+    for f in filters:
+        if f.startswith('+'): comp.append(parse(f[1:]))
+        elif f.startswith('!'): neg.append(parse(f[1:]))
+        else: raw.append(parse(f))
+    return [s for s in seq if not any(matchCl(n,s) for n in neg) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
 
 ########################################################################
 ## Methods for piped iterators
@@ -450,7 +470,7 @@ def toList(val,default=[],check=isSequence):
     if val is None: 
         return default
     elif hasattr(val,'__len__') and len(val)==0: #To prevent exceptions due to non evaluable numpy arrays
-        return [] 
+        return []
     elif not check(val): #You can use (lambda s:isinstance(s,list)) if you want
         return [val]
     elif not hasattr(val,'__len__'): #It forces the return type to have a fixed length
