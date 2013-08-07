@@ -108,20 +108,11 @@ import fandango.functional as fun
 import fandango.device
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
-USE_STATIC_METHODS = getattr(PyTango,'__version_number__',0)<722
-#print 'PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS)
-
-try:
-    #raise Exception('no-taurus')
-    import taurus
-    USE_TAU = True
-    TAU = taurus
-    EVENT_TYPE = taurus.core.TaurusEventType
-    TAU_LOGGER = taurus.core.util.Logger
-except: 
-    print 'Unable to import taurus'
-    USE_TAU=False
-
+if getattr(PyTango,'__version_number__',0)<722:
+    USE_STATIC_METHODS = True
+    print 'PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS)
+else: 
+    USE_STATIC_METHODS = False
 
 import os
 MEM_CHECK = str(os.environ.get('PYMEMCHECK')).lower() == 'true'
@@ -176,6 +167,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     setattr(self,prop,(value[-1] if 'Array' in str(value[0]) else 
                         (value[-1][0] if fun.isSequence(value[-1]) else value[-1]))
                         )
+        print 'UseTaurus = %s'%getattr(self,'UseTaurus',False)
+        if getattr(self,'UseTaurus',False): self.UseTaurus = bool(tango.loadTaurus())
         
         ##Local variables and methods to be bound for the eval methods
         self._globals={} #globals().copy()
@@ -226,7 +219,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
         self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
         self.last_state_exception = ''
-        self.last_attr_exception = ''
+        self.last_attr_exception = None
         self._hook_epoch = 0
         self._cycle_start = 0
         self._total_usage = 0
@@ -257,13 +250,20 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         """
         This code is placed here because its proper execution cannot be guaranteed during init_device().
         """
-        if self.myClass is None:
-            self.myClass = self.get_device_class()
+        try:
+            if self.myClass is None:
+                self.myClass = self.get_device_class()
+            #Check polled to be repeated here but using admin (not allowed at Init()); @todo test if needed with Tango8
+            self.check_polled_attributes(use_admin=True)
+        except:
+            print traceback.format_exc()
+        finally:
+            self.__prepared = True
         return
 
     @self_locked
     def always_executed_hook(self):
-        self.debug("In DynamicDS::always_executed_hook()")
+        self.debug("In DynamicDS::always_executed_hook(TAU=%s)"%tango.TAU)
         try:
             self._hook_epoch = time.time() #Internal debugging
             if not self.__prepared: self.prepare_DynDS() #This code is placed here because its proper execution cannot be guaranteed during init_device()
@@ -324,6 +324,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 else: setattr(self,prop,value)
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
             [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
+        if self.UseTaurus:
+            self.UseTaurus = (tango.TAU or tango.loadTaurus()) and self.UseTaurus
         return
         
     def get_device_property(self,property,update=False):
@@ -354,20 +356,29 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         '''
         If a PolledAttribute is removed of the Attributes declaration it can lead to SegmentationFault at Device Startup.
         polled_attr property must be verified to avoid that.
+        
         The method .get_device_class() cannot be called to get the attr_list value for this class,
         therefore new_attr must be used to add to the valid attributes any attribute added by subclasses
-        Polling configuration configured through properties has preference over the hard-coded values.
-        '''
-        self.warning('In check_polled_attributes(%s)'%new_attr)
-        self._db = getattr(self,'_db',None) or PyTango.Database()
-        my_name = self.get_name()
+        Polling configuration configured through properties has preference over the hard-coded values; 
+        but it seems that Tango does not always update that and polling periods have to be updated.
         
+        Must be called twice ( @todo test if needed with Tango8 ):
+         - at dyn_attr to remove unwanted attributes from polled_attr
+         - at prepareDynDS to update polling periods using the admin device
+         
+        '''
+        self.warning('In check_polled_attributes(%s,use_admin=%s)'%(new_attr,use_admin))
+        my_name = self.get_name()
+        if use_admin:
+            U = PyTango.Util.instance()
+            admin = U.get_dserver_device()
+        else:
+            self._db = getattr(self,'_db',None) or PyTango.Database()
         new_attr = dict.fromkeys(new_attr,self.DEFAULT_POLLING_PERIOD) if isinstance(new_attr,list) else new_attr
         dyn_attrs = list(set(map(str.lower,['state','status']+self.dyn_attrs.keys()+new_attr.keys())))
         pattrs = self.get_polled_attrs()
         npattrs = []
-        self.info('Already polled: %s'%pattrs)
-        
+        self.info('Already polled: %s ... '%pattrs)
         #First: propagate all polled_attrs if they appear in the new attribute list or remove them if don't
         for att,period in pattrs.items():
             if att in npattrs: continue #remove duplicated
@@ -376,7 +387,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             else: 
                 self.info('Removing Attribute %s from %s.polled_attr Property' % (att,my_name))
                 if use_admin:
-                    try: admin.RemObjPolling([name,'attribute',att])
+                    try: admin.rem_obj_polling([my_name,'attribute',att])
                     except: print traceback.format_exc()
         #Second: add new attributes to the list of attributes to configure; attributes where value is None will not be polled
         for n,v in new_attr.iteritems():
@@ -389,13 +400,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 try:
                     att,period = npattrs[i],npattrs[i+1]
                     if att not in pattrs:
-                        admin.AddObjPolling([[int(period)],[name,'attribute',att]])
+                        admin.add_obj_polling([[int(period)],[my_name,'attribute',att]])
                     else:
-                        admin.UpdObjPolling([[int(period)],[name,'attribute',att]])
+                        admin.upd_obj_polling_period([[int(period)],[my_name,'attribute',att]])
                 except:
                     print 'Unable to set %s polling' % (npattrs[i])
                     print traceback.format_exc()
         else:
+           self.info('Updating polled_attr: %s'%npattrs)
            self._db.put_device_property(my_name,{'polled_attr':npattrs})
         self.info('Out of check_polled_attributes ...')
         
@@ -633,8 +645,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 #Setting up change events:
                 if self.check_attribute_events(aname):
                     self._locals[aname] = None
-                    if aname in new_polled_attrs: self.set_change_event(aname,True,False)
-                    else: new_polled_attrs.add(aname)
+                    if aname.lower() in new_polled_attrs: self.set_change_event(aname,True,False)
+                    else: new_polled_attrs.add(aname.lower())
                 elif self.dyn_values[aname].keep:
                     self._locals[aname] = None
                 
@@ -663,10 +675,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         
         #Setting up state events:
         if self.check_attribute_events('State'): 
-            if 'state' in new_polled_attrs: 
+            if 'state' in new_polled_attrs: #Already polled
                 self.warning('State events will be managed always by polling') 
                 self.set_change_event('State',True,False) #Implemented, don't check conditions to push
-            else: new_polled_attrs.add('state')
+            else: new_polled_attrs.add('state') #To be added at next restart
         
         try:
             self.check_polled_attributes(new_attr=dict.fromkeys(new_polled_attrs,self.DEFAULT_POLLING_PERIOD))
@@ -773,7 +785,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         @remark Generators don't work  inside eval!, use lists instead
         '''
         self.debug("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"%shortstr(getattr(self.dyn_values.get(aname,None),'value',None)))
-        
+        tstart = time.time()
         if aname in self.dyn_values:
             formula,compiled = self.dyn_values[aname].formula,self.dyn_values[aname].compiled#self.dyn_attrs[aname]       
         else:#Getting a caseless attribute that match
@@ -877,6 +889,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             raise e#Exception,';'.join([err.origin,err.reason,err.desc])
             #PyTango.Except.throw_exception(str(err.reason),str(err.desc),str(err.origin))
         except Exception,e:
+            if self.last_attr_exception and self.last_attr_exception[0]>tstart:
+                e = self.last_attr_exception[-1]
             if False: #self.trace:
                 print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,str(e)])
                 #print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
@@ -946,19 +960,18 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 print '%s(%s) %s %s: %s' % (prio.upper(),(obj.getLogLevel(prio),obj.log_obj.level),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),obj.get_name(),s)
         #def log(prio,s): 
             #print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
-        if type_ == EVENT_TYPE.Config:
-            if 'Error'==tango.fakeEventType[type_]:
-                    log('error','Error received from %s: %s'%(source, attr_value))
-            else: 
-                log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Not Implemented!'%(
-                    type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
-                    ))
+        if type_ == tango.fakeEventType.Config:
+            log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Config Event Not Implemented!'%(
+                type(source).__name__,source,tango.fakeEventType[type_],type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
+                ))
         else:
             log('info','In DynamicDS.event_received(%s(%s),%s,%s)'%(
-                type(source).__name__,source,EVENT_TYPE[type_],type(attr_value).__name__)
+                type(source).__name__,source,tango.fakeEventType[type_],type(attr_value).__name__)
                 )
             try:
-                full_name = source.getFullName().lower() #.get_full_name()
+                if type_ in ('Error',tango.fakeEventType['Error']):
+                    log('error','Error received from %s: %s'%(source, attr_value))
+                full_name = tango.get_model_name(source) #.get_full_name()
                 if full_name not in self._external_listeners:
                     self.info('No events associated to %s'%full_name)
                 elif self._external_listeners[full_name]:
@@ -978,8 +991,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         """
         This method returns a DeviceProxy to the given attribute.
         """
-        if USE_TAU:
-            return TAU.Device(dname)
+        if self.UseTaurus:
+            return tango.TAU.Device(dname)
         else:
             return PyTango.DeviceProxy(dname)
 
@@ -1004,6 +1017,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             else:
                 devs_in_server = self.myClass and self.myClass.get_devs_in_server() or []
                 if device in devs_in_server:
+                    #READING FROM AN INTERNAL DEVICE
                     self.debug('getXAttr accessing a device in the same server ... using getAttr')
                     if aname.lower()=='state': result = devs_in_server[device].get_state()
                     elif aname.lower()=='status': result = devs_in_server[device].get_status() 
@@ -1012,25 +1026,29 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         result = wvalue
                     else: result = devs_in_server[device].getAttr(aname)
                 else:
+                    #READING FROM AN EXTERNAL DEVICE
                     full_name = (device or self.get_name())+'/'+aname
                     if full_name not in self._external_attributes:
-                        self.debug('%s.getXAttr: creating %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if USE_TAU else 'PyTango',full_name))
-                        if USE_TAU: 
-                            a = TAU.Attribute(full_name)
-                            #full_name = a.getFullName() #If the host is external it must be specified in the formula
+                        self.debug('%s.getXAttr: creating %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if self.UseTaurus else 'PyTango',full_name))
+                        if self.UseTaurus: 
+                            #USING TAURUS+EVENTS = CACHED VALUES
+                            a = tango.TAU.Attribute(full_name)
+                            #full_name = tango.get_model_name(a) #If the host is external it must be specified in the formula
                             self._external_attributes[full_name] = a
                             self._external_attributes[full_name].changePollingPeriod(self.DEFAULT_POLLING_PERIOD)
-                            if len(self._external_attributes) == 1: TAU_LOGGER.disableLogOutput()
+                            if len(self._external_attributes) == 1: tango.TAU_LOGGER.disableLogOutput()
                             if self._locals.get('ATTRIBUTE') and self.check_attribute_events(self._locals.get('ATTRIBUTE')):
                                 #If Attribute has events evalAttr() will be called at every event_received
                                 #If there's no events, then will be not necessary
                                 self.info('\t%s.addListener(%s)'%(full_name,self._locals['ATTRIBUTE']))
-                                if a.getFullName() not in self._external_listeners: self._external_listeners[a.getFullName()]=set()
-                                self._external_listeners[a.getFullName()].add(self._locals['ATTRIBUTE'])
+                                if tango.get_model_name(a) not in self._external_listeners: self._external_listeners[tango.get_model_name(a)]=set()
+                                self._external_listeners[tango.get_model_name(a)].add(self._locals['ATTRIBUTE'])
                             self._external_attributes[full_name].addListener(self.event_received)
-                        else: self._external_attributes[full_name] = PyTango.AttributeProxy(full_name)
+                        else: 
+                            #USING PLAIN PYTANGO (POLLING UNCACHED VALUES)
+                            self._external_attributes[full_name] = tango.CachedAttributeProxy(full_name,keeptime=max((200,self.KeepTime)))
                     else:
-                        self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if USE_TAU else 'PyTango',full_name))
+                        self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if self.UseTaurus else 'PyTango',full_name))
                     if write: 
                         self._external_attributes[full_name].write(wvalue)
                         result = wvalue
@@ -1038,11 +1056,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         attrval = self._external_attributes[full_name].read()
                         result = attrval.value
                     self.debug('%s.read() = %s ...'%(full_name,str(result)[:40])) 
-        except:
+        except Exception,e:
             msg = 'Unable to read attribute %s from device %s: \n%s' % (str(aname),str(device),traceback.format_exc())
             print msg
             self.error(msg)
-            self.last_attr_exception = time.ctime()+': '+ msg
+            self.last_attr_exception = (time.time(),msg,e)
             #Exceptions are not re_thrown to allow other commands to be evaluated if this fails.
         finally:
             if hasattr(self,'myClass') and self.myClass:
@@ -1053,7 +1071,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             result = default if hasattr(default,'__len__') else []
         elif result is None:
             result = default
-        self.debug('Out of getXAttr()')
+        self.debug('Out of getXAttr(%s)'%shortstr(result,40))
         return result
 
     def getXCommand(self,cmd,args=None,feedback=None,expected=None):
@@ -1080,9 +1098,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     else:
                         self.debug('getXCommand calling a proxy to %s' % device)
                         if full_name not in self._external_commands:
-                            if USE_TAU: 
-                                self._external_commands[full_name] =  TAU.Device(device)
-                                if len(self._external_commands)==1: TAU_LOGGER.disableLogOutput()
+                            if self.UseTaurus: 
+                                self._external_commands[full_name] =  tango.TAU.Device(device)
+                                if len(self._external_commands)==1: tango.TAU_LOGGER.disableLogOutput()
                             else: self._external_commands[full_name] = PyTango.DeviceProxy(device)
                         self.debug('getXCommand(%s(%s))'%(full_name,args))
                         if args in (None,[],()):
@@ -1090,9 +1108,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         else:
                             result = self._external_commands[full_name].command_inout(cmd,args)
                         #result = self._external_commands[full_name].command_inout(*([cmd,argin] if argin is not None else [cmd]))
-            except:
-                self.last_attr_exception = time.ctime()+': '+ 'Unable to execute %s(%s): %s' % (full_name,args,traceback.format_exc())
-                self.error(self.last_attr_exception)
+            except Exception,e:
+                msg = 'Unable to execute %s(%s): %s' % (full_name,args,traceback.format_exc())
+                self.last_attr_exception = (time.time(),msg,e)
+                self.error(msg)
                 #Exceptions are not re_thrown to allow other commands to be evaluated if this fails.
             finally:
                 if hasattr(self,'myClass') and self.myClass:
@@ -1231,7 +1250,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if self.last_state_exception:
             status += '\nLast DynamicStateException was:\n\t'+self.last_state_exception
         if self.last_attr_exception:
-            status += '\nLast DynamicAttributeException was:\n\t'+self.last_attr_exception
+            status += '\nLast DynamicAttributeException was:\n\t%s:%s'%(time.ctime(self.last_attr_exception[0]),str(self.last_attr_exception[1]))
         if set: self.set_status(status)
         return status
     
@@ -1304,6 +1323,29 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         e = self.evalState(str(argin))
         argout=str(e)
         return argout
+    
+    #------------------------------------------------------------------
+    #    GetMemUsage command:
+    #
+    #    Description: Returns own process RSS memory usage (Mb).
+    #
+    #    argin:  DevVoid
+    #    argout: DevString      Returns own process RSS memory usage (Mb)
+    #------------------------------------------------------------------
+    #Methods started with underscore could be inherited by child device servers for debugging purposes
+    def getMemUsage(self):
+        print '\tgetMemUsage()'
+        return fandango.linos.get_memory()/1e3
+    
+    #------------------------------------------------------------------
+    #    Read MemUsage attribute
+    #------------------------------------------------------------------
+    def read_MemUsage(self, attr):
+        #print "In ", self.get_name(), "::read_MemUsage()"
+        self.debug("In read_MemUsage()")
+        
+        #    Add your own code here
+        attr.set_value(self.getMemUsage())
 
     """
     #THE FOLLOWING COMMANDS HAVE BEEN COPIED FROM PySignalSimulator AND ARE NOT STILL PORTED TO THIS CLASS BEHAVIOUR!
@@ -1415,6 +1457,10 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "Value of this property will be yes/true,no/false or a list of attributes that will trigger push_event (if configured from jive)",
             ['false'] ],
+        'UseTaurus':
+            [PyTango.DevBoolean,
+            "This property manages if Taurus or PyTango will be used to read external attributes.",
+            [False] ],
         'LogLevel':
             [PyTango.DevString,
             "This property selects the log level (DEBUG/INFO/WARNING/ERROR)",
@@ -1424,8 +1470,8 @@ class DynamicDSClass(PyTango.DeviceClass):
     #    Command definitions
     cmd_list = {
         'updateDynamicAttributes':
-            [[PyTango.DevVoid, ""],
-            [PyTango.DevVoid, ""],
+            [[PyTango.DevVoid, "Reloads properties and updates attributes"],
+            [PyTango.DevVoid, "Reloads properties and updates attributes"],
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
@@ -1435,11 +1481,37 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
+        #'getMemUsage':
+            #[[PyTango.DevVoid, "Returns own process RSS memory usage (Kb)"],
+            #[PyTango.DevDouble, "Returns own process RSS memory usage (Kb)"],
+            #{
+                #'Display level':PyTango.DispLevel.EXPERT,
+             #} ],
         }
 
     #    Attribute definitions
     attr_list = {
+       'MemUsage':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
         }
+        
+    @staticmethod
+    def __new__(cls,*args,**kwargs):
+        """
+        Adding own Properties/Commands to subclasses
+        """
+        print 'In DynamicDSClass.__new__(%s): updating properties'%(cls)
+        dicts = ('class_property_list','device_property_list','cmd_list','attr_list')
+        for d in dicts:
+            dct = getattr(cls,d)
+            for p,v in getattr(DynamicDSClass,d).items():
+                if p not in dct: 
+                    dct[p] = v
+        cls = cls if cls is not DynamicDSClass else PyTango.DeviceClass
+        instance = PyTango.DeviceClass.__new__(cls,*args,**kwargs)
+        return instance
 
     def dyn_attr(self,dev_list):
         print 'In DynamicDSClass.dyn_attr(%s)'%dev_list
@@ -1491,7 +1563,7 @@ DynamicDSTypes={
             'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','long','int'],int),
             'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','short'],int),
             'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str'],str),
-            'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag'],bool),
+            'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
             'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','float','double','DevFloat','IeeeFloat'],float),
             'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','list(long','[long','list(int','[int'],lambda l:[int(i) for i in list(l)],4096,1),
             'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in list(l)],4096,1),
