@@ -316,6 +316,8 @@ def toRegexp(exp,terminate=False):
     
 def filtersmart(seq,filters):
     """
+    filtersmart(sequence,filters=['any_filter','+all_filter','!neg_filter'])
+    
     appies a list of filters to a sequence of strings, 
     behavior of filters depends on first filter character:
         '[a-zA-Z0-9] : an individual filter matches all strings that contain it, one matching filter is enough
