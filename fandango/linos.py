@@ -87,8 +87,9 @@ def get_memory_usage():
     mfree = float(stats['buffers']+stats['cached']+stats['free'])
     return 1-(mfree/stats['total'])
 
-def get_memory(pid,virtual=False):
+def get_memory(pid=None,virtual=False):
     """This function uses '/proc/pid/status' to get the memory consumption of a process """
+    if pid is None: pid = os.getpid()
     mem,units = shell_command('cat /proc/%s/status | grep Vm%s'%(pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
     return int(mem)*(1e3 if 'k' in units else (1e6 if 'm' in units else 1))
 
