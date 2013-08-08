@@ -89,6 +89,8 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         #@Tango6
         #This have been overriden as it seemed not well managed when connecting devices in a same server
         if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
+        if getattr(self,'UpdateAttributesThread',None) and 0<getattr(self,'last_update',0)<(time.time()-10*self.PollingCycle/1e3):
+            raise Exception('PollingThreadIsDead')
         return self._state
     
     def dev_state(self):
@@ -221,9 +223,9 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         args = [[period],[self.get_name(),type_,name]]
         admin = self.get_admin_device()
         if name in self.get_polled_attrs(): 
-            if period: admin.UpdObjPollingPeriod(args)
-            else: admin.RemObjPolling([self.get_name(),type_,name])
-        else: admin.AddObjPolling(args)
+            if period: admin.upd_obj_polling_period(args)
+            else: admin.rem_obj_polling([self.get_name(),type_,name])
+        else: admin.add_obj_polling(args)
             
     def set_polled_command(self,command,period):
         self.set_polled_attribute(command,period,type_='command')
@@ -233,7 +235,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     ##@name DevChild like methods
     #@{    
     
-    def subscribe_external_attributes(self,device,attributes):
+    def subscribe_external_attributes(self,device,attributes,use_tau=False):
         neighbours = self.get_devs_in_server()
         self.info('In subscribe_external_attributes(%s,%s): Devices in the same server are: %s'%(device,attributes,neighbours.keys()))
         if not hasattr(self,'ExternalAttributes'): self.ExternalAttributes = CaselessDict()
@@ -241,9 +243,11 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         if not hasattr(self,'last_event_received'): self.last_event_received = 0
         if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
         if not hasattr(self,'events_error'): self.events_error = ''
+        if not hasattr(self,'last_update'): self.last_update = 0
         device = device.lower()
         deviceObj = neighbours.get(device,None)
-        if USE_TAU and deviceObj is None:
+        self.use_tau = getattr(self,'use_tau',TAU and use_tau)
+        if self.use_tau and deviceObj is None:
             for attribute in attributes: #Done in two loops to ensure that all Cache objects are available
                 self.info ('::init_device(%s): Configuring %s.Attribute for %s' % (self.get_name(),str(TAU.__name__),device+'/'+attribute))
                 aname = (device+'/'+attribute).lower()
@@ -272,7 +276,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 self.Event.set()
             if hasattr(self,'UpdateAttributesThread'):
                 self.UpdateAttributesThread.join(getattr(self,'PollingCycle',3000.))            
-            if USE_TAU: 
+            if getattr(self,'use_tau',False):
                 from taurus import Attribute
                 for at in self.ExternalAttributes.values():
                     if isinstance(at,Attribute):
@@ -286,7 +290,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         device,attribute = device.lower(),attribute.lower()
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None:
-            if USE_TAU: 
+            if getattr(self,'use_tau',False):
                 from taurus import Device
                 Device(device).write_attribute(attribute,data)
             else:
@@ -323,7 +327,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         device,target = device.lower(),target.lower()
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None: 
-            if USE_TAU:
+            if getattr(self,'use_tau',False):
                 from taurus import Device
                 return Device(device).command_inout(target,argin)
             else:
@@ -346,6 +350,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 serverAttributes = [a for a,v in self.ExternalAttributes.items() if isinstance(v,fakeAttributeValue)]
                 waittime = 1e-3*self.PollingCycle/(len(serverAttributes)+1)
                 for aname in serverAttributes:
+                    self.last_update = time.time()
                     try:
                         if self.Event.isSet():
                             self.events_error = 'Thread finished by Event.set()'
@@ -356,10 +361,10 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                         event_type = fakeEventType.lookup['Periodic']
                         try:
                             attr.read(cache=False)
-                        except:
+                        except Exception,e:
                             print '#'*80
                             event_type = fakeEventType.lookup['Error']
-                            self.events_error = traceback.format_exc()
+                            self.events_error = except2str(e) #traceback.format_exc()
                             print self.events_error
                             
                         self.info('Sending fake event: %s/%s = %s(%s)' % (device,attr.name,event_type,attr.value))
