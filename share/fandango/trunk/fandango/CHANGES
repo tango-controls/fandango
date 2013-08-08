@@ -1,5 +1,5 @@
-RELEASE = (10,4,1)
-RELEASE_NOTE = "many improvements focused on better TangoEval for alarms"
+RELEASE = (10,4,2)
+RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
 @todo solve pystatecomposer freezing on loose events
