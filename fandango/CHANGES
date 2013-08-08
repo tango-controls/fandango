@@ -3,6 +3,29 @@ RELEASE_NOTE = "many improvements focused on better TangoEval for alarms"
 
 """
 @todo solve pystatecomposer freezing on loose events
+@todo adding use_taurus as property to DynamicDS
+
+dynamic: added MemUsage attribute to get memory usage of devices
+dynamic: solved bug on parsing of boolean properties
+dynamic: modified DynamicDSClass.__new__ to force all DynamicDS properties and commands to be inherited
+dynamic: if UseTaurus property is not True neither taurus or events are used
+dynamic: enabled check_polled_attributes to use admin device and update polling periods from prepareDynDS method
+dynamic: when using XATTR read values will be cached KeepTime milliseconds.
+dynamic: solved bug on error event received
+
+linos: get_memory() will return own process memory usage by default
+functional: Added filtersmart(sequence,filters=['any_filter','+all_filter','!neg_filter'])
+
+tango: if use_tau argument is not True neither taurus or events are used
+tango: added CachedAttributeProxy with timed persistence of values, used by TangoEval instead of AttributeProxy
+tango: added proxy persistence to fakeAttributeValue, read_internal_attribute and get_device_property
+tango: added get_model_name method to extract models from tango/taurus objects
+
+device: if use_tau argument is not True neither taurus or events are used
+device: modified name of admin DServer polling methods
+device: added exception triggering on polling thread fail
+
+
 
 August 2013
 -------------------------------------------------
