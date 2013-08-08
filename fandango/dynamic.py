@@ -973,7 +973,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     log('error','Error received from %s: %s'%(source, attr_value))
                 full_name = tango.get_model_name(source) #.get_full_name()
                 if full_name not in self._external_listeners:
-                    self.info('No events associated to %s'%full_name)
+                    self.debug('%s does not trigger any dynamic attribute event'%full_name)
                 elif self._external_listeners[full_name]:
                     log('info','\t%s.listeners: %s'%(full_name,self._external_listeners[full_name]))
                     for aname in self._external_listeners[full_name]:
@@ -1334,7 +1334,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getMemUsage(self):
-        print '\tgetMemUsage()'
         return fandango.linos.get_memory()/1e3
     
     #------------------------------------------------------------------
