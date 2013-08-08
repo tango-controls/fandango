@@ -53,15 +53,25 @@ if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
 #taurus imports, here USE_TAU is defined for all fandango
-try:
-    assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
-    import taurus
-    TAU = taurus
-    USE_TAU=True
-    """USE_TAU will be used to choose between taurus.Device and PyTango.DeviceProxy"""
-except:
-    print 'fandango.tango: USE_TAU disabled'
-    USE_TAU=False
+global TAU,USE_TAU,TAU_LOGGER
+TAU,USE_TAU = None,False
+def loadTaurus():
+    print '#'*80
+    print '%s fandango.tango.loadTaurus()'%time.ctime()
+    global TAU,USE_TAU,TAU_LOGGER
+    try:
+        assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
+        import taurus
+        TAU = taurus
+        USE_TAU=True
+        TAU_LOGGER = taurus.core.util.Logger
+        """USE_TAU will be used to choose between taurus.Device and PyTango.DeviceProxy"""
+    except:
+        print 'fandango.tango: USE_TAU disabled'
+        TAU = None
+        USE_TAU=False
+        TAU_LOGGER = fandango.log.Logger
+    return bool(TAU)
 
 import objects
 import threading
@@ -73,37 +83,46 @@ from log import Logger,except2str,printf
 ####################################################################################################################
 ##@name Access Tango Devices and Database
 
-##TangoDatabase singletone, This object is not thread safe, use TAU database if possible
-global TangoDatabase,TangoDevice
-TangoDatabase,TangoDevice = None,None
+##TangoDatabase singletone, This object is not thread safe, use TAU database if threads are needed
+global TangoDatabase,TangoDevice,TangoProxies
+TangoDatabase,TangoDevice,TangoProxies = None,None,None
 
-def get_database(): 
+def get_database(use_tau=False): 
     global TangoDatabase
+    if use_tau and not TAU: use_tau = loadTaurus()
     if TangoDatabase is None:
         try: 
-            TangoDatabase = USE_TAU and taurus.Database() or PyTango.Database()
+            TangoDatabase = (use_tau and TAU and TAU.Database()) or PyTango.Database()
         except: pass
     return TangoDatabase
 
-def get_device(dev): 
+def get_device(dev,use_tau=False,keep=False): 
+    if use_tau and not TAU: use_tau = loadTaurus()
     if isinstance(dev,basestring): 
-        if USE_TAU: return TAU.Device(dev)
-        else: return PyTango.DeviceProxy(dev)
-    elif isinstance(dev,PyTango.DeviceProxy) or (USE_TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
+        if use_tau and TAU: 
+            return TAU.Device(dev)
+        else:
+            global TangoProxies
+            if keep and TangoProxies is None: 
+                TangoProxies = ProxiesDict(use_tau=use_tau)
+            if TangoProxies and (dev in TangoProxies or keep):
+                return TangoProxies[dev]
+            else: 
+                return PyTango.DeviceProxy(dev)
+    elif isinstance(dev,PyTango.DeviceProxy) or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
         return dev
     else:
         return None
 
-def get_database_device(): 
+def get_database_device(use_tau=False): 
     global TangoDevice
     if TangoDevice is None:
         try:
-           TangoDevice = get_device(TangoDatabase.dev_name())
+           TangoDevice = get_device(TangoDatabase.dev_name(use_tau=use_tau))
         except: pass
     return TangoDevice
 
 try:
-    #TangoDatabase = USE_TAU and taurus.core.TaurusManager().getFactory()().getDatabase() or PyTango.Database()
     TangoDatabase = get_database()
     TangoDevice = get_database_device()
 except: pass
@@ -336,6 +355,17 @@ def parse_labels(text):
             labels = [(e,e) for e in exprs]  
         return labels
         
+def get_model_name(model):
+    if fun.isString(model): return model.lower()
+    try: 
+        model = model.getFullName()
+    except: 
+        try:
+            model = model.getModelName()
+        except:
+            print traceback.format_exc()
+    return str(model).lower()
+        
 def parse_tango_model(name,use_tau=False):
     """
     {'attributename': 'state',
@@ -347,7 +377,7 @@ def parse_tango_model(name,use_tau=False):
     values = {'scheme':'tango'}
     values['host'],values['port'] = os.getenv('TANGO_HOST').split(':',1)
     try:
-        if not use_tau or not USE_TAU: raise Exception('NotTau')
+        if not use_tau or not TAU: raise Exception('NotTau')
         from taurus.core import tango as tctango
         from taurus.core import AttributeNameValidator,DeviceNameValidator
         validator = {tctango.TangoDevice:DeviceNameValidator,tctango.TangoAttribute:AttributeNameValidator}
@@ -449,9 +479,12 @@ def get_all_models(expressions,limit=1000):
         if any(re.match(s,expressions) for s in ('\{.*\}','\(.*\)','\[.*\]')): expressions = list(eval(expressions))
         else: expressions = expressions.split(',')
     else:
-        try: from PyQt4 import Qt
-        except: USE_TAU = False
-        if isinstance(expressions,(USE_TAU and Qt.QStringList or list,list,tuple,dict)):
+        types = [list,tuple,dict]
+        try: 
+            from PyQt4 import Qt
+            types.append(Qt.QStringList)
+        except: pass
+        if isinstance(expressions,types):
             expressions = list(str(e) for e in expressions)
     
     print 'In get_all_models(%s:"%s") ...' % (type(expressions),expressions)
@@ -664,68 +697,80 @@ def cast_tango_type(value_type):
     
 def get_internal_devices():
     """ Gets all devices declared in the current Tango server """
-    dct = fandango.CaselessDict()
-    U = PyTango.Util.instance()
-    for klass in U.get_class_list():
-        for dev in U.get_device_list_by_class(klass.get_name()):
-            dct[dev.get_name().lower()]=dev
-    return dct
+    try:
+        U = PyTango.Util.instance()
+        dct = fandango.CaselessDict()
+        for klass in U.get_class_list():
+            for dev in U.get_device_list_by_class(klass.get_name()):
+                dct[dev.get_name().lower()]=dev
+        return dct
+    except:
+        return {}
     
 def read_internal_attribute(device,attribute):
     """
+    This method allows several things:
+      * If a device object (Impl or Proxy) is given, it is used to read the attribute
+      * If the attribute belongs to a device in the SAME SERVER, it accesses directly to the device object
+      * If the attribute belongs to an external SERVER, use PyTango proxies to read it
+      * It can manage dynamic attributes used within the same SERVER calling read_dyn_attr
     device must be a DevImpl object or string, attribute must be an string
+    if the device is not internal this method will connect to a PyTango Proxy
     the method will return a fakeAttributeValue object
     """
     print 'read_internal_attribute(%s,%s)'%(device,attribute)
     import dynamic
+    
     if fun.isString(device):
-        device = get_internal_devices().get(device,PyTango.DeviceProxy(device))
+        device = get_internal_devices().get(device,(getattr(attribute,'parent',None) or get_device(device,use_tau=False,keep=True)))
+    
     attr = attribute if isinstance(attribute,fakeAttributeValue) else fakeAttributeValue(name=attribute,parent=device)
-    isProxy, isDyn = isinstance(attr.parent,PyTango.DeviceProxy),hasattr(attr.parent,'read_dyn_attr')
+    
+    isProxy, isDyn = isinstance(device,PyTango.DeviceProxy),hasattr(device,'read_dyn_attr')
     aname = attr.name.lower()
     if aname=='state': 
-        if isProxy: attr.set_value(attr.parent.state())
-        elif hasattr(attr.parent,'last_state'): attr.set_value(attr.parent.last_state)
-        else: attr.set_value(attr.parent.get_state())
+        if isProxy: attr.set_value(device.state())
+        elif hasattr(device,'last_state'): attr.set_value(device.last_state)
+        else: attr.set_value(device.get_state())
         print '%s = %s' % (attr.name,attr.value)
         attr.error = ''
     else: 
         if isProxy:
-            print ('fandango.update_external_attributes(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
-            val = attr.parent.read_attribute(attr.name)
+            print ('fandango.read_internal_attribute(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
+            val = device.read_attribute(attr.name)
             attr.set_value_date_quality(val.value,val.date,val.quality)
         else:
             allow_method,read_method = None,None
-            for s in dir(attr.parent):
+            for s in dir(device):
                 if s.lower()=='is_%s_allowed'%aname: allow_method = s
                 if s.lower()=='read_%s'%aname: read_method = s
-            print ('fandango.update_external_attributes(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
-            is_allowed = (not allow_method) or getattr(attr.parent,allow_method)(PyTango.AttReqType.READ_REQ)
+            print ('fandango.read_internal_attribute(): calling %s.is_%s_allowed()'%(attr.device,attr.name))
+            is_allowed = (not allow_method) or getattr(device,allow_method)(PyTango.AttReqType.READ_REQ)
             if not is_allowed:
                 attr.throw_exception('%s.read_%s method is not allowed!!!'%(device,aname))
             elif not read_method:
                 if isDyn: 
-                    print ('fandango.update_external_attributes(): calling %s(%s).read_dyn_attr(%s)'%(attr.parent.myClass,attr.device,attr.name))
-                    if not attr.parent.myClass:
+                    print ('fandango.read_internal_attribute(): calling %s(%s).read_dyn_attr(%s)'%(device.myClass,attr.device,attr.name))
+                    if not device.myClass:
                         attr.throw_exception('\t%s is a dynamic device not initialized yet.'%attr.device)
                     else:
                         #Returning valid values
                         try:
-                            attr.parent.myClass.DynDev = attr.parent
-                            if dynamic.USE_STATIC_METHODS: attr.parent.read_dyn_attr(attr.parent,attr)
-                            else: attr.parent.read_dyn_attr(attr)
+                            device.myClass.DynDev = device
+                            if dynamic.USE_STATIC_METHODS: device.read_dyn_attr(device,attr)
+                            else: device.read_dyn_attr(attr)
                             print '%s = %s' % (attr.name,attr.value)
                             attr.error = ''
                         except:
                             attr.throw_exception()
                 else:
-                    attr.throw_exception('%s.read_%s method not found!!!'%(device,aname,[d for d in dir(attr.parent)]))
+                    attr.throw_exception('%s.read_%s method not found!!!'%(device,aname,[d for d in dir(device)]))
             else: 
                 #Returning valid values
-                msg = ('Dev4Tango.update_external_attributes(): calling %s.read_%s()'%(attr.device,aname))
+                msg = ('fandango.read_internal_attribute(): calling %s.read_%s()'%(attr.device,aname))
                 print msg
                 try:
-                    getattr(attr.parent,read_method)(attr)
+                    getattr(device,read_method)(attr)
                     print '%s = %s' % (attr.name,attr.value)
                     attr.error = ''
                 except:
@@ -740,11 +785,11 @@ def get_polled_attrs(device,others=None):
     others argument allows to get extra property values in a single DB call 
     """
     if fun.isSequence(device):
-        return dict(zip(map(str.lower,device[::2]),map(float,device[1::2])))
+        return CaselessDict(zip(map(str.lower,device[::2]),map(float,device[1::2])))
     elif isinstance(device,PyTango.DeviceProxy):
         attrs = device.get_attribute_list()
         periods = [(a.lower(),int(dp.get_attribute_poll_period(a))) for a in attrs]
-        return dict((a,p) for a,p in periods if p)
+        return CaselessDict((a,p) for a,p in periods if p)
     else:
         others = others or []
         if isinstance(device,PyTango.DeviceImpl):
@@ -764,31 +809,72 @@ def get_polled_attrs(device,others=None):
         return d
 
 ########################################################################################
+
+class CachedAttributeProxy(PyTango.AttributeProxy):
+    """ 
+    This subclass of AttributeProxy keeps the last read value for a fixed time.
+    It should avoid abusive attribute access from composers (fandango.dynamic) or alarm servers (fandango.tango)
+    In comparison to AttributeValue, it can be used for attribute configuration setup (including polling/events)
+    And it is WRITABLE!!
+    """
+    def __init__(self,name,keeptime=1000.):
+        self.keeptime = keeptime
+        self.last_read_value = None
+        self.last_read_time = 0
+        PyTango.AttributeProxy.__init__(self,name)
+    
+    def read(self,cache=True):
+        now = time.time()
+        if not cache or (now-self.last_read_time)>(self.keeptime/1e3):
+            self.last_read_time = now
+            try:
+                self.last_read_value = PyTango.AttributeProxy.read(self)
+            except Exception,e:
+                self.last_read_value = e
+        if isinstance(self.last_read_value,Exception): raise self.last_read_value
+        else: return self.last_read_value
+
+
+########################################################################################
 ## A useful fake attribute value and event class
     
 class fakeAttributeValue(object):
-    """ This class simulates a modifiable AttributeValue object (not available in PyTango)
+    """ 
+    This class simulates a modifiable AttributeValue object (not available in PyTango)
+    It is the class used to read values from Dev4Tango devices (valves, pseudos, composer, etc ...)
+    It also has a read(cache) method to be used as a TaurusAttribute or AttributeProxy (but it returns self if cache is not used)
+    The cache is controlled by keeptime variable (milliseconds)
     :param parent: Apart of common Attribute arguments, parent will be used to keep a proxy to the parent object (a DeviceProxy or DeviceImpl) 
     """
-    def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1,parent=None,device=''):
+    def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1,parent=None,device='',error=False,keeptime=0):
         self.name=name
         self.device=device or (self.name.split('/')[-1] if '/' in self.name else '')
+        print '%s: fakeAttributeValue.init(%s/%s)'%(time.ctime(),self.device,self.name)
         self.set_value(value,dim_x,dim_y)
         self.set_date(time_ or time.time())
         self.write_value = None
         self.quality=quality
         self.parent=parent
-        self.error = ''
+        self.error = error
+        self.keeptime = keeptime*1e3 if keeptime<10. else keeptime
+        self.lastread = 0
+        
+    def __repr__(self):
+        return 'fakeAttributeValue(%s,%s,%s,%s,error=%s)'%(self.name,fandango.log.shortstr(self.value),time.ctime(self.get_time()),self.quality,self.error)
+    __str__ = __repr__
         
     def get_name(self): return self.name
     def get_value(self): return self.value
     def get_date(self): return self.time
+    def get_time(self): return self.time.totime()
     def get_quality(self): return self.quality
     
     def read(self,cache=True):
         #Method to emulate AttributeProxy returning an AttributeValue
-        print 'fakeAttributeValue(%s).read(%s)'%(self.name,cache)
-        if not cache:
+        #print '\t\tfakeAttributeValue(%s/%s).read(%s)'%(self.device,self.name,cache)
+        if not self.parent:
+            self.parent = get_device(self.device,use_tau=False,keep=True)
+        if not cache or 0<self.keeptime<(time.time()-self.read()):
             return read_internal_attribute(self.parent,self) #it's important to pass self as argument so values will be kept
         return self 
     
@@ -802,13 +888,16 @@ class fakeAttributeValue(object):
     
     def set_value(self,value,dim_x=1,dim_y=1):
         self.value = value
+        if (dim_x,dim_y) == (1,1):
+            if fun.isSequence(value): 
+                dim_x = len(value)
+                if len(value)>1 and fun.isSequence(value[0]):
+                    dim_y = len(value[0])
         self.dim_x = dim_x
         self.dim_y = dim_y
-        #if fun.isSequence(value):
-            #self.dim_x = len(value)
-            #if value and fun.isSequence(value[0]):
-                #self.dim_y = len(value[0])
         self.set_date(time.time())
+        self.lastread = time.time()
+        
     def set_date(self,timestamp):
         if not isinstance(timestamp,PyTango.TimeVal): 
             timestamp=PyTango.TimeVal(timestamp)
@@ -859,10 +948,10 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
     An earlier version is used in PyTangoArchiving.utils module
     This class must be substituted by Tau.Core.TauManager().getFactory()()
     '''
-    def __init__(self,use_tau = USE_TAU):
+    def __init__(self,use_tau = False):
         self.log = Logger('ProxiesDict')
         self.log.setLogLevel('INFO')
-        self.use_tau = use_tau
+        self.use_tau = TAU and use_tau
         self.call__init__(CaselessDefaultDict,self.__default_factory__)
     def __default_factory__(self,dev_name):
         '''
@@ -953,14 +1042,14 @@ class TangoEval(object):
     FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)'
     #FIND_EXP = 'FIND\(([^)]*)\)'
     
-    def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None, cache=0, use_tau = USE_TAU):
+    def __init__(self,formula='',launch=True,timeout=1000,trace=False, proxies=None, attributes=None, cache=0, use_tau = False):
         self.formula = formula
         self.source = ''
         self.variables = []
         self.timeout = timeout
-        self.use_tau = use_tau
+        self.use_tau = TAU and use_tau
         self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if self.use_tau else ProxiesDict(use_tau=self.use_tau)
-        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if self.use_tau else PyTango.AttributeProxy)
+        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if self.use_tau else (lambda a:PyTango.CachedAttributeProxy(a,keeptime=self.timeout)))
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
         self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
         self.cache_depth = cache
