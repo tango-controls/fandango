@@ -1,9 +1,9 @@
-RELEASE = (10,4,2)
+RELEASE = (10,5)
 RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
-@todo solve pystatecomposer freezing on loose events
-@todo adding use_taurus as property to DynamicDS
+August 2013 - 10.5
+-------------------------------------------------
 
 dynamic: added MemUsage attribute to get memory usage of devices
 dynamic: solved bug on parsing of boolean properties
@@ -25,14 +25,10 @@ device: if use_tau argument is not True neither taurus or events are used
 device: modified name of admin DServer polling methods
 device: added exception triggering on polling thread fail
 
-
-
-August 2013
--------------------------------------------------
 device: Solved a bug that considered DynamicDS methods always static (they are not in PyTango>7.2.2)
 tango: solved a bug on initialized TangoEval.source
 
-July 2013
+July 2013 - 10.4
 -------------------------------------------------
 __init__: Release number moved to CHANGES file
 __init__: Modified to include methods from fandango.tango 
