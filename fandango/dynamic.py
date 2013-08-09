@@ -253,8 +253,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try:
             if self.myClass is None:
                 self.myClass = self.get_device_class()
-            #Check polled to be repeated here but using admin (not allowed at Init()); @todo test if needed with Tango8
-            self.check_polled_attributes(use_admin=True)
+            #Check polled to be repeated here but using admin (not allowed at Init()); not needed with Tango8
+            if getattr(PyTango,'__version_number__',0) < 804:
+                self.check_polled_attributes(use_admin=True)
         except:
             print traceback.format_exc()
         finally:
@@ -362,7 +363,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         Polling configuration configured through properties has preference over the hard-coded values; 
         but it seems that Tango does not always update that and polling periods have to be updated.
         
-        Must be called twice ( @todo test if needed with Tango8 ):
+        Must be called twice (solved in PyTango8)
          - at dyn_attr to remove unwanted attributes from polled_attr
          - at prepareDynDS to update polling periods using the admin device
          
