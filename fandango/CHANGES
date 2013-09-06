@@ -1,7 +1,13 @@
-RELEASE = (10,5)
+RELEASE = (10,6)
 RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
+September 2013 - 10.6
+-------------------------------------------------
+arrays: Added methods to get histograms
+tango: Solved bugs in TangoEval and get_Device()
+threads: Solved bugs in WorkerProcess (needed by PyAlarm), added PAUSE() behavior to stop refreshing
+
 August 2013 - 10.5
 -------------------------------------------------
 
