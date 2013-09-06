@@ -191,6 +191,49 @@ def maxmin(data):
     mn,mx = (t[0][1],t[0][0]),(t[-1][1],t[-1][0])
     return mx,mn
 
+import math
+from math import log10
+
+def logroof(x):
+    m = math.floor(log10(x))
+    i = float(x)/10**m
+    v = (v for v,k in ((1,i<1),(2,i<2),(5,i<5),(10,True)) if k).next()
+    return v*(10**m)
+
+def logfloor(x):
+    m = math.floor(log10(x))
+    i = float(x)/10**m
+    v = (v for v,k in ((0.1,i<1),(1,i<2),(2,i<5),(5,True)) if k).next()
+    return v*(10**m)
+
+def get_histogram(data,n=20,log=False):
+    import math
+    mn = logfloor(min(data))
+    mx = logroof(max(data))
+    print('data=[%e:%e],ranges=[%e:%e]'%(min(data),max(data),mn,mx))
+    if log: mn,mx = log10(mn),log10(mx)
+    step = float(mx-mn)/n
+    print('mn,mx,step = %s, %s, %s'%(mn,mx,step))
+    ranges = []
+    for i in range(n):     
+        r0 = mn+i*step
+        r1 = mn+(i+1)*step
+        if log: r0,r1 = 10**r0,10**r1
+        ranges.append((r0,len([d for d in data if r0<=d<r1])))
+    return ranges
+
+def print_histogram(data,n=20):
+    hist = get_histogram(data,n)
+    total,mx = len(data),max(data)
+    ranges = [min(data)]+[h[0] for h in hist[1:]]+[mx]
+    for i,h in enumerate(hist):
+        r = 100*float(h[1])/total
+        print('%25s : %6s : %s'%(
+            '%e < %e'%(ranges[i],ranges[i+1]),
+            '%2.1f%%'%r,
+            ' *'*(1+int(r/10.))
+            ))
+
 def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,trace=False):
     """
     The array returned will contain @method applied to @data split in @window intervals
