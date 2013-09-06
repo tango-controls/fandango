@@ -118,7 +118,7 @@ def get_database_device(use_tau=False):
     global TangoDevice
     if TangoDevice is None:
         try:
-           TangoDevice = get_device(TangoDatabase.dev_name(use_tau=use_tau))
+           TangoDevice = get_device(TangoDatabase.dev_name(),use_tau=use_tau)
         except: pass
     return TangoDevice
 
@@ -405,7 +405,7 @@ class get_all_devices(fandango.objects.SingletonMap):
     def get_all_devs(self):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
-            print 'updating all_devs ...'
+            #print 'updating all_devs ...'
             self._all_devs = list(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*'))
             self._last_call = now
         return self._all_devs
@@ -1049,7 +1049,7 @@ class TangoEval(object):
         self.timeout = timeout
         self.use_tau = TAU and use_tau
         self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if self.use_tau else ProxiesDict(use_tau=self.use_tau)
-        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if self.use_tau else (lambda a:PyTango.CachedAttributeProxy(a,keeptime=self.timeout)))
+        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if self.use_tau else (lambda a:CachedAttributeProxy(a,keeptime=self.timeout)))
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
         self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
         self.cache_depth = cache
