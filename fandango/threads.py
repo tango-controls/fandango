@@ -476,7 +476,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     """
     
     ALIVE_PERIOD = 15
-    __ALIVE,__ADDKEY,__REMOVEKEY,__BIND,__NULL = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND','__NULL'
+    __ALIVE,__ADDKEY,__REMOVEKEY,__BIND,__NULL,__PAUSE = '__ALIVE','__ADDKEY','__REMOVEKEY','__BIND','__NULL','__PAUSE'
     
     def __init__(self,target=None,start=True,timeout=0,timewait=0):
         """ 
@@ -487,8 +487,10 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         from collections import defaultdict
         self.trace('__init__(%s)'%(target))
         self.timeout = timeout or self.ALIVE_PERIOD #Maximum time between requests, process will die if exceeded
+        self.paused = 0
         self.timewait = max((timewait,0.02)) #Time to wait between operations
         self.data = {} #It will contain a {key:ProcessedData} dictionary
+        self.last_alive = 0
         
         #Process Part
         self._pipe1,self._pipe2 = multiprocessing.Pipe()
@@ -514,17 +516,21 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         
     #Thread Management
     def start(self):
+        #Launches the process and threads
         self._receiver.start(),self._process.start()
     def stop(self):
+        #This method stops all threads
         self.trace('stop()')
         self._process_event.set(),self._threading_event.set()
         self._pipe1.close(),self._pipe2.close() 
+        
     def isAlive(self):
         return self._process.is_alive() and self._receiver.is_alive()
     
     def keys(self): 
         return self.data.keys()
     def add(self,key,target=None,args=None,period=0,expire=0,callback=None):
+        # Adds a command to be periodically executed
         data = self.data[key] = ProcessedData(key,target=target,args=args,period=period,expire=expire,callback=callback)
         self.send(self.__ADDKEY,target=data.get_args())
     def get(self,key,default=__NULL,_raise=False):
@@ -538,6 +544,10 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         d = self.data.pop(key)
         self.send(self.__REMOVEKEY,key)
         return d
+    def pause(self,timeout):
+        # Stops for a while the execution of scheduled keys
+        self.paused = time.time()+timeout
+        self.send(self.__PAUSE,target=self.paused)
         
     def send(self,key,target,args=None,callback=None):
         """ 
@@ -591,6 +601,8 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     #@staticmethod
     def _run_process(self,pipe,event,executor=None):
         """ 
+        This is the main loop of the background Process.
+        
         Queries sent to Process can be executed in different ways:
          - Having a process(query) method given as argument.
          - Having an object with a key(query) method: returns (key,result)
@@ -599,6 +611,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         Executor will be a callable or an object with 'target' methods
         """
         last_alive,idle = time.time(),0 #Using NCycles count instead of raw time to avoid CPU influence
+        key,paused = None,0
         scheduled = {} #It will be a {key:[data,period,last_read]} dictionary
         locals_,modules,instances = {'executor':executor},{},{}
         key = None
@@ -607,30 +620,38 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
             try:
                 idle+=1
                 now = time.time()
+                
                 if pipe.poll():
                     t = pipe.recv() #May be (key,) ; (key,args=None) ; (key,command,args)
                     key,target,args = [(None,None,None),(t[0],None,None),(t[0],t[1],None),t][len(t)]
                     if key!=self.__ALIVE: self.trace(shortstr('.Process: Received: %s => (%s,%s,%s)'%(str(t),key,target,args)))
                     last_alive,idle = time.time(),0 #Keep Alive Thread
-                elif scheduled:
-                    data = first(sorted((v.expire,v) for n,v in scheduled.items()))[-1]
-                    if data.expire<=now: 
-                        data.expire = now+data.period
+                elif scheduled and time.time()>paused:
+                    data = first(sorted((v.date+v.period,v) for n,v in scheduled.items()))[-1]
+                    if key not in scheduled and key is not None:
+                        self.trace('Nothing in queue, checking scheduled tasks ...')
+                    if (data.date+data.period)<=now: 
+                        data.date = now
                         key,target,args = data.name,data.target,data.args
                     else: #print '%s > %s - %s' % (time2str(now),time2str(next))
                         key = None
-                if key == self.__ADDKEY: #(__ADDKEY,(args for ProcessedData(*)))
+                        
+                if key == self.__PAUSE:
+                    # should delay scheduled commands but not freeze those synchronous (like ADDKEY or COMMAND)
+                    paused = target
+                    self.trace('.Process: Scheduled keys will be paused %s seconds.'%(paused-time.time()))
+                elif key == self.__ADDKEY: #(__ADDKEY,(args for ProcessedData(*)))
                     #Done here to evaluate not-periodic keys in the same turn that they are received
                     data = ProcessedData(*target)
                     if data.period>0: 
-                        data.expire = now+data.period
                         scheduled[data.name]=data
                         self.trace('.Process: Added key: %s'%str(data))
                     else: 
                         if data.name in scheduled: 
                             self.trace('.Process: Removing %s key'%data.name)
                             scheduled.pop(data.name)
-                    key,target,args = data.name,data.target,data.args #Added data will be immediately read
+                    if time.time()>paused:
+                        key,target,args = data.name,data.target,data.args #Added data will be immediately read
                 if key is not None:
                     try:
                         if key == self.__REMOVEKEY: #(__REMOVEKEY,key)
@@ -685,10 +706,13 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                 self.trace('.Process:\tUnknown Error in process!\n%s'%traceback.format_exc())
             key = None
             event.wait(self.timewait)
+        print '!'*80
         self.trace('.Process: exit_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive))
                         
     def _receive_data(self):
-        self.last_alive = 0
+        """
+        Main loop of the thread receiving data from the background Process (and launching callbacks when needed)
+        """
         while not self._threading_event.is_set():
             try:
                 if self._pipe1.poll():
@@ -722,6 +746,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                     self.last_alive = time.time()
             except: self.trace('.Thread.is_alive(),Exception:%s'%traceback.format_exc())
             self._threading_event.wait(self.timewait)
+        print '!'*80
         self.trace('.Thread: exit_data_thread')
         self.trace('<'*80)
         self.trace('<'*80)
