@@ -5,7 +5,7 @@ RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus
 September 2013 - 10.6
 -------------------------------------------------
 arrays: Added methods to get histograms
-tango: Solved bugs in TangoEval and get_Device()
+tango: Solved bugs in TangoEval, get_Device() and read_internal_attribute
 threads: Solved bugs in WorkerProcess (needed by PyAlarm), added PAUSE() behavior to stop refreshing
 
 August 2013 - 10.5
