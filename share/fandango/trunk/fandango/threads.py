@@ -693,12 +693,12 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                             else: 
                                 #target can be a an object member or eval(target) result
                                 if key not in scheduled: 
-                                    self.trace('.Process: [%s] = %s(*%s)'%(key,target,args))
+                                    self.trace(shortstr('.Process: [%s] = %s(*%s)'%(key,target,args)))
                                 value = exec_ 
 
                             pipe.send((key,getPickable(value)))
                     except Exception,e:
-                        self.trace('.Process:\tError in %s process!\n%s'%(key,except2str(e)))
+                        self.trace('.Process:\tError in %s process!\n%s\n%s\n%s'%(key,target,args,except2str(e)))
                         #print traceback.format_exc()
                         #print e
                         pipe.send((key,getPickable(e)))
