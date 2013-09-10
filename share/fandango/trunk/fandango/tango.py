@@ -738,7 +738,7 @@ def read_internal_attribute(device,attribute):
         if isProxy:
             print ('fandango.read_internal_attribute(): calling DeviceProxy(%s).read_attribute(%s)'%(attr.device,attr.name))
             val = device.read_attribute(attr.name)
-            attr.set_value_date_quality(val.value,val.date,val.quality)
+            attr.set_value_date_quality(val.value,val.time,val.quality)
         else:
             allow_method,read_method = None,None
             for s in dir(device):
