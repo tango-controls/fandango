@@ -327,7 +327,7 @@ def timefun(fun):
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
 
-def sysargs_to_dict(args=None,defaults=[],trace=True):
+def sysargs_to_dict(args=None,defaults=[],trace=False):
     ''' 
     It parses the command line arguments into an understandable dict
     defaults is the list of anonymous arguments to accept
