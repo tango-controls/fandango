@@ -1,7 +1,15 @@
-RELEASE = (10,6)
+RELEASE = (10,7)
 RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
+October 2013 - 10.7
+-------------------------------------------------
+Better DynamicAttribute conversion to strings
+Removed traces from arg parsing
+Added timestamp to log traces
+Solved bug in except2str
+
+
 September 2013 - 10.6
 -------------------------------------------------
 arrays: Added methods to get histograms
