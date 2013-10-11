@@ -57,6 +57,7 @@ message
 
 import logging, weakref, traceback
 from objects import Object
+from functional import time2str
 import warnings
 
 
@@ -73,7 +74,7 @@ def shortstr(s,max_len=144):
 def except2str(e=None,max_len=int(7.5*80)):
     if e is None: e = traceback.format_exc()
     e = str(e)
-    if 'desc=' or 'desc =' in e:
+    if 'desc=' in e or 'desc =' in e:
         r,c = '',0
         for i in range(e.count('desc')):
             c = e.index('desc',c)+1
@@ -88,15 +89,15 @@ class FakeLogger():
     def __init__(self,header='',keep=False):
         self.header = '%s: '%header if header else ''
         if keep: self._instances.append(self)
-    def trace(self,s):print 'TRACE\t'+self.header+s
-    def debug(self,s):print 'DEBUG\t'+self.header+s
-    def info(self,s):print 'INFO\t'+self.header+s
-    def warning(self,s):print 'WARNING\t'+self.header+s
-    def error(self,s):print 'ERROR\t'+self.header+s
+    def trace(self,s):print time2str()+' '+'TRACE\t'+self.header+s
+    def debug(self,s):print time2str()+' '+'DEBUG\t'+self.header+s
+    def info(self,s):print time2str()+' '+'INFO\t'+self.header+s
+    def warning(self,s):print time2str()+' '+'WARNING\t'+self.header+s
+    def error(self,s):print time2str()+' '+'ERROR\t'+self.header+s
     
 class Logger(Object):
+    
     root_inited    = False
-
     Error    = logging.ERROR
     Warning  = logging.WARNING
     Info     = logging.INFO
