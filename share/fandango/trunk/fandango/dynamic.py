@@ -1669,13 +1669,15 @@ class DynamicAttribute(object):
         result.update(self.value.__add__(other),min([self.date,other.date]),max([self.quality,other.quality]))
         return result.value
 
-    def __repr__(self):
-        r='DynamicAttribute{'
-        r+='%s: %s, '%('value',str(self.value))
-        r+='%s: %s, '%('date',time.ctime(self.date))
-        r+='%s: %s, '%('quality',str(self.quality))
-        if self.type: r+='%s: %s, '%('type',hasattr(self.type,'labels') and self.type.labels[0] or str(self.type))
-        r+='}'
+    def __repr__(self,klass='DynamicAttribute'):
+        r='%s({'%klass
+        r+='"%s": %s; '%('value',repr(self.value))
+        r+='"%s": "%s"; '%('date',time.ctime(self.date))
+        r+='"%s": %s; '%('quality',str(self.quality))
+        if self.type: r+='"%s": %s; '%('type',hasattr(self.type,'labels') and self.type.labels[0] or str(self.type))
+        r+='})'
+        if len(r)>80*2: r = r.replace(';',',\n\t')
+        else: r = r.replace(';',',')
         return r
 
     def operator(self,op_name,other=None,unary=False,multipleargs=False):
