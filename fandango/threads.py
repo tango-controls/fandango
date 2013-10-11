@@ -685,7 +685,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                             if isCallable(exec_): 
                                 # Executing 
                                 if key not in scheduled: 
-                                    self.trace('.Process:  [%s] = %s(%s)(*%s)'%(key,exec_,target,args))
+                                    self.trace(shortstr('.Process:  [%s] = %s(%s)(*%s)'%(key,exec_,target,args)))
                                 if args is None: value = exec_()
                                 elif isDictionary(args): value = exec_(**args)
                                 elif isSequence(args): value = exec_(*args)
