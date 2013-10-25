@@ -83,7 +83,7 @@ from log import Logger,except2str,printf
 ####################################################################################################################
 ##@name Access Tango Devices and Database
 
-##TangoDatabase singletone, This object is not thread safe, use TAU database if threads are needed
+##TangoDatabase singletone
 global TangoDatabase,TangoDevice,TangoProxies
 TangoDatabase,TangoDevice,TangoProxies = None,None,None
 
@@ -118,15 +118,10 @@ def get_database_device(use_tau=False):
     global TangoDevice
     if TangoDevice is None:
         try:
-           TangoDevice = get_device(TangoDatabase.dev_name(),use_tau=use_tau)
+           TangoDevice = get_device(get_database(use_tau).dev_name(),use_tau=use_tau)
         except: pass
     return TangoDevice
 
-try:
-    TangoDatabase = get_database()
-    TangoDevice = get_database_device()
-except: pass
-    
 def add_new_device(server,klass,device):
     dev_info = PyTango.DbDevInfo()
     dev_info.name = device
@@ -139,7 +134,7 @@ def get_device_info(dev):
     This method provides an alternative to DeviceProxy.info() for those devices that are not running
     """
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
-    vals = TangoDevice.DbGetDeviceInfo(dev)
+    vals = get_database_device().DbGetDeviceInfo(dev)
     di = Struct([(k,v) for k,v in zip(('name','ior','level','server','host','started','stopped'),vals[1])])
     di.exported,di.PID = vals[0]
     return di
@@ -204,7 +199,7 @@ def get_device_labels(target,filters='*',brief=True):
     if fandango.isString(target): d = get_device(target)
     else: d,target = target,target.name()
     db = get_database()
-    attrlist = db.get_device_attribute_list(target,filters) if brief else d.get_attribute_list()
+    attrlist = db.get_device_attribute_list(target,filters) if brief and hasattr(db,'get_device_attribute_list') else d.get_attribute_list()
     for a in attrlist:
         l = get_attribute_label(target+'/'+a,use_db=True) if brief else d.get_attribute_config(a).label
         if (not filters or any(map(fun.matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
@@ -227,7 +222,7 @@ def set_device_labels(target,labels):
 def get_matching_device_attribute_labels(device,attribute):
     """ To get all gauge port labels: get_matching_device_attribute_labels('*vgct*','p*') """
     devs = get_matching_devices(device)
-    return dict((t+'/'+a,l) for t in devs for a,l in get_device_labels(t,attribute).items())
+    return dict((t+'/'+a,l) for t in devs for a,l in get_device_labels(t,attribute).items() if check_device(t))
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
