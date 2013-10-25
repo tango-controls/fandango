@@ -182,7 +182,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         if missing_properties:
             try:
                 self.info('In Dev4Tango.get_device_properties(%s): initializing default property values: %s' % (self.get_name(),missing_properties))
-                TangoDatabase.put_device_property(self.get_name(),missing_properties)
+                get_database().put_device_property(self.get_name(),missing_properties)
             except Exception,e:
                 print 'Exception in Dev4Tango.get_device_properties():\n'+str(e)
                 
@@ -497,7 +497,7 @@ class DevChild(Dev4Tango):
                 #if self.get_state()==PyTango.DevState.UNKNOWN: #If the device is not connected to parent, then connection is restarted and attributes subscribed
                     #self.warning('in check_ParentProxy, self.DevState is UNKNOWN')
                     #try:
-                        #if not TangoDatabase.get_device_exported(self.ParentName):
+                        #if not get_database().get_device_exported(self.ParentName):
                             #raise Exception,'%s device is not exported!'%self.ParentName
                         #self.dp = PyTango.DeviceProxy(self.ParentName)
                         #self.Parent = self.dp #Parent is an Alias for the device proxy
