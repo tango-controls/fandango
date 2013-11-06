@@ -204,9 +204,9 @@ class Logger(Object):
         if not self.use_tango: return None
         if getattr(self,'__tango_log',None): return self.tango_obj
         try:
-            import PyTango
-            #self.__tango_log = PyTango.Util.instance().get_device_by_name(self.log_name) #self.get_name()
-            if PyTango.Util.instance().is_svr_starting(): return None
+            #import PyTango
+            #if PyTango.Util.instance().is_svr_starting(): return None
+            self.get_name() #Will trigger exception if Tango object is not ready
             self.__tango_log = self
         except:
             print(traceback.format_exc())
@@ -281,8 +281,10 @@ class Logger(Object):
     def warning(self, msg, *args, **kw):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
-            if self._ForcePrint: self.logPrint('WARNING',msg)
-            else: (self.warn_stream if self.use_tango else self.log_obj.warning)(str(msg).replace('\r',''), *args, **kw)
+            obj = self.getTangoLog()
+            if obj: obj.warn_stream(str(msg).replace('\r',''), *args, **kw)
+            elif self._ForcePrint: self.logPrint('WARNING',msg)
+            else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.warning! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
@@ -291,8 +293,10 @@ class Logger(Object):
     def error(self, msg, *args, **kw):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
-            if self._ForcePrint: self.logPrint('ERROR',msg)
-            else: (self.error_stream if self.use_tango else self.log_obj.error)(str(msg).replace('\r',''), *args, **kw)
+            obj = self.getTangoLog()
+            if obj: obj.error_stream(str(msg).replace('\r',''), *args, **kw)
+            elif self._ForcePrint: self.logPrint('ERROR',msg)
+            else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.error! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
