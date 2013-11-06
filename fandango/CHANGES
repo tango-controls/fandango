@@ -2,6 +2,12 @@ RELEASE = (10,7)
 RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
+November 2013 - 10.7b
+-------------------------------------------------
+Logger: added use_tango as an option to use tango_stream instead of log_obj or print
+Functional: solved bug in replaceCl that failed when using tuples for replacement
+Qt: Added DoubleClick hook to DropTextEdit widget
+
 October 2013 - 10.7
 -------------------------------------------------
 Better DynamicAttribute conversion to strings
@@ -9,12 +15,18 @@ Removed traces from arg parsing
 Added timestamp to log traces
 Solved bug in except2str
 
+Threading still has a lot of problems, release pending to solve it
+
+tango/device::
+Removed pre-initalization of TangoDatabase object, use get_database() instead
+Solved bugs in get_matching_devices/attributes
 
 September 2013 - 10.6
 -------------------------------------------------
 arrays: Added methods to get histograms
 tango: Solved bugs in TangoEval, get_Device() and read_internal_attribute
 threads: Solved bugs in WorkerProcess (needed by PyAlarm), added PAUSE() behavior to stop refreshing
+
 
 August 2013 - 10.5
 -------------------------------------------------
