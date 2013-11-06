@@ -263,7 +263,7 @@ class Logger(Object):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('WARNING',msg)
-            else: (self.warning_stream if self.use_tango else self.log_obj.warning)(str(msg).replace('\r',''), *args, **kw)
+            else: (self.warn_stream if self.use_tango else self.log_obj.warning)(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.warning! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
