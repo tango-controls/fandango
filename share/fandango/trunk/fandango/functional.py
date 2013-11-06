@@ -288,8 +288,11 @@ def searchCl(exp,seq,terminate=False):
 clsearch = searchCl #For backward compatibility
 
 def replaceCl(exp,repl,seq):
-    """ Replaces caseless expression exp by repl in string seq """
-    return re.sub(exp.lower(),repl.lower(),seq.lower())
+    """ 
+    Replaces caseless expression exp by repl in string seq 
+    repl can be string or callable(matchobj) ; to reuse matchobj.group(x) if needed in the replacement string
+    """
+    return re.sub(exp.lower(),repl.lower() if hasattr(repl,'lower') else repl,seq.lower())
 clsub = replaceCl
 
 def sortedRe(iterator,order):
