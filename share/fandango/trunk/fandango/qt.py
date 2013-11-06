@@ -613,6 +613,24 @@ class TangoHostChooser(Qt.QWidget):
 
 
 class QDropTextEdit(Qt.QTextEdit):
+    """
+    This method provides a widget that allows drops of text from other widgets.
+    As a bonus, it provides a simple hook for DoubleClick events
+    """
+    def __init__(self,*args):#,**kwargs):
+        self.double_click_hook = None
+        QtGui.QLineEdit.__init__(self,*args)#,**kwargs)
+    
+    def setClickHook(self,hook):
+        """ the hook must be a function or callable """
+        self.double_click_hook = hook #self.onEdit
+    
+    def mouseDoubleClickEvent(self,event):
+        if self.double_click_hook is not None:
+            self.double_click_hook()
+        else:
+            try: Qt.QTextEdit.mouseDoubleClickEvent(self)
+            except: pass
 
     def setSupportedMimeTypes(self, mimetypes):
         '''
