@@ -103,11 +103,12 @@ class Logger(Object):
     Info     = logging.INFO
     Debug    = logging.DEBUG
     
-    def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,level='INFO',max_len=0):
+    def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,use_tango=True,level='INFO',max_len=0):
         self.max_len = max_len
         self.call__init__(Object)
-        self._ForcePrint    = use_print
         self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
+        self.use_tango = use_tango and hasattr(self,'debug_stream')
+        self._ForcePrint = use_print and not use_tango
         
         if not Logger.root_inited:
             #print 'log format is ',format
@@ -240,7 +241,7 @@ class Logger(Object):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('DEBUG',msg)
-            else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
+            else: (self.debug_stream if self.use_tango else self.log_obj.debug)(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.debug! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()            
@@ -251,7 +252,7 @@ class Logger(Object):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('INFO',msg)
-            else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
+            else: (self.info_stream if self.use_tango else self.log_obj.info)(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.info! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
@@ -262,7 +263,7 @@ class Logger(Object):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('WARNING',msg)
-            else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
+            else: (self.warning_stream if self.use_tango else self.log_obj.warning)(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.warning! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
@@ -272,7 +273,7 @@ class Logger(Object):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
             if self._ForcePrint: self.logPrint('ERROR',msg)
-            else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
+            else: (self.error_stream if self.use_tango else self.log_obj.error)(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.error! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
