@@ -107,30 +107,31 @@ class Logger(Object):
         self.max_len = max_len
         self.call__init__(Object)
         self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
-        self.use_tango = use_tango and hasattr(self,'debug_stream')
-        self._ForcePrint = use_print and not use_tango
         
-        if not Logger.root_inited:
-            #print 'log format is ',format
-            self.initRoot(format)
-            Logger.root_inited = True
-            
         self.log_name = name
         if parent is not None:
             self.full_name = '%s.%s' % (parent.full_name, name)
         else:
             self.full_name = name
-
+            
         self.log_obj = logging.getLogger(self.full_name)
         self.log_handlers = []
 
+        self.use_tango = use_tango and hasattr(self,'debug_stream')
+        self._ForcePrint = use_print
+        
         self.parent = None
         self.children = []
         if parent is not None:
             self.parent = weakref.ref(parent)
             parent.addChild(self)
         self.setLogLevel(level)
-
+        
+        if not Logger.root_inited:
+            #print 'log format is ',format
+            self.initRoot(format)
+            Logger.root_inited = True
+            
     def __del__(self):
         parent = self.getParent()
         if parent is not None:
@@ -198,6 +199,20 @@ class Logger(Object):
 
     def getRootLog(self):
         return logging.getLogger()
+    
+    def getTangoLog(self):
+        if not self.use_tango: return None
+        if getattr(self,'__tango_log',None): return self.tango_obj
+        try:
+            import PyTango
+            #self.__tango_log = PyTango.Util.instance().get_device_by_name(self.log_name) #self.get_name()
+            if PyTango.Util.instance().is_svr_starting(): return None
+            self.__tango_log = self
+        except:
+            print(traceback.format_exc())
+            self.warning('Unable to setup tango logging for %s'%self.log_name)
+            self.__tango_log = None
+        return self.__tango_log
 
     def getParent(self):
         if self.parent is None:
@@ -240,8 +255,10 @@ class Logger(Object):
     def debug(self, msg, *args, **kw):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
-            if self._ForcePrint: self.logPrint('DEBUG',msg)
-            else: (self.debug_stream if self.use_tango else self.log_obj.debug)(str(msg).replace('\r',''), *args, **kw)
+            obj = self.getTangoLog()
+            if obj: obj.debug_stream(str(msg).replace('\r',''), *args, **kw)
+            elif self._ForcePrint: self.logPrint('DEBUG',msg)
+            else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.debug! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()            
@@ -251,8 +268,10 @@ class Logger(Object):
     def info(self, msg, *args, **kw):
         if self.max_len>0: msg = shortstr(msg,self.max_len)
         try:
-            if self._ForcePrint: self.logPrint('INFO',msg)
-            else: (self.info_stream if self.use_tango else self.log_obj.info)(str(msg).replace('\r',''), *args, **kw)
+            obj = self.getTangoLog()
+            if obj: obj.info_stream(str(msg).replace('\r',''), *args, **kw)
+            elif self._ForcePrint: self.logPrint('INFO',msg)
+            else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
             print 'Exception in self.info! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
             print traceback.format_exc()
