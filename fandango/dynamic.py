@@ -140,9 +140,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     ######################################################################################################
 
     def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
-        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
-        self.setLogLevel('INFO')
-        self.warning( ' in DynamicDS.__init__ ...')
+        print '> '+'~'*78
+        self.call__init__('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
+        # Logger must be called after init to use Tango logs properly
+        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',level='INFO')
+        self.warning( ' in DynamicDS(%s).__init__ ...'%name)
         self.trace=False
 
         #Tango Properties
@@ -237,7 +239,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     'States fixed with set/get_state will continue working.')
             self.State = self.rawState
             self.dev_state = self.rawState
-        self.call__init__('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
+        print '< '+'~'*78
 
     def delete_device(self):
         self.warning( 'DynamicDS.delete_device(): ... ')
