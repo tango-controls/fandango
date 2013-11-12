@@ -2,6 +2,11 @@ RELEASE = (10,7)
 RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
+
+Added keeptime argument to TangoEval
+Solved bug that caused long keeptimes on TangoEval attribute proxies
+Added Gatera device server to have "online debugging" on fandango devices.
+
 November 2013 - 10.7b
 -------------------------------------------------
 Logger: added use_tango as an option to use tango_stream instead of log_obj or print
