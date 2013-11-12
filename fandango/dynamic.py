@@ -100,12 +100,12 @@ import inspect
 from PyTango import AttrQuality
 from PyTango import DevState
 from excepts import *
+import fandango
 import fandango.tango as tango
 from fandango.objects import self_locked
-from fandango.dicts import SortedDict,CaselessDefaultDict
+from fandango.dicts import SortedDict,CaselessDefaultDict,defaultdict
 from fandango.log import Logger,shortstr
 import fandango.functional as fun
-import fandango.device
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 if getattr(PyTango,'__version_number__',0)<722:
@@ -228,7 +228,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._last_period = {}
         self._last_read = {}
         self._read_times = {}
-        self._read_count = fandango.dicts.defaultdict(int)
+        self._read_count = defaultdict(int)
         self._eval_times = {}
         self._polled_attr_ = {}
         self.GARBAGE = []
@@ -323,7 +323,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 except Exception,e:
                     self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
-                if prop=='polled_attr': self._polled_attr_ = fandango.device.get_polled_attrs(value)
+                if prop=='polled_attr': self._polled_attr_ = tango.get_polled_attrs(value)
                 else: setattr(self,prop,value)
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
             [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
@@ -352,7 +352,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def get_polled_attrs(self,load=False):
         #@TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
         if load or not getattr(self,'_polled_attr_',None):
-            self._polled_attr_ = fandango.device.get_polled_attrs(self)
+            self._polled_attr_ = tango.get_polled_attrs(self)
         return self._polled_attr_
 
     def check_polled_attributes(self,db=None,new_attr={},use_admin=False):
@@ -818,8 +818,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self.debug("In evalAttr(%s) ... updating dependencies (%s,last read at %s, KeepTime is %s)"%(aname,k,self._last_read.get(k,0),self.KeepTime))
                         if self.KeepTime and (not self._last_read.get(k,0) or now>(self._last_read[k]+(self.KeepTime/1e3))):
                             self.debug("In evalAttr ... updating %s value"%k)
-                            if USE_STATIC_METHODS: self.read_dyn_attr(self,fandango.device.fakeAttributeValue(k))
-                            else: self.read_dyn_attr(fandango.device.fakeAttributeValue(k))
+                            if USE_STATIC_METHODS: self.read_dyn_attr(self,tango.fakeAttributeValue(k))
+                            else: self.read_dyn_attr(tango.fakeAttributeValue(k))
                         v = self.dyn_values[k]
                         if k.lower().strip()!=aname.lower().strip() and isinstance(v.value,Exception): 
                             self.warning('evalAttr(%s): An exception is rethrowed from attribute %s'%(aname,k))
@@ -1126,7 +1126,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 else: device,cmd =  cmd.rsplit('/',1)
             else: device = self.get_name()
             if fun.isString(feedback) and '/' not in feedback: feedback = device+'/'+feedback
-            return fandango.device.TangoCommand(command=cmd,device=device,feedback=feedback,timeout=10.,wait=10.).execute(args,expected=expected)
+            return tango.TangoCommand(command=cmd,device=device,feedback=feedback,timeout=10.,wait=10.).execute(args,expected=expected)
 
     def get_quality_for_attribute(self,aname,attr_value):
         self.debug('In get_quality_for_attribute(%s,%s)' % (aname,shortstr(attr_value,15)[:10]))
@@ -1196,7 +1196,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['STATE']=state
         try:
             if push and self.check_attribute_events('state'): 
-                self.info('DynamicDS(%s.check_state(): pushing new state event'%(self.get_name()))
+                self.info('DynamicDS(%s.set_state(): pushing new state event'%(self.get_name()))
                 try: self.push_change_event('State',state,time.time(),PyTango.AttrQuality.ATTR_VALID)
                 except Exception,e: self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
         except Exception,e: 
