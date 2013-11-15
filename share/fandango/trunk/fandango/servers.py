@@ -59,8 +59,8 @@ class TServer(Object):
         self.name=self.get_simple_name(name)        
         self.update_level(host,0)
         self.controlled = False
-        self.level = 0      
-        self.classes = {}#{}#{class:set(devices)}
+        self.level = 0
+        self._classes = None
         self.state=None #PyTango.DevState.UNKNOWN
         self.log = Logger('TServer-%s'%name)
         self.log.setLogLevel('INFO')
@@ -98,20 +98,14 @@ class TServer(Object):
         except:
             if not dname: return self.state
             else: return None
-    
-    def init_from_db(self,db=None,load_devices=True):
+            
+    def init_from_db(self,db=None,load_devices=False):
         """ Gets name, classes, devices, host, level information from Tango Database. """
-        db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
-        ssi = db.get_server_info(self.name)
+        self._db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
+        ssi = self._db.get_server_info(self.name)
         self.update_level(ssi.host,ssi.level)
-        self.classes = collections.defaultdict(list)
         if load_devices:
-            devs = db.get_device_class_list(self.name)
-            #print 'loading from %s server:%s'%(s,str(devs))
-            for i in range(0,len(devs),2):
-                klass = devs[i+1]
-                self.classes[klass].append(devs[i].lower())
-        self._db = db
+            self.get_classes()
     
     def update_level(self,host,level=0):
         """ It only initializes the values, does not get values from database. """
@@ -119,6 +113,19 @@ class TServer(Object):
         if type(level) is str: level=level.strip()
         if self.controlled: self.host,self.level = host.split('.')[0].strip(),int(level or 0)
         else: self.host,self.level = '',0
+        
+    def get_classes(self,load=False):
+        if not load and self._classes is not None:
+            return self._classes
+        devs = self._db.get_device_class_list(self.name)
+        self._classes = collections.defaultdict(list)
+        #print 'loading from %s server:%s'%(s,str(devs))
+        for i in range(0,len(devs),2):
+            klass = devs[i+1]
+            self._classes[klass].append(devs[i].lower())
+        return self._classes
+        
+    classes = property(fget=get_classes)
         
     def get_server_level(self):
         """ It returns initialized values, does not get values from database. """
@@ -141,7 +148,6 @@ class TServer(Object):
     def get_device_list(self): 
         '''Returns a list of devices declared for this server.'''
         result=[]
-        if not self.classes: self.init_from_db(load_devices=True)
         [result.extend(v) for c,v in self.classes.items() if c.lower()!='dserver']
         return result
     
