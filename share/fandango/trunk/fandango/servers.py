@@ -99,17 +99,18 @@ class TServer(Object):
             if not dname: return self.state
             else: return None
     
-    def init_from_db(self,db=None):
+    def init_from_db(self,db=None,load_devices=True):
         """ Gets name, classes, devices, host, level information from Tango Database. """
         db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
         ssi = db.get_server_info(self.name)
         self.update_level(ssi.host,ssi.level)
-        devs = db.get_device_class_list(self.name)
-        #print 'loading from %s server:%s'%(s,str(devs))
         self.classes = collections.defaultdict(list)
-        for i in range(0,len(devs),2):
-            klass=devs[i+1]
-            self.classes[klass].append(devs[i].lower())
+        if load_devices:
+            devs = db.get_device_class_list(self.name)
+            #print 'loading from %s server:%s'%(s,str(devs))
+            for i in range(0,len(devs),2):
+                klass = devs[i+1]
+                self.classes[klass].append(devs[i].lower())
         self._db = db
     
     def update_level(self,host,level=0):
@@ -140,6 +141,7 @@ class TServer(Object):
     def get_device_list(self): 
         '''Returns a list of devices declared for this server.'''
         result=[]
+        if not self.classes: self.init_from_db(load_devices=True)
         [result.extend(v) for c,v in self.classes.items() if c.lower()!='dserver']
         return result
     
@@ -289,13 +291,9 @@ class ServersDict(CaselessDict,Object):
                 family = server_name.split('/')[0] if '/' in server_name else server_name
                 member = server_name.split('/')[1] if '/' in server_name else '*'
                 servers_list = self.get_devs_from_db('dserver/%s/%s' % (family,member))
-                #families = self.db.get_device_family('dserver/%s/%s' % (family,member))
-                #if families:
-                    #servers_list = []
-                    #for exec_ in families:
-                        #servers_list += ['%s/%s'%(exec_,d) for d in self.db.get_device_member('dserver/%s/%s'%(exec_,member))]
+                #servers_list = [s for s in self.db.get_server_list() if fun.matchCl('%s/%s'%(family,member),s)]
                 if servers_list:
-                    self.load_from_servers_list([d.replace('dserver/','') for d in servers_list])
+                    self.load_from_servers_list([d.replace('dserver/','') for d in servers_list],check=False)
                     self.log.info('%d servers loaded'%len(servers_list))
                     return len(servers_list)
                 else:
@@ -321,10 +319,11 @@ class ServersDict(CaselessDict,Object):
         self.log.info('Loading %d servers matching %s devices'%(len(servers_list),len(devs_list)))
         self.load_from_servers_list([s for s in servers_list if s])
     
-    def load_from_servers_list(self,servers_list):
+    def load_from_servers_list(self,servers_list,check=True):
         """ Initializes the dictionary using a list of server_names like ['Exec/Instance'] """
+        t0 = time.time()
         if type(servers_list) is str: servers_list = servers_list.split(',')
-        self.check_servers_names(servers_list)
+        if check: self.check_servers_names(servers_list)
         for s in servers_list:
             try:           
                 self.log.debug('loading from %s server'%s)
@@ -334,7 +333,7 @@ class ServersDict(CaselessDict,Object):
             except Exception,e:
                 self.log.warning('exception loading %s server: %s' % (s,str(e)[:100]+'...'))
                 print traceback.format_exc()
-        pass
+        #print 'load_from_servers_list(%d) took %f seconds' % (len(servers_list),time.time()-t0)
                     
     def check_servers_names(self,servers_list):
         """ Crosschecks the name of servers (case sensitive) with names retrieved by self.db.get_server_list() """
