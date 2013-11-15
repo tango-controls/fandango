@@ -400,14 +400,14 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     ##@}        
 
 ##############################################################################################################
-## Gatera, DS used to have access to DServer internal objects (as a complement of DServer admin device
+## DDebug, DS used to have access to DServer internal objects (as a complement of DServer admin device
 
 from fandango.dynamic import DynamicDS,DynamicDSClass
-class Gatera(DynamicDS):
+class DDebug(DynamicDS):
     def __init__(self,cl, name):
         U = PyTango.Util.instance()
         DynamicDS.__init__(self,cl,name,_locals={'Util':U,'PyUtil':U,'self':self},useDynStates=False)
-        Gatera.init_device(self)
+        DDebug.init_device(self)
     def init_device(self):
         self.set_state(PyTango.DevState.ON)
         #self.get_DynDS_properties()
@@ -416,10 +416,10 @@ class Gatera(DynamicDS):
     @staticmethod
     def addToServer(py,server,instance):
         name = '%s/%s'%(server,instance)
-        add_new_device(name,'Gatera','sys/%s/%s_%s'%('Gatera',server,instance))
-        py.add_TgClass(GateraClass,Gatera,'Gatera')
+        add_new_device(name,'DDebug','sys/%s/%s_%s'%('DDebug',server,instance))
+        py.add_TgClass(DDebugClass,DDebug,'DDebug')
         
-class GateraClass(DynamicDSClass):
+class DDebugClass(DynamicDSClass):
     class_property_list={}
     device_property_list={}
     cmd_list={'evaluateFormula':[[PyTango.DevString, "formula to evaluate"],[PyTango.DevString, "formula to evaluate"],],}  
