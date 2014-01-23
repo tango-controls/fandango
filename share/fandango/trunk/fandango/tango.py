@@ -273,8 +273,21 @@ def parse_db_command_array(data,keys=1,depth=2):
     return dict
             
 def get_device_property(device,property):
+    """
+    It returns device property value or just first item if value list has lenght==1
+    """
     prop = get_database().get_device_property(device,[property])[property]
     return prop if len(prop)!=1 else prop[0]
+
+def put_device_property(device,property,value=None):
+    """
+    Two syntax are possible:
+     - put_device_property(device,{property:value})
+     - put_device_property(device,property,value)
+    """
+    if not fun.isMapping(property):
+        property = {property:value}
+    return get_database().put_device_property(device,property)
             
 def get_devices_properties(expr,properties,hosts=[],port=10000):
     """
@@ -351,7 +364,9 @@ def parse_labels(text):
         return labels
         
 def get_model_name(model):
-    if fun.isString(model): return model.lower()
+    if fun.isString(model): 
+        m = fun.searchCl(retango,str(model).lower())
+        return m.group() if m else str(model).lower()
     try: 
         model = model.getFullName()
     except: 
