@@ -1,0 +1,31 @@
+#!/usr/bin/python
+
+import fandango
+import sys
+import time
+
+COMMANDS = 'status start stop restart'.split()
+
+args = fandango.sysargs_to_dict(sys.argv[1:],defaults=['keys'],trace=False)
+if not args['keys'] or len(args['keys'])<2 or args['keys'][0] not in COMMANDS:
+    print 'USAGE: ctds <status|start|stop|restart> [servers....]'
+    sys.exit()
+
+action,keys = args['keys'][0],args['keys'][1:]
+astor = fandango.Astor()
+[astor.load_by_name(k) for k in keys]
+
+if action == 'status': 
+    astor.states()
+    print astor.__repr__()
+elif action == 'start': 
+    astor.start_servers()
+elif action == 'stop': 
+    astor.stop_servers()
+elif action == 'restart':
+    print('Stopping servers ...')
+    astor.stop_servers()
+    print('Waiting 10 s ...')
+    time.sleep(10.)
+    print('Starting servers ...')
+    astor.start_servers()
