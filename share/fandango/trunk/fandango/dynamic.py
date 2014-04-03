@@ -185,7 +185,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['COMM'] = lambda _name,_argin=None,feedback=None,expected=None: self.getXCommand(_name,_argin,feedback,expected)
         self._locals['XDEV'] = lambda _name: self.getXDevice(_name)
         self._locals['ForceAttr'] = lambda a,v=None: self.ForceAttr(a,v)
-        self._locals['VAR'] = lambda a,v=None: self.ForceVar(a,v)
+        self._locals['VAR'] = lambda a,v=None,default=None: self.ForceVar(a,v,default=default)
         #self._locals['RWVAR'] = (lambda read_exp=(lambda arg=NAME:self.ForceVar(arg)),
                                 #write_exp=(lambda arg=NAME,val=VALUE:self.ForceVar(arg,val)),
                                 #aname=NAME, 
@@ -597,7 +597,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
                 is_allowed = (lambda s,req_type,a=aname: type(self).is_dyn_allowed(s,req_type,a))
                 max_size = hasattr(self,'DynamicSpectrumSize') and self.DynamicSpectrumSize
-                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in formula else PyTango.AttrWriteType.READ
+                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',s) else PyTango.AttrWriteType.READ
                 for typename,dyntype in DynamicDSTypes.items():
                     if max([formula.startswith(label) for label in dyntype.labels]):
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
@@ -1167,7 +1167,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else: value = self.dyn_values[aname].forced
         return value
         
-    def ForceVar(self,argin,VALUE=None):
+    def ForceVar(self,argin,VALUE=None,default=None):
         ''' Description: The arguments are VariableName and an optional Value.<br>
             This command will force the value of a Variable or will return the last forced value
             (if only one argument is passed). '''
@@ -1178,8 +1178,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         aname = argin[0]
 
         if value is not None: self.variables[aname] = value
-        elif aname in self.variables: value = self.variables[aname]
-        else: value = 0
+        elif aname not in self.variables: self.variables[aname] = default
+        value = self.variables[aname]
         return value
 
 #------------------------------------------------------------------------------------------------------
@@ -1564,14 +1564,14 @@ DynamicDSTypes={
             'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState','long','int'],int),
             'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','long','int'],int),
             'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','short'],int),
-            'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str'],str),
+            'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str'],lambda x:str(x or '')),
             'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
             'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','float','double','DevFloat','IeeeFloat'],float),
-            'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','list(long','[long','list(int','[int'],lambda l:[int(i) for i in list(l)],4096,1),
-            'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in list(l)],4096,1),
-            'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','list(str','[str'],lambda l:[str(i) for i in list(l)],4096,1),
-            'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','list(bool','[bool'],lambda l:[bool(i) for i in list(l)],4096,1),
-            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in list(l)],4096,1),
+            'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','list(long','[long','list(int','[int'],lambda l:[int(i) for i in list(l or [])],4096,1),
+            'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in list(l or [])],4096,1),
+            'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','list(str','[str'],lambda l:[str(i) for i in list(l or [])],4096,1),
+            'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','list(bool','[bool'],lambda l:[bool(i) for i in list(l or [])],4096,1),
+            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in list(l or [])],4096,1),
             }
             
 def CreateDynamicCommands(ds,ds_class):
