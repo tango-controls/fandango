@@ -61,9 +61,9 @@ from functional import time2str
 import warnings
 
 
-def printf(s):
+def printf(*args):
     # This is a 'lambdable' version of print
-    print s
+    print(''.join(map(str,args)))
     
 def shortstr(s,max_len=144):
     s = str(s)
