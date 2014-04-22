@@ -19,6 +19,36 @@ def getApplication(args=None):
     app = Qt.QApplication.instance()
     return app or Qt.QApplication(args or [])
 
+class QDialogWidget(Qt.QDialog):
+    """
+    It converts any Widget into a Dialog
+    """
+    def widget(self):
+        self._widget = getattr(self,'_widget',None)
+        return self._widget
+    def setWidget(self,widget,accept_signal=None,reject_signal=None):
+        self.setMinimumSize(widget.size())
+        self.setLayout(Qt.QVBoxLayout())
+        widget.setParent(self)
+        self.layout().addWidget(widget)
+        self.setSizePolicy(Qt.QSizePolicy.Expanding,Qt.QSizePolicy.Expanding)
+        self._widget = widget
+        if accept_signal:self.connect(widget,Qt.SIGNAL(accept_signal),self.accept)
+        if reject_signal:self.connect(widget,Qt.SIGNAL(reject_signal),self.reject)
+        self.updateGeometry()
+        return self
+    def sizeHint(self):
+        if self.widget(): return self.widget().sizeHint()
+        else: return Qt.QDialog.sizeHint(self)
+        
+class QExceptionMessage(object):
+    def __init__(self,message=None):
+        import traceback
+        self.message = str(message) or traceback.format_exc()
+        self.qmb = Qt.QMessageBox(Qt.QMessageBox.Warning,"Exception","The following exception occurred:\n\n%s"%message,Qt.QMessageBox.Ok)
+        print 'fandango.qt.QExceptionMessage(%s)'%message
+        return self.qmb.exec_()
+
 class QColorDictionary(SortedDict,Singleton):
     """
     Returns a {name:QColor} dictionary; 
@@ -586,6 +616,29 @@ def DoubleClickable(QtKlass):
                 except: pass
     return DoubleClickableQtKlass
                 
+class QOptionChooser(Qt.QDialog):
+    def __init__(self,title,text,command,args,parent=None):
+        Qt.QDialog.__init__(self,parent)
+        self.command = command
+        self.args = args
+        self.combo = Qt.QComboBox()
+        self.combo.addItems(self.args)
+        self.buttons = Qt.QDialogButtonBox(Qt.QDialogButtonBox.Ok|Qt.QDialogButtonBox.Cancel)
+        self.connect(self.buttons,Qt.SIGNAL('accepted()'),self.launch)
+        self.connect(self.buttons,Qt.SIGNAL('rejected()'),self.close)
+    
+        self.setLayout(Qt.QHBoxLayout())
+        self.setWindowTitle(title)
+        self.layout().addWidget(Qt.QLabel(text))
+        self.layout().addWidget(self.combo)
+        self.layout().addWidget(self.buttons)
+
+    def launch(self):
+        cmd = ' '.join(map(str,[self.command[0],self.combo.currentText()]+self.command[1:]))+' &'
+        print cmd
+        import os
+        os.system(cmd)
+
 class TangoHostChooser(Qt.QWidget):
     """
     Allows to choose a tango_host from a list
