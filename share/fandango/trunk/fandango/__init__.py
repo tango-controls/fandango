@@ -84,7 +84,7 @@ except: print 'Unable to import threads module'
 #TANGO related modules
 try:
     from tango import get_device,get_database,get_database_device,get_all_devices,get_device_info,\
-        get_alias_for_device,get_device_for_alias, \
+        get_alias_for_device,get_device_for_alias,get_tango_host, \
         find_devices,find_attributes,get_matching_devices,get_matching_attributes,\
         cast_tango_type,parse_tango_model,check_attribute,check_device,except2str,\
         TangoEval,ProxiesDict,getTangoValue,TangoCommand,fakeEvent,fakeEventType
