@@ -619,10 +619,10 @@ class ServersDict(CaselessDict,Object):
             try:
                 done = False
                 self.proxies.get(starter).command_inout('DevStart',target)
-                ct = int(wait/3)
+                ct = int(wait/10.)
                 dp = self.proxies.get(s_name if 'dserver' in s_name else 'dserver/'+s_name)
                 while ct>0:
-                    event.wait(3)
+                    event.wait(10.)
                     try: 
                         dp.state()
                         ct=0
@@ -668,7 +668,7 @@ class ServersDict(CaselessDict,Object):
         new_servers = [s for s in servers_list if s not in self]
         if new_servers:
             self.check_servers_names(new_servers)
-            self.load_from_servers_list(new_servers)        
+            self.load_from_servers_list(new_servers)
         for server_name in servers_list:
             server = self[server_name]
             if server.ping() is not None:
