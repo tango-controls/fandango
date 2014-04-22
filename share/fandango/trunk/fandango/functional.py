@@ -500,6 +500,9 @@ def str2list(s,separator=''):
 def text2list(s,separator='\n'):
     return filter(bool,str2list(s,separator))
 
+def str2lines(s,length=80,separator='\n'):
+    return separator.join(s[i:i+length] for i in range(0,len(s),length))
+
 def list2str(s,separator='\t',MAX_LENGTH=255):
     s = str(separator).join(str(t) for t in s)
     if MAX_LENGTH>0 and separator not in ('\n','\r') and len(s)>MAX_LENGTH: 
@@ -520,8 +523,12 @@ def negbin(old):
     """ Given a binary number as an string, it returns all bits negated """
     return ''.join(('0','1')[x=='0'] for x in old)
 
-def char2int(c): return ord(c)
-def int2char(n): return unichr(n)
+def char2int(c): 
+    """ord(c)"""
+    return ord(c)
+def int2char(n): 
+    """unichr(n)"""
+    return unichr(n)
 def int2hex(n): return hex(n)
 def int2bin(n): return bin(n)
 def hex2int(c): return int(c,16)
@@ -634,10 +641,36 @@ def mysql2time(mysql_time):
 ## Extended eval
 ########################################################################
 
+def evalF(formula):
+    """
+    Returns a function that executes the formula passes as argument.
+    The formula should use x,y,z as predefined arguments, or use args[..] array instead
+    
+    e.g.:
+    map(evalF("x>2"),range(5)) : [False, False, False, True, True]
+    
+    It is optimized to be efficient (but still 50% slower than a pure lambda)
+    """
+    #return (lambda *args: eval(formula,locals={'args':args,'x':args[0],'y':args[1],'z':args[2]}))
+    c = compile(formula,formula,'eval') #returning a lambda that evals a compiled code makes the method 500% faster
+    return (lambda *args: eval(c,{'args':args,'x':args and args[0],'y':len(args)>1 and args[1],'z':len(args)>2 and args[2]}))
+
+def testF(f,args=[],t=1.):
+    args = toSequence(args)
+    ct,t0 = 0,time.time()
+    while time.time()<t0+5:
+        f(*args)
+        ct+=1
+    return ct
+
 def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exception=Exception):
     """
+    evalX is an enhanced eval function capable of evaluating multiple types and import modules if needed.
+    The _locals/modules/instances dictionaries WILL BE UPDATED with the result of the code! (if '=' or import are used)
+    It is used by some fandango classes to send python code to remote threads; that will evaluate and return the values as pickle objects.
+    
     target may be:
-            - dictionary of built-in types: {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
+         - dictionary of built-in types (pickable): {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
          - string to eval: eval('import $MODULE' or '$VAR=code()' or 'code()')
          - list if list[0] is callable: value = list[0](*list[1:]) 
          - callable: value = callable()
