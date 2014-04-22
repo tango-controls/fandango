@@ -87,14 +87,35 @@ from log import Logger,except2str,printf
 global TangoDatabase,TangoDevice,TangoProxies
 TangoDatabase,TangoDevice,TangoProxies = None,None,None
 
-def get_database(use_tau=False): 
+def get_tango_host(dev_name='',use_db=False):
+    if dev_name:
+        m  = fun.matchCl(rehost,dev_name)
+        return m.groups()[0] if m else get_tango_host(use_db=use_db)
+    elif use_db:
+        return "%s:%s"%(get_database().get_db_host().split('.')[0],get_database().get_db_port())
+    else:
+        return os.getenv('TANGO_HOST') 
+
+def get_database(host='',port='',use_tau=False): 
+    """
+    Method to get a singleton instance of the Tango Database
+    @TODO: host/port is checked only at first creation, once initialized you can't change HOST
+    """
     global TangoDatabase
+    if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
+    elif ':' in host: host,port = host.split(':')
+    args = [host,int(port)] if host and port else []
     if use_tau and not TAU: use_tau = loadTaurus()
-    if TangoDatabase is None:
+    if not args and TangoDatabase:
+        return TangoDatabase
+    else:
         try: 
-            TangoDatabase = (use_tau and TAU and TAU.Database()) or PyTango.Database()
-        except: pass
-    return TangoDatabase
+            db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
+            if not args: TangoDatabase = db
+            return db
+        except:
+            print traceback.format_exc()
+    return
 
 def get_device(dev,use_tau=False,keep=False): 
     if use_tau and not TAU: use_tau = loadTaurus()
@@ -118,7 +139,7 @@ def get_database_device(use_tau=False):
     global TangoDevice
     if TangoDevice is None:
         try:
-           TangoDevice = get_device(get_database(use_tau).dev_name(),use_tau=use_tau)
+           TangoDevice = get_device(get_database(use_tau=use_tau).dev_name(),use_tau=use_tau)
         except: pass
     return TangoDevice
 
@@ -224,6 +245,29 @@ def get_matching_device_attribute_labels(device,attribute):
     devs = get_matching_devices(device)
     return dict((t+'/'+a,l) for t in devs for a,l in get_device_labels(t,attribute).items() if check_device(t))
 
+def get_attribute_info(device,attribute):
+    """
+    This method returns attribute info in the attr_list format
+    It parses values returned by PyTango.DeviceProxy(device).get_attribute_config(attribute)
+    return format:
+            [[PyTango.DevString,
+            PyTango.SPECTRUM,
+            PyTango.READ_WRITE, 2],
+            {
+                'unit':"mbar",
+                'format':"%4d",
+             }],
+    """
+    if fun.isString(device): device = get_device(device)
+    ai = device.get_attribute_config(attribute)
+    types = [PyTango.CmdArgType.values.get(ai.data_type),ai.data_format,ai.writable]
+    if ai.max_dim_x>1: types.append(ai.max_dim_x)
+    if ai.max_dim_y>0: types.append(ai.max_dim_y)
+    formats = dict((k,getattr(ai,k)) 
+        for k,v in (('label',''),('unit','No unit'),('format',''))
+        if getattr(ai,k)!=v)
+    return [types,formats]
+
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
     if not use_db: #using AttributeProxy
@@ -299,27 +343,55 @@ def get_devices_properties(expr,properties,hosts=[],port=10000):
     get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fandango.matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
     else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
-    return dict(('/'.join((host,d)),db.get_device_property(d,properties)) for host,db in tango_dbs.items() for d in get_devs(db,expr))
+    return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties)) for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
     
-def get_matching_device_properties(dev,prop,exclude=''):
+def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=10000):
+    """
+    get_matching_device_properties enhanced with multi-host support
+    get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
+    """    
     db = get_database()
     result = {}
-    devs = dev if fun.isSequence(dev) else get_matching_devices(dev) #devs if fun.isSequence(dev) else [devs]
-    props = prop if fun.isSequence(prop) else list(set(s for d in devs for s in db.get_device_property_list(d,prop)))
-    print 'devs: %s'%devs
-    print 'props: %s'%props
-    for d in devs:
-        if exclude and fun.matchCl(exclude,d): continue
-        r = {}
-        vals = db.get_device_property(d,props)
-        for k,v in vals.items():
-            if v: r[k] = v[0]
-        if r: result[d] = r
-    if not fun.isSequence(devs) or len(devs)==1:
-        if len(props)==1: return result.values()[0].values()[0]
-        else: return result.values()[0]
-    else: return result
+    if not fun.isSequence(devs): devs = [devs]
+    if not fun.isSequence(props): props = [props]
+    if hosts:
+        hosts = [h if ':' in h else '%s:%s'%(h,port) for h in hosts]
+    else:
+        hosts = set(get_tango_host(d) for d in devs)
+    print 'hosts: %s'%hosts
+    #if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
+    #else: tango_dbs = {get_tango_host():get_database()}
+    
+    #for h,db in tango_dbs.items():
+        #pass
+    
+    #devs = [d for for h in hosts for d in (dev if fun.isSequence(dev) else get_matching_devices(dev))] #devs if fun.isSequence(dev) else [devs]
+    #props = prop if fun.isSequence(prop) else list(set(s for d in devs for s in db.get_device_property_list(d,prop)))
+    
+    #print 'devs: %s'%devs
+    #print 'props: %s'%props
+    result = {}
+    for h in hosts:
+        result[h] = {}
+        db = get_database(h)
+        exps  = [h+'/'+e if ':' not in e else e for e in devs]
+        print exps
+        hdevs = [d.replace(h,'') for d in get_matching_devices(exps,fullname=False)]
+        print '%s: %s'%(h,hdevs)
+        for d in hdevs:
+            if exclude and fun.matchCl(exclude,d): continue
+            dprops = [t for p in props for t in db.get_device_property_list(d,p)]
+            if not dprops: continue
+            print d,dprops
+            vals = db.get_device_property(d,dprops)
+            if len(hosts)==1 and len(hdevs)==1:
+                return vals
+            else: 
+                result[h][d] = vals
+        if len(hosts)==1: 
+            return result[h]
+    return result
     
 def property_undo(dev,prop,epoch):
     db = get_database()
@@ -331,6 +403,11 @@ def property_undo(dev,prop,epoch):
         db.put_device_property(dev,{prop:valids[-1].get_value().value_string})
     elif not valids:print('No property values found for %s/%s before %s'%(dev,prop,fun.time2str(epoch)))
     elif not news: print('Property %s/%s not modified after %s'%(dev,prop,fun.time2str(epoch)))
+    
+def get_property_history(dev,prop):
+    db = get_database()
+    his = db.get_device_property_history(dev,prop)
+    return [(fun.str2time(h.get_date()),h.get_value()) for h in his]    
 
 ####################################################################################################################
 ##@name Methods for searching the database with regular expressions
@@ -416,34 +493,39 @@ class get_all_devices(fandango.objects.SingletonMap):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
             #print 'updating all_devs ...'
-            self._all_devs = list(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*'))
+            self._all_devs = map(str.lower,(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*')))
             self._last_call = now
         return self._all_devs
     def __new__(cls,*p,**k):
         instance = fandango.objects.SingletonMap.__new__(cls,*p,**k)
         return instance.get_all_devs()
     
-def get_matching_devices(expressions,limit=0,exported=False):
+def get_matching_devices(expressions,limit=0,exported=False,fullname=True):
     """ 
     Searches for devices matching expressions, if exported is True only running devices are returned 
     """
     if not fun.isSequence(expressions): expressions = [expressions]
+    hosts = set((m.groups()[0] if m else None) for m in (fun.matchCl(rehost,e) for e in expressions))
     all_devs = []
-    if any(not fun.matchCl(rehost,expr) for expr in expressions): all_devs.extend(get_all_devices(exported))
-    for expr in expressions:
-        m = fun.matchCl(rehost,expr) 
-        if m:
-            host = m.groups()[0]
-            print 'get_matching_devices(%s): getting %s devices ...'%(expr,host)
+    defhost = get_tango_host()
+    for host in hosts:
+        if host is None:
+            db_devs = get_all_devices(exported)
+        else:
             odb = PyTango.Database(*host.split(':'))
-            all_devs.extend('%s/%s'%(host,d) for d in odb.get_device_name('*','*'))
-    expressions = map(fun.toRegexp,fun.toList(expressions))
-    result = filter(lambda d: any(fun.matchCl(e,d,terminate=True) for e in expressions),all_devs)
-    return result[:limit] if limit else result
+            db_devs = odb.get_device_exported('*') if exported else odb.get_device_name('*','*')
+        print('get_matching_devices(%s)'%(host or defhost))
+        prefix = '%s/'%(host or defhost)
+        all_devs.extend(prefix+d for d in db_devs)
         
+    expressions = map(fun.toRegexp,fun.toList(expressions))
+    result = filter(lambda d: any(fun.matchCl("(%s/)?"%defhost+e,d,terminate=True) for e in expressions),all_devs)
+    if not fullname: result = [r if r.count('/')<=2 else r.split('/',1)[-1] for r in result]
+    return result[:limit] if limit else result
+    
 find_devices = get_matching_devices
     
-def get_matching_attributes(expressions,limit=0):
+def get_matching_attributes(expressions,limit=0,fullname=None):
     """ 
     Returns all matching device/attribute pairs. 
     regexp only allowed in attribute names
@@ -453,6 +535,7 @@ def get_matching_attributes(expressions,limit=0):
     def_host = os.getenv('TANGO_HOST')
     if not fun.isSequence(expressions): expressions = [expressions]
     #expressions = map(fun.partial(fun.toRegexp,terminate=True),fun.toList(expressions))
+    matches = []
     for e in expressions:
         match = fun.matchCl(retango,e,terminate=True)
         if not match:
@@ -464,8 +547,12 @@ def get_matching_attributes(expressions,limit=0):
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
+        matches.append((host,dev,attr))
+    
+    fullname = fullname or any(m[0]!=def_host for m in matches)
+    for host,dev,attr in matches:
         #print '%s => %s: %s /%s' % (e,host,dev,attr)
-        for d in get_matching_devices(dev,exported=True):
+        for d in get_matching_devices(dev,exported=True,fullname=fullname):
             if fun.matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
@@ -642,7 +729,7 @@ def check_device(dev,attribute=None,command=None,full=False):
     except:
         return None            
 
-def check_attribute(attr,readable=False,timeout=0):
+def check_attribute(attr,readable=False,timeout=0,brief=False):
     """ checks if attribute is available.
     :param readable: Whether if it's mandatory that the attribute returns a value or if it must simply exist.
     :param timeout: Checks if the attribute value have been effectively updated (check zombie processes).
@@ -658,9 +745,9 @@ def check_attribute(attr,readable=False,timeout=0):
             elif timeout and attvalue.time.totime()<(time.time()-timeout):
                 return None
             else:
-                return attvalue
+                return attvalue if not brief else getattr(attvalue,'value',None)
         except Exception,e: 
-            return None if readable else e
+            return None if readable or brief else e
     except:
         return None    
 
@@ -792,7 +879,8 @@ def get_polled_attrs(device,others=None):
     @TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
     if a device is passed, it returns the polled_attr property as a dictionary
     if a list of values is passed, it converts to dictionary
-    others argument allows to get extra property values in a single DB call 
+    others argument allows to get extra property values in a single DB call; 
+    e.g others = ['polled_cmd'] would append the polled commands to the list
     """
     if fun.isSequence(device):
         return CaselessDict(zip(map(str.lower,device[::2]),map(float,device[1::2])))
@@ -813,7 +901,7 @@ def get_polled_attrs(device,others=None):
             device = device.get_name()
         else:
             db = fandango.get_database()
-        props = db.get_device_property(device,['polled_attr']+others)
+        props = db.get_device_property(device,['polled_attr']+fun.toSequence(others))
         d = get_polled_attrs(props.pop('polled_attr'))
         if others: d.update(props)
         return d
@@ -1250,7 +1338,7 @@ class TangoEval(object):
                 raise e
         self.trace('formula = %s' % (self.source))
         self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
-        self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i)[:40])) for k,i in self._locals.items() if k not in self._defaults))
+        #self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i)[:40])) for k,i in self._locals.items() if k not in self._defaults))
         self.result = eval(self.source,dict(self.previous),self._locals)
         self.trace('result = %s' % self.result)
         return self.result
