@@ -636,7 +636,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 try: self.dyn_values[aname].compiled=compile(formula.strip(),'<string>','eval')
                 except: self.error(traceback.format_exc())
                 self.dyn_values[aname].type=self.dyn_types[aname]
-                self.dyn_values[aname].formula=self.dyn_attrs[aname]
 
                 #Adding attributes to DynamicStates queue:
                 for k,v in self.dyn_states.items():
