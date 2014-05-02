@@ -85,6 +85,9 @@ def except2str(e=None,max_len=int(7.5*80)):
     return result or e[:max_len]
     
 class FakeLogger():
+    """
+    This class just simulates a Logger using prints with date and header, it doesn't allow any customization
+    """
     _instances = []
     def __init__(self,header='',keep=False):
         self.header = '%s: '%header if header else ''
@@ -96,6 +99,23 @@ class FakeLogger():
     def error(self,s):print time2str()+' '+'ERROR\t'+self.header+s
     
 class Logger(Object):
+    """
+    This class provides logging methods (debug,info,error,warning) to all classes inheriting it.
+    To use it you must inherit from it and add it within your __init__ method:
+    
+    def __init__(self,cl, name):
+        PyTango.Device_4Impl.__init__(self,cl,name)
+        self.call__init__(fandango.log.Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+    
+    Constructor arguments allow to customize the output format:
+     * name='fandango.Logger' #object name to appear at the beginning
+     * parent=None
+     * format='%(levelname)-8s %(asctime)s %(name)s: %(message)s'\
+     * use_tango=True #Use Tango Logger if available
+     * use_print=True #Use printouts instead of linux logger (use_tango will override this option)
+     * level='INFO' #default log level
+     * max_len=0 #max length of log strings
+    """
     
     root_inited    = False
     Error    = logging.ERROR
@@ -103,7 +123,7 @@ class Logger(Object):
     Info     = logging.INFO
     Debug    = logging.DEBUG
     
-    def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_print=True,use_tango=True,level='INFO',max_len=0):
+    def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_tango=True,use_print=True,level='INFO',max_len=0):
         self.max_len = max_len
         self.call__init__(Object)
         self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
