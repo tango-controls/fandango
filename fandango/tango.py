@@ -52,6 +52,14 @@ from PyTango import AttrQuality
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
+import fandango
+import objects
+import threading
+import functional as fun
+from dicts import CaselessDefaultDict,CaselessDict
+from objects import Object,Struct
+from log import Logger,except2str,printf
+
 #taurus imports, here USE_TAU is defined for all fandango
 global TAU,USE_TAU,TAU_LOGGER
 TAU,USE_TAU = None,False
@@ -70,15 +78,8 @@ def loadTaurus():
         print 'fandango.tango: USE_TAU disabled'
         TAU = None
         USE_TAU=False
-        TAU_LOGGER = fandango.log.Logger
+        TAU_LOGGER = Logger
     return bool(TAU)
-
-import objects
-import threading
-import functional as fun
-from dicts import CaselessDefaultDict,CaselessDict
-from objects import Object,Struct
-from log import Logger,except2str,printf
 
 ####################################################################################################################
 ##@name Access Tango Devices and Database
@@ -190,13 +191,13 @@ def get_real_name(dev,attr=None):
     """
     It translate any device/attribute string by name/alias/label
     """
-    if fandango.isString(dev):
+    if fun.isString(dev):
         if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): dev,attr = dev.rsplit('/',1)
         if '/' not in dev: dev = get_device_for_alias(dev)
         if attr is None: return dev
     for a in get_device_attributes(dev):
-        if fandango.matchCl(attr,a): return (dev+'/'+a)
-        if fandango.matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
+        if fun.matchCl(attr,a): return (dev+'/'+a)
+        if fun.matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
     return None
 
 def get_device_commands(dev):
@@ -205,7 +206,7 @@ def get_device_commands(dev):
 def get_device_attributes(dev,expressions='*'):
     """ Given a device name it returns the attributes matching any of the given expressions """
     expressions = map(fun.toRegexp,fun.toList(expressions))
-    al = (get_device(dev) if fandango.isString(dev) else dev).get_attribute_list()
+    al = (get_device(dev) if fun.isString(dev) else dev).get_attribute_list()
     result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
     return result
         
@@ -217,7 +218,7 @@ def get_device_labels(target,filters='*',brief=True):
     This method works offline, does not need device to be running
     """
     labels = {}
-    if fandango.isString(target): d = get_device(target)
+    if fun.isString(target): d = get_device(target)
     else: d,target = target,target.name()
     db = get_database()
     attrlist = db.get_device_attribute_list(target,filters) if brief and hasattr(db,'get_device_attribute_list') else d.get_attribute_list()
@@ -340,7 +341,7 @@ def get_devices_properties(expr,properties,hosts=[],port=10000):
     get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
     """
     if not fun.isSequence(properties): properties = [properties]
-    get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fandango.matchCl(reg,d)]
+    get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fun.matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
     else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
     return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties)) for host,db in tango_dbs.items() for d in get_devs(db,expr))
@@ -482,13 +483,18 @@ def parse_tango_model(name,use_tau=False):
     if 'attributename' in values: values['attribute'] = values['attributename']
     return values
 
-import fandango.objects
-class get_all_devices(fandango.objects.SingletonMap):
-    def __init__(self,exported=False,keeptime=60):
+TANGO_KEEPTIME = 60 #This variable controls how often the Tango Database will be queried
+
+class get_all_devices(objects.SingletonMap):
+    _keeptime = TANGO_KEEPTIME
+    def __init__(self,exported=False,keeptime=None):
         self._all_devs = []
         self._last_call = 0
-        self._keeptime = keeptime #Only 1 query/minute to DB allowed
         self._exported = exported
+        if keeptime: self.set_keeptime(keeptime)
+    @classmethod
+    def set_keeptime(klass,keeptime):
+        klass._keeptime = max(keeptime,60) #Only 1 query/minute to DB allowed
     def get_all_devs(self):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
@@ -497,7 +503,7 @@ class get_all_devices(fandango.objects.SingletonMap):
             self._last_call = now
         return self._all_devs
     def __new__(cls,*p,**k):
-        instance = fandango.objects.SingletonMap.__new__(cls,*p,**k)
+        instance = objects.SingletonMap.__new__(cls,*p,**k)
         return instance.get_all_devs()
     
 def get_matching_devices(expressions,limit=0,exported=False,fullname=True):
@@ -514,7 +520,6 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=True):
         else:
             odb = PyTango.Database(*host.split(':'))
             db_devs = odb.get_device_exported('*') if exported else odb.get_device_name('*','*')
-        print('get_matching_devices(%s)'%(host or defhost))
         prefix = '%s/'%(host or defhost)
         all_devs.extend(prefix+d for d in db_devs)
         
@@ -562,6 +567,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None):
                     if limit and len(attrs)>limit: break
                 except: 
                     print 'Unable to get attributes for %s'%d
+                    print traceback.format_exc()
     result = list(set(attrs))
     return result[:limit] if limit else result
                     
@@ -910,8 +916,9 @@ def get_polled_attrs(device,others=None):
 
 class CachedAttributeProxy(PyTango.AttributeProxy):
     """ 
-    This subclass of AttributeProxy keeps the last read value for a fixed time.
-    It should avoid abusive attribute access from composers (fandango.dynamic) or alarm servers (fandango.tango)
+    This subclass of AttributeProxy keeps the last read value for a fixed keeptime (in milliseconds).
+    
+    It is used to avoid abusive attribute access from composers (fandango.dynamic) or alarm servers (fandango.tango)
     In comparison to AttributeValue, it can be used for attribute configuration setup (including polling/events)
     And it is WRITABLE!!
     """
@@ -1132,13 +1139,32 @@ def getTangoValue(obj,device=None):
 
 class TangoEval(object):
     """ 
-    Class for Tango formula evaluation
-    Class with methods copied from PyAlarm 
-    All tango-like variables are parsed.
-    Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
+    Class for Tango formula evaluation; used by Panic-like formulas
+    
+    example:
+        te = fandango.TangoEval(cache=3)
+        te.eval('test/sim/test-00/A * test/sim/test-00/S.delta')
+        Out: 2.6307095848792521 #A value multiplied by delta of S in its last 3 values
+    
+    Attributes in the formulas may be (it is recommended to insert spaces between attribute names and operators):
+    
+        dom/fam/memb/attrib >= V1 #Will evaluate the attribute value
+        d/f/m/a1 > V2 and d/f/m/a2 == V3 #Comparing 2 attributes
+        d/f/m.quality != QALARM #Using attribute quality
+        d/f/m/State == UNKNOWN #States can be compared directly
+        d/f/m/A.exception #True if exception occurred
+        d/f/m/A.time #Attribute value time
+        d/f/m/A.value #Explicit value
+        d/f/m/A.delta #Increase/decrease of the value since the first value in cache (if cache and cache_depth are set)
+        d/f/m/A.all #Instead of just value will return an AttributeValue object 
+    
+    All tango-like variables are parsed. TangoEval.macros can be used to do regexp-based substitution. By default FIND(regexp) will be replaced by a list of matching attributes.
+    
+        FIND([a-zA-Z0-9\/].*) macro allows to get any attribute matching a regular expression
+        Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
+        T() < T('YYYY/MM/DD hh:mm') allow to compare actual time with any time
     """
-    FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)'
-    #FIND_EXP = 'FIND\(([^)]*)\)'
+    FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)' #FIND( optional quotes and whatever is not ')' )
     
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,trace=False, proxies=None, attributes=None, cache=0, use_tau = False):
         self.formula = formula
@@ -1154,13 +1180,17 @@ class TangoEval(object):
         self.cache_depth = cache
         self.cache = dicts.CaselessDefaultDict(lambda k:list()) if self.cache_depth else None#Keeps [cache]
         self.result = None
+        self.macros = [('FIND(%s)',self.FIND_EXP,self.find_macro)]
+        
         self._trace = trace
         self._defaults = dict([(str(v),v) for v in PyTango.DevState.values.values()]+[(str(q),q) for q in PyTango.AttrQuality.values.values()])
-        self._defaults['str2epoch'] = lambda *args: time.mktime(time.strptime(*args))
-        self._defaults['str2time'] = lambda *args: time.mktime(time.strptime(*args))
+        self._defaults['T'] = fun.str2time
+        self._defaults['str2time'] = fun.str2time
         self._defaults['time'] = time
+        self._defaults['NOW'] = time.time
         self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
+        self._defaults['PREV'] = self.previous
         #self._locals['now'] = time.time() #Updated at execution time
         self._defaults.update((k,v) for k,v in {'get_domain':get_domain,'get_family':get_family,'get_member':get_member,'parse':parse_tango_model}.items())
         #self._defaults.update((k,None) for k in ('os','sys',)) #Updating Not allowed models
@@ -1179,27 +1209,46 @@ class TangoEval(object):
         self.timeout = int(timeout)
         self.trace('timeout: %s'%timeout)
         
+    def find_macro(self,target):
+        """
+        Gets a match of FIND_EXP and applies get_matching_attributes to the expresion found.
+        """
+        exp = target.replace('"','').replace("'",'').strip()
+        exp,sep,what = exp.partition('.')
+        res = str(sorted(d.lower()+sep+what for d in get_matching_attributes([exp])))
+        return res.replace('"','').replace("'",'')
+    
+    def add_macro(self,macro_name,macro_expression,macro_function):
+        """
+        Add a new macro to be parsed by parse_formula. It will apply macro_function to the target found by macro_expression; the result will later replace macro_name%target
+        
+        e.g: self.add_macro('FIND(%s)',self.FIND_EXP,self.find_macro) #where FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)'
+        """
+        self.macros.insert(0,(macro_name,macro_expression,macro_function))
+        
     def parse_formula(self,formula,_locals=None):
-        """ This method just removes comments and expands FIND() searches in the formula; no tango check, no value replacement """
+        """ 
+        This method just removes comments and applies self.macros (e.g FIND()) searches in the formula; 
+        In this method there is no tango check, neither value replacement 
+        """
         _locals = _locals or {}
         _locals.update(self._locals)
         if '#' in formula:
             formula = formula.split('#',1)[0]
         if ':' in formula and not re.match('^',redev):
-            tag,formula = formula.split(':',1)            
+            tag,formula = formula.split(':',1)
         if _locals and '$(' in formula: #explicit replacement of env variables if $() used
             for l,v in _locals.items():
                 formula = formula.replace('$(%s)'%str(l),str(v))
-        findables = re.findall(self.FIND_EXP,formula)
-        for target in findables:
-            exp = target.replace('"','').replace("'",'').strip()
-            exp,sep,what = exp.partition('.')
-            res = str(sorted(d.lower()+sep+what for d in get_matching_attributes([exp])))
-            formula = formula.replace("FIND(%s)"%target,res.replace('"','').replace("'",''))
-            self.trace('Replacing with results for %s ...%s'%(target,res))
+        for macro_name,macro_exp,macro_fun in self.macros:
+            matches = re.findall(macro_exp,formula)
+            for match in matches:
+                res = macro_fun(match)
+                formula = formula.replace(macro_name%match,res)
+                self.trace('TangoEval.parse_formula: Replacing %s with %s'%(macro_name%match,res))
         return formula
         
-    def parse_variables(self,formula,_locals=None):
+    def parse_variables(self,formula,_locals=None,parsed=False):
         ''' This method parses attributes declarated in formulas with the following formats:
         TAG1: dom/fam/memb/attrib >= V1 #A comment
         TAG2: d/f/m/a1 > V2 and d/f/m/a2 == V3
@@ -1222,12 +1271,12 @@ class TangoEval(object):
         #self.trace( regexp)
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
         
-        formula = self.parse_formula(formula,_locals)
+        if not parsed: formula = self.parse_formula(formula,_locals)
         
         ##@var all_vars list of tuples with (device,/attribute) name matches
         #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
         variables = [s for s in re.findall(regexp,formula)]
-        self.trace('parse_variables(%s): %s'%(formula,variables))
+        self.trace('parse_variables(...): %s'%(variables))
         return variables
         
     def read_attribute(self,device,attribute,what='',_raise=True, timeout=None):
@@ -1235,7 +1284,6 @@ class TangoEval(object):
         Executes a read_attribute and returns the value requested
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         """
-        self.trace('read_attribute(%s/%s.%s)'%(device,attribute,what))
         timeout = timeout or self.timeout
         aname = (device+'/'+attribute).lower()
         try:
@@ -1251,24 +1299,25 @@ class TangoEval(object):
             if self.cache_depth and not any(get_attribute_time(v)==get_attribute_time(value) for v in self.cache[aname]):
                 while len(self.cache[aname])>=self.cache_depth: self.cache[aname].pop(-1)
                 self.cache[aname].insert(0,value)
-            if what == 'all': pass
-            elif what in ('value',''): 
-                value = getTangoValue(value,device=device)
+            if what == 'all': 
                 if self.cache_depth:
                     try: setattr(value,'delta',self.get_delta(aname))
                     except: pass
+                setattr(value,'exception',isinstance(getattr(value,'value',None),PyTango.DevFailed))
+            elif what in ('value',''): 
+                value = getTangoValue(value,device=device)
             elif what == 'time': value = get_attribute_time(value)
-            elif what == 'exception': value = False
+            elif what == 'exception': value = isinstance(getattr(value,'value',None),PyTango.DevFailed) #False
             elif what == 'delta': value = self.get_delta(aname)
             else: value = getattr(value,what)
-            self.trace('Read %s.%s = %s' % (aname,what,value))
+            self.trace('read_attribute(%s/%s.%s) => %s'%(device,attribute,what,value))
         except Exception,e:
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return True
             elif _raise:
                 raise e
             self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
-            #print traceback.format_exc()
+            self.trace(traceback.format_exc())
             value = None
         return value
                 
@@ -1285,11 +1334,18 @@ class TangoEval(object):
     
     def get_delta(self,target):
         # target = (device+'/'+attribute).lower() ; returns difference between first and last cached value
-        if not self.cache or not self.cache_depth or target not in self.cache: 
-            return 0
-        else:
+        if self.cache and target in self.cache:
             cache = self.cache.get(target)
-            return 0 if not cache else (cache[0].value-cache[-1].value)
+        else:
+            var_name = self.parse_tag(target)
+            if var_name in self.previous:
+                device,attribute = self.parse_variables(target)[0][:2]
+                cache = [self.read_attribute(device,attribute,'all'),self.previous[var_name]]
+            else:
+                cache = []
+        delta = 0 if not cache else (cache[0].value-cache[-1].value)
+        self.trace('get_delta(%s); cache[%d] = %s; delta = %s' % (target,len(cache),[v.value for v in cache],delta))
+        return delta
     
     def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
         ''' 
@@ -1309,17 +1365,16 @@ class TangoEval(object):
         #self.previous.update(previous or {}) #<<< Values passed as eval locals are persistent, do we really want that?!?
         
         self.formula = self.parse_formula(self.formula) #Replacement of FIND(...), env variables and comments.
-        variables = self.parse_variables(self.formula)
+        variables = self.parse_variables(self.formula,parsed=True) #Extract the list of tango variables
         self.trace('>'*80)
         self.trace('eval(): variables in formula are %s' % variables)
         self.source = self.formula #It will be modified on each iteration
         targets = [(device + (attribute and '/%s'%attribute) + (what and '.%s'%what),device,attribute,what) for device,attribute,what in variables]
         self.last.clear()
-        #self.last.update(dict((v[0],'') for v in targets))
         ## NOTE!: It is very important to keep the same order in which expressions were extracted
         for target,device,attribute,what in targets: 
             var_name = self.parse_tag(target)
-            self.trace('\t%s => %s'%(target,var_name))
+            #self.trace('\t%s => %s'%(target,var_name))
             try:
                 #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
                 self.previous[var_name] = previous.get(target,
@@ -1340,7 +1395,7 @@ class TangoEval(object):
         self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
         #self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i)[:40])) for k,i in self._locals.items() if k not in self._defaults))
         self.result = eval(self.source,dict(self.previous),self._locals)
-        self.trace('result = %s' % self.result)
+        self.trace('result = %s' % str(self.result))
         return self.result
     pass
         
