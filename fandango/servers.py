@@ -788,6 +788,7 @@ class ServersDict(CaselessDict,Object):
                        
     def get_report(self):
         '''def server_Report(self): The status of Servers '''
+        self.states()
         report='The status of device servers is:\n\n'
         hosts = map(str,set(v.host for v in self.values()))
         for h in sorted(hosts):
