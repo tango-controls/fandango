@@ -597,13 +597,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
                 is_allowed = (lambda s,req_type,a=aname: type(self).is_dyn_allowed(s,req_type,a))
                 max_size = hasattr(self,'DynamicSpectrumSize') and self.DynamicSpectrumSize
-                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',s) else PyTango.AttrWriteType.READ
+                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) else PyTango.AttrWriteType.READ
                 for typename,dyntype in DynamicDSTypes.items():
                     if max([formula.startswith(label) for label in dyntype.labels]):
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
                         if formula.startswith(typename):
                             formula=formula.lstrip(typename)
-                        
+                        self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                         if dyntype.dimx==1:
                             if (create): self.add_attribute(PyTango.Attr(aname,dyntype.tangotype, AttrType), \
                                 self.read_dyn_attr,self.write_dyn_attr,is_allowed)
@@ -619,15 +619,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.debug("DynamicDS.dyn_attr(...): Type not matched for '"+line+"', using DevDouble by default"    )
                     if max(map(formula.startswith,['list(','['])):
                             dyntype = DynamicDSTypes['DevVarDoubleArray']
+                            self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                             if (create): self.add_attribute(PyTango.SpectrumAttr(aname,dyntype.tangotype, AttrType,max_size or dyntype.dimx), \
                                 self.read_dyn_attr,self.write_dyn_attr,is_allowed)
                                 #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
-                            self.dyn_types[aname]=dyntype
                     else:
+                        dyntype = DynamicDSTypes['DevDouble']
+                        self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                         if (create): self.add_attribute(PyTango.Attr(aname,PyTango.ArgType.DevDouble, AttrType), \
                             self.read_dyn_attr,self.write_dyn_attr,is_allowed)
                             #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
-                        self.dyn_types[aname]=DynamicDSTypes['DevDouble']
+                    self.dyn_types[aname]=dyntype
 
                 #print 'Type of Dynamic Attribute "',aname,'=',formula,'" is "',str(self.dyn_types[aname].labels),'"'
                 self.dyn_attrs[aname]=formula
@@ -1297,7 +1299,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.get_DynDS_properties()
         
         ##All attributes managed with dyn_attr() that does not appear in DynamicAttributes or StaticAttributes list will be removed!
-        attrs_list = [name.split('=',1)[0].strip() for name in (self.DynamicAttributes + (hasattr(self,'StaticAttributes') and self.StaticAttributes or []))]
+        attrs_list = [name.split('=',1)[0].strip() for name in (self.DynamicAttributes + (getattr(self,'StaticAttributes',None) or []))]
         for a in self.dyn_attrs:
             if a not in attrs_list:
                 self.warning('DynamicDS.updateDynamicAttributes(): Removing Attribute!: %sn not in [%s]' % (a,attrs_list))
