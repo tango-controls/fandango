@@ -63,7 +63,8 @@ class TServer(Object):
         self._classes = None
         self.state=None #PyTango.DevState.UNKNOWN
         self.log = Logger('TServer-%s'%name)
-        self.log.setLogLevel('INFO')
+        if parent and parent.log.getLogLevel(): self.log.setLogLevel(parent.log.getLogLevel())
+        else: self.log.setLogLevel('ERROR')
         self.state_lock = threading.Lock()
         
         if parent: self.proxies=parent.proxies
@@ -495,7 +496,7 @@ class ServersDict(CaselessDict,Object):
         classes = self.get_all_classes()
         return {}
     
-    def get_host_overview(self,host=''):
+    def get_host_overview(self,host='',as_text=False):
         """Returns a dictionary with astor-like information
         @param host the host to display
         @return {'level':{'server':{'device':State}}}
@@ -511,6 +512,9 @@ class ServersDict(CaselessDict,Object):
                 for server in servers:
                     result[level][server] = self[server].get_all_states()
             if not result: self.log.warning('No servers has been loaded for host %s'%host)
+        if as_text:
+            import arrays
+            result = '\n'.join('\t'.join(map(str,l)) for l in arrays.tree2table(result))
         return result
     
     ## @}
@@ -784,9 +788,13 @@ class ServersDict(CaselessDict,Object):
                        
     def get_report(self):
         '''def server_Report(self): The status of Servers '''
-        report='The status of device servers is:\n'
-        for k in sorted(self.keys()):
-            report+='%s:\t%s\n'%(self[k].name,self[k].state)
+        report='The status of device servers is:\n\n'
+        hosts = map(str,set(v.host for v in self.values()))
+        for h in sorted(hosts):
+            report+='%s:\n'%h
+            for k,v in sorted(self.items()):
+                if v.host!=h:continue
+                else:report+='%50s\t%s\n'%(k,v.state)
         self.log.debug(report)
         return report
         
