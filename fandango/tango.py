@@ -93,7 +93,8 @@ def get_tango_host(dev_name='',use_db=False):
         m  = fun.matchCl(rehost,dev_name)
         return m.groups()[0] if m else get_tango_host(use_db=use_db)
     elif use_db:
-        return "%s:%s"%(get_database().get_db_host().split('.')[0],get_database().get_db_port())
+        use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
+        return "%s:%s"%(use_db.get_db_host().split('.')[0],use_db.get_db_port())
     else:
         return os.getenv('TANGO_HOST') 
 
@@ -121,6 +122,7 @@ def get_database(host='',port='',use_tau=False):
 def get_device(dev,use_tau=False,keep=False): 
     if use_tau and not TAU: use_tau = loadTaurus()
     if isinstance(dev,basestring): 
+        if dev.count('/')==1: dev = 'dserver/'+dev
         if use_tau and TAU: 
             return TAU.Device(dev)
         else:
@@ -454,16 +456,18 @@ def get_model_name(model):
             print traceback.format_exc()
     return str(model).lower()
         
-def parse_tango_model(name,use_tau=False):
+def parse_tango_model(name,use_tau=False,use_host=False):
     """
     {'attributename': 'state',
-    'devicename': 'bo01/vc/ipct-01',
-    'host': 'alba02',
+    'attribute': 'state',
+    'devicename': 'bo01/vc/ipct-01', #Always short name
+    'device': 'cts:10000/bo01/vc/ipct-01', #Will contain host if use_host or host!=TANGO_HOST
+    'host': 'cts',
     'port': '10000',
     'scheme': 'tango'}
     """
     values = {'scheme':'tango'}
-    values['host'],values['port'] = os.getenv('TANGO_HOST').split(':',1)
+    values['host'],values['port'] = defhost = get_tango_host().split(':',1)
     try:
         if not use_tau or not TAU: raise Exception('NotTau')
         from taurus.core import tango as tctango
@@ -475,12 +479,19 @@ def parse_tango_model(name,use_tau=False):
         m = re.match(fandango.tango.retango,name)
         if m:
             gd = m.groupdict()
-            values['devicename'] = '/'.join([s for s in gd['device'].split('/') if ':' not in s])
-            if gd.get('attribute'): values['attributename'] = gd['attribute']
+            values['device'] = '/'.join([s for s in gd['device'].split('/') if ':' not in s])
+            if gd.get('attribute'): values['attribute'] = gd['attribute']
             if gd.get('host'): values['host'],values['port'] = gd['host'].split(':',1)
-    if 'devicename' not in values: return None
-    values['device'] = values['devicename']
-    if 'attributename' in values: values['attribute'] = values['attributename']
+    if 'device' not in values: 
+        return None
+    else:
+        values['devicename'] = values['device']
+        values['model'] = '%s:%s/%s'%(values['host'],values['port'],values['device'])
+        if use_host or tuple(defhost) != (values['host'],values['port']): 
+            values['device'] = values['model']
+        if 'attribute' in values: 
+            values['attributename'] = values['attribute']
+            values['model'] = values['model']+'/'+values['attribute']
     return values
 
 TANGO_KEEPTIME = 60 #This variable controls how often the Tango Database will be queried
@@ -739,6 +750,7 @@ def check_attribute(attr,readable=False,timeout=0,brief=False):
     """ checks if attribute is available.
     :param readable: Whether if it's mandatory that the attribute returns a value or if it must simply exist.
     :param timeout: Checks if the attribute value have been effectively updated (check zombie processes).
+    :param brief: return just .value instead of AttrValue object
     """
     try:
         #PyTango.AttributeProxy(attr).read()
@@ -1106,8 +1118,10 @@ def getTangoValue(obj,device=None):
     try to avoid spectrums.; this method doesn't work for numpy arrays so I have to convert them to less efficient lists.
     """
     try:
+        p = parse_tango_model(obj if type(obj) is str else (device or ''))
+        if p: device,host = p['device'],p['host']+':'+p['port']
+        else: host = get_tango_host()
         if type(obj) is str:
-            device = parse_tango_model(obj)['device']
             obj = PyTango.AttributeProxy(obj).read()
         
         if hasattr(obj,'quality'):
@@ -1117,7 +1131,7 @@ def getTangoValue(obj,device=None):
         else:
             value,quality,t,name,ty = obj,PyTango.AttrQuality.ATTR_VALID,time.time(),'',type(obj)
             
-        try: domain,family,member = device.split('/')
+        try: domain,family,member = device.split('/')[-3:]
         except: domain,family,member = '','',''
             
         Type = type(value)
@@ -1127,7 +1141,7 @@ def getTangoValue(obj,device=None):
         o = nt(value)
         [setattr(o,k,v) for k,v in (
             ('value',value),('quality',quality),('time',t),('name',name),('type',ty),
-            ('device',device),('domain',domain),('family',family),('member',member),
+            ('device',device),('domain',domain),('family',family),('member',member),('host',host),
             )]
         return o
     except:
