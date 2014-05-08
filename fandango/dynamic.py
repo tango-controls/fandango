@@ -1007,8 +1007,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
         :returns: Attribute value or None
         """
-        params = tango.parse_tango_model(aname)
-        device,aname = (params.get('device',None),params.get('attribute',None)) if params else ('',aname)
+        params = tango.parse_tango_model(aname,use_host=False) #Device will contain TANGO_HOST only if differs from current
+        if params: device,aname = params.get('device',None),params.get('attribute',aname)
+        else: device,aname = aname.rsplit('/',1) if '/' in aname else '',aname
+        
         self.debug("DynamicDS(%s)::getXAttr(%s): ..."%(device or self.get_name(),aname))
         result = default #Returning an empty list because it is a False iterable value that can be converted to boolean (and False or None cannot be converted to iterable)
         try:
