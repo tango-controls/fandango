@@ -7,6 +7,7 @@ May 2014 - 10.9
 -------------------------------------------------
 dynamic: #37002 Fake R/W attributes solved using  if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) to check for WRITE formulas.
 dynamic: it was causing the "Bool not iterable" bug when reading empty R/W spectrums (WRITE returned instead of []).
+dynamic: XATTR acceps tango_host:/... URL's
 tango: added get_tango_host method and adapted fandango.tango.* to work in multiple hosts.
 tango: improved Delta and Cache management in TangoEval
 tango: added suport for defining FIND-alike macros in TangoEval
@@ -16,6 +17,7 @@ qt: Added QDialogWidget and QOptionChosser dialogs
 log: printf to accept same arguments than print
 functional: Added evalF and testF to use evaluable strings as lambdas
 functional: str2time returning current time by default
+
 
 November 2013 - 10.8
 -------------------------------------------------
