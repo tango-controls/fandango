@@ -1570,11 +1570,11 @@ DynamicDSTypes={
             'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str'],lambda x:str(x or '')),
             'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
             'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','float','double','DevFloat','IeeeFloat'],float),
-            'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','list(long','[long','list(int','[int'],lambda l:[int(i) for i in list(l or [])],4096,1),
-            'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in list(l or [])],4096,1),
-            'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','list(str','[str'],lambda l:[str(i) for i in list(l or [])],4096,1),
-            'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','list(bool','[bool'],lambda l:[bool(i) for i in list(l or [])],4096,1),
-            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in list(l or [])],4096,1),
+            'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','list(long','[long','list(int','[int'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','list(str','[str'],lambda l:[str(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','list(bool','[bool'],lambda l:[bool(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             }
             
 def CreateDynamicCommands(ds,ds_class):
