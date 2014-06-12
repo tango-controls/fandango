@@ -460,6 +460,20 @@ def isNested(seq,strict=False):
     if not strict and isIterable(child): return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
+    
+def isBool(seq):
+    if seq in (True,False):
+        return True
+    elif isString(seq):
+        return seq.lower() in ('true','yes','1','false','no','0','none')
+    else:
+        return False
+    
+def isDate(seq):
+    try:
+        return str2time(seq)
+    except:
+        return False
 
 ###############################################################################
 
@@ -471,6 +485,34 @@ def str2float(seq):
     """ It returns the first float (x.ye-z) encountered in the string """
     return float(re.search('[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?',seq).group())
 
+def str2bool(seq):
+    """ It parses true/yes/no/false/1/0 as booleans """
+    return seq.lower().strip() not in ('false','0','none','no')
+
+def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
+    """ 
+    Tries to convert string to an standard python type.
+    If use_eval is True, then it tries to evaluate as code.
+    """
+    if not use_eval: sep_exp = '(?:^[^\(\[\{])'+sep_exp #Get non-evaluable lists
+    m = re.match(sep_exp,seq) 
+    if m:
+        return [str2type(s,use_eval) for s in str2list(seq,m.groups()[0])]
+    elif isBool(seq):
+        return str2bool(seq)
+    elif use_eval:
+        try:
+            return eval(seq)
+        except:
+            return seq
+    elif isNumber(seq):
+        return str2float(seq)
+    else:
+        return seq
+    
+def doc2str(obj):
+    return obj.__name__+'\n\n'+obj.__doc__
+    
 def toList(val,default=[],check=isSequence):
     if val is None: 
         return default
