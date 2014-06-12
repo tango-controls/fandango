@@ -74,6 +74,8 @@ class Struct(object):
         return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) for k,v in self.__dict__.items())+'\n\t})'
     def __str__(self):
         return self.__repr__().replace('\n','').replace('\t','')
+    def items(self):
+        return self.__dict__.items()
     pass
         
 def _fget(self,var):
