@@ -1,5 +1,5 @@
-#!/usr/bin/env python2.5
-""" if @gnuheader
+#!/usr/bin/env python
+
 #############################################################################
 ##
 ## file :       db.py
@@ -33,10 +33,11 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@endif
 
+"""
 This package implements a simplified acces to MySQL using FriendlyDB object.
 
+Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 """
 
 import PyTango
@@ -49,9 +50,10 @@ import objects
 import MySQLdb,sys
 
 class FriendlyDB(log.Logger):
-    """ Class for managing the direct access to the database
+    """ 
+    Class for managing direct access to MySQL databases using mysql-python module
     """   
-    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,loglevel='WARNING'):
+    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,loglevel='WARNING',use_tuples=False):
         """ Initialization of MySQL connection """
         self.call__init__(log.Logger,self.__class__.__name__,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
@@ -62,6 +64,7 @@ class FriendlyDB(log.Logger):
         #self.api=api
         self.db_name=db_name
         self.host=host
+        self.use_tuples = use_tuples #It will control if data is returned in tuples or lists
         self.setUser(user,passwd)
         self.autocommit = autocommit
         self.renewMySQLconnection()
@@ -101,17 +104,25 @@ class FriendlyDB(log.Logger):
             self.error( 'Unable to create a MySQLdb connection to "%s"@%s.%s: %s'%(self.user,self.host,self.db_name,str(e)))
             raise Exception,e
    
-    def getCursor(self,renew=True):
-        ''' returns the Cursor for the database'''
-        if renew and self._cursor: 
+    def getCursor(self,renew=True,klass=None):
+        ''' 
+        returns the Cursor for the database
+        renew will force the creation of a new cursor object
+        klass may be any of MySQLdb.cursors classes (e.g. DictCursor)
+        '''
+        if klass in ({},dict):
+            klass = MySQLdb.cursors.DictCursor
+        if (renew or klass) and self._cursor: 
             self._cursor.close()
             del self._cursor
-        if renew or not self._cursor:
-            self._cursor=self.db.cursor()
+        if renew or klass or not self._cursor:
+            self._cursor = self.db.cursor() if not klass else self.db.cursor(cursorclass=klass)
         return self._cursor
    
     def tuples2lists(self,tuples):
-        ''' Converts a N-D tuple to a N-D list '''
+        ''' 
+        Converts a N-D tuple to a N-D list 
+        '''
         return [self.tuples2lists(t) if type(t) is tuple else t for t in tuples]
    
     def table2dicts(self,keys,table):
@@ -123,23 +134,30 @@ class FriendlyDB(log.Logger):
             result.append(d)
         return result
    
-    def Query(self,query,export=True):
+    def Query(self,query,export=True,asDict=False):
         ''' Executes a query directly in the database
         @param query SQL query to be executed
         @param export If it's True, it returns directly the values instead of a cursor
         @return the executed cursor, values can be retrieved by executing cursor.fetchall()
         '''
         try:
-            q=self.getCursor()
+            q=self.getCursor(klass = dict if asDict else None)
             q.execute(query)
         except:
             self.renewMySQLconnection()
-            q=self.getCursor()
-            q.execute(query)            
-        return not export and q or self.tuples2lists(q.fetchall())
+            q=self.getCursor(klass = dict if asDict else None)
+            q.execute(query)
+            
+        if not export:
+            return q
+        elif asDict or not self.use_tuples:
+            return q.fetchall()
+        else:
+            return self.tuples2lists(q.fetchall())
    
     def Select(self,what,tables,clause='',group='',order='',limit='',distinct=False,asDict=False,trace=False):
-        ''' This allows to create and execute Select queries using Lists as arguments
+        ''' 
+        Allows to create and execute Select queries using Lists as arguments
         @return depending on param asDict it returns a list or lists or a list of dictionaries with results
         '''
         if type(what) is list: what=','.join(what) if len(what)>1 else what[0]
@@ -163,16 +181,12 @@ class FriendlyDB(log.Logger):
         if order: query += ' ORDER BY %s' % order
         if limit: query+= ' LIMIT %s' % limit
        
-        q=self.Query(query,False)
-        result=q.fetchall()
-        if not asDict:
+        result = self.Query(query,True,asDict=asDict).fetchall()
+        if not asDict and not self.use_tuples:
             return self.tuples2lists(result)
-        elif what=='*':
-            l = []
-            [l.extend(self.getTableCols(t)) for t in tables.split(',')]
-            return self.table2dicts(l,result)
         else:
-            return self.table2dicts(what.split(','),result)
+            return result
+        #else: return self.table2dicts(what.split(',') if what!='*' else [k for t in tables.split(',') for k in self.getTableCols(t)],result)
    
     def getTables(self,load=False):
         ''' Initializes the keys of the tables dictionary and returns these keys. '''
