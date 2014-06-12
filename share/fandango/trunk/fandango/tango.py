@@ -517,9 +517,10 @@ class get_all_devices(objects.SingletonMap):
         instance = objects.SingletonMap.__new__(cls,*p,**k)
         return instance.get_all_devs()
     
-def get_matching_devices(expressions,limit=0,exported=False,fullname=True):
+def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
     """ 
     Searches for devices matching expressions, if exported is True only running devices are returned 
+    Tango host will be included in the matched name if fullname is True
     """
     if not fun.isSequence(expressions): expressions = [expressions]
     hosts = set((m.groups()[0] if m else None) for m in (fun.matchCl(rehost,e) for e in expressions))
