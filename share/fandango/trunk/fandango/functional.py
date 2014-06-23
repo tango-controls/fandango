@@ -332,12 +332,17 @@ def filtersmart(seq,filters):
     seq = seq if isSequence(seq) else (seq,)
     filters = filters if isSequence(seq) else (filters,)
     raw,comp,neg = [],[],[]
-    parse = lambda s: ('.*' if not s.startswith('^') else '')+toRegexp(s)
+    def parse(s):
+        s = toRegexp(s)
+        if '*' not in s:
+            if not s.startswith('^'): s='.*'+s
+            if not s.startswith('$'): s=s+'.*'
+        return s
     for f in filters:
         if f.startswith('+'): comp.append(parse(f[1:]))
         elif f.startswith('!'): neg.append(parse(f[1:]))
         else: raw.append(parse(f))
-    return [s for s in seq if not any(matchCl(n,s) for n in neg) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
+    return [s for s in seq if (not any(matchCl(n,s) for n in neg)) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
 
 ########################################################################
 ## Methods for piped iterators
@@ -596,14 +601,14 @@ def int2bool(dec,N=16):
     for i in range(N):
         result.append(bool(dec % 2))
         dec = dec >> 1
-    return result        
+    return result
 
 ########################################################################
 ## Time conversion
 ########################################################################
 
 END_OF_TIME = 1024*1024*1024*2 #Jan 19 04:14:08 2038
-TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
+TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
 RAW_TIME = '^([0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
 
 def now():
