@@ -1,12 +1,16 @@
 
-from PyQt4 import Qt,QtCore,QtGui
-import Queue,traceback,time
+import Queue,traceback,time,sys
 from functools import partial
 import fandango
 from functional import isString,isSequence
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton
+
+try:
+    from taurus.external.qt import Qt,QtCore,QtGui
+except:
+    from PyQt4 import Qt,QtCore,QtGui
 
 def getStateLed(model):
     from taurus.qt.qtgui.display import TaurusStateLed
@@ -280,7 +284,6 @@ class QCustomTabWidget(Qt.QWidget):
         print 'QCustomTabWidget.TabToolTip: Not implemented!'
         return
         
-#from taurus.qt import Qt
 #from taurus.qt.qtgui.display import TaurusStateLed
 #qapp = Qt.QApplication([])
 #qf = Qt.QFrame()
@@ -421,7 +424,6 @@ class TauColorComponent(taurusbase.TaurusBaseComponent):
     def getModelClass(self):
         return TaurusAttribute
         
-from taurus.qt import Qt
 from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 
 class QSignalHook(Qt.QObject):
@@ -664,6 +666,73 @@ class TangoHostChooser(Qt.QWidget):
     
 ###############################################################################
 
+class DialogCloser(object):
+    """
+    This decorator triggers dialog closure at the end of the decorated method
+    e.g.
+    dialog = QTextBuffer()
+    widget = TaurusTrend()
+    
+    TaurusTrend.closeEvent = DialogCloser(d)
+    """
+    def __init__(self,dialog):
+        self.dialog = dialog
+    def __call__(self,f):
+        def wrapped_closeEvent(*args):
+            f(*args)
+            try: self.dialog.close()
+            except:pass
+        return wrapped_closeEvent
+
+def setDialogCloser(dialog,widget):
+    """
+    set dialog to be closed on widget.closeEvent()
+    """
+    widget.closeEvent = DialogCloser(dialog)(widget.closeEvent)
+    widget.hideEvent = DialogCloser(dialog)(widget.hideEvent)
+
+class QTextBuffer(Qt.QDialog):
+    def __init__(self,title='TextBuffer',maxlen=1000):
+        Qt.QDialog.__init__(self) #,*args)
+        self.setWindowTitle(title)
+        lwidget,lcheck = Qt.QVBoxLayout(),Qt.QHBoxLayout()
+        self.setLayout(lwidget)
+        self._maxlen = maxlen
+        self._buffer = [] #collections.deque could be used instead
+        self._browser = Qt.QTextBrowser()
+        self._count = Qt.QLabel('0/%d'%maxlen)
+        self._cb = Qt.QCheckBox()
+        self._checked = False
+        self._label = Qt.QLabel('Dont popup logs anymore')
+        self._label.setAlignment(Qt.Qt.AlignLeft)
+        [lcheck.addWidget(w) for w in (self._cb,self._label)]
+        lwidget.addWidget(self._count)
+        lwidget.addWidget(self._browser)
+        lwidget.addLayout(lcheck)
+        self.connect(self._cb,Qt.SIGNAL('toggled(bool)'),self.toggle)
+    def append(self,text):
+        self._buffer.append(text)
+        if len(self._buffer)>=1.2*self._maxlen:
+            self._buffer = self._buffer[-self._maxlen:]
+            self._browser.setText('\n'.join(self._buffer))
+        else:
+            self._browser.append(text)
+        self._count.setText('%d/%d'%(min((self._maxlen,len(self._buffer))),self._maxlen))
+        if not self._checked:
+            self.show()
+    def text(self):
+        return self._browser.text()
+    def setText(self,text):
+        self._buffer = text.split('\n')
+        self._browser.setText(text)
+    def clear(self):
+        self._browser.clear()
+        self._buffer = []
+    def toggle(self,arg=None):
+        self._checked = self._cb.isChecked()
+        #print 'toggled(%s): %s'%(arg,self._checked)
+        #sys.stdout.flush()
+    
 
 class QDropTextEdit(Qt.QTextEdit):
     """
