@@ -495,6 +495,76 @@ if __name__ == '__main__':
     import doctest
     doctest.testmod()
 
+class DictFile(object):
+    """ 
+    @TODO
+    f = IndexedFile('/a/b/c.eps',offset=0,split=',;
+    \t',escape='"',comment='#',skip=True or '',strip=True or '#.*',case=True)
+    f.__getitem__(row,word=None)
+
+    exclusion regexp!!
+
+    ()!()
+    """
+    def __init__(self,):
+        pass
+    def get(self,row,word=None,split=True):
+        """
+        Should understand both int or string indexes
+        
+        For int, return row
+        For str, return line that first word matches (strip key)
+        Word = int, return word at column
+        Word = regexp, return list with matching strings
+        If both regexp, return all matchings in single list
+        If both int, return single element
+        """
+        return None
+    
+    def __getitem__(self,i):
+        """
+        should support D[2,3] or D['A*','b*'] syntaxes?
+        """
+        return None #get(i)
+    
+    def sections(self,begin,end):
+        """
+        begin,end are regexps
+        returns a dict with begins as keys and begin-end texts as values
+        
+        txt = 
+         <data 1>
+          da da da
+         </data>
+         <data 2>
+          ...
+         </data>
+         
+        returns {'<data 1>':'da da da','<data 2>':'...'}
+        
+        It should work for texts like:
+        
+        Header: bla
+        Data: 
+         da
+         di
+         do
+        End:
+        
+        {'Header:':bla,'Data:':'da\ndi\ndo'}
+        """
+        return {}
+    def changed(self):
+        """
+        return True if file changed from last loading
+        """
+        pass
+    def update(self):
+        """
+        reload from file (if changed)
+        """
+        pass
+
 import time
 
 class TimedQueue(list):
