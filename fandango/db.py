@@ -116,7 +116,7 @@ class FriendlyDB(log.Logger):
             self._cursor.close()
             del self._cursor
         if renew or klass or not self._cursor:
-            self._cursor = self.db.cursor() if not klass else self.db.cursor(cursorclass=klass)
+            self._cursor = self.db.cursor() if klass is None else self.db.cursor(cursorclass=klass)
         return self._cursor
    
     def tuples2lists(self,tuples):
@@ -181,7 +181,7 @@ class FriendlyDB(log.Logger):
         if order: query += ' ORDER BY %s' % order
         if limit: query+= ' LIMIT %s' % limit
        
-        result = self.Query(query,True,asDict=asDict).fetchall()
+        result = self.Query(query,True,asDict=asDict)
         if not asDict and not self.use_tuples:
             return self.tuples2lists(result)
         else:
