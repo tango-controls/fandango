@@ -10,7 +10,7 @@
 ##
 ## $Author: Sergi Rubio Manrique, srubio@cells.es $
 ##
-## $Revision: 2008 $
+## $Revision: 2014 $
 ##
 ## copyleft :    ALBA Synchrotron Controls Section, CELLS
 ##               Bellaterra
@@ -40,13 +40,9 @@ This package implements a simplified acces to MySQL using FriendlyDB object.
 Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 """
 
-import PyTango
-from PyTango import *
 import time
 import datetime
-
 import log
-import objects
 import MySQLdb,sys
 
 class FriendlyDB(log.Logger):
