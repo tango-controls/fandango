@@ -609,7 +609,7 @@ def int2bool(dec,N=16):
 
 END_OF_TIME = 1024*1024*1024*2 #Jan 19 04:14:08 2038
 TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
-RAW_TIME = '^([0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
+RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
 
 def now():
     return time.time()
