@@ -40,6 +40,7 @@ srubio@cells.es,
 """
 import time,Queue,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
+from threading import Event,RLock,Thread
 
 from log import except2str,shortstr
 from functional import *
@@ -178,7 +179,6 @@ class CronTab(object):
         print 'In CronTab(%s).start()'%self.line
         if self._thread and self._thread.is_alive:
             self.stop()
-        import threading
         self._thread = self.THREAD_CLASS(target=self._run)
         self.event = self.EVENT_CLASS()
         self._thread.daemon = True
@@ -863,6 +863,56 @@ class Pool(object):
     pass
     
 ###############################################################################
+
+def SubprocessMethod(obj,method,*args,**kwargs):
+    """
+    Method for executing reader.get_attribute_values in background with a timeout (30 s by default)
+    In fact, it allows to call any object method passed by name; or just pass a callable as object.
+    This method could be embedded in a thread with very high timeout to trigger a callback when data is received.
+    This advanced behavior is not implemented yet.
+    
+    example:
+    reader,att = PyTangoArchiving.Reader(),'just/some/nice/attribute'
+    dates = '2014-06-23 00:00','2014-06-30 00:00'
+    values = fandango.threads.SubprocessMethod(reader,'get_attribute_values',att,*dates,timeout=10.)
+    
+    or 
+    
+    def callback(v): print('>> received %d values'%len(v))
+    fandango.threads.SubprocessMethod(reader,'get_attribute_values',att,*dates,timeout=10.,callback=callback)
+    
+    >> received 414131 values
+    """
+    import time,multiprocessing,threading
+    timeout = kwargs.pop('timeout',30.)
+    callback = kwargs.pop('callback',None)
+    print args
+    print kwargs
+    local,remote = multiprocessing.Pipe(False)
+    def do_query(o,m,conn,*a,**k):
+        if None in (o,m): m = o or m
+        else: m = getattr(o,m)
+        print m,a,k
+        conn.send(m(*a,**k))
+        conn.close()
+    args = (obj,method,remote)+args
+    subproc = multiprocessing.Process(target=do_query,args=args,kwargs=kwargs)
+    subproc.start()
+    t0 = time.time()
+    result = None
+    while time.time()<t0+timeout:
+        if local.poll():
+            result = local.recv()
+            break
+        threading.Event().wait(.1)
+    local.close(),remote.close()
+    subproc.terminate(),subproc.join()
+    if time.time()>t0+timeout:
+        raise Exception('TimeOut(%s)!'%str(obj))
+    elif callback:
+        callback(result)
+    else:
+        return result
     
 class AsynchronousFunction(threading.Thread):
     '''This class executes a given function in a separate thread
