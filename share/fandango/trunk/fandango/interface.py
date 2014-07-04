@@ -77,6 +77,38 @@ A direct raw writing/reading to the communication port
 
 """
 
+def getDeviceClassObjects(classname,path=''):
+    """
+    This method locates a Tango Device Class in the python Path and returns its (Device,DeviceClass) objects
+    """
+    import imp
+    desc = imp.find_module(classname)
+    print('getDeviceClassObjects(%s) from %s'%(classname,desc))
+    module = imp.load_module(classname,*desc)
+    return getattr(module,classname),getattr(module,classname+'Class')
+
+def addAllClasses(obj,servername='',db=None,classes=None):
+    """
+    This method will add all classes listed in the database to the server object (if those classes are available in the pythonpath)
+    
+    obj argument must be a PyTango.Util(['exec_name','instance_name']) object
+    If servername or db are not specified will be taken from obj.instance()
+    
+    Dependences can be added to pythonpath using sys.path.insert(0,'path/to/your/device')
+    """
+    if classes is None:
+        instance = obj.instance()
+        if not db:db = instance.get_database()
+        if not servername: servername = instance.get_ds_name()
+        if ' ' in servername or '.py' in servername: servename = '/'.join(s.replace('.py','').strip() for s in servername.split())
+        classes = db.get_server_class_list(servername)
+    for c in classes:
+        dev,devclass = getDeviceClassObjects(c)
+        print('Adding %s,%s to %s'%(dev,devclass,obj))
+        obj.add_TgClass(devclass,dev,c)
+    return obj
+        
+
 def updateChildClassDicts(Child,Parent,Exclude=[]):
     print 'Updating %s from %s'%(Child.__name__,Parent.__name__)
     for attribute in dir(Child):
