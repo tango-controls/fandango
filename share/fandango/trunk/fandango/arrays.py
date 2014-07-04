@@ -1,5 +1,4 @@
 #!/usr/bin/env python2.5
-"""
 #############################################################################
 ##
 ## file :       arrays.py
@@ -34,7 +33,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-"""
+
 
 
 import csv
@@ -49,14 +48,25 @@ __all__ = ['Grid','CSVArray','tree2table']
 #from excepts import *
 #from ExceptionWrapper import *
 
+__doc__ = """
+h1. fandango.arrays module
+
+h2. Array Decimation
+
+It contains many decimation methods, the one used by taurustrend is filter_array; which averages data at some given time intervals
+
+"""
+
 ###############################################################################
 
 from fandango.functional import reldiff,absdiff,seqdiff
 MAX_DATA_SIZE = 2*1024
 
 def decimator(data,min_inc=.05,min_rel=None,max_size=MAX_DATA_SIZE,max_iter=1000):
-    """ This size-focused decimator sequentially iterates until reducing the size of the array """
-    ##THAT WAS A REALLY GOOD ONE!
+    """
+    @NOTE, this is intensive when focusing on size, filter_array is better if you want to keep the shape over time++89+77
+    This size-focused decimator sequentially iterates until reducing the size of the array 
+    """
     start,count = len(data),0
     while len(data)>max_size and count<max_iter:
         d = []
@@ -76,6 +86,7 @@ def decimator(data,min_inc=.05,min_rel=None,max_size=MAX_DATA_SIZE,max_iter=1000
     
 def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
     """ 
+    @NOTE: Although faster, filter_array provides a better decimation for trends
     It will remove all values from a list that doesn't provide information.
     In a set of X consecutive identical values it will remove all except the first and the last.
     A custom compare method can be passed as argument
@@ -100,6 +111,7 @@ def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
 
 def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fixed_time=0,logger=None):
     """ 
+    @NOTE: filter_array provides a better decimation for trends
     Decimates a [(time,numeric value)] buffer by size/rate/increment/time
     Repeated values are always decimated.
     keep_nones forces value-to-None steps to be kept
@@ -164,6 +176,8 @@ def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fi
     return new_data
     
 ###############################################################################
+# The filter_array method and its associated functions
+
 
 F_LAST = 0 #fill with last value
 F_AVG = 1 #fill with average
@@ -172,21 +186,30 @@ F_INT = 3 #linear interpolation
 F_ZERO = 4 #fill with zeroes
 F_NEXT = 5 #fill with next value
 
-def average(seq):
-    return fun.avg(seq)
+# For all this methos arguments may be just values sequence or currentsequence / previousvalue
 
-def rms_value(seq):
-    return fun.rms(seq)
+def average(*args):
+    return fun.avg(args[0])
 
-def maxdiff(seq,ref):
+def rms_value(*args):
+    return fun.rms(args[0])
+
+def maxdiff(*args):
     """ Filter that maximizes changes (therefore, noise) """
-    return sorted((fun.absdiff(s,r),s) for s in seq)[-1]
+    seq,ref = args
+    if None in seq: return None
+    try:
+        return sorted((fun.absdiff(s,ref),s) for s in seq)[-1][-1]
+    except Exception,e:
+        print args
+        raise e
 
-def maxmin(data):
+def maxmin(*args):
     """ 
     Returns timed ((t,max),(t,min)) values from a (t,v) dataset 
     When used to filter an array the winndow will have to be doubled to allocate both values (or just keep the one with max absdiff from previous).
     """
+    data = args[0]
     t = sorted((v,t) for t,v in data)
     mn,mx = (t[0][1],t[0][0]),(t[-1][1],t[-1][0])
     return mx,mn
@@ -205,6 +228,17 @@ def logfloor(x):
     i = float(x)/10**m
     v = (v for v,k in ((0.1,i<1),(1,i<2),(2,i<5),(5,True)) if k).next()
     return v*(10**m)
+
+def get_max_step(data,index=False):
+    import numpy
+    vs = numpy.array(data)
+    diff = vs[1:]-vs[:-1]
+    mx = numpy.nanmax(diff)
+    if not index:
+        return mx
+    else: #Return at which position the step was found
+        ix =1+numpy.where(diff==mx)[0][0]
+        return (ix,mx)
 
 def get_histogram(data,n=20,log=False):
     import math
@@ -240,6 +274,9 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     First interval will be floor(data[0][0],window)+window, containing average of data[t0:t0+window]
     If begin,end intervals are passed, cut-off and filling methods are applied
     The value at floor(time) is the value that closes each interval
+    
+    IF YOUR DATA SOURCE IS A PYTHON LIST; THIS METHOD IS AS FAST AS NUMPY CAN BE 
+    (crosschecked with 1e6 samples against the PyTangoArchiving.utils.decimate_array method using numpy)
     """
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     tfloor = lambda x: fun.floor(x,window)
@@ -302,7 +339,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
                 while i<=ilast and data[i][0]<=t: i+=1
                 #dd = data[i0:i]
                 #if dd: 
-                ndata.append((t,method([v[1] for v in data[i0:i]])))
+                val = method([v[1] for v in data[i0:i]],ndata and ndata[-1][-1] or 0)
+                ndata.append((t,val))
                 #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
         else:
             #Adding data at the end
