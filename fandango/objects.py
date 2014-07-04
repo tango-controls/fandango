@@ -340,3 +340,123 @@ class SingletonMap(object):
         return self.__instance_key
 
 
+###############################################################################
+from functools import wraps
+
+def decorator_with_args(decorator):
+    '''
+    Decorator with Arguments must be used with parenthesis: @decorated() 
+    , even when arguments are not used!!!
+    
+    This method gets an d(f,args,kwargs) decorator and returns a new single-argument decorator that embeds the new call inside.
+    
+    But, this decorator disturbed stdout!!!! 
+    
+    There are some issues when calling nested decorators; it is clearly better to use Decorator classes instead.
+    '''
+    # decorator_with_args = lambda decorator: lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
+    return lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
+
+class Decorator(object):
+    """
+    This generic class allows to differentiate decorators from common classes.
+    Inherit from it and use issubclass(klass,Decorator) to know if a class is a decorator
+    To add arguments to decorator reimplement __init__
+    To modify your wrapper reimplement __call__
+    
+    A decorator __init__ with a single argument can be called like:
+      @D
+      def f(x): 
+        pass
+      
+    If you need a Decorator with arguments then __init__ will manage the 
+    arguments and __call__ will take the function and return a wrapper instead.
+      @D(x,y)
+      def f(z):
+        pass
+    """
+    def __init__(self,f):
+        self.f = f
+    def __call__(self,*args,**kwargs):
+        return self.f(*args,**kwargs)
+        
+class BoundDecorator(Decorator):#object):
+    """
+    Decorates class methods keeping the bound status of its members 
+    
+    Inspired in https://wiki.python.org/moin/PythonDecoratorLibrary#Class_method_decorator_using_instance
+        Class method decorator specific to the instance.
+        It uses a descriptor to delay the definition of the
+        method wrapper.
+        
+    To use it, just inherit from it and rewrite the wrapper method
+    
+    Example:
+    
+    from fandango.objects import BoundDecorator
+    BoundDecorator().tracer = 1
+    
+    class X(object):
+        def __init__(self,name):
+        self.name = name
+        def f(self,*args):
+        return (self.name,args)
+    
+    class D(BoundDecorator):
+        @staticmethod
+        def wrapper(instance,f,*args,**kwargs):
+            print('guess what?')
+            v = f(instance,*args,**kwargs)
+            return v[0]
+    
+    x = X('a')
+    X.f = D()(X.f)
+    x.f()
+    """
+    @staticmethod
+    def wrapper(instance,f,*args,**kwargs):
+        return f(instance, *args, **kwargs)
+    
+    class _Tracer(object):
+        def __init__(self):
+            self._trace = False
+        def __get__(self,obj,type=None):return self
+        def __set__(self,obj,value):self._trace = value
+        def __nonzero__(self): return self._trace
+        def __call__(self,msg):
+            if self: print(msg)
+    tracer = _Tracer() #NOTE: Giving a value to Tracer only works with instances; not from the class
+    
+    def __call__(this,f):
+        class _Descriptor(BoundDecorator):
+            #Inherits to get the wrapper from the BoundDecorator class and be able to exist "onDemand"
+            def __init__(self, f):
+                self.f = f
+            def __get__(self, instance, klass):
+                BoundDecorator.tracer('__get__(%s,%s)'%(instance,klass))
+                if instance is None:
+                    # Class method was requested
+                    return self.make_unbound(klass)
+                return self.make_bound(instance)
+            def make_unbound(self, klass):
+                BoundDecorator.tracer('make_unbound(%s)'%klass)
+                @wraps(self.f)
+                def wrapper(*args, **kwargs):
+                    '''This documentation will vanish :)'''
+                    raise TypeError('unbound method %s() must be called with %s instance '
+                        'as first argument (got nothing instead)'%(self.f.__name__,klass.__name__))
+                return wrapper
+            def make_bound(self, instance):
+                BoundDecorator.tracer('make_bound(%s)'%instance)
+                @wraps(self.f)
+                def wrapper(*args, **kwargs):
+                    '''This documentation will disapear :)'''
+                    BoundDecorator.tracer("Called the decorated method %s of %s"%(self.f.__name__, instance))
+                    #return self.f(instance, *args, **kwargs)
+                    return this.wrapper(instance,f,*args,**kwargs)
+                #wrapper = self.wrapper #wraps(self.f)(self.wrapper)
+                # This instance does not need the descriptor anymore,
+                # let it find the wrapper directly next time:
+                setattr(instance, self.f.__name__, wrapper)
+                return wrapper
+        return _Descriptor(f)
