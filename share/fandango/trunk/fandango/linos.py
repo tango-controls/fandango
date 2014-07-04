@@ -354,6 +354,8 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
     will returns
     
     {H:1,option:value,parameter:VALUE,test:True,params:[default_arg1,default_arg2]}
+    
+    getopt and argparse modules in python provide similar functionality, but are not available in all of our distributions
     '''
     if args is None: args = sys.argv[1:]
     if trace: print 'sysargs_to_dict(%s,%s)'%(args,defaults)
