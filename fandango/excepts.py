@@ -76,6 +76,7 @@ import traceback
 import functools
 import contextlib
 from fandango import log
+from objects import decorator_with_args
 import fandango.functional as fun
 
 def trial(tries,excepts=None,args=None,kwargs=None,return_exception=False):
@@ -101,14 +102,6 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=False):
         excepts = fun.toSequence(excepts)
         vals = [x(e) for x in excepts if fun.isCallable(x)]
         if return_exception: return vals
-
-def decorator_with_args(decorator):
-    '''
-    Decorator with Arguments must be used with parenthesis: @decorated() 
-    , even when arguments are not used!!!
-    '''
-    # decorator_with_args = lambda decorator: lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
-    return lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
 
 exLogger = log.Logger()
 
