@@ -1,4 +1,4 @@
-RELEASE = (10,10)
+RELEASE = (11,00)
 RELEASE_NOTE = "needed for PyTangoArchiving 5.0, improvements in db access and object types, solved bugs in tango multi-host searchs"
 
 """
@@ -9,20 +9,20 @@ ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to
 
 July 2014 - 11.00, needed for PyTangoArchiving 5.0
 -------------------------------------------------
+db: enabled tuples and dictionaries as row types on returned queries; bug solved in Select()
+threads: Added SubProcess method to execute DB queries in a background process with timeout
+tango: get_matching_devices; set fullname=False due to several bugs found in beamlines ... waiting for more conflicts to appear
+tango: get_matching_devices(fullname=False) by default #It solved the bugs in Vacca 
+interface: added getDeviceClassObjects and addAllClasses methods to append dynamically new classes to servers\
 arrays: tested and documented decimation methods, filter_array is the best of them
 arrays: filter_array, improved comparison methods
 functional: str2time: solved bug in RAW_TIME regexp
 functional: added str2bool and str2type (any) methods, added minutes as time units in str2time
-interface: added getDeviceClassObjects and addAllClasses methods to append dynamically new classes to servers
 objects: added Decorator and BoundDecorator classes to manage class-bound decoration
 objects: Added items() method to Struct objects
 qt: Added getQt, QConfirmAction decorator, DialogCloser connector and QTextBuffer widget for logging
 qt: Solved bugs in QDialogWidget, added Ok/Cancel buttons
-tango: get_matching_devices; set fullname=False due to several bugs found in beamlines ... waiting for more conflicts to appear
-tango: get_matching_devices(fullname=False) by default #It solved the bugs in Vacca 
-db: enabled tuples and dictionaries as row types on returned queries; bug solved in Select()
 linos: sys_args_to_dict refactored, added MyMachine to get platform/machine information
-threads: Added SubProcess method to execute DB queries in a background process with timeout
 
 May 2014 - 10.9
 -------------------------------------------------
