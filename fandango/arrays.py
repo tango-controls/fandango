@@ -279,7 +279,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     (crosschecked with 1e6 samples against the PyTangoArchiving.utils.decimate_array method using numpy)
     """
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
-    tfloor = lambda x: fun.floor(x,window)
+    tfloor = lambda x: int(fun.floor(x,window))
+    begin,end,window = map(int,((begin,end,window)))
     
     #CUT-OFF; removing data out of interval    
     #--------------------------------------------------------------------------
