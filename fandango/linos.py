@@ -366,7 +366,7 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
     [(vargs if ('=' in a or a.startswith('-') or (i and args[i-1].startswith('--') and '=' not in args[-1])) else defargs).append(a) 
         for i,a in enumerate(args)]
     defargs = map(cast_arg,defargs)
-        
+    if trace: print('defargs: %s'%defargs)
     for n,a in enumerate(vargs):
         if '=' in a: #argument like [-]ARG=VALUE
             while a.startswith('-'): a = a[1:]
@@ -381,7 +381,7 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
         else: #if a.startswith('-'):
             #A single dash is a plain boolean option
             result[a]=True
-            
+    if trace: print('defaults: %s'%defaults)
     if not defaults:
         if not vargs:
             return defargs
@@ -398,8 +398,8 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
             result.update(zip(defaults,defargs))
             result.update((d,False) for d in defaults if d not in result)
     
-    result = result if not defargs or len(result)>1 else defargs
     if trace: print result
+    if len(result)==1 and None in result: split = True
     if not split:
         return result
     else:
