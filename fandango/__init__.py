@@ -1,6 +1,5 @@
 #!/usr/bin/env python2.5
-"""
-@if gnuheader
+
 #############################################################################
 ##
 ## file :       PyTango_utils
@@ -36,12 +35,12 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@endif
+
+"""
 @package fandango
 @mainpage fandango "Functional tools for Tango" Reference
 Several modules included are used in Tango Device Server projects, like @link dynamic @endlink and PyPLC. @n
 @brief This module(s) include some PyTango additional classes and methods that are not implemented in the C++/Python API's; it replaces the previous PyTango_utils module
- 
 """
 
 import os,traceback
