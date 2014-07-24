@@ -90,7 +90,11 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         #This have been overriden as it seemed not well managed when connecting devices in a same server
         if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
         if getattr(self,'UpdateAttributesThread',None) and 0<getattr(self,'last_update',0)<(time.time()-10*self.PollingCycle/1e3):
-            raise Exception('PollingThreadIsDead')
+            #raise Exception('PollingThreadIsDead')
+            self.set_state(PyTango.DevState.UNKNOWN)
+            msg = 'Dev4Tango.PollingThreadIsDead!, last updated at %s'%time.ctime(getattr(self,'last_update',0))
+            self.error(msg)
+            self.set_status(msg)
         return self._state
     
     def dev_state(self):
