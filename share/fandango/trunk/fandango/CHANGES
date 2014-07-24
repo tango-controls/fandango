@@ -7,7 +7,9 @@ NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not 
 NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
 ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
-July 2014 - 11.00, needed for PyTangoArchiving 5.0
+FIX: arrays: bug in calcullating range from float instead of int
+
+July 2014 - 11.00, needed by PyTangoArchiving 5.0
 -------------------------------------------------
 db: enabled tuples and dictionaries as row types on returned queries; bug solved in Select()
 threads: Added SubProcess method to execute DB queries in a background process with timeout
