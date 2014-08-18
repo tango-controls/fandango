@@ -1,63 +1,12 @@
-#!/usr/bin/env python
 
-#############################################################################
-##
-## file :       db.py
-##
-## description : This module simplifies database access.
-##
-## project :     Tango Control System
-##
-## $Author: Sergi Rubio Manrique, srubio@cells.es $
-##
-## $Revision: 2014 $
-##
-## copyleft :    ALBA Synchrotron Controls Section, CELLS
-##               Bellaterra
-##               Spain
-##
-#############################################################################
-##
-## This file is part of Tango Control System
-##
-## Tango Control System is free software; you can redistribute it and/or
-## modify it under the terms of the GNU General Public License as published
-## by the Free Software Foundation; either version 3 of the License, or
-## (at your option) any later version.
-##
-## Tango Control System is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-##
-## You should have received a copy of the GNU General Public License
-## along with this program; if not, see <http://www.gnu.org/licenses/>.
-###########################################################################
-
-import Queue,traceback,time,sys
+from PyQt4 import Qt,QtCore,QtGui
+import Queue,traceback,time
 from functools import partial
 import fandango
 from functional import isString,isSequence
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton
-
-def getQt(full=False):
-    """
-    Choosing between PyQt and Taurus Qt distributions
-    """
-    try:
-        from taurus.external.qt import Qt,QtCore,QtGui
-    except:
-        from PyQt4 import Qt,QtCore,QtGui
-    if full:
-        return Qt,QtCore,QtGui
-    else:
-        return Qt
-    
-Qt,QtCore,QtGui = getQt(True)
-
-###############################################################################
 
 def getStateLed(model):
     from taurus.qt.qtgui.display import TaurusStateLed
@@ -69,48 +18,6 @@ def getStateLed(model):
 def getApplication(args=None):
     app = Qt.QApplication.instance()
     return app or Qt.QApplication(args or [])
-
-class QDialogWidget(Qt.QDialog):
-    """
-    It converts any Widget into a Dialog
-    
-    setAccept method allows to easily connect the accepted() signal to a callable
-    """
-    def __init__(self,parent=None,flags=None,buttons=None):
-        if flags is not None: Qt.QDialog.__init__(self,parent,flags)
-        else: Qt.QDialog.__init__(self,parent)
-        self.buttons = buttons
-        self.setLayout(Qt.QVBoxLayout())
-        if self.buttons:
-            self.buttons = Qt.QDialogButtonBox(Qt.QDialogButtonBox.Ok|Qt.QDialogButtonBox.Cancel)
-            self.connect(self.buttons,Qt.SIGNAL('accepted()'),self.accept)
-            self.connect(self.buttons,Qt.SIGNAL('rejected()'),self.reject)
-            self.layout().addWidget(self.buttons)
-    def widget(self):
-        self._widget = getattr(self,'_widget',None)
-        return self._widget
-    def setWidget(self,widget,accept_signal=None,reject_signal=None):
-        widget.setParent(self)
-        self.layout().insertWidget(0,widget)
-        self.setSizePolicy(Qt.QSizePolicy.Expanding,Qt.QSizePolicy.Expanding)
-        self._widget = widget
-        if accept_signal:self.connect(widget,Qt.SIGNAL(accept_signal),self.accept)
-        if reject_signal:self.connect(widget,Qt.SIGNAL(reject_signal),self.reject)
-        self.updateGeometry()
-        return self
-    def sizeHint(self):
-        return Qt.QDialog.sizeHint(self)
-    def setAccept(self,f):
-        """connect the accepted() signal to a callable"""
-        self.connect(self.buttons or self,Qt.SIGNAL('accepted()'),f)
-        
-class QExceptionMessage(object):
-    def __init__(self,message=None):
-        import traceback
-        self.message = str(message) or traceback.format_exc()
-        self.qmb = Qt.QMessageBox(Qt.QMessageBox.Warning,"Exception","The following exception occurred:\n\n%s"%message,Qt.QMessageBox.Ok)
-        print 'fandango.qt.QExceptionMessage(%s)'%message
-        return self.qmb.exec_()
 
 class QColorDictionary(SortedDict,Singleton):
     """
@@ -343,6 +250,7 @@ class QCustomTabWidget(Qt.QWidget):
         print 'QCustomTabWidget.TabToolTip: Not implemented!'
         return
         
+#from taurus.qt import Qt
 #from taurus.qt.qtgui.display import TaurusStateLed
 #qapp = Qt.QApplication([])
 #qf = Qt.QFrame()
@@ -483,6 +391,7 @@ class TauColorComponent(taurusbase.TaurusBaseComponent):
     def getModelClass(self):
         return TaurusAttribute
         
+from taurus.qt import Qt
 from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 
 class QSignalHook(Qt.QObject):
@@ -677,29 +586,6 @@ def DoubleClickable(QtKlass):
                 except: pass
     return DoubleClickableQtKlass
                 
-class QOptionChooser(Qt.QDialog):
-    def __init__(self,title,text,command,args,parent=None):
-        Qt.QDialog.__init__(self,parent)
-        self.command = command
-        self.args = args
-        self.combo = Qt.QComboBox()
-        self.combo.addItems(self.args)
-        self.buttons = Qt.QDialogButtonBox(Qt.QDialogButtonBox.Ok|Qt.QDialogButtonBox.Cancel)
-        self.connect(self.buttons,Qt.SIGNAL('accepted()'),self.launch)
-        self.connect(self.buttons,Qt.SIGNAL('rejected()'),self.close)
-    
-        self.setLayout(Qt.QHBoxLayout())
-        self.setWindowTitle(title)
-        self.layout().addWidget(Qt.QLabel(text))
-        self.layout().addWidget(self.combo)
-        self.layout().addWidget(self.buttons)
-
-    def launch(self):
-        cmd = ' '.join(map(str,[self.command[0],self.combo.currentText()]+self.command[1:]))+' &'
-        print cmd
-        import os
-        os.system(cmd)
-
 class TangoHostChooser(Qt.QWidget):
     """
     Allows to choose a tango_host from a list
@@ -725,104 +611,6 @@ class TangoHostChooser(Qt.QWidget):
     
 ###############################################################################
 
-class DialogCloser(object):
-    """
-    This decorator triggers dialog closure at the end of the decorated method
-    e.g.
-    dialog = QTextBuffer()
-    widget = TaurusTrend()
-    
-    TaurusTrend.closeEvent = DialogCloser(d)
-    """
-    def __init__(self,dialog):
-        self.dialog = dialog
-    def __call__(self,f):
-        def wrapped_closeEvent(*args):
-            f(*args)
-            try: self.dialog.close()
-            except:pass
-        return wrapped_closeEvent
-
-def setDialogCloser(dialog,widget):
-    """
-    set dialog to be closed on widget.closeEvent()
-    """
-    widget.closeEvent = DialogCloser(dialog)(widget.closeEvent)
-    widget.hideEvent = DialogCloser(dialog)(widget.hideEvent)
-    
-    
-def QConfirmAction(action,parent=None,title='WARNING',message='Are you sure?',options=Qt.QMessageBox.Ok|Qt.QMessageBox.Cancel):
-    """
-    This method will just execute action but preceeded by a confirmation dialog.
-    To pass arguments to your action just use partial(action,*args,**kwargs) when declaring it
-    e.g:
-        self._clearbutton.connect(self._clearbutton,Qt.SIGNAL('clicked()'),fandango.partial(fandango.qt.QConfirmAction,self.clearBuffers)
-    """
-    if Qt.QMessageBox.Ok == QtGui.QMessageBox.warning(parent,title,message,QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel):
-        action()
-
-class QTextBuffer(Qt.QDialog):
-    """
-    This dialog provides a Text dialog where logs can be inserted from your application in a round buffer.
-    It also provides a button to save the logs into a file if needed.
-    """
-    def __init__(self,title='TextBuffer',maxlen=1000):
-        Qt.QDialog.__init__(self) #,*args)
-        self.setWindowTitle(title)
-        lwidget,lcheck = Qt.QVBoxLayout(),Qt.QHBoxLayout()
-        self.setLayout(lwidget)
-        self._maxlen = maxlen
-        self._buffer = [] #collections.deque could be used instead
-        self._count = Qt.QLabel('0/%d'%maxlen)
-        lwidget.addWidget(self._count)
-        self._browser = Qt.QTextBrowser()
-        lwidget.addWidget(self._browser)
-        self._cb = Qt.QCheckBox()
-        self._checked = False
-        self._label = Qt.QLabel('Dont popup logs anymore')
-        self._label.setAlignment(Qt.Qt.AlignLeft)
-        map(lcheck.addWidget,(self._cb,self._label))
-        lwidget.addLayout(lcheck)
-        self.connect(self._cb,Qt.SIGNAL('toggled(bool)'),self.toggle)
-        self._savebutton = Qt.QPushButton('Save Logs to File')
-        self._savebutton.connect(self._savebutton,Qt.SIGNAL('clicked()'),self.saveLogs)
-        self.layout().addWidget(self._savebutton)
-        
-    def append(self,text):
-        if self._buffer and text==self._buffer[-1]: test = '+1'
-        self._buffer.append(text)
-        if len(self._buffer)>=1.2*self._maxlen:
-            self._buffer = self._buffer[-self._maxlen:]
-            self._browser.setText('\n'.join(self._buffer))
-        else:
-            self._browser.append(text)
-        self._count.setText('%d/%d'%(min((self._maxlen,len(self._buffer))),self._maxlen))
-        if not self._checked:
-            self.show()
-    def text(self):
-        return self._browser.toPlainText()
-    def setText(self,text):
-        self._buffer = text.split('\n')
-        self._browser.setText(text)
-    def clear(self):
-        self._browser.clear()
-        self._buffer = []
-    def toggle(self,arg=None):
-        if arg is None:
-            self._checked = self._cb.isChecked()
-        elif arg:
-            self._cb.setChecked(True)
-            self._checked = True
-        else:
-            self._cb.setChecked(False)
-            self._checked = False
-        #print 'toggled(%s): %s'%(arg,self._checked)
-        #sys.stdout.flush()
-    def saveLogs(self):
-        fname = str(Qt.QFileDialog.getSaveFileName(None,'Choose a file to save'))
-        #self.info('Saving logs to %s'%fname)
-        if fname: open(fname,'w').write(str(self.text()))
-    
 
 class QDropTextEdit(Qt.QTextEdit):
     """

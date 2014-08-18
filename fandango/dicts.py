@@ -770,7 +770,7 @@ enumeration.py: borrowed from tcoutinho@cells.es tau.core.utils library
   and it doesn't allow you to specify values for some constants while leaving
   others unspecified. This approach does those things, while verifying that all
   values (specified and unspecified) are unique. Enum values then are attributes
-  of an Enumeration class (Insect.BEETLE, Car.PASSAT, etc.).
+  of an Enumeration class (Volkswagen.BEETLE, Volkswagen.PASSAT, etc.).
 
 """
 
@@ -781,13 +781,11 @@ class EnumException(Exception):
     pass
 
 class Enumeration:
-    """ @DEPRECATED: Use python Enum type instead!
-    
-        Enumeration class intended to provide the 'enum' feature present in many 
+    """ Enumeration class intended to provide the 'enum' feature present in many 
         programming languages.
         Usage:
-        car = ThingWithType(fruit.Lemon)
-        print whatkind(fruit.type, Lemon)
+        car = ThingWithType(Volkswagen.BEETLE)
+        print whatkind(car.type, Volkswagen)
         bug = ThingWithType(Insect.BEETLE)
         print whatkind(bug.type, Insect)
 
@@ -799,7 +797,7 @@ class Enumeration:
 
         print car.__dict__
         print bug.__dict__
-        pprint.pprint(Cars.__dict__)
+        pprint.pprint(Volkswagen.__dict__)
         pprint.pprint(Insect.__dict__)
         """
         

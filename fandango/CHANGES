@@ -1,47 +1,7 @@
-RELEASE = (11,00)
-RELEASE_NOTE = "needed for PyTangoArchiving 5.0, improvements in db access and object types, solved bugs in tango multi-host searchs"
+RELEASE = (10,8)
+RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
-
-NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not supported in python 2.6 we will wait to next OS upgrade)
-NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
-ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
-
-FIX: arrays: bug in calcullating range from float instead of int
-
-July 2014 - 11.00, needed by PyTangoArchiving 5.0
--------------------------------------------------
-db: enabled tuples and dictionaries as row types on returned queries; bug solved in Select()
-threads: Added SubProcess method to execute DB queries in a background process with timeout
-tango: get_matching_devices; set fullname=False due to several bugs found in beamlines ... waiting for more conflicts to appear
-tango: get_matching_devices(fullname=False) by default #It solved the bugs in Vacca 
-interface: added getDeviceClassObjects and addAllClasses methods to append dynamically new classes to servers\
-arrays: tested and documented decimation methods, filter_array is the best of them
-arrays: filter_array, improved comparison methods
-functional: str2time: solved bug in RAW_TIME regexp
-functional: added str2bool and str2type (any) methods, added minutes as time units in str2time
-objects: added Decorator and BoundDecorator classes to manage class-bound decoration
-objects: Added items() method to Struct objects
-qt: Added getQt, QConfirmAction decorator, DialogCloser connector and QTextBuffer widget for logging
-qt: Solved bugs in QDialogWidget, added Ok/Cancel buttons
-linos: sys_args_to_dict refactored, added MyMachine to get platform/machine information
-
-May 2014 - 10.9
--------------------------------------------------
-taurus enum dependency removed
-dynamic: #37002 Fake R/W attributes solved using  if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) to check for WRITE formulas.
-dynamic: it was causing the "Bool not iterable" bug when reading empty R/W spectrums (WRITE returned instead of []).
-dynamic: XATTR acceps tango_host:/... URL's
-tango: added get_tango_host method and adapted fandango.tango.* to work in multiple hosts.
-tango: improved Delta and Cache management in TangoEval
-tango: added suport for defining FIND-alike macros in TangoEval
-servers: Waittime increased for start_servers
-servers: improved text reports
-qt: Added QDialogWidget and QOptionChosser dialogs
-log: printf to accept same arguments than print
-functional: Added evalF and testF to use evaluable strings as lambdas
-functional: str2time returning current time by default
-
 
 November 2013 - 10.8
 -------------------------------------------------
@@ -50,6 +10,7 @@ Added keeptime argument to TangoEval
 Solved bug that caused long keeptimes on TangoEval attribute proxies
 Added DDebug device server to have "online debugging" on fandango devices.
 ServersDict tuned for faster loading.
+
 Logger: added use_tango as an option to use tango_stream instead of log_obj or print
 Functional: solved bug in replaceCl that failed when using tuples for replacement
 Qt: Added DoubleClick hook to DropTextEdit widget

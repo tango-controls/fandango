@@ -1,5 +1,6 @@
 #!/usr/bin/env python2.5
-
+"""
+@if gnuheader
 #############################################################################
 ##
 ## file :       PyTango_utils
@@ -35,12 +36,12 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-
-"""
+@endif
 @package fandango
 @mainpage fandango "Functional tools for Tango" Reference
 Several modules included are used in Tango Device Server projects, like @link dynamic @endlink and PyPLC. @n
 @brief This module(s) include some PyTango additional classes and methods that are not implemented in the C++/Python API's; it replaces the previous PyTango_utils module
+ 
 """
 
 import os,traceback
@@ -48,7 +49,6 @@ try:
     import objects,imp
     PATH = os.path.dirname(objects.__file__)
     ReleaseNumber = type('ReleaseNumber',(tuple,),{'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
-    #print 'Fandango Release number: %s, loaded from %s/CHANGES' % (ReleaseNumber,PATH)
     RELEASE = ReleaseNumber(imp.load_source('changelog',PATH+'/CHANGES').RELEASE)
 except: 
     print traceback.format_exc()
@@ -84,7 +84,7 @@ except: print 'Unable to import threads module'
 #TANGO related modules
 try:
     from tango import get_device,get_database,get_database_device,get_all_devices,get_device_info,\
-        get_alias_for_device,get_device_for_alias,get_tango_host, \
+        get_alias_for_device,get_device_for_alias, \
         find_devices,find_attributes,get_matching_devices,get_matching_attributes,\
         cast_tango_type,parse_tango_model,check_attribute,check_device,except2str,\
         TangoEval,ProxiesDict,getTangoValue,TangoCommand,fakeEvent,fakeEventType

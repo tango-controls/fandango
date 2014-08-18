@@ -332,17 +332,12 @@ def filtersmart(seq,filters):
     seq = seq if isSequence(seq) else (seq,)
     filters = filters if isSequence(seq) else (filters,)
     raw,comp,neg = [],[],[]
-    def parse(s):
-        s = toRegexp(s)
-        if '*' not in s:
-            if not s.startswith('^'): s='.*'+s
-            if not s.startswith('$'): s=s+'.*'
-        return s
+    parse = lambda s: ('.*' if not s.startswith('^') else '')+toRegexp(s)
     for f in filters:
         if f.startswith('+'): comp.append(parse(f[1:]))
         elif f.startswith('!'): neg.append(parse(f[1:]))
         else: raw.append(parse(f))
-    return [s for s in seq if (not any(matchCl(n,s) for n in neg)) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
+    return [s for s in seq if not any(matchCl(n,s) for n in neg) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
 
 ########################################################################
 ## Methods for piped iterators
@@ -465,20 +460,6 @@ def isNested(seq,strict=False):
     if not strict and isIterable(child): return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
-    
-def isBool(seq):
-    if seq in (True,False):
-        return True
-    elif isString(seq):
-        return seq.lower() in ('true','yes','1','false','no','0','none')
-    else:
-        return False
-    
-def isDate(seq):
-    try:
-        return str2time(seq)
-    except:
-        return False
 
 ###############################################################################
 
@@ -490,34 +471,6 @@ def str2float(seq):
     """ It returns the first float (x.ye-z) encountered in the string """
     return float(re.search('[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?',seq).group())
 
-def str2bool(seq):
-    """ It parses true/yes/no/false/1/0 as booleans """
-    return seq.lower().strip() not in ('false','0','none','no')
-
-def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
-    """ 
-    Tries to convert string to an standard python type.
-    If use_eval is True, then it tries to evaluate as code.
-    """
-    if not use_eval: sep_exp = '(?:^[^\(\[\{])'+sep_exp #Get non-evaluable lists
-    m = re.match(sep_exp,seq) 
-    if m:
-        return [str2type(s,use_eval) for s in str2list(seq,m.groups()[0])]
-    elif isBool(seq):
-        return str2bool(seq)
-    elif use_eval:
-        try:
-            return eval(seq)
-        except:
-            return seq
-    elif isNumber(seq):
-        return str2float(seq)
-    else:
-        return seq
-    
-def doc2str(obj):
-    return obj.__name__+'\n\n'+obj.__doc__
-    
 def toList(val,default=[],check=isSequence):
     if val is None: 
         return default
@@ -547,9 +500,6 @@ def str2list(s,separator=''):
 def text2list(s,separator='\n'):
     return filter(bool,str2list(s,separator))
 
-def str2lines(s,length=80,separator='\n'):
-    return separator.join(s[i:i+length] for i in range(0,len(s),length))
-
 def list2str(s,separator='\t',MAX_LENGTH=255):
     s = str(separator).join(str(t) for t in s)
     if MAX_LENGTH>0 and separator not in ('\n','\r') and len(s)>MAX_LENGTH: 
@@ -570,12 +520,8 @@ def negbin(old):
     """ Given a binary number as an string, it returns all bits negated """
     return ''.join(('0','1')[x=='0'] for x in old)
 
-def char2int(c): 
-    """ord(c)"""
-    return ord(c)
-def int2char(n): 
-    """unichr(n)"""
-    return unichr(n)
+def char2int(c): return ord(c)
+def int2char(n): return unichr(n)
 def int2hex(n): return hex(n)
 def int2bin(n): return bin(n)
 def hex2int(c): return int(c,16)
@@ -601,15 +547,15 @@ def int2bool(dec,N=16):
     for i in range(N):
         result.append(bool(dec % 2))
         dec = dec >> 1
-    return result
+    return result        
 
 ########################################################################
 ## Time conversion
 ########################################################################
 
 END_OF_TIME = 1024*1024*1024*2 #Jan 19 04:14:08 2038
-TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
-RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
+TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
+RAW_TIME = '^([0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
 
 def now():
     return time.time()
@@ -637,9 +583,8 @@ def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
     return time.strftime(cad,time2tuple(epoch))
 epoch2str = time2str
     
-def str2time(seq='',cad=''):
+def str2time(seq,cad=''):
     """ Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format"""
-    if not seq: return time.time()
     seq = str(seq).strip()
     m = re.match(RAW_TIME,seq) 
     if m:
@@ -689,36 +634,10 @@ def mysql2time(mysql_time):
 ## Extended eval
 ########################################################################
 
-def evalF(formula):
-    """
-    Returns a function that executes the formula passes as argument.
-    The formula should use x,y,z as predefined arguments, or use args[..] array instead
-    
-    e.g.:
-    map(evalF("x>2"),range(5)) : [False, False, False, True, True]
-    
-    It is optimized to be efficient (but still 50% slower than a pure lambda)
-    """
-    #return (lambda *args: eval(formula,locals={'args':args,'x':args[0],'y':args[1],'z':args[2]}))
-    c = compile(formula,formula,'eval') #returning a lambda that evals a compiled code makes the method 500% faster
-    return (lambda *args: eval(c,{'args':args,'x':args and args[0],'y':len(args)>1 and args[1],'z':len(args)>2 and args[2]}))
-
-def testF(f,args=[],t=1.):
-    args = toSequence(args)
-    ct,t0 = 0,time.time()
-    while time.time()<t0+5:
-        f(*args)
-        ct+=1
-    return ct
-
 def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exception=Exception):
     """
-    evalX is an enhanced eval function capable of evaluating multiple types and import modules if needed.
-    The _locals/modules/instances dictionaries WILL BE UPDATED with the result of the code! (if '=' or import are used)
-    It is used by some fandango classes to send python code to remote threads; that will evaluate and return the values as pickle objects.
-    
     target may be:
-         - dictionary of built-in types (pickable): {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
+            - dictionary of built-in types: {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
          - string to eval: eval('import $MODULE' or '$VAR=code()' or 'code()')
          - list if list[0] is callable: value = list[0](*list[1:]) 
          - callable: value = callable()
