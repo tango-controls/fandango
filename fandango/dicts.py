@@ -317,39 +317,49 @@ class CaselessDict(dict):
                 raise e
 
     def __getitem__(self, key):
+        key = str(key)
         if dict.has_key(self,key):
             return dict.__getitem__(self,key)
         return dict.__getitem__(self, key.lower() if hasattr(key,'lower') else key)
 
     def __setitem__(self, key, value):
+        key = str(key)
         dict.__setitem__(self, key.lower() if hasattr(key,'lower') else key, value)
 
     def __contains__(self, key):
+        key = str(key)
         return dict.__contains__(self, key.lower() if hasattr(key,'lower') else key)
 
     def has_key(self, key):
+        key = str(key)
         return dict.has_key(self, key.lower() if hasattr(key,'lower') else key)
 
     def get(self, key, def_val=None):
+        key = str(key)
         return dict.get(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def setdefault(self, key, def_val=None):
+        key = str(key)
         return dict.setdefault(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def update(self, other):
         for k,v in other.items():
+            k = str(k)
             dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
 
     def fromkeys(self, iterable, value=None):
         d = CaselessDict()
         for k in iterable:
+            k = str(k)
             dict.__setitem__(d, k.lower() if hasattr(k,'lower') else k, value)
         return d
 
     def pop(self, key, def_val=None):
+        key = str(key)
         return dict.pop(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def __delitem__(self, k):
+        k = str(k)
         dict.__delitem__(self, k.lower() if hasattr(k,'lower') else k)
         
 class CaselessDefaultDict(defaultdict_fromkey,CaselessDict):
@@ -359,6 +369,7 @@ class CaselessDefaultDict(defaultdict_fromkey,CaselessDict):
         CaselessDefaultDict = type('CaselessDefaultType',(CaselessDict,defaultdict_fromkey),{})
     """
     def __getitem__(self, key):
+        key = str(key)
         return defaultdict_fromkey.__getitem__(self, key.lower())
     pass
 
