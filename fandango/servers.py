@@ -857,8 +857,8 @@ class ComposersDict(ServersDict):
         if not hasattr(self,'attributes'): self.attributes = dicts.CaselessDict()
         self.attributes.clear()
         for d in self.get_all_devices():
-            attrs = self.db.get_device_property(d,['DynamicAttributes'])['DynamicAttributes']
-            if not attrs: attrs = self.db.get_device_property(d,['AlarmList'])['AlarmList']
+            attrs = list(self.db.get_device_property(d,['DynamicAttributes'])['DynamicAttributes'])
+            if not attrs: attrs = list(self.db.get_device_property(d,['AlarmList'])['AlarmList'])
             for l in attrs:
                 l = l.split('#')[0].strip()
                 if not l: continue
@@ -897,7 +897,7 @@ class ComposersDict(ServersDict):
         property = args[-1]
         devs = self.get_all_devices()
         if len(args)==2: devs = [d for d in devs if fandango.matchCl(args[0],d)]
-        return dict((d,self.db.get_device_property(d,[property])[property]) for d in devs)
+        return dict((d,list(fun.toList(self.db.get_device_property(d,[property])[property]))) for d in devs)
         
     def set_property(self,*args):
         """ set_property(property,value) or set_property(device_regexp,property,value) """
@@ -908,7 +908,7 @@ class ComposersDict(ServersDict):
         
     def set_formula(self,attribute,formula,update=True):
         dev,attr = attribute.rsplit('/',1)
-        new,prop = [],self.db.get_device_property(dev,['DynamicAttributes'])['DynamicAttributes']
+        new,prop = [],list(self.db.get_device_property(dev,['DynamicAttributes'])['DynamicAttributes'])
         found = False
         for p in prop:
             if not attr.lower() == p.split('=')[0].strip().lower(): 
@@ -924,15 +924,16 @@ class ComposersDict(ServersDict):
             print new[-1]
             
         if update: 
-            self.update_attributes(dev,prop)
+            self.update_attributes(dev,new)
             try:
                 return self.proxies[dev].read_attribute(attr).value
             except Exception,e:
-                print 'Attribute updated but not readable!'
+                print 'Attribute %s:"%s" updated but not readable!'%(dev,attr)
                 return e
         return False
         
     def update_attributes(self,dev,prop=None):
+        print "update_attributes(%s,%s(%s))"%(dev,type(prop),prop)
         if prop is not None: 
             self.db.put_device_property(dev,{'DynamicAttributes':prop})
         try:
