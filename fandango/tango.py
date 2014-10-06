@@ -107,11 +107,11 @@ def get_database(host='',port='',use_tau=False):
     if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
     elif ':' in host: host,port = host.split(':')
     args = [host,int(port)] if host and port else []
-    if use_tau and not TAU: use_tau = loadTaurus()
     if not args and TangoDatabase:
         return TangoDatabase
     else:
         try: 
+            if use_tau and not TAU: TAU = loadTaurus()
             db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
             if not args: TangoDatabase = db
             return db
@@ -540,7 +540,9 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
     if not fullname: result = [r if r.count('/')<=2 else r.split('/',1)[-1] for r in result]
     return result[:limit] if limit else result
     
-find_devices = get_matching_devices
+def find_devices(*args,**kwargs):
+    #A get_matching_devices() alias, just for backwards compatibility
+    return get_matching_devices(*args,**kwargs) 
     
 def get_matching_attributes(expressions,limit=0,fullname=None):
     """ 
@@ -583,7 +585,9 @@ def get_matching_attributes(expressions,limit=0,fullname=None):
     result = list(set(attrs))
     return result[:limit] if limit else result
                     
-find_attributes = get_matching_attributes
+def find_attributes(*args,**kwargs):
+    #A get_matching_attributes() alias, just for backwards compatibility
+    return get_matching_attributes(*args,**kwargs) 
     
 def get_all_models(expressions,limit=1000):
     ''' 
