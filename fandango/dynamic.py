@@ -222,6 +222,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
         self.last_state_exception = ''
         self.last_attr_exception = None
+        self._init_count = 0
         self._hook_epoch = 0
         self._cycle_start = 0
         self._total_usage = 0
@@ -240,10 +241,24 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.State = self.rawState
             self.dev_state = self.rawState
         print '< '+'~'*78
+        
+    def init_device(self):
+        self.info( 'DynamicDS.init_device()')
+        try:
+            if not self.get_init_count():
+                self.get_DynDS_properties()
+            else:
+                self.updateDynamicAttributes()
+        except: 
+            self.warning(traceback.format_exc())
+        self._init_count +=1
 
     def delete_device(self):
         self.warning( 'DynamicDS.delete_device(): ... ')
         ('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl).delete_device(self)
+        
+    def get_init_count(self):
+        return self._init_count
         
     def get_parent_class(self):
         return type(self).mro()[type(self).mro().index(DynamicDS)+1]
