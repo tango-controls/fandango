@@ -57,6 +57,7 @@ message
 
 import logging, weakref, traceback
 from objects import Object
+from pprint import pprint
 from functional import time2str
 import warnings
 
@@ -280,7 +281,7 @@ class Logger(Object):
             elif self._ForcePrint: self.logPrint('DEBUG',msg)
             else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
-            print 'Exception in self.debug! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
+            print 'Exception in self.debug! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
             print traceback.format_exc()            
             #raise e
     
@@ -293,7 +294,7 @@ class Logger(Object):
             elif self._ForcePrint: self.logPrint('INFO',msg)
             else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
-            print 'Exception in self.info! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
+            print 'Exception in self.info! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
             print traceback.format_exc()
             #raise e
      
@@ -306,7 +307,7 @@ class Logger(Object):
             elif self._ForcePrint: self.logPrint('WARNING',msg)
             else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
-            print 'Exception in self.warning! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
+            print 'Exception in self.warning! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
             print traceback.format_exc()
             #raise e
             
@@ -318,7 +319,7 @@ class Logger(Object):
             elif self._ForcePrint: self.logPrint('ERROR',msg)
             else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
         except Exception,e:
-            print 'Exception in self.error! \ne:%s\nargs:%s\nkw:%s'%(str(e),str(args),str(kw))
+            print 'Exception in self.error! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
             print traceback.format_exc()
             #raise e            
         
