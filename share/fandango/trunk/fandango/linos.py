@@ -19,7 +19,7 @@ Out[77]:
 """
 
 import time,sys,os,re
-import fandango.functional as fun
+import fandango.objects as fun #objects module includes functional
 
 ################################################################################3
 # Shell methods
@@ -62,7 +62,7 @@ def sendmail(subject,text,receivers,attachments=None,trace=False):
 ################################################################################3
 # Platform/Architecture/Hostname methods
 
-class MyMachine(object):
+class MyMachine(fun.Struct):
     """ This method identifies the current Machine (OS/Arch/Hostname/Kernel) using the platform module """
     def __init__(self):
         import platform
