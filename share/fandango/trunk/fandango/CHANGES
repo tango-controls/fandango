@@ -15,6 +15,7 @@ arrays: bug in calcullating range from float instead of int
 dynamic: DynamicDS devices capable of use init() to reload dynamic attributes
 log: bugs in logging when using last pytango releases
 servers: ComposersDict updated to PyTango>8
+device: Dev4Tango polling thread exception replaced by error message
 
 
 July 2014 - 11.00, needed by PyTangoArchiving 5.0
