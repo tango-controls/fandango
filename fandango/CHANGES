@@ -1,5 +1,5 @@
-RELEASE = (11,00)
-RELEASE_NOTE = "needed for PyTangoArchiving 5.0, improvements in db access and object types, solved bugs in tango multi-host searchs"
+RELEASE = (11,1)
+RELEASE_NOTE = "needed for PyTangoArchiving>5.0 and PyTango>8.1"
 
 """
 
@@ -7,7 +7,15 @@ NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not 
 NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
 ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
-FIX: arrays: bug in calcullating range from float instead of int
+October 2014 - 11.1
+-------------------------------------------------
+
+dicts: fixed bug when keys are QStrings instead of python strings
+arrays: bug in calcullating range from float instead of int
+dynamic: DynamicDS devices capable of use init() to reload dynamic attributes
+log: bugs in logging when using last pytango releases
+servers: ComposersDict updated to PyTango>8
+
 
 July 2014 - 11.00, needed by PyTangoArchiving 5.0
 -------------------------------------------------
