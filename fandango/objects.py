@@ -55,8 +55,11 @@ def dirModule(module):
     return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
 
 def loadModule(source,modulename=None):
-    from imp import load_source
-    return load_source(modulename or replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),source)
+    from imp import load_source,find_module,load_module
+    if modulename or '/' in source or '.' in source:
+        return load_source(modulename or replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),source)
+    else:
+        return load_module(source,*find_module(source))
 
 def dirClasses(module,owned=False):
     v = [a for a,v in module.__dict__.items() if isinstance(v,type)]

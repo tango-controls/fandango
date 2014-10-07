@@ -7,15 +7,17 @@ NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not 
 NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
 ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
-October 2014 - 11.1
+October 2014 - 11.1 needed for PyTangoArchiving>5.0 and PyTango>8.1
 -------------------------------------------------
 
 dicts: fixed bug when keys are QStrings instead of python strings
 arrays: bug in calcullating range from float instead of int
 dynamic: DynamicDS devices capable of use init() to reload dynamic attributes
+dynamic: added LoadFromFile property and load_from_file command to be able to load attribute lists from files
 log: bugs in logging when using last pytango releases
 servers: ComposersDict updated to PyTango>8
 device: Dev4Tango polling thread exception replaced by error message
+objects: loadModule method improved to search by module name instead of path
 
 
 July 2014 - 11.00, needed by PyTangoArchiving 5.0
