@@ -1207,6 +1207,8 @@ class TangoEval(object):
         self._defaults['str2time'] = fun.str2time
         self._defaults['time'] = time
         self._defaults['NOW'] = time.time
+        self._defaults['DEVICES'] = self.proxies
+        self._defaults['DEV'] = lambda x:self.proxies[x]
         self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
         self._defaults['PREV'] = self.previous
