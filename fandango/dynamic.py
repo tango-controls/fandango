@@ -310,6 +310,27 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #except Exception,e:
             #self.last_state_exception = 'Exception in read_attr_hardware: %s'%str(e)
             #self.error('Exception in read_attr_hardware: %s'%str(e))
+            
+    def parseStaticAttributes(self,add=True,keep=True):
+        """ Parsing StaticAttributes if defined. """
+        attrs = []
+        if hasattr(self,'StaticAttributes'): 
+            for a in self.StaticAttributes:
+                aname = a.split('#')[0].split('=')[0].strip()
+                if aname:
+                    attrs.append(aname)
+                    if any(d.startswith(aname) for d in self.DynamicAttributes):
+                        self.info('StaticAttribute %s overriden by DynamicAttributes Property'%(aname))
+                    else:
+                        self.info('Adding StaticAttribute %s to DynamicAttributes list'%(aname))
+                        self.DynamicAttributes.append(a)
+                if keep:
+                    #Adds to KeepAttributes if default value is overriden, works if dyn_attr is called after init_device (Tango7)
+                    if not any(k.lower()==aname.lower() for k in self.KeepAttributes):
+                        self.KeepAttributes.append(aname)
+                    self.KeepAttributes = [k for k in self.KeepAttributes if 'no'!=k.lower().strip()]
+            return attrs
+        else: return []
 
     def get_DynDS_properties(self,db=None):
         """
@@ -346,6 +367,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.UseTaurus = (tango.TAU or tango.loadTaurus()) and self.UseTaurus
         if self.LoadFromFile:
             self.load_from_file()
+        #Adding Static Attributes if defined in the SubClass
+        if getattr(self,'StaticAttributes',None):
+            self.parseStaticAttributes(add=True,keep=True)
         return
         
     def get_device_property(self,property,update=False):
@@ -1462,11 +1486,11 @@ class DynamicDSClass(PyTango.DeviceClass):
         'DynamicAttributes':
             [PyTango.DevVarStringArray,
             "Attributes and formulas to create for this device.\n\nThis Tango Attributes will be generated dynamically using this syntax:\n\nT3=int(SomeCommand(7007)/10.)\n\n\nSee the class description to know how to make any method available in attributes declaration.\n\nNOTE:Python generators dont work here, use comprehension lists instead.",
-            [] ],
+            [ '#Write here your Attribute formulas' ] ],
         'DynamicStates':
             [PyTango.DevVarStringArray,
             "This property will allow to declare new States dinamically based on\n\ndynamic attributes changes. The function Attr will allow to use the\n\nvalue of attributes in formulas.\n\n\n\nALARM=Attr(T1)>70\nOK=1",
-            [] ],
+            [ '#Write here your State formulas' ] ],
         'DynamicQualities':
             [PyTango.DevVarStringArray,
             "This property will allow to declare formulas for Attribute Qualities.",
@@ -1593,8 +1617,6 @@ class DynamicDSType(object):
         self.pytype=pytype
         self.dimx=dimx
         self.dimy=dimy
-        pass
-    pass
 
 DynamicDSTypes={
             'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState','long','int'],int),
@@ -1607,8 +1629,15 @@ DynamicDSTypes={
             'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','list(str','[str'],lambda l:[str(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','list(bool','[bool'],lambda l:[bool(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
-            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','DevVarFloatArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             }
+            
+def isTypeSupported(ttype,n_dim=None):
+    if n_dim is not None and n_dim not in (0,1): return False
+    ttype = getattr(ttype,'name',str(ttype))
+    r = any(ttype in t.labels for t in DynamicDSTypes.values())
+    print ttype,r
+    return r
             
 def CreateDynamicCommands(ds,ds_class):
     """
@@ -1842,3 +1871,109 @@ class DynamicAttribute(object):
 
 
 
+#==================================================================
+#
+#    Fandango DynamicDS Server main method
+#
+#==================================================================
+
+class DynamicServer(object):
+    """
+    The DynamicServer class provides .util .instance .db .classes to have access to Tango DS internals.
+    """
+    
+    PROPERTY = 'PYTHON_CLASSPATH'
+    
+    def __init__(self,name='',classes={},add_debug=False,log='-v2'):
+        if not name:
+            server,instance,logs = self.parse_args()
+            self.name = server+'/'+instance
+        else:
+            self.name,server,instance,logs = name,name.split('/')[0],name.split('/')[-1],log
+        self.args = [server,instance,logs]
+        print 'In DynamicServer(%s)'%self.args
+        self.util = PyTango.Util(self.args)
+        self.instance = self.util.instance()
+        self.db = self.instance.get_database()
+        class_list = self.db.get_device_class_list(self.instance.get_ds_name()) #Device,Class object list
+        self.classes = fandango.dicts.defaultdict(list)
+        [self.classes[c].append(d) for d,c in zip(class_list[::2],class_list[1::2]) if c.lower()!='dserver']
+        for C,devs in classes.items():
+            for d in devs:
+                if C not in self.classes or d not in self.classes[C]:
+                    fandango.tango.add_new_device(self.name,C,d)
+                    self.classes[C].append(d)
+        self.load_classes()
+        if add_debug and 'DDebug' not in self.classes:
+            from fandango.device import DDebug
+            DDebug.addToServer(self.util,*(self.name.split('/')))
+        
+    def parse_args(self,args=[]):
+        import sys
+        if not args:args = sys.argv
+        assert len(args)>=2,'1 argument required!:\n\tpython dynamic.py instance [-vX]'
+        print args
+        server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicDS'
+        instance = args[1]
+        logs = (args[2:] or ['-v4'])[0]
+        ds_name = server+'/'+instance
+        return (server,instance,logs)
+                    
+    def load_classes(self):
+        self.path = (self.db.get_property(self.PROPERTY,['DeviceClasses'])['DeviceClasses'] or [''])[0]
+        if self.path: sys.path.append(self.path)
+        self.modules = {}
+        import fandango.objects
+        for c in self.classes:
+            try:
+                p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
+                print '\nLoading %s from %s' % (c,p or self.path)
+                if p:
+                    self.modules[c] = fandango.objects.loadModule(p)
+                elif c in dir(fandango.device):
+                    self.modules[c] = fandango.device
+                elif c in dir(fandango.interface):
+                    self.modules[c] = fandango.interface
+                else:
+                    try:
+                        self.modules[c] = fandango.objects.loadModule(c)
+                        assert getattr(self.modules[c],c+'Class')
+                    except:
+                        m = self.path+'/%s/%s.py'%(c,c)
+                        print '\nLoading %s from %s' % (c,m)
+                        self.modules[c] = fandango.objects.loadModule(m)
+                self.util.add_TgClass(getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c)
+            except:
+                traceback.print_exc()
+                sys.exit(-1)
+        print '\nDynamicDS: %d classes loaded: %s'%(len(self.classes),','.join(self.classes))
+        
+    def main(self,args=None):
+        U = self.util.instance()
+        U.server_init()
+        U.server_run()
+        
+if __name__ == '__main__':
+    pyds = DynamicServer(add_debug=True)
+    pyds.main()
+    
+    #try:
+        #py = PyTango.Util(sys.argv)
+        ## Adding all commands/properties from fandango.DynamicDS
+        #PySignalSimulator,PySignalSimulatorClass = FullTangoInheritance('PySignalSimulator',PySignalSimulator,PySignalSimulatorClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
+        #py.add_TgClass(PySignalSimulatorClass,PySignalSimulator,'PySignalSimulator')
+
+        #U = PyTango.Util.instance()
+        #fandango.dynamic.CreateDynamicCommands(PySignalSimulator,PySignalSimulatorClass)
+        #U.server_init()
+        #U.server_run()
+
+    #except PyTango.DevFailed,e:
+        #print '-------> Received a DevFailed exception:',traceback.format_exc()
+    #except Exception,e:
+        #print '-------> An unforeseen exception occured....',traceback.format_exc()
+#else:
+    ##Enabling subclassing
+    #PySignalSimulator,PySignalSimulatorClass = FullTangoInheritance('PySignalSimulator',PySignalSimulator,PySignalSimulatorClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)    
+    
+    
