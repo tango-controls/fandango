@@ -50,29 +50,36 @@ try:
     ReleaseNumber = type('ReleaseNumber',(tuple,),{'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
     #print 'Fandango Release number: %s, loaded from %s/CHANGES' % (ReleaseNumber,PATH)
     RELEASE = ReleaseNumber(imp.load_source('changelog',PATH+'/CHANGES').RELEASE)
-except: 
+except Exception,e: 
     print traceback.format_exc()
-    print 'Unable to load RELEASE number'
+    print 'Unable to load RELEASE number: %s'%e
 
 try:
     from functional import *
-except: print 'Unable to import functional module'
+except Exception,e: print 'Unable to import functional module: %s'%e
+
 try:
     from log import printf,Logger,LogFilter,shortstr,except2str,FakeLogger
-except: print 'Unable to import log module'
+except Exception,e: print 'Unable to import log module: %s'%e
+
 try:
     from excepts import trial,getLastException,getPreviousExceptions,ExceptionWrapper,Catched,Catched2
 except: print 'Unable to import excepts module'
+
 try:
     from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
-except: 
-    print 'Unable to import objects module'
+    from objects import dirModule,loadModule,dirClasses,obj2dict
+except Exception,e: 
+    print 'Unable to import objects module: %s'%traceback.format_exc()
+    
 try:
-    from linos import shell_command,ping,sysargs_to_dict,listdir
-except: print 'Unable to import linos module'
+    from linos import shell_command,ping,sysargs_to_dict,listdir,sendmail,MyMachine
+except: print 'Unable to import linos module: %s\n'%traceback.format_exc()
+
 try: 
     from arrays import CSVArray
 except: print 'Unable to import arrays module'
+
 try:
     from dicts import ThreadDict,CaselessDict,ReversibleDict,CaselessDefaultDict,DefaultThreadDict,Enumeration,SortedDict,CaselessList
     from dicts import defaultdict,defaultdict_fromkey,fuzzyDict,reversedict,collections
