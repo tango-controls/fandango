@@ -70,6 +70,42 @@ def getApplication(args=None):
     app = Qt.QApplication.instance()
     return app or Qt.QApplication(args or [])
 
+def execApplication():
+    getApplication().exec_()
+   
+def getQwtTimeScaleDraw():
+    from PyQt4 import Qt,Qwt5
+    from PyQt4.Qwt5 import qplt,QwtScaleDraw,QwtText
+    class QwtTimeScale(QwtScaleDraw):
+        def label(self,v):
+            return QwtText('\n'.join(fandango.time2str(v).split()))
+    return QwtTimeScale()
+    
+def getRandomColor(i=None):
+    import random
+    ranges = 50,230
+    if i is not None:
+        ranges = map(int,(170,256/(i+.01),256%(i+0.01),256-256/(i+0.01)) if i<256 else (170,i/256.,i%256))
+        ranges = min(ranges),max(ranges)
+        print ranges
+    return Qt.QColor(
+        int(random.randint(*ranges)),
+        int(random.randint(*ranges)),
+        int(random.randint(*ranges)))
+
+def getQwtPlot(series,xIsTime=False):
+    """ Series would be a {Label:[(time,value)]} dictionary """
+    app = getApplication()
+    from PyQt4 import Qt,Qwt5
+    from PyQt4.Qwt5 import qplt,QwtScaleDraw
+    qpt = qplt.Plot(*[qplt.Curve(
+            [x[0] for x in t[1]],
+            [y[1] for y in t[1]],t[0],
+            qplt.Pen(getRandomColor(i=None),2)) 
+        for i,t in enumerate(series.items())])
+    if xIsTime: qpt.setAxisScaleDraw(qpt.xBottom,getQwtTimeScaleDraw())
+    return qpt
+
 class QDialogWidget(Qt.QDialog):
     """
     It converts any Widget into a Dialog
@@ -373,13 +409,23 @@ class TauFakeEventReceiver():
     def event_received(self,source,type_,value):
         print '%s: Event from %s: %s(%s)'% (time.ctime(),source,type_,shortstr(getattr(value,'value',value)))
         
-import taurus.core,taurus.qt
-import taurus.qt.qtgui.util.tauruscolor as colors
-import taurus.qt.qtgui.base as taurusbase
-from taurus.core import TaurusEventType,TaurusAttribute
-from taurus.qt.qtgui.graphic import TaurusGraphicsItem
+class TaurusImportException(Exception):
+    pass
+        
+try:
+    import taurus.core,taurus.qt
+    import taurus.qt.qtgui.util.tauruscolor as colors
+    import taurus.qt.qtgui.base as taurusbase
+    from taurus.qt.qtgui.base import TaurusBaseComponent
+    from taurus.core import TaurusEventType,TaurusAttribute
+    from taurus.qt.qtgui.graphic import TaurusGraphicsItem
+    from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
+except:
+    print 'Unable to import Taurus!'
+    taurus,colors,taurusbase,tie = None,None,None,TaurusImportException
+    TaurusBaseComponent,TaurusEventType,TaurusAttribute,TaurusGraphicsItem,TaurusWidget = tie,tie,tie,tie,tie
 
-def getColorsForValue(value,palette = colors.QT_DEVICE_STATE_PALETTE):
+def getColorsForValue(value,palette = getattr(colors,'QT_DEVICE_STATE_PALETTE',None)):
     """ 
     Get QColor equivalent for a given Tango attribute value 
     It returns a Background,Foreground tuple
@@ -399,7 +445,7 @@ def getColorsForValue(value,palette = colors.QT_DEVICE_STATE_PALETTE):
         
     return bg_brush.color(),fg_brush.color()
 
-class TauColorComponent(taurusbase.TaurusBaseComponent):
+class TauColorComponent(TaurusBaseComponent):
     """
     Abstract class for Tau color-based items.
     
@@ -482,8 +528,6 @@ class TauColorComponent(taurusbase.TaurusBaseComponent):
 
     def getModelClass(self):
         return TaurusAttribute
-        
-from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 
 class QSignalHook(Qt.QObject):
     """
@@ -523,8 +567,10 @@ def modelSetter(obj,model):
         obj.setModel(model)
     return
         
-class TauEmitterThread(Qt.QThread):
+class QWorker(Qt.QThread):
     """
+    IF YOU USE TAURUS, GO THERE INSTEAD: taurus.qt.qtcore.util.emitter.SingletonWorker ; it is more optimized and maintained
+    
     This object get items from a python Queue and performs a thread safe operation on them.
     It is useful to delay signals in a background thread.
     :param parent: a Qt/Tau object
@@ -599,7 +645,7 @@ class TauEmitterThread(Qt.QThread):
 
     def getDone(self):
         """ Returns % of done tasks in 0-1 range """
-        return self._done/(self._done+self.getQueue().qsize()) if self._done else 0.
+        return float(self._done)/(self._done+self.getQueue().qsize()) if self._done else 0.
 
     def _doSomething(self,args):
         self.log.debug('At TauEmitterThread._doSomething(%s)'%str(args))
@@ -620,16 +666,18 @@ class TauEmitterThread(Qt.QThread):
         queue = self.getQueue()
         (queue.empty() and self.log.info or self.log.debug)('At TauEmitterThread.next(), %d items remaining.' % queue.qsize())
         try:
-            if not queue.empty():            
+            if not queue.empty():
                 if not self._cursor and self.cursor is not None: 
                     Qt.QApplication.instance().setOverrideCursor(Qt.QCursor(self.cursor))
                     self._cursor=True                
                 item = queue.get(False) #A blocking get here would hang the GUIs!!!
                 self.todo.put(item)
                 self.log.debug('Item added to todo queue: %s' % str(item))
-            elif self._cursor: 
-                Qt.QApplication.instance().restoreOverrideCursor()
-                self._cursor = False        
+            else:
+                self._done = 0.
+                if self._cursor: 
+                    Qt.QApplication.instance().restoreOverrideCursor()
+                    self._cursor = False        
                 
         except Queue.Empty,e:
             self.log.warning(traceback.format_exc())
@@ -655,6 +703,8 @@ class TauEmitterThread(Qt.QThread):
             #End of while
         self.log.info('#'*80+'\nOut of TauEmitterThread.run()'+'\n'+'#'*80)
         #End of Thread 
+        
+TauEmitterThread = QWorker #For backwards compatibility
             
 ###############################################################################
 
