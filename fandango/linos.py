@@ -46,16 +46,17 @@ def shell_command(*commands, **keywords):
     elif split: return result.split('\n')
     else: return result
     
-def sendmail(subject,text,receivers,attachments=None,trace=False):
+def sendmail(subject,text,receivers,sender='',attachments=None,trace=False):
     if '\n' in text and '\\n' not in text:
         text = text.replace('\n','\\n')
-    attachments = attachments and ' '.join('-a %s'%a for a in attachments) or ''
-    receivers = ' '.join(receivers)
+    sender = sender and " -r %s"%sender
+    attachments = attachments and ' '+' '.join('-a %s'%a for a in attachments) or ''
+    receivers = ' '+' '.join(receivers)
     command = 'echo -e "'+text+'" '
     command += '| mail -s "%s" ' % subject
     #command += '-S from=%s ' % self.FromAddress #'-r %s ' % (self.FromAddress)
     #command += (MAIL_RECEIVER if fandango.isString(MAIL_RECEIVER) else ','.join(MAIL_RECEIVER))
-    command += attachments + ' ' + receivers
+    command += sender + attachments + receivers
     if trace: print(command.rsplit('|',1)[-1])
     os.system(command)
     
