@@ -39,8 +39,9 @@
 @description It includes 2 wonderful classes: Object (by ahoms) and Singleton (by MarcSantiago)
 @attention THIS MODULE IS DEPRECATED, Use @b tau.core.utils.Singleton and @b tau.core.utils.Object instead!
 """
-
+import __builtin__
 from __builtin__ import object
+
 from functional import *
 from operator import isCallable
 import Queue
@@ -55,6 +56,7 @@ def dirModule(module):
     return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
 
 def loadModule(source,modulename=None):
+    #Loads a python module either from source file or from module
     from imp import load_source,find_module,load_module
     if modulename or '/' in source or '.' in source:
         return load_source(modulename or replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),source)
@@ -65,6 +67,36 @@ def dirClasses(module,owned=False):
     v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
     if owned: return [a for a in dirModule(module) if a in v]
     else: return v
+    
+def obj2dict(obj,type_check=True):
+    dct = {}
+    try:
+        for name in dir(obj):
+            try:
+                attr = getattr(obj,name)
+                if hasattr(attr,'__call__'): continue
+                if name == 'inited_class_list': continue
+                if name.startswith('__'): continue
+                if type_check:
+                    try: 
+                        if type(attr).__name__ not in dir(__builtin__):
+                            if isinstance(attr,dict):
+                                attr = dict((k,v) for k,v in attr.items())
+                            else:
+                                attr = str(attr)
+                    except: 
+                        continue
+                dct[name] = attr
+            except Exception,e:
+                print(e)
+        klass = obj.__class__
+        if '__class__' not in dct: dct['__class__'] = klass.__name__
+        if '__bases__' not in dct: dct['__bases__'] = [b.__name__ for b in klass.__bases__]
+        if '__base__' not in dct: dct['__base__'] = klass.__base__.__name__
+    except Exception,e:
+        print(e)
+    return(dct)
+
 
 ## Useful class objects
 
@@ -253,10 +285,7 @@ class Object(object):
         return
             
     def getAttrDict(self):
-        attr = dict(self.__dict__)
-        if 'inited_class_list' in attr:
-            del attr['inited_class_list']
-        return attr
+        return obj2dict(self)
         
     def updateAttrDict(self, other):
         attr = other.getAttrDict()
