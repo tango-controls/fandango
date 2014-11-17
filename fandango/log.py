@@ -271,57 +271,37 @@ class Logger(Object):
             
     def output(self, msg, *args, **kw):
         self.log_obj.log(Logger.Output, msg, *args, **kw)
-        
     
     def debug(self, msg, *args, **kw):
-        if self.max_len>0: msg = shortstr(msg,self.max_len)
-        try:
-            obj = self.getTangoLog()
-            if obj: obj.debug_stream(str(msg).replace('\r',''), *args, **kw)
-            elif self._ForcePrint: self.logPrint('DEBUG',msg)
-            else: self.log_obj.debug(str(msg).replace('\r',''), *args, **kw)
-        except Exception,e:
-            print 'Exception in self.debug! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
-            print traceback.format_exc()            
-            #raise e
-    
+        self.sendToStream(msg,'debug',3,*args,**kw)
     
     def info(self, msg, *args, **kw):
-        if self.max_len>0: msg = shortstr(msg,self.max_len)
-        try:
-            obj = self.getTangoLog()
-            if obj: obj.info_stream(str(msg).replace('\r',''), *args, **kw)
-            elif self._ForcePrint: self.logPrint('INFO',msg)
-            else: self.log_obj.info(str(msg).replace('\r',''), *args, **kw)
-        except Exception,e:
-            print 'Exception in self.info! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
-            print traceback.format_exc()
-            #raise e
-     
+        self.sendToStream(msg,'info',2,*args,**kw)
 
     def warning(self, msg, *args, **kw):
-        if self.max_len>0: msg = shortstr(msg,self.max_len)
-        try:
-            obj = self.getTangoLog()
-            if obj: obj.warn_stream(str(msg).replace('\r',''), *args, **kw)
-            elif self._ForcePrint: self.logPrint('WARNING',msg)
-            else: self.log_obj.warning(str(msg).replace('\r',''), *args, **kw)
-        except Exception,e:
-            print 'Exception in self.warning! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
-            print traceback.format_exc()
-            #raise e
+        self.sendToStream(msg,'warning',1,*args,**kw)
             
     def error(self, msg, *args, **kw):
-        if self.max_len>0: msg = shortstr(msg,self.max_len)
+        self.sendToStream(msg,'error',0,*args,**kw)
+            
+    def sendToStream(self,msg,level,prio,*args,**kw):
+        #stream should be a number in trace=4,debug=3,info=2,warning=1,error=0
         try:
+            prio = min(prio,3)
+            if self.max_len>0: msg = shortstr(msg,self.max_len)
+            msg = str(msg).replace('\r','').replace('%','%%')
             obj = self.getTangoLog()
-            if obj: obj.error_stream(str(msg).replace('\r',''), *args, **kw)
-            elif self._ForcePrint: self.logPrint('ERROR',msg)
-            else: self.log_obj.error(str(msg).replace('\r',''), *args, **kw)
+            if obj: 
+                stream = (obj.error_stream,obj.warn_stream,obj.info_stream,obj.debug_stream)[prio]
+                stream(msg, *args, **kw)
+            elif self._ForcePrint: 
+                self.logPrint(level.upper(),msg)
+            else: 
+                stream = (self.log_obj.error,self.log_obj.warning,self.log_obj.info,self.log_obj.debug)[prio]
+                stream(msg, *args, **kw)
         except Exception,e:
-            print 'Exception in self.error! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(str(msg),str(e),str(args),str(kw))
+            print 'Exception in Logger.%s! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(level,msg,e,str(args),str(kw))
             print traceback.format_exc()
-            #raise e            
         
 
     def deprecated(self, msg, *args, **kw):
