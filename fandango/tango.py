@@ -107,16 +107,26 @@ def get_database(host='',port='',use_tau=False):
     if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
     elif ':' in host: host,port = host.split(':')
     args = [host,int(port)] if host and port else []
-    if not args and TangoDatabase:
-        return TangoDatabase
-    else:
-        try: 
-            if use_tau and not TAU: TAU = loadTaurus()
-            db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
-            if not args: TangoDatabase = db
-            return db
+    
+    ### DISABLED, CRUSHED WITH BAD_INV_ORDER CORBA in Tango8
+    if False and not args and TangoDatabase:
+        try:
+            t = time.time()
+            #TangoDatabase.get_info() #TOO SLOW TO BE A CHECK!
+            #TangoDatabase.check_tango_host(TangoDatabase.get_db_host()+':'+TangoDatabase.get_db_port())
+            #TangoDatabase.get_timeout_millis()
+            print time.time()-t
+            return TangoDatabase 
         except:
-            print traceback.format_exc()
+            #traceback.print_exc()
+            pass #defaulting to Taurus/PyTango
+    try: 
+        if use_tau and not TAU: TAU = loadTaurus()
+        db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
+        if not args: TangoDatabase = db
+        return db
+    except:
+        print traceback.format_exc()
     return
 
 def get_device(dev,use_tau=False,keep=False): 
@@ -319,14 +329,14 @@ def parse_db_command_array(data,keys=1,depth=2):
         dict.update([(k,v)])
     return dict
             
-def get_device_property(device,property):
+def get_device_property(device,property,db=None):
     """
     It returns device property value or just first item if value list has lenght==1
     """
-    prop = get_database().get_device_property(device,[property])[property]
+    prop = (db or get_database()).get_device_property(device,[property])[property]
     return prop if len(prop)!=1 else prop[0]
 
-def put_device_property(device,property,value=None):
+def put_device_property(device,property,value=None,db=None):
     """
     Two syntax are possible:
      - put_device_property(device,{property:value})
@@ -334,7 +344,11 @@ def put_device_property(device,property,value=None):
     """
     if not fun.isMapping(property):
         property = {property:value}
-    return get_database().put_device_property(device,property)
+    else:
+        for p,v in property.items():
+            if fun.isSequence(v) and len(v)==1:
+                property[p] = v[0]
+    return (db or get_database()).put_device_property(device,property)
             
 def get_devices_properties(expr,properties,hosts=[],port=10000):
     """
