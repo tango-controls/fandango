@@ -1,7 +1,25 @@
-RELEASE = (11,1)
-RELEASE_NOTE = "needed for PyTangoArchiving>5.0 and PyTango>8.1"
+RELEASE = (11,2)
+RELEASE_NOTE = "Added DynamicServer/CopyCatDS, Taurus/PyTango independent, needed for PyTangoArchiving.widget>5.2 and PyTango>8.1"
 
 """
+dynamic: added DynamicServer main class to load new device classes on runtime
+dynamic: added parseStaticAttributes method to check subclasses
+dynamic: solved bug parsing DevFloat attributes
+objects: Added methods: obj2dict, Struct.updateAttrsDict
+functional: Added extended regexps (&,!) to all *chCl methods
+functional: Added default arg to first,last methods
+interface: moved to subdirectory to put there new device templates
+interface: Added CopyCatDS (aka gateway/simulator/doppleganger)
+tango: get_database() bypassed to avoid BAD_INV corba crahes in Tango8
+when using get/put_device_property within device servers.
+excepts: PyTango independent, trial() adapted to return values
+log: log exception management centralized in sendToStream()
+linos: sendmail, added from argument
+qt: taurus independent
+qt: QWorker replaces TauEmitterThread
+qt: new getQwtPlot() method
+
+
 
 NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not supported in python 2.6 we will wait to next OS upgrade)
 NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
@@ -18,6 +36,7 @@ log: bugs in logging when using last pytango releases
 servers: ComposersDict updated to PyTango>8
 device: Dev4Tango polling thread exception replaced by error message
 objects: loadModule method improved to search by module name instead of path
+TangoEval: Added DEVICES dict and DEV command to access device proxies from formulas
 
 
 July 2014 - 11.00, needed by PyTangoArchiving 5.0
