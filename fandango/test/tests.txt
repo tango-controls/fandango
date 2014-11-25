@@ -1,0 +1,4 @@
+
+Do pycheck on individual files
+
+pychecker --limit 200 device.py 2>/dev/null | grep device.py
