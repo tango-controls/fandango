@@ -91,7 +91,7 @@ except: print 'Unable to import threads module'
 
 #TANGO related modules
 try:
-    from tango import get_device,get_database,get_database_device,get_all_devices,get_device_info,\
+    from tango import TGet,get_device,get_database,get_database_device,get_all_devices,get_device_info,\
         get_alias_for_device,get_device_for_alias,get_tango_host, \
         find_devices,find_attributes,get_matching_devices,get_matching_attributes,\
         cast_tango_type,parse_tango_model,check_attribute,check_device,except2str,\
@@ -103,11 +103,17 @@ try:
         from servers import ServersDict,Astor,ProxiesDict,ComposersDict
     except Exception,e: raise Exception('fandango.servers: %s'%e)
     try: 
-        from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute,DynamicDSTypes,CreateDynamicCommands
-    except Exception,e: raise Exception('fandango.dynamic: %s'%e)
-    try: 
+        path = imp.find_module('fandango')[1]
+        deprecated = [f for f in (os.path.join(path,'interface'+ext) for ext in ('.py','.pyc','.pyo','py~')) if os.path.exists(f)]
+        if deprecated:
+            print 'fandango.interface: deprecated files still exist: %s'%','.join(deprecated)
+            try: [os.remove(f) for f in deprecated]
+            except: print('... and should be removed manually!')
         from interface import FullTangoInheritance,NewTypeInheritance
     except Exception,e: raise Exception('fandango.interface: %s'%e)
+    try: 
+        from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute,DynamicDSTypes,CreateDynamicCommands,DynamicServer
+    except Exception,e: raise Exception('fandango.dynamic: %s'%e)
 except Exception,e: 
     print 'Unable to import fandango.*tango modules: %s'%e
     #print traceback.format_exc()
