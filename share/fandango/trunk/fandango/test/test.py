@@ -51,4 +51,20 @@ except Exception,e:
     print m+': KO!'
     sys.exit(1)
     
+try:
+    m = 'fandango.tango'
+    if not fun.searchCl(a,m): raise Skip()
+    import fandango.tango as f_tango
+    assert isinstance(f_tango.get_proxy('sys/database/2'),fandango.tango.PyTango.DeviceProxy)
+    assert isinstance(f_tango.get_proxy('sys/database/2/state'),fandango.tango.PyTango.AttributeProxy)
+    assert isinstance(f_tango.TGet(),fandango.tango.PyTango.Database)
+    assert isinstance(f_tango.TGet(f_tango.TGet('sys/database/*')[0]),fandango.tango.PyTango.DeviceProxy)
+    assert isinstance(f_tango.TGet(f_tango.TGet('sys/database/*/st[a]te')[0]),int)
+    print m+': OK'
+except Skip:pass
+except Exception,e: 
+    traceback.print_exc()
+    print m+': KO!'
+    sys.exit(1)
+    
 sys.exit(0)
