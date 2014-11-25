@@ -66,7 +66,7 @@ except: pass
 ## Some miscellaneous logic methods
 ########################################################################
   
-def first(seq,default=Exception):
+def first(seq):
     """Returns first element of sequence"""
     try: 
         return seq[0]
@@ -74,14 +74,11 @@ def first(seq,default=Exception):
         try: 
             return seq.next()
         except Exception,d:
-            if default is not Exception:
-                return default
-            else:
-                raise d
+            raise d
             #raise e #if .next() also doesn't work throw unsubscriptable exception
     return
 
-def last(seq,MAX=1000,default=Exception):
+def last(seq,MAX=1000):
     """Returns last element of sequence"""
     try:
         return seq[-1]
@@ -89,10 +86,7 @@ def last(seq,MAX=1000,default=Exception):
         try: 
             n = seq.next()
         except: 
-            if default is not Exception:
-                return default
-            else:
-                raise e #if .next() also doesn't work throw unsubscriptable exception
+            raise e #if .next() also doesn't work throw unsubscriptable exception
         try:
             for i in range(1,MAX):
                 n = seq.next()
@@ -283,23 +277,13 @@ def inCl(exp,seq,regexp=True):
     else:
         return exp in seq
     
-def matchCl(exp,seq,terminate=False,extend=False):
+def matchCl(exp,seq,terminate=False):
     """ Returns a caseless match between expression and given string """
-    if extend:
-        if '&' in exp:
-            return all(matchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
-            return not matchCl(exp[1:],seq,terminate,extend=True) 
     return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clmatch = matchCl #For backward compatibility
 
-def searchCl(exp,seq,terminate=False,extend=False):
+def searchCl(exp,seq,terminate=False):
     """ Returns a caseless regular expression search between expression and given string """
-    if extend:
-        if '&' in exp:
-            return all(searchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
-            return not searchCl(exp[1:],seq,terminate,extend=True)
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
 
@@ -348,17 +332,12 @@ def filtersmart(seq,filters):
     seq = seq if isSequence(seq) else (seq,)
     filters = filters if isSequence(seq) else (filters,)
     raw,comp,neg = [],[],[]
-    def parse(s):
-        s = toRegexp(s)
-        if '*' not in s:
-            if not s.startswith('^'): s='.*'+s
-            if not s.startswith('$'): s=s+'.*'
-        return s
+    parse = lambda s: ('.*' if not s.startswith('^') else '')+toRegexp(s)
     for f in filters:
         if f.startswith('+'): comp.append(parse(f[1:]))
         elif f.startswith('!'): neg.append(parse(f[1:]))
         else: raw.append(parse(f))
-    return [s for s in seq if (not any(matchCl(n,s) for n in neg)) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
+    return [s for s in seq if not any(matchCl(n,s) for n in neg) and any(matchCl(r,s) for r in raw) and (not comp or all(matchCl(c,s) for c in comp))]
 
 ########################################################################
 ## Methods for piped iterators
@@ -481,20 +460,6 @@ def isNested(seq,strict=False):
     if not strict and isIterable(child): return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
-    
-def isBool(seq):
-    if seq in (True,False):
-        return True
-    elif isString(seq):
-        return seq.lower() in ('true','yes','1','false','no','0','none')
-    else:
-        return False
-    
-def isDate(seq):
-    try:
-        return str2time(seq)
-    except:
-        return False
 
 ###############################################################################
 
@@ -506,34 +471,6 @@ def str2float(seq):
     """ It returns the first float (x.ye-z) encountered in the string """
     return float(re.search('[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?',seq).group())
 
-def str2bool(seq):
-    """ It parses true/yes/no/false/1/0 as booleans """
-    return seq.lower().strip() not in ('false','0','none','no')
-
-def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
-    """ 
-    Tries to convert string to an standard python type.
-    If use_eval is True, then it tries to evaluate as code.
-    """
-    if not use_eval: sep_exp = '(?:^[^\(\[\{])'+sep_exp #Get non-evaluable lists
-    m = re.match(sep_exp,seq) 
-    if m:
-        return [str2type(s,use_eval) for s in str2list(seq,m.groups()[0])]
-    elif isBool(seq):
-        return str2bool(seq)
-    elif use_eval:
-        try:
-            return eval(seq)
-        except:
-            return seq
-    elif isNumber(seq):
-        return str2float(seq)
-    else:
-        return seq
-    
-def doc2str(obj):
-    return obj.__name__+'\n\n'+obj.__doc__
-    
 def toList(val,default=[],check=isSequence):
     if val is None: 
         return default
@@ -617,15 +554,15 @@ def int2bool(dec,N=16):
     for i in range(N):
         result.append(bool(dec % 2))
         dec = dec >> 1
-    return result
+    return result        
 
 ########################################################################
 ## Time conversion
 ########################################################################
 
 END_OF_TIME = 1024*1024*1024*2 #Jan 19 04:14:08 2038
-TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
-RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
+TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
+RAW_TIME = '^([0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
 
 def now():
     return time.time()

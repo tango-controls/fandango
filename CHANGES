@@ -1,64 +1,10 @@
-RELEASE = (11,2)
-RELEASE_NOTE = "Added DynamicServer/CopyCatDS, Taurus/PyTango independent, needed for PyTangoArchiving.widget>5.2 and PyTango>8.1"
+RELEASE = (10,9)
+RELEASE_NOTE = "many improvements focused on better TangoEval for alarms, taurus-less proxies and bug solving in DynamicDS"
 
 """
-dynamic: added DynamicServer main class to load new device classes on runtime
-dynamic: added parseStaticAttributes method to check subclasses
-dynamic: solved bug parsing DevFloat attributes
-objects: Added methods: obj2dict, Struct.updateAttrsDict
-functional: Added extended regexps (&,!) to all *chCl methods
-functional: Added default arg to first,last methods
-interface: moved to subdirectory to put there new device templates
-interface: Added CopyCatDS (aka gateway/simulator/doppleganger)
-tango: get_database() bypassed to avoid BAD_INV corba crahes in Tango8
-when using get/put_device_property within device servers.
-excepts: PyTango independent, trial() adapted to return values
-log: log exception management centralized in sendToStream()
-linos: sendmail, added from argument
-qt: taurus independent
-qt: QWorker replaces TauEmitterThread
-qt: new getQwtPlot() method
-
-
-
-NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not supported in python 2.6 we will wait to next OS upgrade)
-NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
-ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
-
-October 2014 - 11.1 needed for PyTangoArchiving>5.0 and PyTango>8.1
--------------------------------------------------
-
-dicts: fixed bug when keys are QStrings instead of python strings
-arrays: bug in calcullating range from float instead of int
-dynamic: DynamicDS devices capable of use init() to reload dynamic attributes
-dynamic: added LoadFromFile property and load_from_file command to be able to load attribute lists from files
-log: bugs in logging when using last pytango releases
-servers: ComposersDict updated to PyTango>8
-device: Dev4Tango polling thread exception replaced by error message
-objects: loadModule method improved to search by module name instead of path
-TangoEval: Added DEVICES dict and DEV command to access device proxies from formulas
-
-
-July 2014 - 11.00, needed by PyTangoArchiving 5.0
--------------------------------------------------
-db: enabled tuples and dictionaries as row types on returned queries; bug solved in Select()
-threads: Added SubProcess method to execute DB queries in a background process with timeout
-tango: get_matching_devices; set fullname=False due to several bugs found in beamlines ... waiting for more conflicts to appear
-tango: get_matching_devices(fullname=False) by default #It solved the bugs in Vacca 
-interface: added getDeviceClassObjects and addAllClasses methods to append dynamically new classes to servers\
-arrays: tested and documented decimation methods, filter_array is the best of them
-arrays: filter_array, improved comparison methods
-functional: str2time: solved bug in RAW_TIME regexp
-functional: added str2bool and str2type (any) methods, added minutes as time units in str2time
-objects: added Decorator and BoundDecorator classes to manage class-bound decoration
-objects: Added items() method to Struct objects
-qt: Added getQt, QConfirmAction decorator, DialogCloser connector and QTextBuffer widget for logging
-qt: Solved bugs in QDialogWidget, added Ok/Cancel buttons
-linos: sys_args_to_dict refactored, added MyMachine to get platform/machine information
 
 May 2014 - 10.9
 -------------------------------------------------
-taurus enum dependency removed
 dynamic: #37002 Fake R/W attributes solved using  if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) to check for WRITE formulas.
 dynamic: it was causing the "Bool not iterable" bug when reading empty R/W spectrums (WRITE returned instead of []).
 dynamic: XATTR acceps tango_host:/... URL's

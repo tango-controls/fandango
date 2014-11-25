@@ -317,49 +317,39 @@ class CaselessDict(dict):
                 raise e
 
     def __getitem__(self, key):
-        key = str(key)
         if dict.has_key(self,key):
             return dict.__getitem__(self,key)
         return dict.__getitem__(self, key.lower() if hasattr(key,'lower') else key)
 
     def __setitem__(self, key, value):
-        key = str(key)
         dict.__setitem__(self, key.lower() if hasattr(key,'lower') else key, value)
 
     def __contains__(self, key):
-        key = str(key)
         return dict.__contains__(self, key.lower() if hasattr(key,'lower') else key)
 
     def has_key(self, key):
-        key = str(key)
         return dict.has_key(self, key.lower() if hasattr(key,'lower') else key)
 
     def get(self, key, def_val=None):
-        key = str(key)
         return dict.get(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def setdefault(self, key, def_val=None):
-        key = str(key)
         return dict.setdefault(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def update(self, other):
         for k,v in other.items():
-            k = str(k)
             dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
 
     def fromkeys(self, iterable, value=None):
         d = CaselessDict()
         for k in iterable:
-            k = str(k)
             dict.__setitem__(d, k.lower() if hasattr(k,'lower') else k, value)
         return d
 
     def pop(self, key, def_val=None):
-        key = str(key)
         return dict.pop(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def __delitem__(self, k):
-        k = str(k)
         dict.__delitem__(self, k.lower() if hasattr(k,'lower') else k)
         
 class CaselessDefaultDict(defaultdict_fromkey,CaselessDict):
@@ -369,7 +359,6 @@ class CaselessDefaultDict(defaultdict_fromkey,CaselessDict):
         CaselessDefaultDict = type('CaselessDefaultType',(CaselessDict,defaultdict_fromkey),{})
     """
     def __getitem__(self, key):
-        key = str(key)
         return defaultdict_fromkey.__getitem__(self, key.lower())
     pass
 
@@ -781,7 +770,7 @@ enumeration.py: borrowed from tcoutinho@cells.es tau.core.utils library
   and it doesn't allow you to specify values for some constants while leaving
   others unspecified. This approach does those things, while verifying that all
   values (specified and unspecified) are unique. Enum values then are attributes
-  of an Enumeration class (Insect.BEETLE, Car.PASSAT, etc.).
+  of an Enumeration class (Volkswagen.BEETLE, Volkswagen.PASSAT, etc.).
 
 """
 
@@ -792,13 +781,11 @@ class EnumException(Exception):
     pass
 
 class Enumeration:
-    """ @DEPRECATED: Use python Enum type instead!
-    
-        Enumeration class intended to provide the 'enum' feature present in many 
+    """ Enumeration class intended to provide the 'enum' feature present in many 
         programming languages.
         Usage:
-        car = ThingWithType(fruit.Lemon)
-        print whatkind(fruit.type, Lemon)
+        car = ThingWithType(Volkswagen.BEETLE)
+        print whatkind(car.type, Volkswagen)
         bug = ThingWithType(Insect.BEETLE)
         print whatkind(bug.type, Insect)
 
@@ -810,7 +797,7 @@ class Enumeration:
 
         print car.__dict__
         print bug.__dict__
-        pprint.pprint(Cars.__dict__)
+        pprint.pprint(Volkswagen.__dict__)
         pprint.pprint(Insect.__dict__)
         """
         

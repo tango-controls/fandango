@@ -1,63 +1,12 @@
-#!/usr/bin/env python
 
-#############################################################################
-##
-## file :       db.py
-##
-## description : This module simplifies database access.
-##
-## project :     Tango Control System
-##
-## $Author: Sergi Rubio Manrique, srubio@cells.es $
-##
-## $Revision: 2014 $
-##
-## copyleft :    ALBA Synchrotron Controls Section, CELLS
-##               Bellaterra
-##               Spain
-##
-#############################################################################
-##
-## This file is part of Tango Control System
-##
-## Tango Control System is free software; you can redistribute it and/or
-## modify it under the terms of the GNU General Public License as published
-## by the Free Software Foundation; either version 3 of the License, or
-## (at your option) any later version.
-##
-## Tango Control System is distributed in the hope that it will be useful,
-## but WITHOUT ANY WARRANTY; without even the implied warranty of
-## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-## GNU General Public License for more details.
-##
-## You should have received a copy of the GNU General Public License
-## along with this program; if not, see <http://www.gnu.org/licenses/>.
-###########################################################################
-
-import Queue,traceback,time,sys
+from PyQt4 import Qt,QtCore,QtGui
+import Queue,traceback,time
 from functools import partial
 import fandango
 from functional import isString,isSequence
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton
-
-def getQt(full=False):
-    """
-    Choosing between PyQt and Taurus Qt distributions
-    """
-    try:
-        from taurus.external.qt import Qt,QtCore,QtGui
-    except:
-        from PyQt4 import Qt,QtCore,QtGui
-    if full:
-        return Qt,QtCore,QtGui
-    else:
-        return Qt
-    
-Qt,QtCore,QtGui = getQt(True)
-
-###############################################################################
 
 def getStateLed(model):
     from taurus.qt.qtgui.display import TaurusStateLed
@@ -70,64 +19,18 @@ def getApplication(args=None):
     app = Qt.QApplication.instance()
     return app or Qt.QApplication(args or [])
 
-def execApplication():
-    getApplication().exec_()
-   
-def getQwtTimeScaleDraw():
-    from PyQt4 import Qt,Qwt5
-    from PyQt4.Qwt5 import qplt,QwtScaleDraw,QwtText
-    class QwtTimeScale(QwtScaleDraw):
-        def label(self,v):
-            return QwtText('\n'.join(fandango.time2str(v).split()))
-    return QwtTimeScale()
-    
-def getRandomColor(i=None):
-    import random
-    ranges = 50,230
-    if i is not None:
-        ranges = map(int,(170,256/(i+.01),256%(i+0.01),256-256/(i+0.01)) if i<256 else (170,i/256.,i%256))
-        ranges = min(ranges),max(ranges)
-        print ranges
-    return Qt.QColor(
-        int(random.randint(*ranges)),
-        int(random.randint(*ranges)),
-        int(random.randint(*ranges)))
-
-def getQwtPlot(series,xIsTime=False):
-    """ Series would be a {Label:[(time,value)]} dictionary """
-    app = getApplication()
-    from PyQt4 import Qt,Qwt5
-    from PyQt4.Qwt5 import qplt,QwtScaleDraw
-    qpt = qplt.Plot(*[qplt.Curve(
-            [x[0] for x in t[1]],
-            [y[1] for y in t[1]],t[0],
-            qplt.Pen(getRandomColor(i=None),2)) 
-        for i,t in enumerate(series.items())])
-    if xIsTime: qpt.setAxisScaleDraw(qpt.xBottom,getQwtTimeScaleDraw())
-    return qpt
-
 class QDialogWidget(Qt.QDialog):
     """
     It converts any Widget into a Dialog
-    
-    setAccept method allows to easily connect the accepted() signal to a callable
     """
-    def __init__(self,parent=None,flags=None,buttons=None):
-        if flags is not None: Qt.QDialog.__init__(self,parent,flags)
-        else: Qt.QDialog.__init__(self,parent)
-        self.buttons = buttons
-        self.setLayout(Qt.QVBoxLayout())
-        if self.buttons:
-            self.buttons = Qt.QDialogButtonBox(Qt.QDialogButtonBox.Ok|Qt.QDialogButtonBox.Cancel)
-            self.connect(self.buttons,Qt.SIGNAL('accepted()'),self.accept)
-            self.connect(self.buttons,Qt.SIGNAL('rejected()'),self.reject)
-            self.layout().addWidget(self.buttons)
     def widget(self):
         self._widget = getattr(self,'_widget',None)
         return self._widget
     def setWidget(self,widget,accept_signal=None,reject_signal=None):
+        self.setMinimumSize(widget.size())
+        self.setLayout(Qt.QVBoxLayout())
         widget.setParent(self)
-        self.layout().insertWidget(0,widget)
+        self.layout().addWidget(widget)
         self.setSizePolicy(Qt.QSizePolicy.Expanding,Qt.QSizePolicy.Expanding)
         self._widget = widget
         if accept_signal:self.connect(widget,Qt.SIGNAL(accept_signal),self.accept)
@@ -135,10 +38,8 @@ class QDialogWidget(Qt.QDialog):
         self.updateGeometry()
         return self
     def sizeHint(self):
-        return Qt.QDialog.sizeHint(self)
-    def setAccept(self,f):
-        """connect the accepted() signal to a callable"""
-        self.connect(self.buttons or self,Qt.SIGNAL('accepted()'),f)
+        if self.widget(): return self.widget().sizeHint()
+        else: return Qt.QDialog.sizeHint(self)
         
 class QExceptionMessage(object):
     def __init__(self,message=None):
@@ -379,6 +280,7 @@ class QCustomTabWidget(Qt.QWidget):
         print 'QCustomTabWidget.TabToolTip: Not implemented!'
         return
         
+#from taurus.qt import Qt
 #from taurus.qt.qtgui.display import TaurusStateLed
 #qapp = Qt.QApplication([])
 #qf = Qt.QFrame()
@@ -409,23 +311,13 @@ class TauFakeEventReceiver():
     def event_received(self,source,type_,value):
         print '%s: Event from %s: %s(%s)'% (time.ctime(),source,type_,shortstr(getattr(value,'value',value)))
         
-class TaurusImportException(Exception):
-    pass
-        
-try:
-    import taurus.core,taurus.qt
-    import taurus.qt.qtgui.util.tauruscolor as colors
-    import taurus.qt.qtgui.base as taurusbase
-    from taurus.qt.qtgui.base import TaurusBaseComponent
-    from taurus.core import TaurusEventType,TaurusAttribute
-    from taurus.qt.qtgui.graphic import TaurusGraphicsItem
-    from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
-except:
-    print 'Unable to import Taurus!'
-    taurus,colors,taurusbase,tie = None,None,None,TaurusImportException
-    TaurusBaseComponent,TaurusEventType,TaurusAttribute,TaurusGraphicsItem,TaurusWidget = tie,tie,tie,tie,tie
+import taurus.core,taurus.qt
+import taurus.qt.qtgui.util.tauruscolor as colors
+import taurus.qt.qtgui.base as taurusbase
+from taurus.core import TaurusEventType,TaurusAttribute
+from taurus.qt.qtgui.graphic import TaurusGraphicsItem
 
-def getColorsForValue(value,palette = getattr(colors,'QT_DEVICE_STATE_PALETTE',None)):
+def getColorsForValue(value,palette = colors.QT_DEVICE_STATE_PALETTE):
     """ 
     Get QColor equivalent for a given Tango attribute value 
     It returns a Background,Foreground tuple
@@ -445,7 +337,7 @@ def getColorsForValue(value,palette = getattr(colors,'QT_DEVICE_STATE_PALETTE',N
         
     return bg_brush.color(),fg_brush.color()
 
-class TauColorComponent(TaurusBaseComponent):
+class TauColorComponent(taurusbase.TaurusBaseComponent):
     """
     Abstract class for Tau color-based items.
     
@@ -528,6 +420,9 @@ class TauColorComponent(TaurusBaseComponent):
 
     def getModelClass(self):
         return TaurusAttribute
+        
+from taurus.qt import Qt
+from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 
 class QSignalHook(Qt.QObject):
     """
@@ -567,10 +462,8 @@ def modelSetter(obj,model):
         obj.setModel(model)
     return
         
-class QWorker(Qt.QThread):
+class TauEmitterThread(Qt.QThread):
     """
-    IF YOU USE TAURUS, GO THERE INSTEAD: taurus.qt.qtcore.util.emitter.SingletonWorker ; it is more optimized and maintained
-    
     This object get items from a python Queue and performs a thread safe operation on them.
     It is useful to delay signals in a background thread.
     :param parent: a Qt/Tau object
@@ -645,7 +538,7 @@ class QWorker(Qt.QThread):
 
     def getDone(self):
         """ Returns % of done tasks in 0-1 range """
-        return float(self._done)/(self._done+self.getQueue().qsize()) if self._done else 0.
+        return self._done/(self._done+self.getQueue().qsize()) if self._done else 0.
 
     def _doSomething(self,args):
         self.log.debug('At TauEmitterThread._doSomething(%s)'%str(args))
@@ -666,18 +559,16 @@ class QWorker(Qt.QThread):
         queue = self.getQueue()
         (queue.empty() and self.log.info or self.log.debug)('At TauEmitterThread.next(), %d items remaining.' % queue.qsize())
         try:
-            if not queue.empty():
+            if not queue.empty():            
                 if not self._cursor and self.cursor is not None: 
                     Qt.QApplication.instance().setOverrideCursor(Qt.QCursor(self.cursor))
                     self._cursor=True                
                 item = queue.get(False) #A blocking get here would hang the GUIs!!!
                 self.todo.put(item)
                 self.log.debug('Item added to todo queue: %s' % str(item))
-            else:
-                self._done = 0.
-                if self._cursor: 
-                    Qt.QApplication.instance().restoreOverrideCursor()
-                    self._cursor = False        
+            elif self._cursor: 
+                Qt.QApplication.instance().restoreOverrideCursor()
+                self._cursor = False        
                 
         except Queue.Empty,e:
             self.log.warning(traceback.format_exc())
@@ -703,8 +594,6 @@ class QWorker(Qt.QThread):
             #End of while
         self.log.info('#'*80+'\nOut of TauEmitterThread.run()'+'\n'+'#'*80)
         #End of Thread 
-        
-TauEmitterThread = QWorker #For backwards compatibility
             
 ###############################################################################
 
@@ -775,104 +664,6 @@ class TangoHostChooser(Qt.QWidget):
     
 ###############################################################################
 
-class DialogCloser(object):
-    """
-    This decorator triggers dialog closure at the end of the decorated method
-    e.g.
-    dialog = QTextBuffer()
-    widget = TaurusTrend()
-    
-    TaurusTrend.closeEvent = DialogCloser(d)
-    """
-    def __init__(self,dialog):
-        self.dialog = dialog
-    def __call__(self,f):
-        def wrapped_closeEvent(*args):
-            f(*args)
-            try: self.dialog.close()
-            except:pass
-        return wrapped_closeEvent
-
-def setDialogCloser(dialog,widget):
-    """
-    set dialog to be closed on widget.closeEvent()
-    """
-    widget.closeEvent = DialogCloser(dialog)(widget.closeEvent)
-    widget.hideEvent = DialogCloser(dialog)(widget.hideEvent)
-    
-    
-def QConfirmAction(action,parent=None,title='WARNING',message='Are you sure?',options=Qt.QMessageBox.Ok|Qt.QMessageBox.Cancel):
-    """
-    This method will just execute action but preceeded by a confirmation dialog.
-    To pass arguments to your action just use partial(action,*args,**kwargs) when declaring it
-    e.g:
-        self._clearbutton.connect(self._clearbutton,Qt.SIGNAL('clicked()'),fandango.partial(fandango.qt.QConfirmAction,self.clearBuffers)
-    """
-    if Qt.QMessageBox.Ok == QtGui.QMessageBox.warning(parent,title,message,QtGui.QMessageBox.Ok|QtGui.QMessageBox.Cancel):
-        action()
-
-class QTextBuffer(Qt.QDialog):
-    """
-    This dialog provides a Text dialog where logs can be inserted from your application in a round buffer.
-    It also provides a button to save the logs into a file if needed.
-    """
-    def __init__(self,title='TextBuffer',maxlen=1000):
-        Qt.QDialog.__init__(self) #,*args)
-        self.setWindowTitle(title)
-        lwidget,lcheck = Qt.QVBoxLayout(),Qt.QHBoxLayout()
-        self.setLayout(lwidget)
-        self._maxlen = maxlen
-        self._buffer = [] #collections.deque could be used instead
-        self._count = Qt.QLabel('0/%d'%maxlen)
-        lwidget.addWidget(self._count)
-        self._browser = Qt.QTextBrowser()
-        lwidget.addWidget(self._browser)
-        self._cb = Qt.QCheckBox()
-        self._checked = False
-        self._label = Qt.QLabel('Dont popup logs anymore')
-        self._label.setAlignment(Qt.Qt.AlignLeft)
-        map(lcheck.addWidget,(self._cb,self._label))
-        lwidget.addLayout(lcheck)
-        self.connect(self._cb,Qt.SIGNAL('toggled(bool)'),self.toggle)
-        self._savebutton = Qt.QPushButton('Save Logs to File')
-        self._savebutton.connect(self._savebutton,Qt.SIGNAL('clicked()'),self.saveLogs)
-        self.layout().addWidget(self._savebutton)
-        
-    def append(self,text):
-        if self._buffer and text==self._buffer[-1]: test = '+1'
-        self._buffer.append(text)
-        if len(self._buffer)>=1.2*self._maxlen:
-            self._buffer = self._buffer[-self._maxlen:]
-            self._browser.setText('\n'.join(self._buffer))
-        else:
-            self._browser.append(text)
-        self._count.setText('%d/%d'%(min((self._maxlen,len(self._buffer))),self._maxlen))
-        if not self._checked:
-            self.show()
-    def text(self):
-        return self._browser.toPlainText()
-    def setText(self,text):
-        self._buffer = text.split('\n')
-        self._browser.setText(text)
-    def clear(self):
-        self._browser.clear()
-        self._buffer = []
-    def toggle(self,arg=None):
-        if arg is None:
-            self._checked = self._cb.isChecked()
-        elif arg:
-            self._cb.setChecked(True)
-            self._checked = True
-        else:
-            self._cb.setChecked(False)
-            self._checked = False
-        #print 'toggled(%s): %s'%(arg,self._checked)
-        #sys.stdout.flush()
-    def saveLogs(self):
-        fname = str(Qt.QFileDialog.getSaveFileName(None,'Choose a file to save'))
-        #self.info('Saving logs to %s'%fname)
-        if fname: open(fname,'w').write(str(self.text()))
-    
 
 class QDropTextEdit(Qt.QTextEdit):
     """

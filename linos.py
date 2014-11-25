@@ -19,10 +19,7 @@ Out[77]:
 """
 
 import time,sys,os,re
-import fandango.objects as fun #objects module includes functional
-
-################################################################################3
-# Shell methods
+import fandango.functional as fun
 
 def shell_command(*commands, **keywords):
     """Executes a list of commands linking their stdin and stdouts
@@ -46,33 +43,18 @@ def shell_command(*commands, **keywords):
     elif split: return result.split('\n')
     else: return result
     
-def sendmail(subject,text,receivers,sender='',attachments=None,trace=False):
+def sendmail(subject,text,receivers,attachments=None,trace=False):
     if '\n' in text and '\\n' not in text:
         text = text.replace('\n','\\n')
-    sender = sender and " -r %s"%sender
-    attachments = attachments and ' '+' '.join('-a %s'%a for a in attachments) or ''
-    receivers = ' '+' '.join(receivers)
+    attachments = attachments and ' '.join('-a %s'%a for a in attachments) or ''
+    receivers = ' '.join(receivers)
     command = 'echo -e "'+text+'" '
     command += '| mail -s "%s" ' % subject
     #command += '-S from=%s ' % self.FromAddress #'-r %s ' % (self.FromAddress)
     #command += (MAIL_RECEIVER if fandango.isString(MAIL_RECEIVER) else ','.join(MAIL_RECEIVER))
-    command += sender + attachments + receivers
+    command += attachments + ' ' + receivers
     if trace: print(command.rsplit('|',1)[-1])
     os.system(command)
-    
-################################################################################3
-# Platform/Architecture/Hostname methods
-
-class MyMachine(fun.Struct):
-    """ This method identifies the current Machine (OS/Arch/Hostname/Kernel) using the platform module """
-    def __init__(self):
-        import platform
-        self.hostname = self.host = platform.node()
-        self.dist = platform.dist()
-        self.arch = platform.machine()
-        self.kernel = platform.release()
-        self.os = platform.system()
-        self.platform = platform.platform()
 
 ################################################################################3
 # Processes methods
@@ -345,72 +327,48 @@ def timefun(fun):
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
 
-def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
+def sysargs_to_dict(args=None,defaults=[],trace=False):
     ''' 
     It parses the command line arguments into an understandable dict
-    defaults is the list of anonymous arguments to accept (would be False if not specified)
+    defaults is the list of anonymous arguments to accept
     
-    > command H=1 --option=value --parameter VALUE -test default_arg1 default_arg2
-    
-    will returns
-    
-    {H:1,option:value,parameter:VALUE,test:True,params:[default_arg1,default_arg2]}
-    
-    getopt and argparse modules in python provide similar functionality, but are not available in all of our distributions
+    > command --option=value --parameter VALUE default_arg1 default_arg2
     '''
     if args is None: args = sys.argv[1:]
     if trace: print 'sysargs_to_dict(%s,%s)'%(args,defaults)
     result,defargs,vargs = {},[],[]
-    cast_arg = lambda x: fun.str2type(x,use_eval=True) if cast else x
     
     ##Separate parameter/options and default arguments
-    [(vargs if ('=' in a or a.startswith('-') or (i and args[i-1].startswith('--') and '=' not in args[-1])) else defargs).append(a) 
-        for i,a in enumerate(args)]
-    defargs = map(cast_arg,defargs)
-    if trace: print('defargs: %s'%defargs)
+    [(vargs if ('=' in a or a.startswith('-') or (i and '-' in args[i-1] and '=' not in args[-1])) else defargs).append(a) for i,a in enumerate(args)]
+    #for i,a in enumerate(args):
+        #if ('=' in a or a.startswith('-') or (i and args[i-1].startswith('-') and '=' not in args[-1])):
+            #print 'adding varg %s'%a
+            #vargs.append(a)
+        #else:
+            #defargs.append(a)
+    if not defaults:
+        if not vargs and defargs: #Arguments do not parse
+            return sysargs_to_dict(None,args) #Defaulting to sys.argv
+    else:
+        if len(defaults)==1: result[defaults[0]] = defargs[0] if len(defargs)==1 else (defargs or None)
+        else: [result.update(((defaults[i],a),)) for i,a in enumerate(defargs) if a]
     for n,a in enumerate(vargs):
         if '=' in a: #argument like [-]ARG=VALUE
             while a.startswith('-'): a = a[1:]
-            if a: result[a.split('=',1)[0]] = cast_arg(a.split('=',1)[1])
-        elif a.startswith('--'): #argument with - prefix
+            if a: result[a.split('=',1)[0]] = a.split('=',1)[1]
+        elif a.startswith('-'): #argument with - prefix
             while a.startswith('-'): a = a[1:] 
             if not a: continue
-            #If it is not the last value it is considered an assigment
             if (n+1)<len(args) and not args[n+1].startswith('-'): # --OPTION VALUE
-                result[a],n = cast_arg(args[n+1]),n+1 
+                result[a],n = args[n+1],n+1 
             else: result[a]=True # --OPTION for option=True
-        else: #if a.startswith('-'):
-            #A single dash is a plain boolean option
-            result[a]=True
-    if trace: print('defaults: %s'%defaults)
-    if not defaults:
-        if not vargs:
-            return defargs
-        else:
-            result[None] = defargs
-        #if not vargs and defargs: #Arguments do not parse
-            #return sysargs_to_dict(None,args) #Defaulting to sys.argv
-    else: #Assigning arguments using defaults as keys
-        defaults = [d for d in defaults if d not in result]
-        if len(defaults)==1: 
-            result[defaults[0]] = defargs[0] if len(defargs)==1 else (defargs or None)
-        else:
-            if len(defargs)>len(defaults): result[None] = defargs[len(defaults):]
-            result.update(zip(defaults,defargs))
-            result.update((d,False) for d in defaults if d not in result)
     
     if trace: print result
-    if len(result)==1 and None in result: split = True
-    if not split:
-        return result
-    else:
-        args = result.pop(None,[])
-        kwargs = result
-        return args,kwargs
+    return result
 
 def arg_to_bool(arg):
     if type(arg) is str:
-        return arg.lower() in ('true','yes') or False
+        return 'true' in arg.lower() or False
     else:
         return bool(arg)
 
@@ -429,9 +387,3 @@ def expand_args_to_list(args,type_=int):
 
 expand_args_to_int_list = lambda args: expand_args_to_list(args,int)
 expand_args_to_str_list = lambda args: expand_args_to_list(args,str)
-
-if __name__ == '__main__':
-    import sys
-    #print sysargs_to_dict(defaults=['params'],cast=False,split=True)
-    print sysargs_to_dict.__name__,'\n',sysargs_to_dict.__doc__
-    print sysargs_to_dict(cast=False,split=True)

@@ -107,26 +107,16 @@ def get_database(host='',port='',use_tau=False):
     if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
     elif ':' in host: host,port = host.split(':')
     args = [host,int(port)] if host and port else []
-    
-    ### DISABLED, CRUSHED WITH BAD_INV_ORDER CORBA in Tango8
-    if False and not args and TangoDatabase:
-        try:
-            t = time.time()
-            #TangoDatabase.get_info() #TOO SLOW TO BE A CHECK!
-            #TangoDatabase.check_tango_host(TangoDatabase.get_db_host()+':'+TangoDatabase.get_db_port())
-            #TangoDatabase.get_timeout_millis()
-            print time.time()-t
-            return TangoDatabase 
+    if use_tau and not TAU: use_tau = loadTaurus()
+    if not args and TangoDatabase:
+        return TangoDatabase
+    else:
+        try: 
+            db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
+            if not args: TangoDatabase = db
+            return db
         except:
-            #traceback.print_exc()
-            pass #defaulting to Taurus/PyTango
-    try: 
-        if use_tau and not TAU: TAU = loadTaurus()
-        db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
-        if not args: TangoDatabase = db
-        return db
-    except:
-        print traceback.format_exc()
+            print traceback.format_exc()
     return
 
 def get_device(dev,use_tau=False,keep=False): 
@@ -329,14 +319,14 @@ def parse_db_command_array(data,keys=1,depth=2):
         dict.update([(k,v)])
     return dict
             
-def get_device_property(device,property,db=None):
+def get_device_property(device,property):
     """
     It returns device property value or just first item if value list has lenght==1
     """
-    prop = (db or get_database()).get_device_property(device,[property])[property]
+    prop = get_database().get_device_property(device,[property])[property]
     return prop if len(prop)!=1 else prop[0]
 
-def put_device_property(device,property,value=None,db=None):
+def put_device_property(device,property,value=None):
     """
     Two syntax are possible:
      - put_device_property(device,{property:value})
@@ -344,11 +334,7 @@ def put_device_property(device,property,value=None,db=None):
     """
     if not fun.isMapping(property):
         property = {property:value}
-    else:
-        for p,v in property.items():
-            if fun.isSequence(v) and len(v)==1:
-                property[p] = v[0]
-    return (db or get_database()).put_device_property(device,property)
+    return get_database().put_device_property(device,property)
             
 def get_devices_properties(expr,properties,hosts=[],port=10000):
     """
@@ -531,10 +517,9 @@ class get_all_devices(objects.SingletonMap):
         instance = objects.SingletonMap.__new__(cls,*p,**k)
         return instance.get_all_devs()
     
-def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
+def get_matching_devices(expressions,limit=0,exported=False,fullname=True):
     """ 
     Searches for devices matching expressions, if exported is True only running devices are returned 
-    Tango host will be included in the matched name if fullname is True
     """
     if not fun.isSequence(expressions): expressions = [expressions]
     hosts = set((m.groups()[0] if m else None) for m in (fun.matchCl(rehost,e) for e in expressions))
@@ -554,9 +539,7 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
     if not fullname: result = [r if r.count('/')<=2 else r.split('/',1)[-1] for r in result]
     return result[:limit] if limit else result
     
-def find_devices(*args,**kwargs):
-    #A get_matching_devices() alias, just for backwards compatibility
-    return get_matching_devices(*args,**kwargs) 
+find_devices = get_matching_devices
     
 def get_matching_attributes(expressions,limit=0,fullname=None):
     """ 
@@ -599,9 +582,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None):
     result = list(set(attrs))
     return result[:limit] if limit else result
                     
-def find_attributes(*args,**kwargs):
-    #A get_matching_attributes() alias, just for backwards compatibility
-    return get_matching_attributes(*args,**kwargs) 
+find_attributes = get_matching_attributes
     
 def get_all_models(expressions,limit=1000):
     ''' 
@@ -1221,8 +1202,6 @@ class TangoEval(object):
         self._defaults['str2time'] = fun.str2time
         self._defaults['time'] = time
         self._defaults['NOW'] = time.time
-        self._defaults['DEVICES'] = self.proxies
-        self._defaults['DEV'] = lambda x:self.proxies[x]
         self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
         self._defaults['PREV'] = self.previous
