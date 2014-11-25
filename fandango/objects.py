@@ -459,7 +459,7 @@ class BoundDecorator(Decorator):#object):
             if self: print(msg)
     tracer = _Tracer() #NOTE: Giving a value to Tracer only works with instances; not from the class
     
-    def __call__(this,f):
+    def __call__(this,f=None):
         class _Descriptor(BoundDecorator):
             #Inherits to get the wrapper from the BoundDecorator class and be able to exist "onDemand"
             def __init__(self, f):
@@ -474,9 +474,14 @@ class BoundDecorator(Decorator):#object):
                 BoundDecorator.tracer('make_unbound(%s)'%klass)
                 @wraps(self.f)
                 def wrapper(*args, **kwargs):
-                    '''This documentation will vanish :)'''
-                    raise TypeError('unbound method %s() must be called with %s instance '
-                        'as first argument (got nothing instead)'%(self.f.__name__,klass.__name__))
+                    '''This documentation will disapear :)
+                    This method may work well only without arguments
+                    '''
+                    #raise TypeError('unbound method %s() must be called with %s class '
+                        #'as first argument (got nothing instead)'%(self.f.__name__,klass.__name__))
+                    #return self.f(instance, *args, **kwargs)
+                    BoundDecorator.tracer("Called the unbound method %s of %s"%(self.f.__name__, klass.__name__))
+                    return partial(this.wrapper,f=f)(*args,**kwargs)
                 return wrapper
             def make_bound(self, instance):
                 BoundDecorator.tracer('make_bound(%s)'%instance)
