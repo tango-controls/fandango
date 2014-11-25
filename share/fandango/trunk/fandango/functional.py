@@ -425,11 +425,11 @@ def isString(seq):
     if any(s in str(type(seq)).lower() for s in ('vector','array','list',)): return False
     if 'qstring' == str(type(seq)).lower(): return True # It matches QString
     return False
-    
-def isRegexp(seq):
+
+WILDCARDS = '^$*+?{[]\|()' #r'
+def isRegexp(seq,wildcards=WILDCARDS):
     """ This function is just a hint, use it with care. """
-    RE = r'^$*+?{[]\|()'
-    return anyone(c in RE for c in seq)
+    return anyone(c in wildcards for c in seq)
     
 def isNumber(seq):
     #return operator.isNumberType(seq)
