@@ -16,7 +16,7 @@ Major Changes:
   dynamic: added parseStaticAttributes method to check subclasses
   functional: Added extended regexps (&,!) to all *chCl methods
   interface: moved to subdirectory to put there new device templates (Processor, CopyCat, Player/Recorder, Dev4Tango, DevChild, ...)
-  interface: Added check on import fandango to remove all files (if allowed by OS)
+  interface: Added check on import fandango to remove deprecated files (if allowed by OS)
   interface: Added CopyCatDS (aka gateway/simulator/doppleganger)
   tango: get_database() bypassed to avoid BAD_INV corba crahes in Tango8  when using get/put_device_property within device servers.
   tango: added TGet and get_proxy helper methods (accept/return both devices and attributes, proxies and lists)

@@ -181,13 +181,20 @@ class CopyCatServer(DynamicServer):
     """
     The DynamicServer class provides .util .instance .db .classes to have access to Tango DS internals.
     """
+    def load_class(self,c):
+        if c.endswith('_Copy'): return
+        else: DynamicServer.load_class(self,c)
         
     def main(self,class_override=True):
         #fandango.tango.get_device_property failed!     desc = BAD_INV_ORDER CORBA system exception: BAD_INV_ORDER_ORBHasShutdown
         #doppels = dict((d,(db.get_device_property(d,['TargetDevice'])['TargetDevice'] or [''])[0]) for d in self.classes['CopyCatDS'])
-        targets = dict((d,fandango.tango.get_device_property(d,'TargetDevice')) for d in self.classes['CopyCatDS'])
+        ks = [k for k in self.classes if fandango.matchCl('CopyCatDS|(^*Copy$)',k)]
+        print 'classes: %s'%ks
+        doppels = [t for k in ks for t in self.classes[k]]
+        print 'copycat devices: %s'%doppels
+        targets = dict((d,fandango.tango.get_device_property(d,'TargetDevice')) for d in doppels)
         classes = {}
-        print targets
+        print 'targets: %s'
         for t in set(targets.values()):
             if t: classes[t] = choose_db(t,self.db).get_class_for_device(t if ':' not in t else t.split('/',1)[-1])
         print 'Devices: \n%s'%"\n".join(sorted('%s = %s(%s)'%(d,t,classes.get(t,None)) for d,t in targets.items()))
