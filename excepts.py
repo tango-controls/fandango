@@ -75,69 +75,21 @@ import sys
 import traceback
 import functools
 import contextlib
-from fandango import log
-from objects import decorator_with_args
-import fandango.functional as fun
+import PyTango
+from . import log
 
-try:
-    from PyTango import DevFailed,Except
-except:
-    DevFailed,Except = Exception,Exception
-
-def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
-    """ This method executes a try,except clause in a single line
-    :param tries: may be a callable or a list of callables
-    :param excepts: it can be a callable, a list of callables or a map of {ExceptionType:[callables]}
-    """
-    try:
-        tries = fun.toSequence(tries)
-        args = fun.notNone(args,[])
-        kwargs = fun.notNone(kwargs,{})
-        excepts = fun.notNone(excepts,lambda e: log.printf(str(e)))
-        result = [t(*args,**kwargs) for t in tries if fun.isCallable(t)]
-        return result[0] if len(result)==1 else result
-    except Exception,e:
-        if fun.isCallable(excepts):
-            v = excepts(e)
-            return return_exception and v
-        else:
-            if fun.isDictionary(excepts):
-                if type(e) in excepts: excepts = excepts.get(type(e))
-                elif type(e).__name__ in excepts: excepts = excepts.get(type(e).__name__)
-                else:
-                    candidates = [t for t in excepts if isinstance(e,t)]
-                    if candidates: excepts = excepts[candidates[0]]
-                    else: excepts = excepts.get('') or excepts.get(None) or []
-            excepts = fun.toSequence(excepts)
-            vals = [x(e) for x in excepts if fun.isCallable(x)]
-            return return_exception and vals
+def decorator_with_args(decorator):
+    '''
+    Decorator with Arguments must be used with parenthesis: @decorated() 
+    , even when arguments are not used!!!
+    '''
+    # decorator_with_args = lambda decorator: lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
+    return lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
 
 exLogger = log.Logger()
 
 def getLastException():
     return str(traceback.format_exc())
-
-"""
-@TODO: These methods failed with python 2.6; to be checked ...
-
-def get_exception_line(as_str=False):
-    ty,e,tb = sys.exc_info()
-    file,line = tb[-1][:2] if tb else ('',0)
-    result = (file,line,tb)
-    if as_str: return '%s[%d]: %s!'%result
-    else: return result
-
-def exc2str(e):
-    if isinstance(e,DevFailed):
-        msg=''
-        try:
-            msg = getattr(e.args[0],'description',e.args[0]['description'])
-        except:
-            msg = [s for s in str(e).split('\n') if 'desc' in s][0].strip()
-        return 'DevFailed(%s)'%msg
-    else:
-        return get_exception_line(as_str=True)
-"""
 
 def getPreviousExceptions(limit=0):
     """
@@ -157,10 +109,6 @@ def getPreviousExceptions(limit=0):
     except Exception,e:
         print 'Aaaargh!'
         return traceback.format_exc()
-    
-class RethrownException(Exception):
-    pass
-    
 
 #@decorator_with_args #This decorator disturbed stdout!!!! ... There's a problem calling nested decorators!!!
 def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose=False,rethrow=False):
@@ -178,12 +126,12 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
             result = fun(*args,**kwargs)
             #sys.stdout.write('fun DONE!!!\n')
             return result
-        except DevFailed, e:
+        except PyTango.DevFailed, e:
             exstring=getPreviousExceptions()            
             if verbose:
                 print '-'*80
                 #exstring = traceback.format_exc()
-                logger.warning('DevFailed Exception Catched: \n%s'%exstring)
+                logger.warning('PyTango.DevFailed Exception Catched: \n%s'%exstring)
                 try:
                     if showArgs: logger.info('%s(*args=%s, **kwargs=%s)'%(fun.__name__,args,kwargs))
                 except:pass
@@ -191,12 +139,12 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
                 print '-'*80
 
             if postmethod: postmethod(exstring)
-            err = e.args[0]
             if rethrow:
-                #Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
-                Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
+                #PyTango.Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
+                err = e.args[0]
+                PyTango.Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
             else:
-                Except.throw_exception(err.reason,err.desc,err.origin)
+                PyTango.Except.throw_exception(err.reason,err.desc,err.origin)
         except Exception,e:
             #exstring = traceback.format_exc()
             exstring=getPreviousExceptions()
@@ -208,7 +156,7 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
                 except:pass
                 print '-'*80                                 
             if postmethod: postmethod(exstring)
-            Except.throw_exception('Exception',exstring,"%s(...)"%fun.__name__)
+            PyTango.Except.throw_exception('Exception',exstring,"%s(...)"%fun.__name__)
         pass    
     
     #ExceptionWrapper behaves like a decorator
@@ -242,18 +190,17 @@ class ExceptionManager(object):
                 print '-'*80
 
             if self.postmethod: self.postmethod(exstring)
-            if etype is DevFailed:
+            if etype is PyTango.DevFailed:
                 #for k,v in e[0].items():print k,':',v
                 if True: #not self.rethrow: #re_throw doesn't work!
                     #The exception is throw just as it was
                     err = e[0]
-                    Except.throw_exception(err.reason,err.desc,err.origin)
-                    #Except.throw_exception(e.args[0]['reason'],e.args[0]['desc'],e.args[0]['origin'])
+                    PyTango.Except.throw_exception(err.reason,err.desc,err.origin)
+                    #PyTango.Except.throw_exception(e.args[0]['reason'],e.args[0]['desc'],e.args[0]['origin'])
                 else: #It doesn't work!!!
-                    #ex=DevFailed(e[0]['reason'],e[0]['desc'],e[0]['origin'])
-                    #Except.re_throw_exception(ex, '','','')
+                    #ex=PyTango.DevFailed(e[0]['reason'],e[0]['desc'],e[0]['origin'])
+                    #PyTango.Except.re_throw_exception(ex, '','','')
                     pass
             else: #elif etype is Exception:
                 exstring = self.origin or len(exstring)<125 and exstring or stack[-1]
-                Except.throw_exception(etype.__name__,str(e),exstring)
-
+                PyTango.Except.throw_exception(etype.__name__,str(e),exstring)
