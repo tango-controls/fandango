@@ -655,7 +655,7 @@ epoch2str = time2str
     
 def str2time(seq='',cad=''):
     """ Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format"""
-    if not seq: return time.time()
+    if seq in (None,''): return time.time()
     seq = str(seq).strip()
     m = re.match(RAW_TIME,seq) 
     if m:
