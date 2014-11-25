@@ -439,4 +439,7 @@ def pickle_device(dev_name):
     dp = get_device(dev_name)
     attrs = dp.get_attribute_list()
     commands = get_device_commands(dp)
-
+    
+    
+    
+    

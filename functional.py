@@ -66,7 +66,7 @@ except: pass
 ## Some miscellaneous logic methods
 ########################################################################
   
-def first(seq,default=Exception):
+def first(seq):
     """Returns first element of sequence"""
     try: 
         return seq[0]
@@ -74,14 +74,11 @@ def first(seq,default=Exception):
         try: 
             return seq.next()
         except Exception,d:
-            if default is not Exception:
-                return default
-            else:
-                raise d
+            raise d
             #raise e #if .next() also doesn't work throw unsubscriptable exception
     return
 
-def last(seq,MAX=1000,default=Exception):
+def last(seq,MAX=1000):
     """Returns last element of sequence"""
     try:
         return seq[-1]
@@ -89,10 +86,7 @@ def last(seq,MAX=1000,default=Exception):
         try: 
             n = seq.next()
         except: 
-            if default is not Exception:
-                return default
-            else:
-                raise e #if .next() also doesn't work throw unsubscriptable exception
+            raise e #if .next() also doesn't work throw unsubscriptable exception
         try:
             for i in range(1,MAX):
                 n = seq.next()
@@ -283,23 +277,13 @@ def inCl(exp,seq,regexp=True):
     else:
         return exp in seq
     
-def matchCl(exp,seq,terminate=False,extend=False):
+def matchCl(exp,seq,terminate=False):
     """ Returns a caseless match between expression and given string """
-    if extend:
-        if '&' in exp:
-            return all(matchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
-            return not matchCl(exp[1:],seq,terminate,extend=True) 
     return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clmatch = matchCl #For backward compatibility
 
-def searchCl(exp,seq,terminate=False,extend=False):
+def searchCl(exp,seq,terminate=False):
     """ Returns a caseless regular expression search between expression and given string """
-    if extend:
-        if '&' in exp:
-            return all(searchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
-            return not searchCl(exp[1:],seq,terminate,extend=True)
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
 

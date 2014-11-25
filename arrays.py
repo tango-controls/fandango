@@ -34,11 +34,14 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
 
-import csv,sys,re,operator,traceback
+
+
+import csv
+import sys
+import re
+import operator
 import functional as fun
 from fandango.dicts import SortedDict
-try: import numpy as np
-except: np = None
 
 __all__ = ['Grid','CSVArray','tree2table']
 
@@ -201,16 +204,6 @@ def maxdiff(*args):
         print args
         raise e
 
-def notnone(*args):
-    seq,ref,method = args[0],fun.first(args[1:] or [0]),fun.first(args[2:] or [average])
-    print 'notnone from %s'%ref
-    try:
-      if np: return method(*((v for v in seq if v is not None and not np.isnan(v)),ref))
-      else: return method(*((v for v in seq if v is not None),ref))
-    except:
-      traceback.print_exc()
-      return ref
-
 def maxmin(*args):
     """ 
     Returns timed ((t,max),(t,min)) values from a (t,v) dataset 
@@ -345,12 +338,13 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
                 #Averaging data within interval
                 i0 = i
                 while i<=ilast and data[i][0]<=t: i+=1
-                #val = method([v[1] for v in data[i0:i]],ndata and ndata[-1][-1] or 0)
-                val = method((v[1] for v in data[i0:i]),ndata and ndata[-1][-1] or 0)
+                #dd = data[i0:i]
+                #if dd: 
+                val = method([v[1] for v in data[i0:i]],ndata and ndata[-1][-1] or 0)
                 ndata.append((t,val))
                 #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
         else:
-            #Adding data at the end, it will be applied whenever the size of array is smaller than expected value
+            #Adding data at the end
             if ndata: nx = ndata[-1][1]
             else: nx = None
             ndata.append((t,nx))
