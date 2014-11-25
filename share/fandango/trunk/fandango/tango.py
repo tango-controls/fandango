@@ -82,6 +82,24 @@ def loadTaurus():
     return bool(TAU)
 
 ####################################################################################################################
+def TGet(*args):
+    """ 
+    Universal fandango helper, it will return a matching Tango object depending on the arguments passed
+    Objects are: database (), server (*/*), attribute ((:/)?*/*/*/*), device (*)
+    """
+    if not args:
+        return get_database()
+    arg0 = args[0]
+    if arg0.count('/')==1:
+        return fandango.Servers.ServersDict(arg0)
+    if arg0.count('/')>(2+(':' in arg0)):
+        return get_matching_attributes(arg0) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else check_attribute(arg0,brief=True)
+    else:
+        return get_matching_devices(arg0) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else get_device(arg0)
+        
+####################################################################################################################
+
+####################################################################################################################
 ##@name Access Tango Devices and Database
 
 ##TangoDatabase singletone
@@ -128,6 +146,15 @@ def get_database(host='',port='',use_tau=False):
     except:
         print traceback.format_exc()
     return
+        
+def get_proxy(argin,use_tau=False,keep=False):
+    """
+    Returns attribute or device proxy depending on argin syntax
+    """
+    if argin.count('/')>(2+(':' in argin)):
+        return PyTango.AttributeProxy(argin)
+    else:
+        return get_device(argin,use_tau,keep)
 
 def get_device(dev,use_tau=False,keep=False): 
     if use_tau and not TAU: use_tau = loadTaurus()
