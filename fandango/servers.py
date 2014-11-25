@@ -869,7 +869,7 @@ class ComposersDict(ServersDict):
     def get_attributes(self,device=None,attribute=None):
         """Both device and attribute are regexps"""
         getattr(self,'attributes',self.load_attributes())
-        result = sorted(n for n,f in self.attributes.items() if 
+        result = CaselessDict((n,f) for n,f in self.attributes.items() if 
                     (not device or fun.matchCl(device,n.rsplit('/',1)[0],terminate=True)) and
                     (not attribute or fun.matchCl(attribute,n.rsplit('/',1)[-1],terminate=True))
                 )
@@ -896,14 +896,15 @@ class ComposersDict(ServersDict):
         """ get_property(property) or get_property(device_regexp,property) """
         property = args[-1]
         devs = self.get_all_devices()
-        if len(args)==2: devs = [d for d in devs if fandango.matchCl(args[0],d)]
-        return dict((d,list(fun.toList(self.db.get_device_property(d,[property])[property]))) for d in devs)
+        if len(args)==2: devs = [d for d in devs if fun.matchCl(args[0],d)]
+        r = dict((d,list(fun.toList(self.db.get_device_property(d,[property])[property]))) for d in devs)
+        return r # if len(r)>1 else r.values()[0]
         
     def set_property(self,*args):
         """ set_property(property,value) or set_property(device_regexp,property,value) """
         property,value = args[-2:]
         devs = self.get_all_devices()
-        if len(args)==3: devs = [d for d in devs if fandango.matchCl(args[0],d)]
+        if len(args)==3: devs = [d for d in devs if fun.matchCl(args[0],d)]
         return [(d,self.db.put_device_property(d,{property:value}))[0] for d in devs]
         
     def set_formula(self,attribute,formula,update=True):
