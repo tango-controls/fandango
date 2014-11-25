@@ -102,6 +102,7 @@ from PyTango import DevState
 from excepts import *
 import fandango
 import fandango.tango as tango
+import fandango.objects as objects
 from fandango.objects import self_locked
 from fandango.dicts import SortedDict,CaselessDefaultDict,defaultdict
 from fandango.log import Logger,shortstr
@@ -1880,6 +1881,8 @@ class DynamicAttribute(object):
 class DynamicServer(object):
     """
     The DynamicServer class provides .util .instance .db .classes to have access to Tango DS internals.
+    
+    To load your own custom classes you can override the load_class method to modify how classes are generated (see CopyCatDS as example)
     """
     
     PROPERTY = 'PYTHON_CLASSPATH'
@@ -1903,7 +1906,11 @@ class DynamicServer(object):
                 if C not in self.classes or d not in self.classes[C]:
                     fandango.tango.add_new_device(self.name,C,d)
                     self.classes[C].append(d)
-        self.load_classes()
+        self.path = (self.db.get_property(self.PROPERTY,['DeviceClasses'])['DeviceClasses'] or [''])[0]
+        if self.path: sys.path.append(self.path)
+        self.modules = {}
+        [self.load_class(c) for c in self.classes]
+        print '\nDynamicDS: %d classes loaded: %s'%(len(self.classes),','.join(self.classes))
         if add_debug and 'DDebug' not in self.classes:
             from fandango.device import DDebug
             DDebug.addToServer(self.util,*(self.name.split('/')))
@@ -1919,34 +1926,28 @@ class DynamicServer(object):
         ds_name = server+'/'+instance
         return (server,instance,logs)
                     
-    def load_classes(self):
-        self.path = (self.db.get_property(self.PROPERTY,['DeviceClasses'])['DeviceClasses'] or [''])[0]
-        if self.path: sys.path.append(self.path)
-        self.modules = {}
-        import fandango.objects
-        for c in self.classes:
-            try:
-                p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
-                print '\nLoading %s from %s' % (c,p or self.path)
-                if p:
-                    self.modules[c] = fandango.objects.loadModule(p)
-                elif c in dir(fandango.device):
-                    self.modules[c] = fandango.device
-                elif c in dir(fandango.interface):
-                    self.modules[c] = fandango.interface
-                else:
-                    try:
-                        self.modules[c] = fandango.objects.loadModule(c)
-                        assert getattr(self.modules[c],c+'Class')
-                    except:
-                        m = self.path+'/%s/%s.py'%(c,c)
-                        print '\nLoading %s from %s' % (c,m)
-                        self.modules[c] = fandango.objects.loadModule(m)
-                self.util.add_TgClass(getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c)
-            except:
-                traceback.print_exc()
-                sys.exit(-1)
-        print '\nDynamicDS: %d classes loaded: %s'%(len(self.classes),','.join(self.classes))
+    def load_class(self,c):
+        try:
+            p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
+            print '\nLoading %s from %s' % (c,p or self.path)
+            if p:
+                self.modules[c] = fandango.objects.loadModule(p)
+            elif c in dir(fandango.device):
+                self.modules[c] = fandango.device
+            elif c in dir(fandango.interface):
+                self.modules[c] = fandango.interface
+            else:
+                try:
+                    self.modules[c] = fandango.objects.loadModule(c)
+                    assert getattr(self.modules[c],c+'Class')
+                except:
+                    m = self.path+'/%s/%s.py'%(c,c)
+                    print '\nLoading %s from %s' % (c,m)
+                    self.modules[c] = fandango.objects.loadModule(m)
+            self.util.add_TgClass(getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c)
+        except:
+            traceback.print_exc()
+            sys.exit(-1)
         
     def main(self,args=None):
         U = self.util.instance()
