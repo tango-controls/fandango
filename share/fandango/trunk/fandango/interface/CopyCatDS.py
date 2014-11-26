@@ -185,7 +185,7 @@ class CopyCatServer(DynamicServer):
         if c.endswith('_Copy'): return
         else: DynamicServer.load_class(self,c)
         
-    def main(self,class_override=True):
+    def main(self,class_override=False):
         #fandango.tango.get_device_property failed!     desc = BAD_INV_ORDER CORBA system exception: BAD_INV_ORDER_ORBHasShutdown
         #doppels = dict((d,(db.get_device_property(d,['TargetDevice'])['TargetDevice'] or [''])[0]) for d in self.classes['CopyCatDS'])
         ks = [k for k in self.classes if fandango.matchCl('CopyCatDS|(^*Copy$)',k)]
@@ -200,7 +200,9 @@ class CopyCatServer(DynamicServer):
         print 'Devices: \n%s'%"\n".join(sorted('%s = %s(%s)'%(d,t,classes.get(t,None)) for d,t in targets.items()))
         if class_override and classes:
             for c in set(classes.values()):
-                print('Adding %sCopy ...'%c)
+                print('Adding %s_Copy ...'%c)
+                import fandango.interface
+                setattr(fandango.interface,'%s_Copy',CopyCatDS),setattr(fandango.interface,'%s_CopyClass',CopyCatDSClass)
                 self.util.add_TgClass(CopyCatDSClass,CopyCatDS,c+'_Copy')
             for d in targets:
                 fandango.tango.add_new_device(self.name,classes[targets[d]]+'_Copy',d)
@@ -231,7 +233,7 @@ if __name__ == '__main__':
     if '--test' in sys.argv:
         __test_Doppelganger('sys/tg_test/1')
         print '\n'
-        __test_CopyCatDS('sys/tg_test/1')
+        __test_CopyCatDS('sys/tg_test/1',class_override=True)
     else:
         ds = CopyCatServer('CopyCatDS/'+sys.argv[1],log=(sys.argv[2:] or ['-v2'])[0])
         ds.main()
