@@ -6,8 +6,9 @@ class Skip(Exception): pass
 #Testing fandango imports
 try:
     m = 'fandango.__all__'
-    print 'Loading %s ...'%m
+    print 'Loading fandango ...'
     import fandango
+    print 'ReleaseNumber = %s'%str(fandango.RELEASE)
     from fandango import *
     import fandango.functional as fun
     print '\n\n'+m+': OK'
