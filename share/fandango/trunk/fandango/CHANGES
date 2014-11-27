@@ -21,6 +21,7 @@ Major Changes:
   tango: get_database() bypassed to avoid BAD_INV corba crahes in Tango8  when using get/put_device_property within device servers.
   tango: added TGet and get_proxy helper methods (accept/return both devices and attributes, proxies and lists)
   test: added test sub module for continuous integration
+  scripts: added tango_*py to manage/start/stop devices from shell using Astor/Starter
 
 arrays: added notNone decimation, solved bug in maxmin
 dynamic: solved bug parsing DevFloat attributes
