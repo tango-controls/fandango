@@ -385,7 +385,7 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
     if trace: print('defaults: %s'%defaults)
     if not defaults:
         if not vargs:
-            return defargs
+            return {} #defargs
         else:
             result[None] = defargs
         #if not vargs and defargs: #Arguments do not parse
