@@ -28,8 +28,10 @@ dynamic: solved bug parsing DevFloat attributes
 excepts: PyTango independent, trial() adapted to return values
 functional: Added default arg to first,last methods
 functional: Solved bug in str2time to accept 0 as a valid time argument
-functional: Added WILDCARDS attribute as default argument to isRegexp 
+functional: Added WILDCARDS attribute as default argument to isRegexp
+functional: using negative timestamps as relative time from now 
 linos: sendmail, added from argument
+linos: solved bug in sysargs_todict when returning a list instead of dict
 log: log exception management centralized in sendToStream()
 objects: Added methods: obj2dict, Struct.updateAttrsDict
 objects: Solved bug in BoundDecorator when calling as an unbound method
