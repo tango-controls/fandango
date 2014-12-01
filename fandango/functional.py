@@ -632,6 +632,7 @@ def now():
 
 def time2tuple(epoch=None):
     if epoch is None: epoch = now()
+    elif epoch<0: epoch = now()-epoch
     return time.localtime(epoch)
     
 def tuple2time(tup):
@@ -646,10 +647,12 @@ def date2str(date):
 
 def time2date(epoch=None):
     if epoch is None: epoch = now()
+    elif epoch<0: epoch = now()-epoch
     return datetime.datetime.fromtimestamp(epoch)
 
 def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
     if epoch is None: epoch = now() 
+    elif epoch<0: epoch = now()-epoch
     return time.strftime(cad,time2tuple(epoch))
 epoch2str = time2str
     
