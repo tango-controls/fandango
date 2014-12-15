@@ -195,9 +195,11 @@ def get_device_info(dev):
     This method provides an alternative to DeviceProxy.info() for those devices that are not running
     """
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
-    vals = get_database_device().DbGetDeviceInfo(dev)
+    dd = get_database_device()
+    vals = dd.DbGetDeviceInfo(dev)
     di = Struct([(k,v) for k,v in zip(('name','ior','level','server','host','started','stopped'),vals[1])])
     di.exported,di.PID = vals[0]
+    di.dev_class = dd.DbGetClassForDevice(dev)
     return di
 
 def get_device_host(dev):
@@ -209,7 +211,7 @@ def get_device_host(dev):
 def get_device_started(target):
     """ Returns device started time """
     return get_database_device().DbGetDeviceInfo(target)[-1][5]
-    
+  
 def get_device_for_alias(alias):
     try: return get_database().get_device_alias(alias)
     except Exception,e:
