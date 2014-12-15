@@ -47,11 +47,17 @@ def shell_command(*commands, **keywords):
     else: return result
     
 def sendmail(subject,text,receivers,sender='',attachments=None,trace=False):
+    # method for sending mails
+    if trace: print 'Sending mail to %s'%receivers
+    chars = sorted(set(re.findall('[^a-zA-Z0-9/\ \n\.\=\(\),\[\]_\-]',text)))
+    for c in chars:
+        if c in text and '\\'+c not in text:
+            text = text.replace(c,'\\'+c)
     if '\n' in text and '\\n' not in text:
         text = text.replace('\n','\\n')
+    receivers = ' '+(receivers if isinstance(receivers,str) else ' '.join(receivers)) 
     sender = sender and " -r %s"%sender
     attachments = attachments and ' '+' '.join('-a %s'%a for a in attachments) or ''
-    receivers = ' '+' '.join(receivers)
     command = 'echo -e "'+text+'" '
     command += '| mail -s "%s" ' % subject
     #command += '-S from=%s ' % self.FromAddress #'-r %s ' % (self.FromAddress)
