@@ -55,7 +55,7 @@ message
 
 """
 
-import logging, weakref, traceback
+import time, logging, weakref, traceback
 from objects import Object
 from pprint import pprint
 from functional import time2str
@@ -168,7 +168,6 @@ class Logger(Object):
         self._ForcePrint=force
         
     def getTimeString(self,t=None):
-        import time
         if t is None: t=time.time()
         cad='%Y-%m-%d %H:%M:%S'
         s = time.strftime(cad,time.localtime(t))
