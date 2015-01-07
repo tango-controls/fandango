@@ -55,8 +55,17 @@ except: pass
 
 _EVENT = threading.Event()
 
-def wait(seconds):
-    _EVENT.wait(seconds)
+def wait(seconds,event=True):
+    """
+    :param seconds: seconds to wait for
+    :param event: if True (default) it uses a dummy Event, if False it uses time.sleep, if Event is passed then it calls event.wait(seconds)
+    """
+    if not event:
+        time.sleep(seconds)
+    elif isinstance(event,threading.Event):
+        event.wait(seconds)
+    else:
+        _EVENT.wait(seconds)
     
 class FakeLock(object):
     """ Just for debugging, can replace a Lock when debugging a deadLock issue. """
@@ -303,10 +312,9 @@ class WorkerThread(object):
         self.modules = getattr(self,'modules',{})
         self.instances = getattr(self,'instances',{})
         self._locals = getattr(self,'_locals',{})
-        evalX(target,
+        return evalX(target,
             _locals=self._locals,modules=self.modules,instances=self.instances,
             _trace=self._trace,_exception=WorkerException)
-        return evalX(*args,**kwargs)
         
     def run(self):
         print 'WorkerThread(%s) started!'%self._name
@@ -883,7 +891,6 @@ def SubprocessMethod(obj,method,*args,**kwargs):
     
     >> received 414131 values
     """
-    import time,multiprocessing,threading
     timeout = kwargs.pop('timeout',30.)
     callback = kwargs.pop('callback',None)
     print args
