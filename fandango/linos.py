@@ -107,6 +107,7 @@ def get_free_memory(units='m'):
     return stats['buffers']+stats['cached']+stats['free']
 
 def get_memory_usage():
+    """This method returns the percentage of total memory used in this machine"""
     stats = get_memstats()
     mfree = float(stats['buffers']+stats['cached']+stats['free'])
     return 1-(mfree/stats['total'])
@@ -121,7 +122,7 @@ def get_cpu(pid):
     """ Uses ps to get the CPU usage of a process by PID ; it will trigger exception of PID doesn't exist """
     return float(linos.shell_command('ps h -p %d -o pcpu'%pid))
         
-def get_process_pid(include='',exclude='grep|screen'):
+def get_process_pid(include='',exclude='grep|screen|kwrite'):
     if not include: return os.getpid()
     include = include.replace(' ','.*')
     exclude = exclude.replace(' ','.*')
@@ -137,8 +138,16 @@ def get_process_pid(include='',exclude='grep|screen'):
                 pids.append(int(p))
                 break
     if len(pids)>1:
-        raise Exception('Multiple PIDs found: please refine search using exclude argument')
+        raise Exception('Multiple PIDs found: please refine your search using exclude argument')
     return pids[0]
+        
+def check_process(pid):
+    try: return file_exists('/proc/%s'%pid) #os.kill(pid,0)
+    except: return False
+        
+def kill_process(process=None,signal=15):
+    pid = process if fun.isNumber(process) else get_process_pid(process)
+    os.kill(pid,signal)
     
 def KillEmAll(klass):
     processes = shell_command('ps uax').split('\n')
