@@ -237,7 +237,7 @@ def matchAll(exprs,seq):
     exprs,seq = toSequence(exprs),toSequence(seq)
     if anyone(isRegexp(e) for e in exprs):
         exprs = [(e.endswith('$') and e or (e+'$')) for e in exprs]
-        return [s for s in seq if anyone(re.match(e,s) for e in exprs)]
+        return [s for s in seq if anyone(matchCl(e,s) for e in exprs)]
     else:
         return [s for s in seq if s in exprs]
     
@@ -324,14 +324,20 @@ def sortedRe(iterator,order):
         print '%s:%s' % (i,sorter(i))
     return sorted(iterator,key=sorter)
 
-def toRegexp(exp,terminate=False):
+def toCl(exp,terminate=False,wildcards=('*',' '),lower=True):
     """ Replaces * by .* and ? by . in the given expression. """
-    exp = str(exp)
-    exp = exp.replace('*','.*') if '*' in exp and not any(s in exp for s in ('.*','\*')) else exp
-    #exp = exp.replace('?','.') if '?' in exp and not any(s in exp for s in (')?',']?','}?')) else exp
+    exp = str(exp).strip()
+    if lower: exp = exp.lower()
+    if not any(s in exp for s in ('.*','\*')):
+        for w in wildcards:
+            exp = exp.replace(w,'.*')
     if terminate and not exp.strip().endswith('$'): exp += '$'
     exp = exp.replace('(?p<','(?P<') #Preventing missing P<name> clausses
     return exp
+    
+def toRegexp(exp,terminate=False):
+    """ Case sensitive version of the previous one, for backwards compatibility """
+    return toCl(exp,terminate,wildcards=('*',),lower=False)
     
 def filtersmart(seq,filters):
     """
