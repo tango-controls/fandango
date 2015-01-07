@@ -49,6 +49,7 @@ srubio@cells.es,
 2008 
 """
 
+import time,traceback
 import collections
 from objects import self_locked
             
@@ -149,7 +150,6 @@ class ThreadDict(dict):
         
     def run(self):
         self.tracer('In ThreadDict.run()')
-        import time
         while not self.event.isSet():
             keys = sorted(self.threadkeys())
             if self._last_read and self._last_read!=keys[-1]: #Thread stopped before finishing the cycle!
@@ -163,7 +163,6 @@ class ThreadDict(dict):
                         self._updates[k] = time.time()
                 except Exception,e:
                     if self.trace:
-                        import traceback
                         print '!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:1000] #+': %s'%str(e)
                     #raise e
                     self.__setitem__(k,e,hw=False)
@@ -213,7 +212,6 @@ class ThreadDict(dict):
         
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
-        import time
         if self.trace: print 'In ThreadDict.__getitem__(%s,%s)'%(key,hw)
         if (hw or not self.threaded) and self.read_method: # or (self.threaded and key not in self._threadkeys) #HW ACCESS MUST NOT BE DONE WITHOUT ASKING EXPLICITLY! (Use __setitem__(k,None) instead)
             value = self.read_method(key)
@@ -223,7 +221,6 @@ class ThreadDict(dict):
 
     def __setitem__(self,key,value,hw=True):
         ''' This method launches a write_method execution if the hw flag is not explicitly set to False. '''
-        import time
         if self.trace: print 'In ThreadDict.__setitem__(%s,...,%s)'%(key,hw)
         if hw and self.write_method: 
             #It implies that a key will not be added here to read thread!
@@ -234,7 +231,6 @@ class ThreadDict(dict):
     
     @self_locked
     def get(self,key,default=None):
-        import time
         if not self.threaded and self.read_method: 
             dict.__setitem__(self,key,self.read_method(key))
             self.last_update = time.time()
