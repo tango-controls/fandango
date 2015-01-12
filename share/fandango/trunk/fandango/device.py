@@ -410,7 +410,14 @@ from fandango.dynamic import DynamicDS,DynamicDSClass
 class DDebug(DynamicDS):
     def __init__(self,cl, name):
         U = PyTango.Util.instance()
-        DynamicDS.__init__(self,cl,name,_locals={'Util':U,'PyUtil':U,'self':self},useDynStates=False)
+        import gc,resource
+        try:
+            import guppy
+            heapy = guppy.hpy()
+        except:guppy,heapy = None,None
+        DynamicDS.__init__(self,cl,name,_locals={'Util':U,'PyUtil':U,'self':self,'fandango':fandango,
+            'resource':resource,'gc':gc,'guppy':guppy,'heapy':heapy},
+            useDynStates=False)
         DDebug.init_device(self)
     def init_device(self):
         self.set_state(PyTango.DevState.ON)
