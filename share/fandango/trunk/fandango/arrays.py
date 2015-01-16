@@ -326,36 +326,43 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     
     #Inserting averaged data
     #--------------------------------------------------------------------------
-    i = 0
+    i,i0 = 0,0
     next = []
     ilast = len(data)-1
     if trace: print 't0: %s' % (window+tfloor(data[0][0]-1))
-    for t in range(window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window):
-        if i<=ilast:
-            if data[i][0]>t:
-                #Filling "whitespace" with last data
-                nx = (
-                    (filling==F_LAST and ndata and ndata[-1][1]) or
-                    (filling==F_NONE and None) or
-                    (filling==F_ZERO and 0) or
-                    None)
-                ndata.append((t,nx))
-                #print 'whitespace: %s'%str(ndata[-1])
+    try:
+        for t in range(window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window):
+            if i<=ilast:
+                if data[i][0]>t:
+                    #Filling "whitespace" with last data
+                    nx = (
+                        (filling==F_LAST and ndata and ndata[-1][1]) or
+                        (filling==F_NONE and None) or
+                        (filling==F_ZERO and 0) or
+                        None)
+                    ndata.append((t,nx))
+                    #print 'whitespace: %s'%str(ndata[-1])
+                else:
+                    #Averaging data within interval
+                    i0 = i
+                    while i<=ilast and data[i][0]<=t: i+=1
+                    #val = method([v[1] for v in data[i0:i]],ndata and ndata[-1][-1] or 0)
+                    a1 = list(v[1] for v in data[i0:i])
+                    a2 = ndata and ndata[-1][-1] or 0
+                    val = method(a1,a2)
+                    ndata.append((t,val))
+                    #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
             else:
-                #Averaging data within interval
-                i0 = i
-                while i<=ilast and data[i][0]<=t: i+=1
-                #val = method([v[1] for v in data[i0:i]],ndata and ndata[-1][-1] or 0)
-                val = method((v[1] for v in data[i0:i]),ndata and ndata[-1][-1] or 0)
-                ndata.append((t,val))
-                #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
-        else:
-            #Adding data at the end, it will be applied whenever the size of array is smaller than expected value
-            if ndata: nx = ndata[-1][1]
-            else: nx = None
-            ndata.append((t,nx))
-            #print 'post: %s'%str(ndata[-1])
-
+                #Adding data at the end, it will be applied whenever the size of array is smaller than expected value
+                if ndata: nx = ndata[-1][1]
+                else: nx = None
+                ndata.append((t,nx))
+                #print 'post: %s'%str(ndata[-1])
+    except Exception,e:
+        print i0,'-',i,'/',ilast,':',filling,':',data[i0:i]
+        print ndata and ndata[-1] 
+        print ndata and ndata[-1] and ndata[-1][-1]
+        raise Exception(traceback.format_exc())
     return ndata
     
 ###############################################################################
