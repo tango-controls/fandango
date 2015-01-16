@@ -9,6 +9,22 @@ PENDING:
   ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
 -------------------------------------------------
+November 2014 - 11.3 needed for PyTangoArchiving>6.0 and PyTango>8.1
+-------------------------------------------------
+
+arrays:Solved exceptions in filter_array
+dbs:Default cursor changed to SSCursor, fetchall replaced by sequencial fetchone()
+dynamic:guppy,heapy added to locals() when PYMEMCHECK=True
+sendmail: added character cleanup
+tango: added device class to get_device_info
+dicts: removed unnecessary time imports
+functional: toRegexp replaced by toCl (careless and caseless extended expression)
+linos: check_process/kill_process methods added #Used by latest PyTangoArchiving.Reader
+threads: Solved bug in WorkerThread.process
+device:DDebug:fandango/resource/gc/guppy/heapy modules added to DDebug local path
+qt:Solved bug in QExceptionMessage
+
+-------------------------------------------------
 November 2014 - 11.2 needed for PyTangoArchiving>5.2 and PyTango>8.1
 -------------------------------------------------
 Major Changes:
