@@ -40,10 +40,8 @@ This package implements a simplified acces to MySQL using FriendlyDB object.
 Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 """
 
-import time
-import datetime
-import log
-import MySQLdb,sys
+import time,datetime,log,traceback,sys
+import MySQLdb
 
 class FriendlyDB(log.Logger):
     """ 
@@ -65,6 +63,7 @@ class FriendlyDB(log.Logger):
         self.autocommit = autocommit
         self.renewMySQLconnection()
         self._cursor=None
+        self._recursion = 0
         self.tables={}
         
     def __del__(self):
@@ -105,15 +104,23 @@ class FriendlyDB(log.Logger):
         returns the Cursor for the database
         renew will force the creation of a new cursor object
         klass may be any of MySQLdb.cursors classes (e.g. DictCursor)
+        MySQLdb.cursors.SSCursor allows to minimize mem usage in clients (although it relies memory cleanup to the server!)
         '''
-        if klass in ({},dict):
-            klass = MySQLdb.cursors.DictCursor
-        if (renew or klass) and self._cursor: 
-            self._cursor.close()
-            del self._cursor
-        if renew or klass or not self._cursor:
-            self._cursor = self.db.cursor() if klass is None else self.db.cursor(cursorclass=klass)
-        return self._cursor
+        try:
+            if klass in ({},dict):
+                klass = MySQLdb.cursors.DictCursor
+            if (renew or klass) and self._cursor: 
+                if not self._recursion:
+                    self._cursor.close()
+                    del self._cursor
+            if renew or klass or not self._cursor:
+                self._cursor = self.db.cursor(MySQLdb.cursors.SSCursor) if klass is None else self.db.cursor(cursorclass=klass)
+            return self._cursor
+        except:
+            print traceback.format_exc()
+            self.renewMySQLconnection()
+            self._recursion += 1
+            return self.getCursor(renew=True,klass=klass)
    
     def tuples2lists(self,tuples):
         ''' 
@@ -129,6 +136,19 @@ class FriendlyDB(log.Logger):
             [d.__setitem__(keys[i],line[i]) for i in range(min([len(keys),len(line)]))]
             result.append(d)
         return result
+        
+    def fetchall(self,cursor=None):
+        """
+        This method provides a custom replacement to cursor.fetchall() method.
+        It is used to return a list instead of a big tuple; what seems to cause trouble to python garbage collector.
+        """
+        vals = []
+        cursor = cursor or self.getCursor()
+        while True:
+            v = cursor.fetchone()
+            if v is None: break
+            vals.append(v)
+        return vals
    
     def Query(self,query,export=True,asDict=False):
         ''' Executes a query directly in the database
@@ -137,7 +157,7 @@ class FriendlyDB(log.Logger):
         @return the executed cursor, values can be retrieved by executing cursor.fetchall()
         '''
         try:
-            q=self.getCursor(klass = dict if asDict else None)
+            q=self.getCursor(klass = dict if asDict else MySQLdb.cursors.SSCursor)
             q.execute(query)
         except:
             self.renewMySQLconnection()
@@ -147,9 +167,9 @@ class FriendlyDB(log.Logger):
         if not export:
             return q
         elif asDict or not self.use_tuples:
-            return q.fetchall()
+            return self.fetchall(q) #q.fetchall()
         else:
-            return self.tuples2lists(q.fetchall())
+            return self.tuples2lists(self.fetchall(q)) #q.fetchall()
    
     def Select(self,what,tables,clause='',group='',order='',limit='',distinct=False,asDict=False,trace=False):
         ''' 
