@@ -146,7 +146,7 @@ class QExceptionMessage(object):
         self.message = str(message) or traceback.format_exc()
         self.qmb = Qt.QMessageBox(Qt.QMessageBox.Warning,"Exception","The following exception occurred:\n\n%s"%message,Qt.QMessageBox.Ok)
         print 'fandango.qt.QExceptionMessage(%s)'%message
-        return self.qmb.exec_()
+        self.qmb.exec_()
 
 class QColorDictionary(SortedDict,Singleton):
     """
