@@ -116,7 +116,7 @@ else:
     USE_STATIC_METHODS = False
 
 import os
-MEM_CHECK = str(os.environ.get('PYMEMCHECK')).lower() == 'true'
+MEM_CHECK = str(os.environ.get('PYMEMCHECK')).lower() in ('yes','true','1')
 if MEM_CHECK:
     try: 
         import guppy
@@ -124,6 +124,7 @@ if MEM_CHECK:
         HEAPY.setrelheap()    
     except:
         MEM_CHECK=False
+else: MEM_CHECK = HEAPY = guppy = None
 
 GARBAGE_COLLECTION=False
 GARBAGE,NEW_GARBAGE = None,None
@@ -199,6 +200,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
         self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
         self._locals['DYN'] = DynamicAttribute
+        if MEM_CHECK:
+            self._locals['guppy'] = guppy
+            self._locals['heapy'] = HEAPY
         [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
         [self._locals.__setitem__(k,dst.pytype) for k,dst in DynamicDSTypes.items()]
         
@@ -508,9 +512,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 except:
                     print traceback.format_exc()
                 self.GARBAGE = grb
-            if MEM_CHECK:
-                h = HEAPY.heap()
-                self.info(str(h))
+            #if MEM_CHECK:
+                #self._locals['heap'] = h = HEAPY.heap()
+                #self.info(str(h))
             for a in self._read_count: self._read_count[a] = 0
             self._cycle_start = now
             self._total_usage = 0
