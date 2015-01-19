@@ -47,7 +47,7 @@ class FriendlyDB(log.Logger):
     """ 
     Class for managing direct access to MySQL databases using mysql-python module
     """   
-    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,loglevel='WARNING',use_tuples=False):
+    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,loglevel='WARNING',use_tuples=False,default_cursor=None):
         """ Initialization of MySQL connection """
         self.call__init__(log.Logger,self.__class__.__name__,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
@@ -62,6 +62,7 @@ class FriendlyDB(log.Logger):
         self.setUser(user,passwd)
         self.autocommit = autocommit
         self.renewMySQLconnection()
+        self.default_cursor = default_cursor or MySQLdb.cursors.Cursor
         self._cursor=None
         self._recursion = 0
         self.tables={}
@@ -114,7 +115,7 @@ class FriendlyDB(log.Logger):
                     self._cursor.close()
                     del self._cursor
             if renew or klass or not self._cursor:
-                self._cursor = self.db.cursor(MySQLdb.cursors.SSCursor) if klass is None else self.db.cursor(cursorclass=klass)
+                self._cursor = self.db.cursor(self.default_cursor) if klass is None else self.db.cursor(cursorclass=klass)
             return self._cursor
         except:
             print traceback.format_exc()
@@ -157,7 +158,7 @@ class FriendlyDB(log.Logger):
         @return the executed cursor, values can be retrieved by executing cursor.fetchall()
         '''
         try:
-            q=self.getCursor(klass = dict if asDict else MySQLdb.cursors.SSCursor)
+            q=self.getCursor(klass = dict if asDict else self.default_cursor)
             q.execute(query)
         except:
             self.renewMySQLconnection()
