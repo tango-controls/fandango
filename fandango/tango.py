@@ -1014,7 +1014,6 @@ class fakeAttributeValue(object):
     def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1,parent=None,device='',error=False,keeptime=0):
         self.name=name
         self.device=device or (self.name.split('/')[-1] if '/' in self.name else '')
-        print '%s: fakeAttributeValue.init(%s/%s)'%(time.ctime(),self.device,self.name)
         self.set_value(value,dim_x,dim_y)
         self.set_date(time_ or time.time())
         self.write_value = None
