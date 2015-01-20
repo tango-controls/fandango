@@ -117,10 +117,10 @@ else:
 
 import os
 MEM_CHECK = str(os.environ.get('PYMEMCHECK')).lower() in ('yes','true','1')
-if MEM_CHECK:
+if MEM_CHECK and 'HEAPY' not in locals():
     try: 
         import guppy
-        HEAPY = guppy.hpy()    
+        HEAPY = guppy.hpy()
         HEAPY.setrelheap()    
     except:
         MEM_CHECK=False
@@ -801,7 +801,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.debug('DynamicDS('+self.get_name()+").read_dyn_attr("+aname+")="+text_result+
                     ", ellapsed %1.2e"%(self._eval_times[aname])+" seconds.\n")
                     #", finished at "+time.ctime(now)+"="+str(now)+", timestamp is %s"%str(date)+", difference is "+str(now-date))
-            if (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==sorted(self.dyn_values.keys())[-1]):
+            if 'debug' in str(self.getLogLevel()) and (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==sorted(self.dyn_values.keys())[-1]):
                 self.attribute_polling_report()
         except Exception, e:           
             now=time.time()
