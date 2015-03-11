@@ -9,7 +9,7 @@ PENDING:
   ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
 
-ONGOING .........
+ONGOING ......... preparing next PyAlarm release
 
 CopyCatDS: import bug solved, without this fix the Gateway devices do not start!
 interface: Added DeviceClassInheritance decorator
