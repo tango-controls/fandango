@@ -345,7 +345,7 @@ class SingletonMap(object):
             if hasattr(cls,'init_single'): 
                 cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
             cls.__instances[key] = __instance
-            print '#'*80+'\n'+'%s.__instances[%s] = %s'%(str(cls),key,str(__instance))
+            #print '#'*80+'\n'+'%s.__instances[%s] = %s'%(str(cls),key,str(__instance))
         return cls.__instances[key]
             
     @classmethod
