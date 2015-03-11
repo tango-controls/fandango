@@ -1237,7 +1237,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         aname = argin[0]
 
         if value is not None: self.variables[aname] = value
-        elif get(self.variables,aname) is None: self.variables[aname] = default
+        elif self.variables.get(aname) is None: self.variables[aname] = default
         value = self.variables[aname]
         return value
 
