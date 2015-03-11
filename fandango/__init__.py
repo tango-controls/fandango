@@ -119,7 +119,7 @@ except Exception,e:
     #print traceback.format_exc()
 
 #OTHER fancy modules
-if False:
+if False: #Disabled to avoid extra dependencies!!
     try: import web
     except: print 'Unable to import fandango.web module'
     try: import qt
