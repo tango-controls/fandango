@@ -248,7 +248,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         print '< '+'~'*78
         
     def init_device(self):
-        self.info( 'DynamicDS.init_device()')
+        self.info( 'DynamicDS.init_device(%d)'%(self.get_init_count()))
         try:
             if not self.get_init_count():
                 self.get_DynDS_properties()
@@ -278,8 +278,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             #Check polled to be repeated here but using admin (not allowed at Init()); not needed with Tango8
             if getattr(PyTango,'__version_number__',0) < 804:
                 self.check_polled_attributes(use_admin=True)
-        except:
-            print traceback.format_exc()
+        except Exception,e:
+            print 'prepare_DynDS failed!: %s' % str(e).replace('\n',';') #traceback.format_exc()
         finally:
             self.__prepared = True
         return
@@ -951,11 +951,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         except Exception,e:
             if self.last_attr_exception and self.last_attr_exception[0]>tstart:
                 e = self.last_attr_exception[-1]
-            if False: #self.trace:
+            if 0: #self.trace:
                 print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,str(e)])
                 #print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
                 print traceback.format_exc()
-            raise e#Exception,'DynamicDS_eval(%s): %s'%(formula,traceback.format_exc())
+            raise Exception(str(traceback.format_exc())) #Exception,'DynamicDS_eval(%s): %s'%(formula,traceback.format_exc())
             #PyTango.Except.throw_exception('DynamicDS_evalAttr_WrongFormula','%s is not a valid expression!'%formula,str(traceback.format_exc()))
         finally:
             self._locals['ATTRIBUTE'] = ''
@@ -1237,7 +1237,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         aname = argin[0]
 
         if value is not None: self.variables[aname] = value
-        elif aname not in self.variables: self.variables[aname] = default
+        elif get(self.variables,aname) is None: self.variables[aname] = default
         value = self.variables[aname]
         return value
 
