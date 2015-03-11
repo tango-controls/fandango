@@ -1,4 +1,4 @@
-RELEASE = (11,2)
+RELEASE = (11,3)
 RELEASE_NOTE = "New DynamicServer,CopyCatDS classes, interface submodule refactored, Taurus/PyTango independent, needed for PyTangoArchiving.widget>5.2 and PyTango>8.1"
 
 """
@@ -8,12 +8,23 @@ PENDING:
   NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
   ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
+
+ONGOING .........
+
+CopyCatDS: import bug solved, without this fix the Gateway devices do not start!
+interface: Added DeviceClassInheritance decorator
+dynamic: solved case bug on evaluating variables #<<<< ADD TO TESTING
+functional: Add NaN, isNaN, isFalse methods, solved bug in END_OF_TIME
+qt: added ApiBrowser widget
+tango: enabled fake CacheAttributeProxy on TangoEval read attribute
+
 -------------------------------------------------
-November 2014 - 11.3 needed for PyTangoArchiving>6.0 and PyTango>8.1
+January 2015 - 11.3 needed for PyTangoArchiving>6.0 and PyTango>8.1
 -------------------------------------------------
 
 arrays:Solved exceptions in filter_array
-dbs:Default cursor changed to SSCursor, fetchall replaced by sequencial fetchone()
+dbs:Added default_cursor to FriendlyDB creator (to avoid conflicts between
+Cursor/SSCursor), fetchall replaced by sequencial fetchone()
 dynamic:guppy,heapy added to locals() when PYMEMCHECK=True
 sendmail: added character cleanup
 tango: added device class to get_device_info
