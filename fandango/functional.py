@@ -445,8 +445,16 @@ def isNumber(seq):
         return True
     except: return False
     
+NaN = float('nan')
+    
+def isNaN(seq):
+    return isinstance(seq,(int,float)) and math.isnan(seq) or (isString(seq) and seq.lower().strip() == 'nan')
+    
 def isNone(seq):
     return seq is None or (isString(seq) and seq.lower().strip() in ('none','null','nan',''))
+
+def isFalse(seq):
+    return not seq or str(seq).lower().strip() in ('false','0','no')
 
 def isGenerator(seq):
     from types import GeneratorType
@@ -492,7 +500,7 @@ def isBool(seq):
     if seq in (True,False):
         return True
     elif isString(seq):
-        return seq.lower() in ('true','yes','1','false','no','0','none')
+        return seq.lower() in ('true','yes','1','false','no','0') #none/nan will not be considered boolean
     else:
         return False
     
@@ -629,7 +637,7 @@ def int2bool(dec,N=16):
 ## Time conversion
 ########################################################################
 
-END_OF_TIME = 1024*1024*1024*2 #Jan 19 04:14:08 2038
+END_OF_TIME = 1024*1024*1024*2-1 #Jan 19 04:14:07 2038
 TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
 RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
 
