@@ -186,6 +186,8 @@ class CopyCatServer(DynamicServer):
         else: DynamicServer.load_class(self,c)
         
     def main(self,class_override=False):
+        import fandango #needed to avoid startup exceptions when loading dynamically
+        
         #fandango.tango.get_device_property failed!     desc = BAD_INV_ORDER CORBA system exception: BAD_INV_ORDER_ORBHasShutdown
         #doppels = dict((d,(db.get_device_property(d,['TargetDevice'])['TargetDevice'] or [''])[0]) for d in self.classes['CopyCatDS'])
         ks = [k for k in self.classes if fandango.matchCl('CopyCatDS|(^*Copy$)',k)]
