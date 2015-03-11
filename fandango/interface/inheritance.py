@@ -152,6 +152,14 @@ def FullTangoInheritance(name,child,childClass,parent,parentClass,Exclude=[],For
     else:
         return child,childClass
     
+def DeviceClassInheritance(ChildClass):
+    """ class decorator """
+    for b in ChildClass.__bases__:
+        for p in ('class_property_list','device_property_list','cmd_list','attr_list'):
+            d = getattr(b,p,{})
+            d and getattr(ChildClass,p).update((k,v) for k,v in d.items() if k not in getattr(ChildClass,p))
+    return ChildClass
+    
 def addTangoInterfaces(device,interfaces):
     """ It adds properties and implementation to the parent class from a list of tuples (Device,DeviceClass)
     @param device A tuple (Device,DeviceClass) to be extended with interfaces
