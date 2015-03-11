@@ -1096,3 +1096,72 @@ class QDictToolBar(Qt.QToolBar):
         except: 
             print('Unable to add toolbar to MainWindow(%s)'%MainWindow)
             print traceback.format_exc()
+
+class ApiBrowser(Qt.QWidget):
+    
+    def __init__(self,parent=None,model='import fandango'):
+        print('ApiBrowser(%s)'%model)
+        try:
+            self.model = ''
+            self.target = None
+            self._locals = {}
+            self._modules = {}
+            self._instances = {}
+            for c in model.split(';'):
+                model,o = c,self.evalX(c)
+            if '=' in model:
+                self.model,dct = model.split()[0],self._locals
+            elif 'import' in model:
+                self.model,dct = model.split()[-1],self._modules
+            else:
+                self.model,dct = model,{model:o}
+            self.target = dct[self.model]
+            self.evalX('import fandango')
+        except:
+            traceback.print_exc()
+        Qt.QWidget.__init__(self,parent)
+        self.setup()
+        
+    def evalX(self,c):
+        return fandango.evalX(c,_locals=self._locals,modules=self._modules,instances=self._instances,_trace=True)
+        
+    def setup(self):
+        self.combo = Qt.QComboBox(self)
+        self.args = Qt.QLineEdit(self)
+        self.result = Qt.QTextBrowser(self)
+        self.button = Qt.QPushButton('Go!')
+        self.setLayout(Qt.QGridLayout())
+        self.layout().addWidget(Qt.QLabel('ApiBrowser(%s)'%self.model),0,0,1,4)
+        self.layout().addWidget(self.combo,1,0,1,1)
+        self.layout().addWidget(self.args,1,1,1,2)
+        self.layout().addWidget(self.button,1,3,1,1)
+        self.layout().addWidget(self.result,2,0,3,4)
+        self.connect(self.button,Qt.SIGNAL('clicked()'),self.execute)
+        self.combo.addItems(dir(self.target))
+        
+    def execute(self):
+        cmd = str(self.combo.currentText())
+        args = str(self.args.text())
+        O,q = '','%s.%s'%(self.model,cmd)
+        try:
+            call = self.evalX('fandango.isCallable(%s)'%q)
+            print(call)
+            if call:
+                q = '%s.%s(%s)'%(self.model,cmd,args)
+            print(q)
+            o = self.evalX(q)
+        except:
+            o = traceback.format_exc()
+        print(o)
+        self.result.setPlainText(str(o))
+    
+    @staticmethod
+    def run():
+        qapp = getApplication()
+        kw = sys.argv[1:] and {'model':';'.join(sys.argv[1:])} or {}
+        w = ApiBrowser(**kw)
+        w.show()
+        qapp.exec_()
+        
+if __name__ == '__main__':
+    ApiBrowser.run()
