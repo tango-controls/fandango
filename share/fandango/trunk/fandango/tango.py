@@ -552,7 +552,7 @@ class get_all_devices(objects.SingletonMap):
     def get_all_devs(self):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
-            #print 'updating all_devs ...'
+            print 'updating all_devs ..........................................'
             self._all_devs = map(str.lower,(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*')))
             self._last_call = now
         return self._all_devs
@@ -570,9 +570,10 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
     all_devs = []
     defhost = get_tango_host()
     for host in hosts:
-        if host is None:
+        if host in (None,defhost):
             db_devs = get_all_devices(exported)
         else:
+            print('get_matching_devices(*%s)'%host)
             odb = PyTango.Database(*host.split(':'))
             db_devs = odb.get_device_exported('*') if exported else odb.get_device_name('*','*')
         prefix = '%s/'%(host or defhost)
@@ -982,18 +983,24 @@ class CachedAttributeProxy(PyTango.AttributeProxy):
     In comparison to AttributeValue, it can be used for attribute configuration setup (including polling/events)
     And it is WRITABLE!!
     """
-    def __init__(self,name,keeptime=1000.):
+    def __init__(self,name,keeptime=1000.,fake=False):
         self.keeptime = keeptime
         self.last_read_value = None
         self.last_read_time = 0
-        PyTango.AttributeProxy.__init__(self,name)
+        self.fake = fake
+        if not fake: PyTango.AttributeProxy.__init__(self,name)
+        else: self.name = name
+        
+    def set_cache(self,value,t=None):
+        self.last_read_time = t or time.time()
+        self.last_read_value = hasattr(value,'value') and value or fakeAttributeValue('',value)
     
     def read(self,cache=True):
         now = time.time()
         if not cache or (now-self.last_read_time)>(self.keeptime/1e3):
             self.last_read_time = now
             try:
-                self.last_read_value = PyTango.AttributeProxy.read(self)
+                self.last_read_value = None if self.fake else PyTango.AttributeProxy.read(self)
             except Exception,e:
                 self.last_read_value = e
         if isinstance(self.last_read_value,Exception): raise self.last_read_value
@@ -1130,7 +1137,7 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
                 dev = (attrklass if str(dev_name).count('/')==(4 if ':' in dev_name else 3) else devklass)(dev_name)
             except Exception,e:
                 print('ProxiesDict: %s doesnt exist!'%dev_name)
-                print traceback.format_exc()
+                #print traceback.format_exc()
                 dev = None
         return dev
             
@@ -1235,7 +1242,7 @@ class TangoEval(object):
         self.keeptime = keeptime
         self.use_tau = TAU and use_tau
         self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if self.use_tau else ProxiesDict(use_tau=self.use_tau)
-        self.attributes = attributes or dicts.defaultdict_fromkey(taurus.Attribute if self.use_tau else (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
+        self.attributes = attributes or dicts.CaselessDefaultDict(taurus.Attribute if self.use_tau else (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
         self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
         self.cache_depth = cache
@@ -1254,6 +1261,7 @@ class TangoEval(object):
         self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
         self._defaults['PREV'] = self.previous
+        self._defaults['READ'] = self.read_attribute
         #self._locals['now'] = time.time() #Updated at execution time
         self._defaults.update((k,v) for k,v in {'get_domain':get_domain,'get_family':get_family,'get_member':get_member,'parse':parse_tango_model}.items())
         #self._defaults.update((k,None) for k in ('os','sys',)) #Updating Not allowed models
@@ -1376,12 +1384,12 @@ class TangoEval(object):
             self.trace('read_attribute(%s/%s.%s) => %s'%(device,attribute,what,value))
         except Exception,e:
             if isinstance(e,PyTango.DevFailed) and what=='exception':
-                return True
-            elif _raise:
+                return e
+            elif _raise and not fun.isNaN(_raise):
                 raise e
             self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
             self.trace(traceback.format_exc())
-            value = None
+            value = _raise
         return value
                 
     def update_locals(self,dct=None):
