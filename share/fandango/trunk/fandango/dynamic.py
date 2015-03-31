@@ -196,6 +196,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['SetStatus'] = lambda status: [True,self.set_status(status)]
         self._locals['Add2Status'] = lambda status: [True,self.set_status(self.get_status()+status)]
         self._locals['EVAL'] = lambda formula: self.evaluateFormula(formula)
+        self._locals['MATCH'] = lambda expr,cad: fun.matchCl(expr,cad)
+        self._locals['DELAY'] = lambda secs: fandango.wait(secs)
         self._locals['PROPERTY'] = lambda property,update=False: self.get_device_property(property,update)
         self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
         self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
@@ -398,7 +400,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
     def load_from_file(self,filename=None):
         """ This line is put in a separate method to allow subclasses to override this behavior"""
-        filename = None or self.LoadFromFile
+        filename = filename or self.LoadFromFile
         data = self.open_file(filename) if filename.lower().strip() not in ('no','false','') else []
         if data:
             self.DynamicAttributes = list(data)+list(self.DynamicAttributes)
@@ -951,10 +953,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         except Exception,e:
             if self.last_attr_exception and self.last_attr_exception[0]>tstart:
                 e = self.last_attr_exception[-1]
-            if 0: #self.trace:
-                print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,str(e)])
+            if 1: #self.trace:
+                print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,]) #str(e)])
                 #print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
-                print traceback.format_exc()
+                #print traceback.format_exc()
             raise Exception(str(traceback.format_exc())) #Exception,'DynamicDS_eval(%s): %s'%(formula,traceback.format_exc())
             #PyTango.Except.throw_exception('DynamicDS_evalAttr_WrongFormula','%s is not a valid expression!'%formula,str(traceback.format_exc()))
         finally:
@@ -1382,10 +1384,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def evaluateFormula(self,argin):
         t0 = time.time()
-        print '\tevaluateFormula(%s)'%argin
+        self.debug('\tevaluateFormula(%s)'%argin)
         e = self.evalState(str(argin))
         argout=str(e)
-        print '\tevaluateFormula took %s seconds'%(time.time()-t0)
+        self.debug('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout
     
     #------------------------------------------------------------------
@@ -1961,6 +1963,7 @@ class DynamicServer(object):
 if __name__ == '__main__':
     pyds = DynamicServer(add_debug=True)
     pyds.main()
+    print('launched ...')
     
     #try:
         #py = PyTango.Util(sys.argv)
