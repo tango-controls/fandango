@@ -207,6 +207,7 @@ def contains(a,b,regexp=True):
 def anyone(seq,method=bool):
     """Returns first that is true or last that is false"""
     if not seq: return False
+    s = None
     for s in seq:
         if method(s): return s
     return s if not s else None
