@@ -1018,8 +1018,20 @@ class QGridTable(Qt.QFrame):#Qt.QFrame):
     def setColumnWidth(self,col,width):
         self.layout().setColumnMinimumWidth(col,width)
     def clear(self):
-        for item in self._widgets:
-            self.removeWidget(item)
+        def deleteItems(layout):
+          if layout is not None:
+            while layout.count():
+                item = layout.takeAt(0)
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
+                else:
+                    deleteItems(item.layout())
+        deleteItems(self.layout())
+        #l = self.layout()
+        #l.deleteLater()
+        #self.setLayout(Qt.QGridLayout())
+        self._widgets = []
     def removeWidget(self,widget):
         self.layout().removeWidget(widget)
         if widget in self._widgets: self._widgets.remove(widget)
