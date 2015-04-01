@@ -1,5 +1,5 @@
-RELEASE = (11,3)
-RELEASE_NOTE = "New DynamicServer,CopyCatDS classes, interface submodule refactored, Taurus/PyTango independent, needed for PyTangoArchiving.widget>5.2 and PyTango>8.1"
+RELEASE = (11,4)
+RELEASE_NOTE = "Bugs solved for better simulations"
 
 """
 PENDING:
@@ -11,6 +11,10 @@ PENDING:
 
 ONGOING ......... preparing next PyAlarm release
 
+debug: timeit method added
+functional: anyone bug solved
+qt: Solved bug on QGridLayout
+dynamic: Added MATCH and DELAY keywords to formulas
 CopyCatDS: import bug solved, without this fix the Gateway devices do not start!
 interface: Added DeviceClassInheritance decorator
 dynamic: solved case bug on evaluating variables #<<<< ADD TO TESTING
@@ -19,7 +23,7 @@ qt: added ApiBrowser widget
 tango: enabled fake CacheAttributeProxy on TangoEval read attribute
 
 -------------------------------------------------
-January 2015 - 11.3 needed for PyTangoArchiving>6.0 and PyTango>8.1
+January 2015 - 11.3 New DynamicServer,CopyCatDS classes, interface submodule refactored, Taurus/PyTango independent, needed for PyTangoArchiving.widget>5.2 and PyTango>8.1
 -------------------------------------------------
 
 arrays:Solved exceptions in filter_array
