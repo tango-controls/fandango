@@ -200,7 +200,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['DELAY'] = lambda secs: fandango.wait(secs)
         self._locals['PROPERTY'] = lambda property,update=False: self.get_device_property(property,update)
         self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
-        self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
+        self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
         self._locals['DYN'] = DynamicAttribute
         self._locals['SCALAR'] = lambda t,v: castDynamicType(dims=0,klass=t,value=v)
         self._locals['SPECTRUM'] = lambda t,v: castDynamicType(dims=1,klass=t,value=v)
@@ -259,8 +259,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.get_DynDS_properties()
             else:
                 self.updateDynamicAttributes()
+            for c,f in self.dyn_comms.items(): 
+                k = c.split('/')[-1]
+                if self.get_name().lower() in c.lower() and k not in self._locals:
+                   self._locals.update({k:(lambda argin,cmd=k:self.evalCommand(cmd,argin))})
         except: 
-            self.warning(traceback.format_exc())
+            print(traceback.format_exc()) #self.warning(traceback.format_exc())
         self._init_count +=1
 
     def delete_device(self):
@@ -341,6 +345,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.KeepAttributes = [k for k in self.KeepAttributes if 'no'!=k.lower().strip()]
             return attrs
         else: return []
+    
+    @staticmethod
+    def get_db():
+        DynamicDS._db = getattr(DynamicDS,'_db',None) or PyTango.Util.instance().get_database()
+        return DynamicDS._db
 
     def get_DynDS_properties(self,db=None):
         """
@@ -351,7 +360,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.info('In get_DynDS_properties(): updating DynamicDS properties from Database')
         ## THIS FUNCTION IS USED FROM updateDynamicAttributes
         self.get_device_properties(self.get_device_class()) #It will reload all subclass specific properties (with its own default values)
-        self._db = db or getattr(self,'_db',None) or PyTango.Util.instance().get_database()
+        self._db = db or self.get_db()
         if self.LogLevel: 
             try: self.setLogLevel(self.LogLevel)
             except: self.warning('Unable to setLogLevel(%s)'%self.LogLevel)
@@ -376,7 +385,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if self.UseTaurus:
             self.UseTaurus = (tango.TAU or tango.loadTaurus()) and self.UseTaurus
         if self.LoadFromFile:
-            self.load_from_file()
+            DynamicDS.load_from_file(device=self)
         #Adding Static Attributes if defined in the SubClass
         if getattr(self,'StaticAttributes',None):
             self.parseStaticAttributes(add=True,keep=True)
@@ -388,33 +397,38 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         value = getattr(self,property) 
         return value[0] if fandango.isSequence(value) and len(value)==1 else value
         
-    def open_file(self,filename):
-        self.info('DynamicDS(%s).open_file(%s)'%(self.get_name(),filename))
+    @staticmethod
+    def open_file(filename,device=None):
+        print('DynamicDS().open_file(%s)'%(filename))
         r = []
         try:
-            if not hasattr(self,'PATH'): self.PATH = self.get_device_property('PATH') or ''
-            if self.PATH: filename = self.PATH+'/'+filename
+            if device:
+                if not hasattr(device,'PATH'): device.PATH = device.get_device_property('PATH') or ''
+                if device.PATH: filename = device.PATH+'/'+filename
             f = open(filename)
             r = f.readlines()
             f.close()
         except: print(traceback.format_exc())
         return r
-            
-    def load_from_file(self,filename=None,apply=True):
+
+    @staticmethod
+    def load_from_file(filename=None,device=None):
         """ This line is put in a separate method to allow subclasses to override this behavior"""
-        filename = filename or self.LoadFromFile
-        data = self.open_file(filename) if filename.lower().strip() not in ('no','false','') else []
-        if data and apply: self.DynamicAttributes = list(data)+list(self.DynamicAttributes)
+        filename = filename or device.LoadFromFile
+        data = DynamicDS.open_file(filename,device=device) if filename.lower().strip() not in ('no','false','') else []
+        if data and device: device.DynamicAttributes = list(data)+list(device.DynamicAttributes)
         return data
     
     _EXTENSIONS = ['@COPY:','@FILE:']
-    def check_property_extensions(self,prop,value):
-        if prop in DynamicDSClass.device_property_list and fandango.isSequence(value) and any(str(s).startswith(e) for e in self._EXTENSIONS for s in value):
+    @staticmethod
+    def check_property_extensions(prop,value):
+        #print(prop in DynamicDSClass.device_property_list,fandango.isSequence(value),any(str(s).startswith(e) for e in DynamicDS._EXTENSIONS for s in value))
+        if prop in DynamicDSClass.device_property_list and fandango.isSequence(value) and any(str(s).startswith(e) for e in DynamicDS._EXTENSIONS for s in value):
             parsed,get_arg = [],(lambda x:x.split(':',1)[-1].split('#')[0])
             for v in value:
                 try:
-                    if v.startswith('@COPY:'): parsed.extend(self._db.get_device_property(get_arg(v),[prop])[prop])
-                    if v.startswith('@FILE:'): parsed.extend(self.load_from_file(get_arg(v),apply=False))
+                    if v.startswith('@COPY:'): parsed.extend(DynamicDS.get_db().get_device_property(get_arg(v),[prop])[prop])
+                    elif v.startswith('@FILE:'): parsed.extend(DynamicDS.load_from_file(get_arg(v),device=None))
                     else: parsed.append(v)
                 except: print('check_property_extensions(%s,%s): %s'%(prop,value,traceback.format_exc()))
             return parsed
@@ -924,7 +938,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             if WRITE: self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
             elif aname in self.dyn_values: self.debug('%s::evalAttr(READ): Attribute=%s; formula=%s;'%(self.get_name(),aname,formula,))
             else: self.info('%s::evalAttr(COMMAND): formula=%s;'%(self.get_name(),formula,))
-            result = eval(compiled or formula,self._globals,self._locals)
+
+            result = eval(compiled or formula,self._globals,self._locals) #<<<<< EVAL!
 
             #Push/Keep Read Attributes
             if not WRITE and aname in self.dyn_values:
@@ -984,23 +999,28 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         Overloading the eval method to be used to evaluate State expressions
         ... To customize it: copy it to your device and add any method you will need
         @remark Generators don't work  inside eval!, use lists instead
+        
+        The main difference with evalAttr is that evalState will not Check Dependencies nor push events
         """
         self.debug('DynamicDS.evalState/evaluateFormula(%s)'%(isinstance(formula,str) and formula or 'code'))
         #MODIFIIED!! to use pure DynamicAttributes
         #Attr = lambda a: self.dyn_values[a].value
         t = time.time()-self.time0
         for k,v in self.dyn_values.items(): self._locals[k]=v#.value #Updating Last Attribute Values
-        #__locals=locals().copy() #Low priority: local variables
-        __locals = {}
+        __locals = {}#__locals=locals().copy() #Low priority: local variables
         __locals.update(self._locals) #Second priority: object statements
         __locals.update(_locals) #High Priority: variables passed as argument
         __locals.update(
             {'STATE':self.get_state(),'t':time.time()-self.time0,'NAME': self.get_name(),
-            #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
-            'ATTRIBUTES':sorted(self.dyn_values.keys()),
+            'ATTRIBUTES':sorted(self.dyn_values.keys()),#'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
             })
-        #print 'IN EVALSTATE LOCALS ARE:\n',__locals
         return eval(formula,self._globals,__locals)
+    
+    def evalCommand(self,cmd,argin=None):
+        """This method will execute a command declared using DynamicCommands property"""
+        k = cmd if '/' in cmd else self.get_name()+'/'+cmd
+        assert k in self.dyn_comms.keys(),('%s command not declared in properties!'%(k))
+        return self.evalAttr(self.dyn_comms[k],_locals={'ARGS':argin})
 
     #------------------------------------------------------------------------------------------------------
     #   Methods usable inside Attributes declaration
@@ -1386,8 +1406,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         DynamicDS.dyn_attr(self)
         
         #Updating DynamicCommands (just update of formulas)
-        try: CreateDynamicCommands(type(self),type(self.get_device_class()))
-        except: self.error('CreateDynamicCommands failed: %s'%traceback.format_exc)
+        try: 
+            CreateDynamicCommands(type(self),type(self.get_device_class()))
+        except: 
+            print('CreateDynamicCommands failed: %s'%traceback.format_exc())
 
     #------------------------------------------------------------------
     #    EvaluateFormula command:
@@ -1514,6 +1536,10 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "This property will allow to declare new States dinamically based on\n\ndynamic attributes changes. The function Attr will allow to use the\n\nvalue of attributes in formulas.\n\n\n\nALARM=Attr(T1)>70\nOK=1",
             [ '#Write here your State formulas' ] ],
+        'DynamicCommands':
+            [PyTango.DevVarStringArray,
+            "This property will allow to declare new Commands at startup with formulas like: SendStrings=DevLong(WATTR(NAME+'/Channel',SPECTRUM(str,ARGS)))",
+            [ '#Write here your Command formulas' ] ],            
         'DynamicQualities':
             [PyTango.DevVarStringArray,
             "This property will allow to declare formulas for Attribute Qualities.",
@@ -1697,17 +1723,17 @@ def CreateDynamicCommands(ds,ds_class):
     if not hasattr(ds,'dyn_comms'): ds.dyn_comms = {}
     
     for dev in devs:
-        print 'In DynamicDS.CreateDynamicCommands(%s.%s)'%(server,dev)
-        prop =db.get_device_property(dev,['DynamicCommands'])['DynamicCommands']
-        lines = [l for l in [d.split('#')[0].strip() for d in prop] if l]
-        ds.dyn_comms.update([(dev+'/'+l.split('=',1)[0].strip(),l.split('=',1)[1].strip()) for l in lines])
-        print 'dyn_comms = %s' % ds.dyn_comms
-        for name,formula in ds.dyn_comms.items():
+        prop = db.get_device_property(dev,['DynamicCommands'])['DynamicCommands']
+        print 'In DynamicDS.CreateDynamicCommands(%s.%s): %s'%(server,dev,prop)
+        prop = DynamicDS.check_property_extensions('DynamicCommands',prop)
+        lines = [(dev+'/'+l.split('=',1)[0].strip(),l.split('=',1)[1].strip()) for l in [d.split('#')[0].strip() for d in prop if d] if l]
+        ds.dyn_comms.update(lines)
+        for name,formula in lines: #ds.dyn_comms.items():
             name = name.rsplit('/',1)[-1]
-            print 'In DynamicDS.CreateDynamicCommands(%s.%s.%s())'%(server,dev,name)
             if name.lower() in [s.lower() for s in dir(ds)]:
-                print ('Dynamic Command %s Already Exists, skipping!!!'%name)
+                print ('Dynamic Command %s.%s Already Exists, skipping!!!'%(type(ds),name))
                 continue
+            #print 'In DynamicDS.CreateDynamicCommands(%s.%s.%s())'%(server,dev,name)
             name = ([n for n in ds_class.cmd_list.keys() if n.lower()==name.lower()] or [name])[0]
             return_type = PyTango.CmdArgType.names.get(formula.split('(')[0],PyTango.DevString)
             itype = ('SCALAR(int,ARGS)' in formula and PyTango.DevLong or
@@ -1721,10 +1747,9 @@ def CreateDynamicCommands(ds,ds_class):
                      'ARGS' in formula and PyTango.DevVarStringArray or
                      PyTango.DevVoid)
             ds_class.cmd_list[name] = [[itype, "ARGS"],[return_type, "result"],]
-            setattr(ds,name,
-                lambda obj,argin=None,cmd_name=name: (obj._locals.update((('ARGS',argin),)), 
-                    obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name]))[-1]
-                )
+            #USING STATIC METHODS; THIS PART MAY BE SENSIBLE TO PyTANGO UPGRADES
+            setattr(ds,name,lambda obj,argin=None,cmd_name=name:obj.evalCommand(cmd_name,argin))
+            #lambda obj,argin=None,cmd_name=name: (obj._locals.update((('ARGS',argin),)),obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name]))[-1])
     print 'Out of DynamicDS.CreateDynamicCommands(%s)'%(server)
     return
     
