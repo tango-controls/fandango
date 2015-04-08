@@ -202,6 +202,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
         self._locals['FILE'] = lambda filename: self.open_file(filename) #This command will allow to setup attributes from config files
         self._locals['DYN'] = DynamicAttribute
+        self._locals['SCALAR'] = lambda t,v: castDynamicType(dims=0,klass=t,value=v)
+        self._locals['SPECTRUM'] = lambda t,v: castDynamicType(dims=1,klass=t,value=v)
+        self._locals['IMAGE'] = lambda t,v: castDynamicType(dims=2,klass=t,value=v)
         if MEM_CHECK:
             self._locals['guppy'] = guppy
             self._locals['heapy'] = HEAPY
@@ -367,7 +370,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
                 if prop=='polled_attr': self._polled_attr_ = tango.get_polled_attrs(value)
-                else: setattr(self,prop,value)
+                else: setattr(self,prop,self.check_property_extensions(prop,value))
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
             [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
         if self.UseTaurus:
@@ -387,25 +390,35 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     def open_file(self,filename):
         self.info('DynamicDS(%s).open_file(%s)'%(self.get_name(),filename))
+        r = []
         try:
             if not hasattr(self,'PATH'): self.PATH = self.get_device_property('PATH') or ''
             if self.PATH: filename = self.PATH+'/'+filename
             f = open(filename)
             r = f.readlines()
             f.close()
-            return r
-        except:
-            print traceback.format_exc()
-            return []
+        except: print(traceback.format_exc())
+        return r
             
-    def load_from_file(self,filename=None):
+    def load_from_file(self,filename=None,apply=True):
         """ This line is put in a separate method to allow subclasses to override this behavior"""
         filename = filename or self.LoadFromFile
         data = self.open_file(filename) if filename.lower().strip() not in ('no','false','') else []
-        if data:
-            self.DynamicAttributes = list(data)+list(self.DynamicAttributes)
+        if data and apply: self.DynamicAttributes = list(data)+list(self.DynamicAttributes)
         return data
-        
+    
+    _EXTENSIONS = ['@COPY:','@FILE:']
+    def check_property_extensions(self,prop,value):
+        if prop in DynamicDSClass.device_property_list and fandango.isSequence(value) and any(str(s).startswith(e) for e in self._EXTENSIONS for s in value):
+            parsed,get_arg = [],(lambda x:x.split(':',1)[-1].split('#')[0])
+            for v in value:
+                try:
+                    if v.startswith('@COPY:'): parsed.extend(self._db.get_device_property(get_arg(v),[prop])[prop])
+                    if v.startswith('@FILE:'): parsed.extend(self.load_from_file(get_arg(v),apply=False))
+                    else: parsed.append(v)
+                except: print('check_property_extensions(%s,%s): %s'%(prop,value,traceback.format_exc()))
+            return parsed
+        return value
             
     def get_polled_attrs(self,load=False):
         #@TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
@@ -596,8 +609,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #read_method = lambda attr,fire_event=True,s=self: s.read_dyn_attr(attr,fire_event)
         #write_method = lambda attr,fire_event=True,s=self: s.write_dyn_attr(attr,fire_event)
 
-        if not hasattr(self,'DynamicStates'):
-            self.error('DynamicDS property NOT INITIALIZED!')
+        if not hasattr(self,'DynamicStates'): self.error('DynamicDS property NOT INITIALIZED!')
             
         if self.DynamicStates:
             self.dyn_states = SortedDict()
@@ -666,8 +678,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             if (create): self.add_attribute(PyTango.Attr(aname,dyntype.tangotype, AttrType), \
                                 self.read_dyn_attr,self.write_dyn_attr,is_allowed)
                                 #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
-                        else:
+                        elif dyntype.dimy==1:
                             if (create): self.add_attribute(PyTango.SpectrumAttr(aname,dyntype.tangotype, AttrType,max_size or dyntype.dimx), \
+                                self.read_dyn_attr,self.write_dyn_attr,is_allowed)
+                                #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
+                        else:
+                            if (create): self.add_attribute(PyTango.ImageAttr(aname,dyntype.tangotype, AttrType,max_size or dyntype.dimx,max_size or dyntype.dimy), \
                                 self.read_dyn_attr,self.write_dyn_attr,is_allowed)
                                 #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
                         self.dyn_types[aname]=dyntype
@@ -1627,24 +1643,36 @@ class DynamicDSType(object):
 
 DynamicDSTypes={
             'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState','long','int'],int),
-            'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','long','int'],int),
+            'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','long','int','SCALAR(int'],int),
             'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','short'],int),
-            'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str'],lambda x:str(x or '')),
-            'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
-            'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','float','double','DevFloat','IeeeFloat'],float),
-            'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','list(long','[long','list(int','[int'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str','SCALAR(str'],lambda x:str(x or '')),
+            'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag','SCALAR(bool'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
+            'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','float','double','DevFloat','IeeeFloat','SCALAR(float'],float),
+
+            'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','SPECTRUM(int,','list(long','[long','list(int','[int'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
-            'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','list(str','[str'],lambda l:[str(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
-            'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','list(bool','[bool'],lambda l:[bool(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
-            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','DevVarFloatArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarStringArray':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringArray','SPECTRUM(str,','list(str','[str'],lambda l:[str(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','SPECTRUM(bool,','list(bool','[bool'],lambda l:[bool(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','SPECTRUM(float,','DevVarFloatArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
+            
+            'DevVarLongImage':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongImage','IMAGE(int,'],lambda l:[map(int,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarShortImage':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortImage',],lambda l:[map(int,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarStringImage':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringImage','IMAGE(str,'],lambda l:[map(str,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarBooleanImage':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanImage','IMAGE(bool,'],lambda l:[map(bool,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarDoubleImage':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleImage','IMAGE(float,'],lambda l:[map(float,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
             }
+DynamicDSTypes['DevVarFloatArray'] = DynamicDSTypes['DevVarDoubleArray']
             
 def isTypeSupported(ttype,n_dim=None):
     if n_dim is not None and n_dim not in (0,1): return False
     ttype = getattr(ttype,'name',str(ttype))
-    r = any(ttype in t.labels for t in DynamicDSTypes.values())
-    print ttype,r
-    return r
+    return any(ttype in t.labels for t in DynamicDSTypes.values())
+
+def castDynamicType(dims,klass,value):
+    t = {(0,int):'DevLong',(0,float):'DevDouble',(0,bool):'DevBoolean',(0,str):'DevString',
+         (1,int):'DevVarLongArray',(1,float):'DevVarDoubleArray',(1,bool):'DevVarBooleanArray',(1,str):'DevVarStringArray',
+         (2,int):'DevVarLongImage',(2,float):'DevVarDoubleImage',(2,bool):'DevVarBooleanImage',(2,str):'DevVarStringImage',}
+    return DynamicDSTypes[t[dims,klass]].pytype(value)
             
 def CreateDynamicCommands(ds,ds_class):
     """
@@ -1682,14 +1710,20 @@ def CreateDynamicCommands(ds,ds_class):
                 continue
             name = ([n for n in ds_class.cmd_list.keys() if n.lower()==name.lower()] or [name])[0]
             return_type = PyTango.CmdArgType.names.get(formula.split('(')[0],PyTango.DevString)
-            arg_command = [[PyTango.DevVarStringArray, "ARGS"],[return_type, "result"],]
-            void_command = [[PyTango.DevVoid, "ARGS"],[return_type, "result"],]
-            ds_class.cmd_list[name] = arg_command if 'ARGS' in formula else void_command
+            itype = ('SCALAR(int,ARGS)' in formula and PyTango.DevLong or
+                     'SCALAR(float,ARGS)' in formula and PyTango.DevDouble or
+                     'SCALAR(str,ARGS)' in formula and PyTango.DevString or
+                     'SCALAR(bool,ARGS)' in formula and PyTango.DevBoolean or
+                     'SPECTRUM(int,ARGS)' in formula and PyTango.DevVarLongArray or
+                     'SPECTRUM(float,ARGS)' in formula and PyTango.DevVarDoubleArray or
+                     'SPECTRUM(str,ARGS)' in formula and PyTango.DevVarStringArray or
+                     'SPECTRUM(bool,ARGS)' in formula and PyTango.DevVarBooleanArray or
+                     'ARGS' in formula and PyTango.DevVarStringArray or
+                     PyTango.DevVoid)
+            ds_class.cmd_list[name] = [[itype, "ARGS"],[return_type, "result"],]
             setattr(ds,name,
-                lambda obj,argin=None,cmd_name=name: (
-                    obj._locals.update((('ARGS',argin),)), 
-                    obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name])
-                    )[-1]
+                lambda obj,argin=None,cmd_name=name: (obj._locals.update((('ARGS',argin),)), 
+                    obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name]))[-1]
                 )
     print 'Out of DynamicDS.CreateDynamicCommands(%s)'%(server)
     return
