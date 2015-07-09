@@ -221,6 +221,59 @@ def maxmin(*args):
     mn,mx = (t[0][1],t[0][0]),(t[-1][1],t[-1][0])
     return mx,mn
 
+##METHODS OBTAINED FROM PyTangoArchiving READER
+
+def choose_first_value(v,w,t=0,tmin=-300):
+    """ 
+    Args are v,w for values and t for point to calcullate; 
+    tmin is the min epoch to be considered valid
+    """  
+    r = (0,None)
+    t = t or max((v[0],w[0]))
+    if tmin<0: tmin = t+tmin
+    if not v[0] or v[0]<w[0]: r = v #V chosen if V.time is smaller
+    elif not w[0] or w[0]<v[0]: r = w #W chosen if W.time is smaller
+    if tmin>0 and r[0]<tmin: r = (r[0],None) #If t<tmin; value returned is None
+    return (t,r[1])
+
+def choose_last_value(v,w,t=0,tmin=-300):
+    """ 
+    Args are v,w for values and t for point to calcullate; 
+    tmin is the min epoch to be considered valid
+    """  
+    r = (0,None)
+    t = t or max((v[0],w[0]))
+    if tmin<0: tmin = t+tmin
+    if not w[0] or v[0]>w[0]: r = v #V chosen if V.time is bigger
+    elif not v[0] or w[0]>v[0]: r = w #W chosen if W.time is bigger
+    if tmin>0 and r[0]<tmin: r = (r[0],None) #If t<tmin; value returned is None
+    return (t,r[1])
+    
+def choose_max_value(v,w,t=0,tmin=-300):
+    """ 
+    Args are v,w for values and t for point to calcullate; 
+    tmin is the min epoch to be considered valid
+    """  
+    r = (0,None)
+    t = t or max((v[0],w[0]))
+    if tmin<0: tmin = t+tmin
+    if tmin>0:
+        if v[0]<tmin: v = (0,None)
+        if w[0]<tmin: w = (0,None)
+    if not w[0] or v[1]>w[1]: r = v
+    elif not v[0] or w[1]>v[1]: r = w
+    return (t,r[1])
+    
+def choose_last_max_value(v,w,t=0,tmin=-300):
+    """ 
+    This method returns max value for epochs out of interval
+    For epochs in interval, it returns latest
+    Args are v,w for values and t for point to calcullate; 
+    tmin is the min epoch to be considered valid
+    """  
+    if t>max((v[0],w[0])): return choose_max_value(v,w,t,tmin)
+    else: return choose_last_value(v,w,t,tmin)
+
 import math
 from math import log10
 
@@ -248,6 +301,7 @@ def get_max_step(data,index=False):
         return (ix,mx)
 
 def get_histogram(data,n=20,log=False):
+    """ Groups data in N steps """
     import math
     mn = logfloor(min(data))
     mx = logroof(max(data))
@@ -264,6 +318,7 @@ def get_histogram(data,n=20,log=False):
     return ranges
 
 def print_histogram(data,n=20):
+    """ Prints Groups of data in N steps """
     hist = get_histogram(data,n)
     total,mx = len(data),max(data)
     ranges = [min(data)]+[h[0] for h in hist[1:]]+[mx]
@@ -368,7 +423,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
 ###############################################################################
 
 def dict2array(dct):
-    """ Converts a dictionary in a table of data, lists are unnested columns """
+    """ Converts a dictionary in a table showing nested data, lists are unnested columns """
     data,table = {},[]
     data['nrows'],data['ncols'] = 0,2 if fun.isDictionary(dct) else 1
     def expand(d,level):#,nrows=nrows,ncols=ncols):
@@ -392,7 +447,7 @@ def dict2array(dct):
     return table
 
 def array2dict(table):
-    """ Converts a table in a dictionary of left-to-right nested date, unnested columns are lists"""
+    """ Converts a table in a dictionary of left-to-right nested data, unnested columns are lists"""
     nrows,ncols = len(table),len(table[0])
     r,c = 0,0
     def expand(r,c,end):
@@ -450,6 +505,88 @@ def tree2table(tree):
             [result.append(list(line)) for line in lines]
     #print 'result: tree2table(tree) returned: %s' % (result)
     return result
+
+def values2text(table,order=None,sep='\t',eof='\n',header=True):
+    """ 
+    Input is a dictionary of {variable:[(time,values)]}; it will convert the dictionary into a text table with a column for each variable
+    It assumes that values in diferent columns have been already correlated
+    """
+    start = time.time()
+    if not order or not all(k in order for k in table): keys = list(sorted(table.keys()))
+    else: keys = sorted(table.keys(),key=order.index)
+    value_to_text = lambda s: str(s).replace('None','').replace('[','').replace(']','')
+    is_timed = fun.isSequence(table.values()[0][0]) and len(table.values()[0][0])==2
+    csv = '' if not header else (sep.join((['date','time'] if is_timed else [])+keys)+eof)
+    for i,t in enumerate(table.values()[0]):
+        if is_timed:
+            row = [fun.time2str(t[0]),str(t[0])]+[value_to_text(table[k][i][-1]) for k in keys]
+        else:
+            row = [value_to_text(table[k][i]) for k in keys]
+        csv+=sep.join(row) + eof
+    #print('Text file generated in %d milliseconds'%(1000*(time.time()-start)))
+    return csv
+        
+def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,AUTO_SIZE=50000,MAX_SIZE=0,MIN_RESOLUTION=0.05):
+    ''' Correlates values to have all epochs in all columns
+    :param values:  {curve_name:[values]}
+    :param resolution: two epochs with difference smaller than resolution will be considered equal
+    :param stop: an end date for correlation
+    :param rule: a method(tupleA,tupleB,epoch) like (min,max,median,average,last,etc...) that will take two last column (t,value) tuples and time and will return the tuple to keep
+    '''
+    start = time.time()
+    #print('correlate_values(%d x %d,resolution=%s,MAX_SIZE=%d) started at %s'%(len(values),max(len(v) for v in values.values()),resolution,MAX_SIZE,time.ctime(start)))
+    stop = stop or start
+    keys = sorted(values.keys())
+    table = dict((k,list()) for k in keys)
+    index = dict((k,0) for k in keys)
+    lasts = dict((k,(0,None)) for k in keys)
+    first,last = min([t[0][0] if t else 1e12 for t in values.values()]),max([t[-1][0] if t else 0 for t in values.values()])
+    if resolution is None:
+        #Avg: aproximated time resolution of each row
+        avg = (last-first)/min((AUTO_SIZE/6,max(len(v) for v in values.values()) or 1))
+        if avg < 10: resolution = 1
+        elif 10 <= avg<60: resolution = 10
+        elif 60 <= avg<600: resolution = 60
+        elif 600 <= avg<3600: resolution = 600
+        else: resolution = 3600 #defaults
+        print('correlate_values(...) resolution set to %2.3f -> %d s'%(avg,resolution))
+    assert resolution>MIN_RESOLUTION, 'Resolution must be > %s'%MIN_RESOLUTION
+    if rule is None: rule = fun.partial(choose_first_value,tmin=-resolution*10)
+    #if rule is None: rule = fun.partial(choose_last_max_value,tmin=-resolution*10)
+    epochs = range(int(first*1000-resolution*1000),int(last*1000+resolution*1000),int(resolution*1000)) #Ranges in milliseconds
+    if MAX_SIZE: epochs = epochs[:MAX_SIZE]
+    for k,data in values.items():
+        #print('Correlating %s->%s values from %s'%(len(data),len(epochs),k))
+        i,v,end = 0,data[0] if data else (first,None),data[-1][0] if data else (last,None)
+        for t in epochs:
+            t = t*1e-3 #Correcting back to seconds
+            v,tt = None,t+resolution
+            #Inserted value will  be (<end of interval>,<correlated value>)
+            #The idea is that if there's a value in the interval, it is chosen
+            #If there's no value, then it will be generated using previous/next values
+            #If there's no next or previous then value will be None
+            #NOTE: Already tried a lot of optimization, reducing number of IFs doesn't improve
+            #Only could guess if iterating through values could be better than iterating times
+            if i<len(data):
+                for r in data[i:]:
+                    if r[0]>(tt):
+                        if v is None: #No value in the interval
+                            if not table[k]: v = (t,None)
+                            else: v = rule(*[table[k][-1],r,tt]) #Generating value from previous/next
+                        break
+                    #therefore, r[0]<=(t+resolution)
+                    else: i,v = i+1,(t,r[1])
+                    ## A more ellaborated election (e.g. to maximize change)
+                    #elif v is None: 
+                        #i,v = i+1,(t,r[1])
+                    #else:
+                        #i,v = i+1,rule(*[v,r,tt])
+            else: #Filling table with Nones
+                v = (t+resolution,None)
+            table[k].append((tt,v[1]))
+        #print('\t%s values in table'%(len(table[k])))
+    #print('Values correlated in %d milliseconds'%(1000*(time.time()-start)))
+    return table
         
 ###############################################################################
 
