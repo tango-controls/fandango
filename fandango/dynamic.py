@@ -94,19 +94,15 @@ This Module includes several classes:
         </pre>
 """
 
-import PyTango
-import sys,threading,time,traceback
-import inspect
-from PyTango import AttrQuality
-from PyTango import DevState
+import PyTango,sys,threading,time,traceback,re,inspect
+from PyTango import AttrQuality,DevState
+
+import fandango,tango,objects
 from excepts import *
-import fandango
-import fandango.tango as tango
-import fandango.objects as objects
-from fandango.objects import self_locked
-from fandango.dicts import SortedDict,CaselessDefaultDict,defaultdict
-from fandango.log import Logger,shortstr
-import fandango.functional as fun
+from objects import self_locked
+from dicts import SortedDict,CaselessDefaultDict,defaultdict
+from log import Logger,shortstr
+import functional as fun
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 if getattr(PyTango,'__version_number__',0)<722:
@@ -419,20 +415,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if data and device: device.DynamicAttributes = list(data)+list(device.DynamicAttributes)
         return data
     
-    _EXTENSIONS = ['@COPY:','@FILE:']
+    EXTENSIONS = dict(list(tango.EXTENSIONS.items()))
+    
     @staticmethod
-    def check_property_extensions(prop,value):
-        #print(prop in DynamicDSClass.device_property_list,fandango.isSequence(value),any(str(s).startswith(e) for e in DynamicDS._EXTENSIONS for s in value))
-        if prop in DynamicDSClass.device_property_list and fandango.isSequence(value) and any(str(s).startswith(e) for e in DynamicDS._EXTENSIONS for s in value):
-            parsed,get_arg = [],(lambda x:x.split(':',1)[-1].split('#')[0])
-            for v in value:
-                try:
-                    if v.startswith('@COPY:'): parsed.extend(DynamicDS.get_db().get_device_property(get_arg(v),[prop])[prop])
-                    elif v.startswith('@FILE:'): parsed.extend(DynamicDS.load_from_file(get_arg(v),device=None))
-                    else: parsed.append(v)
-                except: print('check_property_extensions(%s,%s): %s'%(prop,value,traceback.format_exc()))
-            return parsed
-        return value
+    def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS):
+        return tango.check_property_extensions(prop,value,extensions=DynamicDS.EXTENSIONS,db=DynamicDS.get_db(),filters=DynamicDSClass.device_property_list)
             
     def get_polled_attrs(self,load=False):
         #@TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
@@ -683,9 +670,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 max_size = hasattr(self,'DynamicSpectrumSize') and self.DynamicSpectrumSize
                 AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) else PyTango.AttrWriteType.READ
                 for typename,dyntype in DynamicDSTypes.items():
-                    if max([formula.startswith(label) for label in dyntype.labels]):
+                    if dyntype.match(formula):
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
-                        if formula.startswith(typename):
+                        if formula.startswith(typename+'('): #DevULong should not match DevULong64
                             formula=formula.lstrip(typename)
                         self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                         if dyntype.dimx==1:
@@ -859,9 +846,18 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def write_dyn_attr(self,attr,fire_event=True):
         aname = attr.get_name()
         self.debug("DynamicDS("+self.get_name()+")::write_dyn_atr("+aname+"), entering at "+time.ctime()+"...")
-        data=[]
-        attr.get_write_value(data)
-        if self.dyn_types[aname].dimx==1: data=data[0]
+        
+        #THIS CHANGE MUST BE TESTED AGAINST PYTANGO7!!!! For Scalar/Spectrum/Image R/W Attrs!!
+        try: #PyTango8
+            data = attr.get_write_value()
+        except:
+            data = []
+            attr.get_write_value(data)
+            if self.dyn_types[aname].dimx==1: 
+                data = data[0]
+            elif self.dyn_types[aname].dimy!=1:
+                x = attr.get_max_dim_x()
+                data = [data[i:i+x] for i in range(len(data))[::x]]            
         self.setAttr(aname,data)
         #self.dyn_values[aname].update(result,time.time(),PyTango.AttrQuality.ATTR_VALID)
         ##if fire_event: self.fireAttrEvent(aname,data)
@@ -927,7 +923,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 'READ':bool(not WRITE),
                 'ATTRIBUTE':aname,
                 'NAME':self.get_name(),
-                'VALUE':VALUE,
+                'VALUE':VALUE if VALUE is None or aname not in self.dyn_types else self.dyn_types[aname].pytype(VALUE),
                 'STATE':self.get_state(),
                 'LOCALS':self._locals,
                 #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
@@ -1105,7 +1101,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if params: device,aname = params.get('device',None),params.get('attribute',aname)
         else: device,aname = aname.rsplit('/',1) if '/' in aname else '',aname
         
-        self.debug("DynamicDS(%s)::getXAttr(%s): ..."%(device or self.get_name(),aname))
+        (self.info if write else self.debug)("DynamicDS(%s)::getXAttr(%s,write=%s): ..."%(device or self.get_name(),aname,write and '%s(%s)'%(type(wvalue),wvalue)))
         result = default #Returning an empty list because it is a False iterable value that can be converted to boolean (and False or None cannot be converted to iterable)
         try:
             if not device:
@@ -1150,6 +1146,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     else:
                         self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if self.UseTaurus else 'PyTango',full_name))
                     if write: 
+                        self.info('getXAttr(Write): %s(%s)'%(type(wvalue),wvalue))
                         self._external_attributes[full_name].write(wvalue)
                         result = wvalue
                     else:
@@ -1666,14 +1663,21 @@ class DynamicDSType(object):
         self.pytype=pytype
         self.dimx=dimx
         self.dimy=dimy
+    def match(self,expr):
+        for l in self.labels:
+            if re.match(l.replace('(','\(').replace('[','\[')+'[\(,]',expr):
+                return True
+        return False
 
 DynamicDSTypes={
-            'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState','long','int'],int),
-            'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','long','int','SCALAR(int'],int),
-            'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','short'],int),
+            #Labels will be matched at the beginning of formulas using re.match(label+'[(,]',formula)
+            'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState',],int),
+            'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','DevULong','int','SCALAR(int'],int),
+            'DevLong64':DynamicDSType(PyTango.ArgType.DevLong,['DevLong64','DevULong64','long','SCALAR(long'],long),
+            'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','DevUShort','short'],int),
             'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str','SCALAR(str'],lambda x:str(x or '')),
             'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag','SCALAR(bool'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
-            'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','float','double','DevFloat','IeeeFloat','SCALAR(float'],float),
+            'DevDouble':DynamicDSType(PyTango.ArgType.DevDouble,['DevDouble','DevDouble64','float','double','DevFloat','IeeeFloat','SCALAR(float'],float),
 
             'DevVarLongArray':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongArray','SPECTRUM(int,','list(long','[long','list(int','[int'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             'DevVarShortArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortArray','list(short','[short'],lambda l:[int(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
@@ -1688,6 +1692,10 @@ DynamicDSTypes={
             'DevVarDoubleImage':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleImage','IMAGE(float,'],lambda l:[map(float,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
             }
 DynamicDSTypes['DevVarFloatArray'] = DynamicDSTypes['DevVarDoubleArray']
+DynamicDSTypes['DevULong'] = DynamicDSTypes['DevLong']
+DynamicDSTypes['DevULong64'] = DynamicDSTypes['DevLong64']
+DynamicDSTypes['DevUShort'] = DynamicDSTypes['DevShort']
+DynamicDSTypes['DevDouble64'] = DynamicDSTypes['DevDouble']
             
 def isTypeSupported(ttype,n_dim=None):
     if n_dim is not None and n_dim not in (0,1): return False
