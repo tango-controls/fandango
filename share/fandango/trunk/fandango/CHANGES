@@ -1,4 +1,4 @@
-RELEASE = (11,4)
+RELEASE = (11,5)
 RELEASE_NOTE = "Bugs solved for better simulations"
 
 """
@@ -10,6 +10,32 @@ PENDING:
 
 
 ONGOING ......... preparing next PyAlarm release
+
+-------------------------------------------------
+January 2015 - 11.5 Improvements for 64 bits support and simulations
+-------------------------------------------------
+
+dynamic: Added image attributes and SCALAR,SPECTRUM,IMAGE keywords for conversion
+dynamic: Added argument data types in commands (using SCALAR(int,ARGs) or SPECTRUM(bool,ARGS))
+dynamic: Added castDynamicType method
+dynamic: enabled @COPY and @FILE extensions to DynamicCommands syntax.
+dynamic: Added 64 bits types support.
+dynamic: Solved bug on VALUE parsing on attribute reading.
+dynamic: Solved bug with Spectrum attributes in tango8
+
+arrays: array methods from PyTangoArchiving.reader: correlate_values, values2text, choose_*_value
+tango: Added property extensions (COPY/FILE) to fill properties with external values.
+tango: @COPY:device or @FILE:filename.txt; To enable it, file methods have been changed to static methods.
+tango: Added 64 bits support as python long.
+tango: Solved bugs on tango_host parsing.
+server: Solved bug on getting executable names
+qt: Solved bug in QExceptionMessage, added QDropable meta class
+functional: Added retry(callable) method
+interface/CopyCatDS: added retries on attribute list querying (sometimes fails due to locks)
+
+-------------------------------------------------
+January 2015 - 11.4 Bugs solved for better simulations
+-------------------------------------------------
 
 debug: timeit method added
 functional: anyone bug solved
