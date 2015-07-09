@@ -62,7 +62,7 @@ def wait(seconds,event=True):
     """
     if not event:
         time.sleep(seconds)
-    elif isinstance(event,type(_EVENT)):
+    elif isinstance(event,threading.Event):
         event.wait(seconds)
     else:
         _EVENT.wait(seconds)
