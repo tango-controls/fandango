@@ -198,7 +198,8 @@ def djoin(a,b):
         
 def splitList(seq,split):
     """splits a list in lists of 'split' size"""
-    return [seq[split*i:split*(i+1)] for i in range(1+len(seq)/split)]
+    #return [seq[split*i:split*(i+1)] for i in range(1+len(seq)/split)]
+    return [seq[i:i+split] for i in range(len(seq))[::split]]
     
 def contains(a,b,regexp=True):
     """ Returns a in b; using a as regular expression if wanted """
@@ -723,6 +724,17 @@ def mysql2time(mysql_time):
 ## Extended eval
 ########################################################################
 
+def retry(callable,retries=3,pause=0,args=[],kwargs={}):
+    r = None
+    for i in range(retries):
+        try:
+            r = callable(*args,**kwargs)
+            break
+        except Exception,e:
+            if i==(retries-1): raise e
+            elif pause: time.sleep(pause)
+    return r
+    
 def evalF(formula):
     """
     Returns a function that executes the formula passes as argument.
