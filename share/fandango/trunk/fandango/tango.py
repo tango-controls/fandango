@@ -112,7 +112,7 @@ def get_tango_host(dev_name='',use_db=False):
         return m.groups()[0] if m else get_tango_host(use_db=use_db)
     elif use_db:
         use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
-        return "%s:%s"%(use_db.get_db_host().split('.')[0],use_db.get_db_port())
+        return "%s:%d"%(use_db.get_db_host().strip().split('.')[0],int(use_db.get_db_port()))
     else:
         return os.getenv('TANGO_HOST') 
 
@@ -175,11 +175,13 @@ def get_device(dev,use_tau=False,keep=False):
     else:
         return None
 
-def get_database_device(use_tau=False): 
+def get_database_device(use_tau=False,db=None): 
     global TangoDevice
     if TangoDevice is None:
         try:
-           TangoDevice = get_device(get_database(use_tau=use_tau).dev_name(),use_tau=use_tau)
+           dev_name = (db or get_database(use_tau=use_tau)).dev_name()
+           dev_name = get_tango_host(use_db=db)+'/'+dev_name if db else dev_name
+           TangoDevice = get_device(dev_name,use_tau=use_tau)
         except: pass
     return TangoDevice
 
@@ -190,12 +192,12 @@ def add_new_device(server,klass,device):
     dev_info.server = server
     get_database().add_device(dev_info)    
     
-def get_device_info(dev):
+def get_device_info(dev,db=None):
     """
     This method provides an alternative to DeviceProxy.info() for those devices that are not running
     """
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
-    dd = get_database_device()
+    dd = get_database_device(db=db)
     vals = dd.DbGetDeviceInfo(dev)
     di = Struct([(k,v) for k,v in zip(('name','ior','level','server','host','started','stopped'),vals[1])])
     di.exported,di.PID = vals[0]
@@ -455,6 +457,44 @@ def get_property_history(dev,prop):
     his = db.get_device_property_history(dev,prop)
     return [(fun.str2time(h.get_date()),h.get_value()) for h in his]    
 
+###############################################################################
+# Property extensions
+
+def get_extension_arg(x): 
+    return x.split(':',1)[-1].split('#')[0]
+
+def _copy_extension(prop,row,db=None): 
+    db = db or get_database()
+    return db.get_device_property(get_extension_arg(row),[prop])[prop]
+
+def _file_extension(prop,row,db=None):
+    try:
+        f = open(get_extension_arg(row))
+        r = f.readlines()
+        f.close()
+        return r
+    except:
+        traceback.print_exc()
+        return []
+
+EXTENSIONS = {'@COPY:':_copy_extension,'@FILE:':_file_extension}
+
+def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS,filters=[]):
+    db = db or get_database()
+    #print(prop in DynamicDSClass.device_property_list,fandango.isSequence(value),any(str(s).startswith(e) for e in DynamicDS._EXTENSIONS for s in value))
+    if (not filters or prop in filters) and fandango.isSequence(value) and any(str(s).startswith(e) for e in extensions for s in value):
+        parsed,get_arg = [],(lambda x:x.split(':',1)[-1].split('#')[0])
+        for v in value:
+            try:
+                #if v.startswith('@COPY:'): parsed.extend(DynamicDS._copy_extension(prop,v))
+                #elif v.startswith('@FILE:'): parsed.extend(DynamicDS._file_extension(prop,v))
+                ext,f = fun.first([(e,f) for e,f in extensions.items() if v.startswith(e)] or [(None,None)])
+                if ext: parsed.extend(f(prop,v))
+                else: parsed.append(v)
+            except: print('check_property_extensions(%s,%s): %s'%(prop,value,traceback.format_exc()))
+        return parsed
+    return value
+
 ####################################################################################################################
 ##@name Methods for searching the database with regular expressions
 #@{
@@ -552,7 +592,7 @@ class get_all_devices(objects.SingletonMap):
     def get_all_devs(self):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
-            print 'updating all_devs ..........................................'
+            #print 'updating all_devs ..........................................'
             self._all_devs = map(str.lower,(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*')))
             self._last_call = now
         return self._all_devs
@@ -854,7 +894,9 @@ def cast_tango_type(value_type):
         return bool
     elif value_type in (PyTango.DevDouble,PyTango.DevFloat): 
         return float
-    elif value_type in (PyTango.DevState,PyTango.DevShort,PyTango.DevInt,PyTango.DevLong,PyTango.DevLong64,PyTango.DevULong,PyTango.DevULong64,PyTango.DevUShort,PyTango.DevUChar): 
+    elif value_type in (PyTango.DevLong64,PyTango.DevULong64):
+        return long
+    elif value_type in (PyTango.DevState,PyTango.DevShort,PyTango.DevInt,PyTango.DevLong,PyTango.DevULong,PyTango.DevUShort,PyTango.DevUChar): 
         return int
     else: 
         return str
