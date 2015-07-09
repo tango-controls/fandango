@@ -141,11 +141,13 @@ class QDialogWidget(Qt.QDialog):
         self.connect(self.buttons or self,Qt.SIGNAL('accepted()'),f)
         
 class QExceptionMessage(object):
-    def __init__(self,message=None):
+    def __init__(self,*args):
         import traceback
-        self.message = str(message) or traceback.format_exc()
-        self.qmb = Qt.QMessageBox(Qt.QMessageBox.Warning,"Exception","The following exception occurred:\n\n%s"%message,Qt.QMessageBox.Ok)
-        print 'fandango.qt.QExceptionMessage(%s)'%message
+        self.message = '\n'.join(map(str,args)) or ''
+        if not self.message or len(args)<2:
+            self.message+=traceback.format_exc()
+        self.qmb = Qt.QMessageBox(Qt.QMessageBox.Warning,"Exception","The following exception occurred:\n\n%s"%self.message,Qt.QMessageBox.Ok)
+        print 'fandango.qt.QExceptionMessage(%s)'%self.message
         self.qmb.exec_()
 
 class QColorDictionary(SortedDict,Singleton):
@@ -708,6 +710,61 @@ TauEmitterThread = QWorker #For backwards compatibility
             
 ###############################################################################
 
+def Dropable(QtKlass):
+    """ 
+    This decorator enables a Qt class to execute a 'hook' method every time is double-clicked
+    """    
+    class DropableQtKlass(QtKlass):
+        def setSupportedMimeTypes(self, mimetypes):
+            ''' sets the mimeTypes that this widget support 
+            :param mimetypes: (list<str>) list (ordered by priority) of MIME type names
+            '''
+            self._supportedMimeTypes = mimetypes
+        def mimeTypes(self):
+            try: 
+                import taurus, taurus.qt, taurus.qt.qtcore
+                from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
+                self.setSupportedMimeTypes([TAURUS_MODEL_LIST_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_ATTR_MIME_TYPE,TAURUS_MODEL_MIME_TYPE, 'text/plain'])
+            except:
+                print 'Unable to import TAURUS MIME TYPES: %s'%traceback.format_exc()
+            return self.getSupportedMimeTypes()
+        def getSupportedMimeTypes(self): 
+            print self._supportedMimeTypes
+            return self._supportedMimeTypes
+        def dropModels(self,models):
+            self.setText(str(models)) #self.setText(str(self.toPlainText())+'\n'+str(models))
+        #In this method is where dropped data is checked
+        def dropEvent(self, event):
+            '''reimplemented to support dropping of modelnames in forms'''
+            print('dropEvent(%s): %s,%s'%(event,event.mimeData(),event.mimeData().formats()))
+            if event.source() is self:
+                print('Internal drag/drop not allowed')
+            elif any(s in event.mimeData().formats() for s in self.mimeTypes()):
+                mtype = self.handleMimeData(event.mimeData(),self.dropModels)#lambda m:self.addModels('^%s$'%m))
+                event.acceptProposedAction()
+            else: print('Invalid model in dropped data')
+        def handleMimeData(self, mimeData, method):
+            '''Selects the most appropriate data from the given mimeData object (in the order returned by :meth:`getSupportedMimeTypes`) and passes it to the given method.
+            :param mimeData: (QMimeData) the MIME data object from which the model is to be extracted
+            :param method: (callable<str>) a method that accepts a string as argument. This method will be called with the data from the mimeData object
+            :return: (str or None) returns the MimeType used if the model was successfully set, or None if the model could not be set
+            '''
+            formats = mimeData.formats()
+            print mimeData
+            print mimeData.data
+            for mtype in self.mimeTypes():
+                if mtype in formats:
+                    try:
+                        d = mimeData.data(mtype)
+                        assert d is not None
+                        method(str(d)) #mimeData.text()))
+                        return mtype
+                    except:
+                        print('Invalid data (%s,%s) for MIMETYPE=%s'%(repr(mimeData),repr(d), repr(mtype)))
+                        traceback.print_exc()
+                        return None
+    return DropableQtKlass
+
 def DoubleClickable(QtKlass):
     """ 
     This decorator enables a Qt class to execute a 'hook' method every time is double-clicked
@@ -881,7 +938,7 @@ class QDropTextEdit(Qt.QTextEdit):
     """
     def __init__(self,*args):#,**kwargs):
         self.double_click_hook = None
-        QtGui.QLineEdit.__init__(self,*args)#,**kwargs)
+        QtGui.QTextEdit.__init__(self,*args)#,**kwargs)
     
     def setClickHook(self,hook):
         """ the hook must be a function or callable """
