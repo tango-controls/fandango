@@ -50,7 +50,9 @@ def copy_cmd_list(device):
     return cmd_list
         
 def get_attr_descriptions(device):
-    return dict((c.name,c) for c in fandango.get_device(device).attribute_list_query())
+    dp = fandango.get_device(device)
+    aql = fandango.retry(dp.attribute_list_query)
+    return dict((c.name,c) for c in aql)
 
 def copy_attr_list(device):
     attr_list = {}
