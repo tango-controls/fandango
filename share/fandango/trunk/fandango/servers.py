@@ -48,7 +48,7 @@ from objects import Object
 from dicts import CaselessDefaultDict,CaselessDict
 from fandango.log import Logger
 
-from fandango.tango import ProxiesDict
+from fandango.tango import ProxiesDict,get_device_info
     
 ####################################################################################################################
 
@@ -56,7 +56,8 @@ class TServer(Object):
     '''Class used by ServerDict to manage TangoDeviceServer admin devices.'''
     def __init__(self,name='', host='', parent=None):
         if not name or '/' not in name: raise Exception,'TServer_WrongServerName_%s' % name
-        self.name=self.get_simple_name(name)        
+        self.info = None
+        self.name=self.get_simple_name(name)
         self.update_level(host,0)
         self.controlled = False
         self.level = 0
@@ -66,7 +67,6 @@ class TServer(Object):
         if parent and parent.log.getLogLevel(): self.log.setLogLevel(parent.log.getLogLevel())
         else: self.log.setLogLevel('ERROR')
         self.state_lock = threading.Lock()
-        
         if parent: self.proxies=parent.proxies
         else: self.proxies=ProxiesDict()
         pass
@@ -102,11 +102,12 @@ class TServer(Object):
             
     def init_from_db(self,db=None,load_devices=False):
         """ Gets name, classes, devices, host, level information from Tango Database. """
+        #print ('init_from_db(%s,%s)'%(self.name,load_devices))
         self._db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
-        ssi = self._db.get_server_info(self.name)
-        self.update_level(ssi.host,ssi.level)
-        if load_devices:
-            self.get_classes()
+        self.info = get_device_info('dserver/'+self.name,db=self._db) #get_server_info() replaced by DbGetServerInfo to obtain the real name of the launcher
+        self.name = self.info.server
+        self.update_level(self.info.host,self.info.level)
+        if load_devices: self.get_classes()
     
     def update_level(self,host,level=0):
         """ It only initializes the values, does not get values from database. """
@@ -601,7 +602,7 @@ class ServersDict(CaselessDict,Object):
                 continue
             if not host: 
                 try:
-                    if s_name in self: self[s_name].init_from_db(self.db)
+                    if s_name in self: self[s_name].init_from_db(self.db) #Updating info from DB even if it was already initialized (it may be out-of-sync)
                     self[s_name].get_server_level()
                 except Exception,e: 
                     self.log.warning('start/stop_servers(%s): Unable to retrieve host/level information: %s'%(s_name,e))
@@ -613,7 +614,7 @@ class ServersDict(CaselessDict,Object):
             
         for level,host,s_name in sorted(full_servers_list):
             t0 = time.time()
-            target = self[s_name].name
+            target = self[s_name].name #Using the True name as returned by DbGetDeviceInfo()
             if host:
                 starter = 'tango/admin/%s'%host
             else:
