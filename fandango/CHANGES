@@ -12,7 +12,7 @@ PENDING:
 ONGOING ......... preparing next PyAlarm release
 
 -------------------------------------------------
-August 2015 - 11.6 
+August 2015 - 11.6 New QEvaluator tool for debugging PyQt
 -------------------------------------------------
 
 dynamic: added getDynamicConfig to have external access to the current DynamicAttributes engine configuration
