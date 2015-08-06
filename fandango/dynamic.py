@@ -100,7 +100,7 @@ from PyTango import AttrQuality,DevState
 import fandango,tango,objects
 from excepts import *
 from objects import self_locked
-from dicts import SortedDict,CaselessDefaultDict,defaultdict
+from dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
 from log import Logger,shortstr
 import functional as fun
 
@@ -170,11 +170,40 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         print 'UseTaurus = %s'%getattr(self,'UseTaurus',False)
         if getattr(self,'UseTaurus',False): self.UseTaurus = bool(tango.loadTaurus())
         
+        # Internal object references
+        self.__prepared = False
+        self.myClass = None
+        
+        ## This dictionary stores XAttr valid arguments and AttributeProxy/TauAttribute objects
+        self._external_attributes = CaselessDict()
+        self._external_listeners = CaselessDict() #CaselessDefaultDict(set)
+        self._external_commands = CaselessDict()
+
+        self.time0 = time.time()
+        self.simulationMode = False #If it is enabled the ForceAttr command overwrites the values of dyn_values
+        self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
+        self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
+        self.last_state_exception = ''
+        self.last_attr_exception = None
+        self._init_count = 0
+        self._hook_epoch = 0
+        self._cycle_start = 0
+        self._total_usage = 0
+        self._last_period = {}
+        self._last_read = {}
+        self._read_times = {}
+        self._read_count = defaultdict(int)
+        self._eval_times = {}
+        self._polled_attr_ = {}
+        self.GARBAGE = []
+        
         ##Local variables and methods to be bound for the eval methods
         self._globals={} #globals().copy()
         if _globals: self._globals.update(_globals)
         self._locals = {}
         self._locals['self'] = self
+        self._locals['time2str'] = fandango.time2str
+        self._locals['ctime2time'] = fandango.ctime2time
         self._locals['Attr'] = lambda _name: self.getAttr(_name)
         self._locals['ATTR'] = lambda _name: self.getAttr(_name)
         self._locals['XAttr'] = lambda _name,default=None: self.getXAttr(_name,default=default)
@@ -212,33 +241,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals.update(self.TangoStates)
         
         if _locals: self._locals.update(_locals) #New submitted methods have priority over the old ones
-
-        # Internal object references
-        self.__prepared = False
-        self.myClass = None
-        
-        ## This dictionary stores XAttr valid arguments and AttributeProxy/TauAttribute objects
-        self._external_attributes = dict()
-        self._external_listeners = dict() #CaselessDefaultDict(set)
-        self._external_commands = dict()
-
-        self.time0 = time.time()
-        self.simulationMode = False #If it is enabled the ForceAttr command overwrites the values of dyn_values
-        self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
-        self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
-        self.last_state_exception = ''
-        self.last_attr_exception = None
-        self._init_count = 0
-        self._hook_epoch = 0
-        self._cycle_start = 0
-        self._total_usage = 0
-        self._last_period = {}
-        self._last_read = {}
-        self._read_times = {}
-        self._read_count = defaultdict(int)
-        self._eval_times = {}
-        self._polled_attr_ = {}
-        self.GARBAGE = []
 
         self.useDynStates = useDynStates
         if self.useDynStates:
@@ -928,6 +930,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 'LOCALS':self._locals,
                 #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
                 'ATTRIBUTES':sorted(self.dyn_values.keys()),
+                'XATTRS':self._external_attributes,
                 }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
             if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
             
@@ -1142,7 +1145,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             self._external_attributes[full_name].addListener(self.event_received)
                         else: 
                             #USING PLAIN PYTANGO (POLLING UNCACHED VALUES)
-                            self._external_attributes[full_name] = tango.CachedAttributeProxy(full_name,keeptime=max((200,self.KeepTime)))
+                            self._external_attributes[full_name] = tango.CachedAttributeProxy(full_name,max((100,self.KeepTime)))#keeptime=self.KeepTime)
                     else:
                         self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if self.UseTaurus else 'PyTango',full_name))
                     if write: 
@@ -1426,6 +1429,21 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         return argout
     
     #------------------------------------------------------------------
+    #    GetDynamicConfig command:
+    #
+    #    Description: Return current property values
+    #
+    #    argin:  DevVoid
+    #    argout: DevString      Return current property values
+    #------------------------------------------------------------------
+    #Methods started with underscore could be inherited by child device servers for debugging purposes
+    def getDynamicConfig(self):
+        exclude = 'DynamicAttributes','DynamicCommands','DynamicStates','DynamicStatus'
+        return '\n'.join(sorted('%s: %s'%(k,getattr(self,k,None)) 
+            for l in (DynamicDSClass.class_property_list,DynamicDSClass.device_property_list)
+            for k in l if k not in exclude))
+    
+    #------------------------------------------------------------------
     #    GetMemUsage command:
     #
     #    Description: Returns own process RSS memory usage (Mb).
@@ -1512,6 +1530,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 #------------------------------------------------------------------------------------------------------
 
 class DynamicDSClass(PyTango.DeviceClass):
+
     #This device will point to the device actually being readed; it is set by read_attr_hardware() method; it should be thread safe
     DynDev = None
 
@@ -1589,12 +1608,18 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
-        #'getMemUsage':
-            #[[PyTango.DevVoid, "Returns own process RSS memory usage (Kb)"],
-            #[PyTango.DevDouble, "Returns own process RSS memory usage (Kb)"],
-            #{
-                #'Display level':PyTango.DispLevel.EXPERT,
-             #} ],
+        'getDynamicConfig':
+            [[PyTango.DevVoid, "Print current property values"],
+            [PyTango.DevString, "Print current property values"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],            
+        'getMemUsage':
+            [[PyTango.DevVoid, "Returns own process RSS memory usage (Kb)"],
+            [PyTango.DevDouble, "Returns own process RSS memory usage (Kb)"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],
         }
 
     #    Attribute definitions
@@ -1617,7 +1642,7 @@ class DynamicDSClass(PyTango.DeviceClass):
             for p,v in getattr(DynamicDSClass,d).items():
                 if p not in dct: 
                     dct[p] = v
-        cls = cls if cls is not DynamicDSClass else PyTango.DeviceClass
+        #cls = cls if cls is not DynamicDSClass else PyTango.DeviceClass
         instance = PyTango.DeviceClass.__new__(cls,*args,**kwargs)
         return instance
 
@@ -1672,7 +1697,7 @@ class DynamicDSType(object):
 DynamicDSTypes={
             #Labels will be matched at the beginning of formulas using re.match(label+'[(,]',formula)
             'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState',],int),
-            'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','DevULong','int','SCALAR(int'],int),
+            'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','DevULong','int','SCALAR(int','DYN(int'],int),
             'DevLong64':DynamicDSType(PyTango.ArgType.DevLong,['DevLong64','DevULong64','long','SCALAR(long'],long),
             'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','DevUShort','short'],int),
             'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str','SCALAR(str'],lambda x:str(x or '')),
@@ -1960,13 +1985,13 @@ class DynamicServer(object):
     
     PROPERTY = 'PYTHON_CLASSPATH'
     
-    def __init__(self,name='',classes={},add_debug=False,log='-v2'):
+    def __init__(self,name='',classes={},add_debug=False,log='-v2',orb=[]):
         if not name:
-            server,instance,logs = self.parse_args()
+            server,instance,logs,orb = self.parse_args()
             self.name = server+'/'+instance
         else:
             self.name,server,instance,logs = name,name.split('/')[0],name.split('/')[-1],log
-        self.args = [server,instance,logs]
+        self.args = [server,instance,logs]+orb
         print 'In DynamicServer(%s)'%self.args
         self.util = PyTango.Util(self.args)
         self.instance = self.util.instance()
@@ -1995,12 +2020,22 @@ class DynamicServer(object):
         print args
         server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicDS'
         instance = args[1]
-        logs = (args[2:] or ['-v4'])[0]
+        logs,orb = '-v2',[]
+        for i in (2,3):
+            if args[i:]:
+                if args[i].startswith('-v'):
+                    logs = args[i]
+                else:
+                    orb = args[i:i+2]
+                    break
+            else: break
         ds_name = server+'/'+instance
-        return (server,instance,logs)
+        return (server,instance,logs,orb)
                     
     def load_class(self,c):
         try:
+            if c in locals():
+                return locals[c]
             p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
             print '\nLoading %s from %s' % (c,p or self.path)
             if p:
