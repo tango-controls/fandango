@@ -101,17 +101,36 @@ def obj2dict(obj,type_check=True):
 ## Useful class objects
 
 class Struct(object):
-    def __init__(self,dct = None):
-        if dct is None: dct = {}
-        elif isSequence(dct) and not isDictionary(dct): dct = dict.fromkeys(dct) #isDictionary also matches items lists
+    """
+    Metamorphic class to pass/retrieve data objects as object or dictionary
+    """
+    def __init__(self,*args,**kwargs):
+        self.load(*args,**kwargs)
+    def load(self,*args,**kwargs):
+        dct = args[0] if len(args)==1 else (args or kwargs)
+        if isSequence(dct) and not isDictionary(dct): dct = dict.fromkeys(dct) #isDictionary also matches items lists
         [setattr(self,k,v) for k,v in (dct.items() if hasattr(dct,'items') else dct)]
+        
+    def keys(self): return self.__dict__.keys()
+    def values(self): return self.__dict__.values()
+    def items(self): return self.__dict__.items()
+    def __getitem__(self,k): return getattr(self,k)
+    def __setitem__(self,k): return setattr(self,k,v)
+    def __contains__(self,k): return hasattr(self,k)
+
+    def __call__(self,*args,**kwargs):
+        """getter with one string, setter if 2 are passed"""
+        assert len(args) in (1,2)
+        if len(args)==2: setattr(self,args[0],args[1])
+        elif len(args)==1 and isString(args[0]): return getattr(self,args[0])
+        else: self.load(*args,**kwargs)
     def __repr__(self):
         return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) for k,v in self.__dict__.items())+'\n\t})'
     def __str__(self):
         return self.__repr__().replace('\n','').replace('\t','')
-    def items(self):
-        return self.__dict__.items()
-    pass
+    def to_str(self,order=None,sep=','):
+        """ This method provides a formatable string for sorting""" 
+        return self.__str__() if order is None else (sep.join('%s'%self[k] for k in order))
         
 def _fget(self,var):
     return getattr(self,var)
