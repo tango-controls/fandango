@@ -183,14 +183,14 @@ def file_exists(path):
 def get_file_size(path):
     return os.stat(path)[stat.ST_SIZE]
 
-def listdir(folder,mask='.*',files=False,folders=False):
+def listdir(folder,mask='.*',files=False,folders=False,links=False):
     try:
         if folders and not files:
-            vals = os.walk(folder).next()[1]
+            vals = os.walk(folder,followlinks=links).next()[1]
         elif files and not folders:
-            vals = os.walk(folder).next()[2]
+            vals = os.walk(folder,followlinks=links).next()[2]
         else:
-            vals = os.listdir(folder)
+            vals = os.listdir(folder,links=links)
         if mask:
             return [f for f in vals if re.match(fun.toRegexp(mask),f)]
         else:
