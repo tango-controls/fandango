@@ -93,9 +93,9 @@ def TGet(*args):
     if arg0.count('/')==1:
         return fandango.Servers.ServersDict(arg0)
     if arg0.count('/')>(2+(':' in arg0)):
-        return get_matching_attributes(arg0) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else check_attribute(arg0,brief=True)
+        return sorted(get_matching_attributes(arg0)) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else check_attribute(arg0,brief=True)
     else:
-        return get_matching_devices(arg0) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else get_device(arg0)
+        return sorted(get_matching_devices(arg0)) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else get_device(arg0)
         
 ####################################################################################################################
 
@@ -856,7 +856,11 @@ def check_attribute(attr,readable=False,timeout=0,brief=False):
         except Exception,e: 
             return None if readable or brief else e
     except:
-        return None    
+        return None
+    
+def read_attribute(attr,timeout=0,full=False):
+    """ Alias to check_attribute(attr,brief=True)"""
+    return check_attribute(attr,timeout=timeout,brief=not full)
 
 def check_device_list(devices,attribute=None,command=None):
     """ 
