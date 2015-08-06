@@ -48,6 +48,25 @@ by Sergi Rubio,
 srubio@cells.es, 
 2010 
 """
+
+
+import sys,time,traceback
+import fandango
+from fandango.functional import time2str,isString,isSequence,toList
+import pickle
+import PyQt4
+from PyQt4 import Qt
+from PyQt4.Qt import QColor
+#import fandango.qt
+
+#import guiqwt
+#import guidata
+#from guiqwt.plot import CurveDialog
+#from guiqwt.builder import make
+#from guiqwt.styles import COLORS
+
+###############################################################################
+
 page = lambda s: '<html>%s</html>'%s
 body = lambda s: '<body>%s</body>'%s
 paragraph = lambda s: '<p>%s</p>'%s
@@ -75,7 +94,11 @@ title = lambda s,n=1: '<a name="%s"><h%d>%s</h%d></a>' % (iname(s),n,s,n) #<a> a
 title1 = lambda s: '<h1>%s</h1>'%s
 
 row,cell = (lambda s: '<tr>%s</tr>'%s) , (lambda s: '<td>%s</td>'%s)
-table = lambda s: '<table border=1>\n'+'\n'.join([row(''.join([(cell('%s'%c) if ((i or len(s)==1) and j) else cell(bold('%s'%c))) for j,c in enumerate(r)])) for i,r in enumerate(s)])+'\n</table>'
+table = lambda s: '<table border=1>\n'+'\n'.join([row(''.join([
+                            (cell('%s'%c) if (len(s)==1 or j or (len(toList(r))<3 and i)) else cell(bold('%s'%c)))
+                                for j,c in enumerate(toList(r))])) 
+                            for i,r in enumerate(s)]
+                   )+'\n</table>'
 
 def list_to_ulist(l):
     return ulist('\n'.join(item(str(s)) for s in l))
@@ -109,21 +132,6 @@ def dict2dict2table(seq,keys=None,formatter=None):
     
 
 ###############################################################################
-
-import sys,time,traceback
-import fandango
-from fandango.functional import time2str
-import pickle
-import PyQt4
-from PyQt4 import Qt
-from PyQt4.Qt import QColor
-#import fandango.qt
-
-#import guiqwt
-#import guidata
-#from guiqwt.plot import CurveDialog
-#from guiqwt.builder import make
-#from guiqwt.styles import COLORS
 
 MULTIPLIER = 10
 OFFSETS = [-15,-30,-45,-60,-75,-90,-105,-120]
