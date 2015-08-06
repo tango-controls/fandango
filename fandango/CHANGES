@@ -12,7 +12,22 @@ PENDING:
 ONGOING ......... preparing next PyAlarm release
 
 -------------------------------------------------
-January 2015 - 11.5 Improvements for 64 bits support and simulations
+August 2015 - 11.6 
+-------------------------------------------------
+
+dynamic: added getDynamicConfig to have external access to the current DynamicAttributes engine configuration
+dynamic: first step for quality/timestamp forwarding on attributes (under test, DevLong only)
+dynamic: solved bug on parsing CORBA endpoint on sys args
+dynamic: changed order of local variables initialization on init()
+functional: evalX, get/import module refactored to be usable from QEvaluator
+objects: Struct upgraded to be more dict-alike and callable
+qt: ApiBrowser upgraded to QEvaluator, to be used for PyQt debugging
+qt: added QTableOnWidget
+qt: QWorker modified to be usable from sqlite
+tango: added read_attribute alias to check_attribute(brief=True)
+
+-------------------------------------------------
+July 2015 - 11.5 Improvements for 64 bits support and simulations
 -------------------------------------------------
 
 dynamic: Added image attributes and SCALAR,SPECTRUM,IMAGE keywords for conversion
@@ -34,7 +49,7 @@ functional: Added retry(callable) method
 interface/CopyCatDS: added retries on attribute list querying (sometimes fails due to locks)
 
 -------------------------------------------------
-January 2015 - 11.4 Bugs solved for better simulations
+April 2015 - 11.4 Bugs solved for better simulations
 -------------------------------------------------
 
 debug: timeit method added
