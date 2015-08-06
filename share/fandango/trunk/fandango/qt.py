@@ -34,10 +34,10 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
 
-import Queue,traceback,time,sys
+import Queue,traceback,time,sys,os
 from functools import partial
 import fandango
-from functional import isString,isSequence
+from fandango.functional import isString,isSequence,isDictionary,isCallable
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton
@@ -652,7 +652,8 @@ class QWorker(Qt.QThread):
     def _doSomething(self,args):
         self.log.debug('At TauEmitterThread._doSomething(%s)'%str(args))
         if not self.method: 
-            method,args = args[0],args[1:]
+            if isSequence(args): method,args = args[0],args[1:]
+            else: method,args = args,[]
         else: 
             method = self.method
         if method:
@@ -663,6 +664,13 @@ class QWorker(Qt.QThread):
         self.emitter.emit(Qt.SIGNAL("somethingDone"))
         self._done += 1
         return
+    
+    def put(self,*args):
+        """
+        QWorker.put(callable,arg0,arg1,arg2,...)
+        """
+        if len(args)==1 and isSequence(args[0]): args = args[0]
+        self.getQueue().put(args)
                 
     def next(self):
         queue = self.getQueue()
@@ -1165,72 +1173,205 @@ class QDictToolBar(Qt.QToolBar):
         except: 
             print('Unable to add toolbar to MainWindow(%s)'%MainWindow)
             print traceback.format_exc()
-
-class ApiBrowser(Qt.QWidget):
+            
+class QTableOnWidget(Qt.QWidget):
     
-    def __init__(self,parent=None,model='import fandango'):
-        print('ApiBrowser(%s)'%model)
+    def __init__(self,parent=None,data=None):
+        Qt.QWidget.__init__(self,parent=parent)
+        self.setLayout(Qt.QVBoxLayout())
+        self.table = Qt.QTableWidget(self)
+        self.layout().addWidget(self.table)
+        for k in type(self.table).__dict__:
+            if not k.startswith('_') and k not in type(self).__dict__:
+                setattr(self,k,getattr(self.table,k))
+        if data: self.setData(data)
+
+    def setData(self,data):
+        if not isSequence(data[0]): data = [fandango.toList(r) for r in data]
+        self.setRowCount(len(data))
+        self.setColumnCount(len(data[0]))
+        [self.setItem(i,j,Qt.QTableWidgetItem(str(data[i][j]))) for i in range(len(data)) for j in range(len(data[0]))]
+        self.table.resizeColumnsToContents()
+        self.table.horizontalHeader().setStretchLastSection(True)
+            
+class QEvaluator(Qt.QWidget):
+
+    def __init__(self,parent=None,model='',filename='~/.qeval_history'): #'import fandango'):
+        import fandango.web, fandango.functional
+        print('%s()'%type(self).__name__)
+        Qt.QWidget.__init__(self,parent)
         try:
-            self.model = ''
-            self.target = None
-            self._locals = {}
+            self.name = type(self).__name__
+            self._locals = {'self':self,'load':self.setModel,'printf':self.printf,'Qt':Qt}
+            self._locals.update([(k,v) for k,v in fandango.functional.__dict__.items() if isCallable(v)])
+            self._locals['mdir'] = self.dir_module
+            self._locals['help'] = self.help
+            self._locals['doc'] = lambda x:x.__doc__
+            self._locals['run'] = fandango.objects.loadModule
+            self._locals.update((k,getattr(fandango.web,k)) for k in ('table','bold','color'))
             self._modules = {}
             self._instances = {}
-            for c in model.split(';'):
-                model,o = c,self.evalX(c)
-            if '=' in model:
-                self.model,dct = model.split()[0],self._locals
-            elif 'import' in model:
-                self.model,dct = model.split()[-1],self._modules
-            else:
-                self.model,dct = model,{model:o}
-            self.target = dct[self.model]
-            self.evalX('import fandango')
+            self.history = []
+            self.filename = filename.replace('~',os.getenv('HOME')) if filename.startswith('~') else filename
+            try:#Enabling Syntax Highlighting
+                from pygments import highlight
+                from pygments.lexers import PythonLexer
+                from pygments.formatters import HtmlFormatter
+                lexer,frmt=PythonLexer(),HtmlFormatter()
+                self.css=frmt.get_style_defs('.highlight')
+                self.highlight = lambda t,l=lexer,f=frmt: highlight(t,l,f) 
+                #html='<head><style>%s</style><body>%s</body>'%(css,highlight(code,lexer,frmt))
+            except:
+                traceback.print_exc()
+                self.css = None
+                self.highlight = lambda t: '<pre>%s</pre>'%t
+            self.evalQ('import fandango')
+            self.evalQ('import fandango.qt')
+            self.evalQ('f=fandango')
+            self.setup_ui()
+            self.setEval()
+            self.setModel(model or '')
         except:
             traceback.print_exc()
-        Qt.QWidget.__init__(self,parent)
-        self.setup()
         
-    def evalX(self,c):
+    def dir_module(self,*args):
+        f = fandango.first((a for a in args if isString(a)),'*')
+        if '*' not in f and not f.startswith('_'): f = '*%s*'%f
+        ks = fandango.first((dir(a) for a in args if not isString(a)),self._locals.keys())
+        return sorted((t for t in fandango.matchAll(f,ks) if f.startswith('_') or not t.startswith('__')),key=str.lower)
+    
+    def help(self,m):
+        try:
+            import inspect
+            return '%s\n%s'%(inspect.getsource(m).split(':')[0].replace('\n',''),m.__doc__)
+        except: return str(m)
+        
+    def setEval(self,m=None):
+        self._eval = m or self.evalQ
+        
+    def setModel(self,model=None):
+        print 'QEvaluator.setModel(%s)'%model
+        try:
+            if model:
+                if isString(model):
+                    for c in model.split(';'):
+                        try: model,o = c,self.evalQ(c)
+                        except: model,o = 'import '+c,self.evalQ('import '+c)
+                    if '=' in model:
+                        self.model,dct = model.split()[0],self._locals
+                    elif 'import' in model:
+                        self.model,dct = model.split()[-1],self._modules
+                    else:
+                        self.model,dct = model,{model:o}
+                    self.target = dct[self.model]
+                else:
+                    self.model = str(model)
+                    self.target = model
+                self._locals['model'] = self.target
+                self.commands = fandango.matchAll('^[a-zA-Z]*',dir(self.target))
+                self.combo.clear()
+                self.combo.addItems(sorted(self.commands,key=str.lower))
+            else:
+                self.model = None
+                self.target = None
+                self.commands = []
+                self.combo.clear()
+                self.combo.addItems(list(reversed(self.history)))
+            self.setWindowTitle('FANDANGO.%s(%s)'%(self.name,self.model or ''))
+        except:
+            w = QExceptionMessage()
+        
+    def evalQ(self,c):
         return fandango.evalX(c,_locals=self._locals,modules=self._modules,instances=self._instances,_trace=True)
         
-    def setup(self):
+    def setup_ui(self):
+        from PyQt4.QtWebKit import QWebView
         self.combo = Qt.QComboBox(self)
-        self.args = Qt.QLineEdit(self)
-        self.result = Qt.QTextBrowser(self)
-        self.button = Qt.QPushButton('Go!')
+        self.combo.setEditable(True) #self.model in (None,'fandango'))
+        self.args = Qt.QComboBox(self) #Qt.QLineEdit(self)
+        self.args.setEditable(True)
+        self.result = QWebView(self)
+        self.result.setHtml('<html><head><style>%s</style></head><body></body></html>'%(self.css))
+        self.button = Qt.QPushButton('Execute!')
+        self.export = Qt.QPushButton('Save History')
+        self.shortcut = Qt.QShortcut(self)
+        self.shortcut.setKey(Qt.QKeySequence("Ctrl+Enter"))
+        self.connect(self.shortcut, Qt.SIGNAL("activated()"), self.button.animateClick) #self.execute)
+        self.check = Qt.QCheckBox('Append')
+        self.check.setChecked(True)
         self.setLayout(Qt.QGridLayout())
-        self.layout().addWidget(Qt.QLabel('ApiBrowser(%s)'%self.model),0,0,1,4)
-        self.layout().addWidget(self.combo,1,0,1,1)
-        self.layout().addWidget(self.args,1,1,1,2)
-        self.layout().addWidget(self.button,1,3,1,1)
-        self.layout().addWidget(self.result,2,0,3,4)
+        self.layout().addWidget(Qt.QLabel('Write python code or load(module) and select from the list'),0,0,1,4)
+        self.layout().addWidget(Qt.QLabel('function/statement'),1,0,1,1)
+        self.layout().addWidget(self.combo,1,1,1,3)
+        self.layout().addWidget(Qt.QLabel('arguments'),2,0,1,1)
+        self.layout().addWidget(self.args,2,1,1,3)
+        self.layout().addWidget(self.result,3,0,4,4)
+        self.layout().addWidget(self.button,8,0,1,2)
+        self.layout().addWidget(self.export,8,2,1,1)
+        self.layout().addWidget(self.check,8,3,1,1)
         self.connect(self.button,Qt.SIGNAL('clicked()'),self.execute)
-        self.combo.addItems(dir(self.target))
+        self.connect(self.export,Qt.SIGNAL('clicked()'),self.save_to)
         
     def execute(self):
-        cmd = str(self.combo.currentText())
-        args = str(self.args.text())
-        O,q = '','%s.%s'%(self.model,cmd)
+        cmd,args = str(self.combo.currentText()),str(self.args.currentText()) #text())
+        print('execute: %s(%s)'%(cmd,args))
+        if self.filename:
+            try: open(self.filename,'a').write('%s.%s(%s)\n'%(self.model,cmd,args))
+            except: pass
         try:
-            call = self.evalX('fandango.isCallable(%s)'%q)
-            print(call)
-            if call:
-                q = '%s.%s(%s)'%(self.model,cmd,args)
-            print(q)
-            o = self.evalX(q)
+            q = cmd if cmd not in self.commands else 'self.target.%s'%(cmd)
+            o = self._eval(q)
+            if fandango.isCallable(o) and args:
+                print '%s(%s)'%(o,args)
+                self._locals['_ftmp'] = o
+                o = self._eval('_ftmp(%s)'%(args))
+                self.history.append('%s(%s)'%(o,args))
+            else: self.history.append(q)
+            #print(self.history[-1])
         except:
             o = traceback.format_exc()
-        print(o)
-        self.result.setPlainText(str(o))
+            print(o)
+        txt = '\n'.join(map(str,o.items()) if hasattr(o,'items') else ([(str(t).strip('\n\r ') or getattr(t,'__name__','?')) for t in o] if isSequence(o) else [str(o)]))
+        isHtml = txt.strip().startswith('<') and txt.strip().endswith('>') and '</' in txt
+        txt = ('execute: %s(%s) => '%(cmd,args))+type(o).__name__+':\n'+'-'*80+'\n' + txt
+        self.printf(txt,append=self.check.isChecked(),highlight=not isHtml)
+        if self.model is None and not any(i>1 and cmd==str(self.combo.itemText(i)) for i in range(self.combo.count())): 
+            self.combo.insertItems(0,[cmd])
+        self.args.insertItems(0,[args])
+        
+    def save_to(self,filename=None,txt=None):
+        pass
+        
+    def printf(self,txt,append=True,highlight=False,curr=''):
+        if append: 
+            try: 
+                curr = self.result.page().currentFrame().toHtml().replace('</body></html>','')
+                plain = self.result.page().currentFrame().toPlainText()
+            except: 
+                traceback.print_exc()
+                curr = ''
+        txt = self.highlight(txt) if (highlight is True) else txt #highlight=1 can still be used to force highlighting
+        if (self.css and '<style>' not in curr) or not curr or not append:
+            txt = ('<html><head><style>%s</style></head><body>%s</body></html>'%(self.css,txt))
+        else:
+            txt = (str(curr)+'<br>'+txt+'</body></html>')
+        self.result.setHtml(txt)
+        try:
+            self.result.keyPressEvent(Qt.QKeyEvent(Qt.QEvent.KeyPress,Qt.Qt.Key_End,Qt.Qt.NoModifier))
+            #self.result.page().mainFrame().scroll(0,self.result.page().mainFrame().contentsSize().height())
+        except:
+            traceback.print_exc()
     
     @staticmethod
-    def run():
+    def main():
         qapp = getApplication()
         kw = sys.argv[1:] and {'model':';'.join(sys.argv[1:])} or {}
-        w = ApiBrowser(**kw)
+        w = QEvaluator(**kw)
         w.show()
-        qapp.exec_()
+        qapp.exec_()        
+        
+
+class ApiBrowser(QEvaluator): pass #For backwards compatibility
         
 if __name__ == '__main__':
-    ApiBrowser.run()
+    QEvaluator.main()
