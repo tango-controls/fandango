@@ -593,7 +593,7 @@ class get_all_devices(objects.SingletonMap):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
             #print 'updating all_devs ..........................................'
-            self._all_devs = map(str.lower,(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*')))
+            self._all_devs = sorted(map(str.lower,(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*'))))
             self._last_call = now
         return self._all_devs
     def __new__(cls,*p,**k):
@@ -660,7 +660,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
                 try: 
-                    ats = get_device_attributes(d,[attr])
+                    ats = sorted(get_device_attributes(d,[attr]),key=str.lower)
                     attrs.extend([d+'/'+a for a in ats])
                     if limit and len(attrs)>limit: break
                 except: 
@@ -1235,10 +1235,9 @@ def getTangoValue(obj,device=None):
         except: domain,family,member = '','',''
             
         Type = type(value)
-        Type = Type if (Type is not bool and ty!=PyTango.CmdArgType.DevState) else int
-        #print Type
+        Type = Type if (Type not in (bool,None,type(None)) and ty!=PyTango.CmdArgType.DevState) else int
         nt = type('tangoed_'+Type.__name__,(Type,TangoedValue),{})
-        o = nt(value)
+        o = nt(value or 0)
         [setattr(o,k,v) for k,v in (
             ('value',value),('quality',quality),('time',t),('name',name),('type',ty),
             ('device',device),('domain',domain),('family',family),('member',member),('host',host),
