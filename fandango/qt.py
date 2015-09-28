@@ -40,7 +40,7 @@ import fandango
 from fandango.functional import isString,isSequence,isDictionary,isCallable
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
-from fandango.objects import Singleton
+from fandango.objects import Singleton,Decorated,Decorator,ClassDecorator,BoundDecorator
 
 def getQt(full=False):
     """
@@ -718,79 +718,179 @@ TauEmitterThread = QWorker #For backwards compatibility
             
 ###############################################################################
 
+###############################################################################
+# QT Helping Classes
+
+@ClassDecorator
 def Dropable(QtKlass):
     """ 
-    This decorator enables a Qt class to execute a 'hook' method every time is double-clicked
+    This decorator enables any Qt class to accept drops
     """    
-    class DropableQtKlass(QtKlass):
+    class DropableQtKlass(QtKlass): #,Decorated):
+    
+        def checkDropSupport(self): 
+            ''' Initializes DropEvent support '''
+            try: 
+                self.setAcceptDrops(True)
+                if not hasattr(self,'TAURUS_DEV_MIME_TYPE'):
+                    import taurus, taurus.qt, taurus.qt.qtcore
+                    from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
+                    self.TAURUS_DEV_MIME_TYPE = TAURUS_DEV_MIME_TYPE
+                    self.TAURUS_ATTR_MIME_TYPE = TAURUS_ATTR_MIME_TYPE
+                    self.TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_MIME_TYPE
+                    self.TAURUS_MODEL_LIST_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE
+            except: traceback.print_exc()
+            self.TEXT_MIME_TYPE = 'text/plain'
+            return True
+
+        def getSupportedMimeTypes(self): 
+            '''
+            :param mimetypes: (list<str>) list (ordered by priority) of MIME type names or a {mimeType: callback} dictionary (w/out priority if not using SortedDict)
+            '''
+            self.checkDropSupport()
+            if not getattr(self,'_supportedMimeTypes',[]):
+                try: 
+                    self.setSupportedMimeTypes([self.TAURUS_DEV_MIME_TYPE, self.TAURUS_ATTR_MIME_TYPE,self.TAURUS_MODEL_MIME_TYPE, self.TAURUS_MODEL_LIST_MIME_TYPE, self.TEXT_MIME_TYPE])
+                except:
+                    print 'Unable to import TAURUS MIME TYPES: %s'%traceback.format_exc()
+                    self.setSupportedMimeTypes([self.TEXT_MIME_TYPE])
+            return self._supportedMimeTypes
+        
         def setSupportedMimeTypes(self, mimetypes):
             ''' sets the mimeTypes that this widget support 
-            :param mimetypes: (list<str>) list (ordered by priority) of MIME type names
+            :param mimetypes: (list<str>) list (ordered by priority) of MIME type names or a {mimeType: callback} dictionary (w/out priority if not using SortedDict)
             '''
+            print 'In setSupportedMimeTypes()'
+            self.checkDropSupport()
             self._supportedMimeTypes = mimetypes
-        def mimeTypes(self):
-            try: 
-                import taurus, taurus.qt, taurus.qt.qtcore
-                from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
-                self.setSupportedMimeTypes([TAURUS_MODEL_LIST_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_ATTR_MIME_TYPE,TAURUS_MODEL_MIME_TYPE, 'text/plain'])
-            except:
-                print 'Unable to import TAURUS MIME TYPES: %s'%traceback.format_exc()
-            return self.getSupportedMimeTypes()
-        def getSupportedMimeTypes(self): 
-            print self._supportedMimeTypes
-            return self._supportedMimeTypes
-        def dropModels(self,models):
-            self.setText(str(models)) #self.setText(str(self.toPlainText())+'\n'+str(models))
-        #In this method is where dropped data is checked
+
+        def setDropEventCallback(self,callback):
+            ''' Assings default DropEventCallback '''
+            self._dropeventcallback = callback
+            
+        def getDropEventCallback(self,mimetype = None):
+            try:
+                mimes = self.getSupportedMimeTypes()
+                if mimetype and fandango.isMapping(mimes):
+                    return mimes.get(mimetype)
+            except: traceback.print_exc()
+            return getattr(self,'_dropeventcallback',None) or getattr(self,'setText',None)
+        
+        # ENABLING DROP OF DEVICE NAMES :
+        def checkSupportedMimeType(self,event,accept=False): 
+            for t in self.getSupportedMimeTypes():
+                if t in event.mimeData().formats():
+                    if accept: event.acceptProposedAction()
+                    return self.getDropEventCallback(t) or True
+            return False
+        handleMimeData = checkSupportedMimeType
+        def dragEnterEvent(self,event): self.checkSupportedMimeType(event,accept=True)
+        def dragMoveEvent(self,event): event.acceptProposedAction()
+                
         def dropEvent(self, event):
-            '''reimplemented to support dropping of modelnames in forms'''
+            '''reimplemented to support drag&drop of models. See :class:`QWidget`'''
             print('dropEvent(%s): %s,%s'%(event,event.mimeData(),event.mimeData().formats()))
             if event.source() is self:
                 print('Internal drag/drop not allowed')
-            elif any(s in event.mimeData().formats() for s in self.mimeTypes()):
-                mtype = self.handleMimeData(event.mimeData(),self.dropModels)#lambda m:self.addModels('^%s$'%m))
-                event.acceptProposedAction()
-            else: print('Invalid model in dropped data')
-        def handleMimeData(self, mimeData, method):
+            mtype = self.handleMimeData(event.mimeData())
+            event.acceptProposedAction()
+            
+        def handleMimeData(self, mimeData, method=None):
             '''Selects the most appropriate data from the given mimeData object (in the order returned by :meth:`getSupportedMimeTypes`) and passes it to the given method.
             :param mimeData: (QMimeData) the MIME data object from which the model is to be extracted
             :param method: (callable<str>) a method that accepts a string as argument. This method will be called with the data from the mimeData object
             :return: (str or None) returns the MimeType used if the model was successfully set, or None if the model could not be set
             '''
-            formats = mimeData.formats()
-            print mimeData
-            print mimeData.data
-            for mtype in self.mimeTypes():
-                if mtype in formats:
+            for mtype in self.getSupportedMimeTypes():
+                try:
+                    data = str(mimeData.data(mtype) or '')
                     try:
-                        d = mimeData.data(mtype)
-                        assert d is not None
-                        method(str(d)) #mimeData.text()))
-                        return mtype
-                    except:
-                        print('Invalid data (%s,%s) for MIMETYPE=%s'%(repr(mimeData),repr(d), repr(mtype)))
-                        traceback.print_exc()
-                        return None
+                        if data.strip():
+                            try:
+                                (method or self.getDropEventCallback(mtype))(data)
+                                event.acceptProposedAction()
+                                return mtype
+                            except:
+                                print('Invalid data (%s,%s) for MIMETYPE=%s'%(repr(mimeData),repr(data), repr(mtype)))
+                                traceback.print_exc()
+                                return None
+                    except: self.info(traceback.warning_exc())
+                except: self.debug('\tNot dropable data (%s)'%(data))
     return DropableQtKlass
 
+QDropable = Dropable(object)
+
+@ClassDecorator
 def DoubleClickable(QtKlass):
     """ 
     This decorator enables a Qt class to execute a 'hook' method every time is double-clicked
     """    
-    class DoubleClickableQtKlass(QtKlass):
+    class DoubleClickableQtKlass(QtKlass): #,Decorated):
+        __doc__ = DoubleClickable.__doc__
         def __init__(self,*args):
             self.my_hook = None
             QtKlass.__init__(self,*args)
         def setClickHook(self,hook):
             """ the hook must be a function or callable """
-            self.my_hook = hook #self.onEdit
+            self._doubleclickhook = hook #self.onEdit
         def mouseDoubleClickEvent(self,event):
-            if self.my_hook is not None:
-                self.my_hook()
+            if getattr(self,'_doubleclickhook',None) is not None:
+                self._doubleclickhook()
             else:
                 try: QtKlass.mouseDoubleClickEvent(self)
                 except: pass
     return DoubleClickableQtKlass
+
+QDoubleClickable = DoubleClickable(object)
+
+@ClassDecorator
+def Draggable(QtKlass):
+    """
+    This ClassDecorator enables Drag on widgets that does not support it.
+    BUT!, it will fail on those that already implement it (e.g. QTextEdit)
+    """
+    
+    class DraggableQtKlass(QtKlass): #,Decorated):
+        __doc__ = Draggable.__doc__
+        
+        def setDragEventCallback(self,hook):
+            self._drageventcallback = hook
+            
+        def getDragEventCallback(self):
+            if not getattr(self,'_drageventcallback',None):
+                self.setDragEventCallback(lambda s=self:str(s.text() if hasattr(s,'text') else ''))
+            return self._drageventcallback
+        
+        def mousePressEvent(self, event):
+            '''reimplemented to provide drag events'''
+            #QtKlass.mousePressEvent(self, event)
+            QtKlass.mousePressEvent(self,event)
+            print 'In Draggable(%s).mousePressEvent'%type(self)
+            if event.button() == Qt.Qt.LeftButton: self.dragStartPosition = event.pos()
+                
+        def mouseMoveEvent(self, event):
+            '''reimplemented to provide drag events'''
+            QtKlass.mouseMoveEvent(self,event)
+            if not event.buttons() & Qt.Qt.LeftButton:
+                return
+            mimeData = self.getDragEventCallback()()
+            if not isinstance(mimeData,Qt.QMimeData):
+                txt = str(mimeData)
+                mimeData = Qt.QMimeData()
+                mimeData.setText(txt)
+            drag = Qt.QDrag(self)
+            drag.setMimeData(mimeData)
+            drag.setHotSpot(event.pos() - self.rect().topLeft())
+            dropAction = drag.start(Qt.Qt.CopyAction)
+    return DraggableQtKlass
+
+QDraggable = Draggable(object)
+QDraggableLabel = Draggable(Qt.QLabel)
+
+#class QDraggableLabel(!Draggable,Qt.QLabel):
+    #def __init__(self,parent=None,text=''):
+        #Qt.QLabel.__init__(self,text)
+        #Draggable.__init__(self)
                 
 class QOptionChooser(Qt.QDialog):
     def __init__(self,title,text,command,args,parent=None):
@@ -943,10 +1043,12 @@ class QDropTextEdit(Qt.QTextEdit):
     """
     This method provides a widget that allows drops of text from other widgets.
     As a bonus, it provides a simple hook for DoubleClick events
+    But!, QTextEdit already supported drag/drop, so it is just an exercise of how to do these things.
     """
     def __init__(self,*args):#,**kwargs):
         self.double_click_hook = None
         QtGui.QTextEdit.__init__(self,*args)#,**kwargs)
+        self.mimeTypes() #Default mimeTypes loaded
     
     def setClickHook(self,hook):
         """ the hook must be a function or callable """
@@ -1014,8 +1116,11 @@ class QDropTextEdit(Qt.QTextEdit):
         :return: (str or None) returns the MimeType used if the model was
                  successfully set, or None if the model could not be set
         '''
+        print('QDropTextEdit.handleMimeData(%s,%s)'%(mimeData,method))
         supported = self.mimeTypes()
+        print map(str,supported)
         formats = mimeData.formats()
+        print map(str,formats)
         for mtype in supported:
             if mtype in formats:
                 d = str(mimeData.data(mtype))
@@ -1195,6 +1300,14 @@ class QTableOnWidget(Qt.QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
             
 class QEvaluator(Qt.QWidget):
+    """
+    Default methods:
+     mdir(expr,[module]): return elements matching expr, from module or locals()
+     help(method): returns source of method or __doc__
+     doc(method): idem
+     run(module): loads a module (reloads?)
+     table/bold/color: html formatting
+    """
 
     def __init__(self,parent=None,model='',filename='~/.qeval_history'): #'import fandango'):
         import fandango.web, fandango.functional
@@ -1240,10 +1353,13 @@ class QEvaluator(Qt.QWidget):
         ks = fandango.first((dir(a) for a in args if not isString(a)),self._locals.keys())
         return sorted((t for t in fandango.matchAll(f,ks) if f.startswith('_') or not t.startswith('__')),key=str.lower)
     
-    def help(self,m):
+    def help(self,m=None):
         try:
-            import inspect
-            return '%s\n%s'%(inspect.getsource(m).split(':')[0].replace('\n',''),m.__doc__)
+            if m:
+                import inspect
+                return '%s\n%s'%(inspect.getsource(m).split(':')[0].replace('\n',''),m.__doc__)
+            else:
+                return self.__doc__
         except: return str(m)
         
     def setEval(self,m=None):
@@ -1294,6 +1410,11 @@ class QEvaluator(Qt.QWidget):
         self.result.setHtml('<html><head><style>%s</style></head><body></body></html>'%(self.css))
         self.button = Qt.QPushButton('Execute!')
         self.export = Qt.QPushButton('Save History')
+        self.mlbt = Qt.QPushButton('ml')
+        self.mlbt.setMaximumWidth(50)
+        self.mlload = Qt.QPushButton('load history')
+        self.mlex = Qt.QPushButton('Execute!')
+        self.mledit = Qt.QTextEdit()
         self.shortcut = Qt.QShortcut(self)
         self.shortcut.setKey(Qt.QKeySequence("Ctrl+Enter"))
         self.connect(self.shortcut, Qt.SIGNAL("activated()"), self.button.animateClick) #self.execute)
@@ -1303,17 +1424,33 @@ class QEvaluator(Qt.QWidget):
         self.layout().addWidget(Qt.QLabel('Write python code or load(module) and select from the list'),0,0,1,4)
         self.layout().addWidget(Qt.QLabel('function/statement'),1,0,1,1)
         self.layout().addWidget(self.combo,1,1,1,3)
+        self.layout().addWidget(self.mlbt,1,4,1,1)
         self.layout().addWidget(Qt.QLabel('arguments'),2,0,1,1)
         self.layout().addWidget(self.args,2,1,1,3)
-        self.layout().addWidget(self.result,3,0,4,4)
+        self.layout().addWidget(self.result,3,0,4,5)
         self.layout().addWidget(self.button,8,0,1,2)
         self.layout().addWidget(self.export,8,2,1,1)
         self.layout().addWidget(self.check,8,3,1,1)
         self.connect(self.button,Qt.SIGNAL('clicked()'),self.execute)
         self.connect(self.export,Qt.SIGNAL('clicked()'),self.save_to)
+        self.connect(self.mlbt,Qt.SIGNAL('clicked()'),self.multiline_edit)
+        self.connect(self.mlex,Qt.SIGNAL('clicked()'),self.multiline_exec)
+        self.connect(self.mlload,Qt.SIGNAL('clicked()'),self.multiline_load)
         
-    def execute(self):
-        cmd,args = str(self.combo.currentText()),str(self.args.currentText()) #text())
+    def multiline_edit(self):
+        if not hasattr(self,'mlqd'):
+            self.mlqd = Qt.QDialog(self)
+            self.mlqd.setWindowTitle('Editor'),self.mlqd.setLayout(Qt.QVBoxLayout())
+            map(self.mlqd.layout().addWidget,(self.mlload,self.mledit,self.mlex))
+        self.mlqd.show()
+    def multiline_exec(self):
+        [self.execute(l.strip(),'') for l in str(self.mledit.toPlainText()).split('\n')]
+    def multiline_load(self):
+        self.mledit.setText('\n'.join(self.history))
+        
+    def execute(self,cmd=None,args=None):
+        if not cmd and not args:
+            cmd,args = str(self.combo.currentText()),str(self.args.currentText()) #text())
         print('execute: %s(%s)'%(cmd,args))
         if self.filename:
             try: open(self.filename,'a').write('%s.%s(%s)\n'%(self.model,cmd,args))
