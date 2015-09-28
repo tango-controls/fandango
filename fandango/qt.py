@@ -783,7 +783,7 @@ def Dropable(QtKlass):
                     if accept: event.acceptProposedAction()
                     return self.getDropEventCallback(t) or True
             return False
-        handleMimeData = checkSupportedMimeType
+        
         def dragEnterEvent(self,event): self.checkSupportedMimeType(event,accept=True)
         def dragMoveEvent(self,event): event.acceptProposedAction()
                 
@@ -808,7 +808,6 @@ def Dropable(QtKlass):
                         if data.strip():
                             try:
                                 (method or self.getDropEventCallback(mtype))(data)
-                                event.acceptProposedAction()
                                 return mtype
                             except:
                                 print('Invalid data (%s,%s) for MIMETYPE=%s'%(repr(mimeData),repr(data), repr(mtype)))
