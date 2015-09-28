@@ -409,6 +409,8 @@ def decorator_with_args(decorator):
     # decorator_with_args = lambda decorator: lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
     return lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
 
+class Decorated(object): pass
+
 class Decorator(object):
     """
     This generic class allows to differentiate decorators from common classes.
@@ -431,6 +433,8 @@ class Decorator(object):
         self.f = f
     def __call__(self,*args,**kwargs):
         return self.f(*args,**kwargs)
+    
+class ClassDecorator(Decorator): pass
         
 class BoundDecorator(Decorator):#object):
     """

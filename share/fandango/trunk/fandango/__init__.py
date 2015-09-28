@@ -69,6 +69,7 @@ except: print 'Unable to import excepts module'
 try:
     from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
     from objects import dirModule,loadModule,dirClasses,obj2dict
+    from objects import Decorator,ClassDecorator,Decorated,BoundDecorator
 except Exception,e: 
     print 'Unable to import objects module: %s'%traceback.format_exc()
     
