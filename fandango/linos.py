@@ -190,7 +190,7 @@ def listdir(folder,mask='.*',files=False,folders=False,links=False):
         elif files and not folders:
             vals = os.walk(folder,followlinks=links).next()[2]
         else:
-            vals = os.listdir(folder,links=links)
+            vals = os.listdir(folder)
         if mask:
             return [f for f in vals if re.match(fun.toRegexp(mask),f)]
         else:
