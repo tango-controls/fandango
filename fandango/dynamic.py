@@ -204,6 +204,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['self'] = self
         self._locals['time2str'] = fandango.time2str
         self._locals['ctime2time'] = fandango.ctime2time
+        for k in dir(fandango.functional):
+            if '2' in k or k.startswith('to') or k.startswith('is'):
+                self._locals[k] = getattr(fandango.functional,k)
         self._locals['Attr'] = lambda _name: self.getAttr(_name)
         self._locals['ATTR'] = lambda _name: self.getAttr(_name)
         self._locals['XAttr'] = lambda _name,default=None: self.getXAttr(_name,default=default)
@@ -2018,7 +2021,7 @@ class DynamicServer(object):
         if not args:args = sys.argv
         assert len(args)>=2,'1 argument required!:\n\tpython dynamic.py instance [-vX]'
         print args
-        server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicDS'
+        server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
         instance = args[1]
         logs,orb = '-v2',[]
         for i in (2,3):
