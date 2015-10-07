@@ -631,12 +631,16 @@ def bin2signedint(x,N=16):
     return i
     
 def int2bool(dec,N=16):
-    """Decimal to binary converter"""
+    """Converts an integer to a binary represented as a boolean array"""
     result,dec = [],int(dec)
     for i in range(N):
         result.append(bool(dec % 2))
         dec = dec >> 1
     return result
+
+def bool2int(seq):
+    """ Converts a boolean array to an unsigned integer """
+    return fandango.bin2unsigned(''.join(map(str,map(int,reversed(seq)))))
 
 ########################################################################
 ## Time conversion
