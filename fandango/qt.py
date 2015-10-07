@@ -1278,25 +1278,117 @@ class QDictToolBar(Qt.QToolBar):
             print('Unable to add toolbar to MainWindow(%s)'%MainWindow)
             print traceback.format_exc()
             
-class QTableOnWidget(Qt.QWidget):
+def GetFramedTaurusValue(model=None,label=True,hook=None):
+
+    from taurus.qt.qtgui.panel import TaurusValue
+    frame = QtGui.QFrame()
+    frame.setLayout(QtGui.QGridLayout())
+    frame.layout().setContentsMargins(2,2,2,2)
+    frame.layout().setSpacing(0)
+    frame.layout().setSpacing(0)
+    frame.taurusvalue = TaurusValue(frame)
+    if hook:
+        frame.taurusvalue.connect(frame.taurusvalue, QtCore.SIGNAL("itemClicked(QString)"), hook)
+    if label:
+        frame.taurusvalue.setLabelConfig('label') ## DO NOT DELETE THIS LINE!!!
+    else:
+        frame.taurusvalue.setLabelWidgetClass(None)
+    if model:
+        frame.taurusvalue.setModel(model)
+    return frame
+
+class QWidgetWithLayout(Qt.QWidget):
+    """
+    A helper widget that allows to create QWidgets with predefined layouts
+    """
+    def __init__(self,parent=None,layout=None,child=None):
+        Qt.QWidget.__init__(self,parent)
+
+        if layout is None:
+            layout = Qt.QHBoxLayout()
+        else:
+            layout = layout() if isinstance(layout,type) else layout
+            
+        self.setLayout(layout)
+        
+        if child is not None:
+            self.addChildWidget(child)
     
-    def __init__(self,parent=None,data=None):
-        Qt.QWidget.__init__(self,parent=parent)
+    def addChildWidget(self,child,row=None,column=None):
+        child.setParent(self)
+        
+        if isinstance(self.layout(),Qt.QGridLayout):
+            row = fandango.notNone(row,self.layout().rowCount()-1)
+            column = fandango.notNone(column,0)
+            self.layout().addWidget(child,row,column)
+            
+        else:
+            self.layout().addWidget(child)
+    
+    def childWidget(self):
+        if isinstance(self.layout(),Qt.QGridLayout):
+            return self.layout().itemAt(0,0).widget()
+        else:
+            return self.layout().itemAt(0).widget()
+    
+    def removeChildWidget(self):
+        w = self.childWidget()
+        self.layout().removeWidget(w)
+        w.setParent(None)
+        return w
+        
+        
+class QTableOnWidget(Qt.QWidget):
+    """
+    A Helper class to easily initialize a QTable from an array
+    """
+    
+    def __init__(self,parent=None,data=None,filters=True):
+        Qt.QWidget.__init__(self,parent)
         self.setLayout(Qt.QVBoxLayout())
+        if filters:
+            self.top = Qt.QWidget()
+            self.top.setLayout(Qt.QHBoxLayout())
+            self.bar,self.button = Qt.QLineEdit(),Qt.QPushButton('Filter!')
+            map(self.top.layout().addWidget,(self.bar,self.button))
+            self.button.connect(self.button,Qt.SIGNAL('clicked()'),self.setFiltered)
+            self.layout().addWidget(self.top)
         self.table = Qt.QTableWidget(self)
         self.layout().addWidget(self.table)
         for k in type(self.table).__dict__:
             if not k.startswith('_') and k not in type(self).__dict__:
                 setattr(self,k,getattr(self.table,k))
-        if data: self.setData(data)
+        self.data = data
+        self.widgets = {}
+        if data: self.setData()
 
-    def setData(self,data):
-        if not isSequence(data[0]): data = [fandango.toList(r) for r in data]
-        self.setRowCount(len(data))
-        self.setColumnCount(len(data[0]))
-        [self.setItem(i,j,Qt.QTableWidgetItem(str(data[i][j]))) for i in range(len(data)) for j in range(len(data[0]))]
+    def setData(self,data=None):
+        data = fandango.notNone(data,self.data)
+        if data and not isSequence(data[0]): data = [fandango.toList(r) for r in data]
+        height,width = len(data),max(len(r) for r in (data or [[]]))
+        self.setRowCount(height),self.setColumnCount(width)
+        for i in range(height):
+            for j in range(width):
+                try:
+                    if j>=len(data[i]): continue 
+                    o = data[i][j]
+                    if isinstance(o,Qt.QWidget):
+                        w = self.cellWidget(i,j)
+                        self.removeCellWidget(i,j)
+                        if w: w.setParent(None)
+                        qw = Qt.QWidget()
+                        self.setCellWidget(i,j,Qt.QWidget())
+                        self.cellWidget(i,j).setLayout(Qt.QVBoxLayout())
+                    else:
+                        self.setItem(i,j,Qt.QTableWidgetItem(str(o)))
+                except:
+                    traceback.print_exc()
         self.table.resizeColumnsToContents()
         self.table.horizontalHeader().setStretchLastSection(True)
+        
+    def setFiltered(self):
+        data = [d for d in self.data if fandango.searchCl(str(self.bar.text()),str(d))]
+        self.setData(data)
             
 class QEvaluator(Qt.QWidget):
     """
