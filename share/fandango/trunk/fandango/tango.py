@@ -112,16 +112,20 @@ def get_tango_host(dev_name='',use_db=False):
     If devicesis none, then environment variable or PyTango.Database are used to extract the host
     If TANGO_HOST is not defined it will always fallback to PyTango.Database()
     """
-    if dev_name:
-        m  = fun.matchCl(rehost,dev_name)
-        return m.groups()[0] if m else get_tango_host(use_db=use_db)
-    elif use_db:
-        use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
-        return "%s:%d"%(use_db.get_db_host().strip().split('.')[0],int(use_db.get_db_port()))
-    else:
-        host = os.getenv('TANGO_HOST') 
-        return host or get_tango_host(use_db=True) 
-
+    try:
+        if dev_name:
+            m  = fun.matchCl(rehost,dev_name)
+            return m.groups()[0] if m else get_tango_host(use_db=use_db)
+        elif use_db:
+            use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
+            return "%s:%d"%(use_db.get_db_host().strip().split('.')[0],int(use_db.get_db_port()))
+        else:
+            host = os.getenv('TANGO_HOST') 
+            return host or get_tango_host(use_db=True) 
+    except:
+        print('ERROR: get_tango_host(): '+traceback.print_exc())
+        return 'localhost:10000'
+    
 def get_database(host='',port='',use_tau=False): 
     """
     Method to get a singleton instance of the Tango Database
