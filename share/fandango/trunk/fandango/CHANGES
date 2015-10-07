@@ -11,6 +11,15 @@ PENDING:
 
 ONGOING ......... preparing next PyAlarm release
 
+tango: solved bug in TangoEval that caused exception on parsing None types
+tango: solved bug in get_tango_host that caused weird eval values on Panic and Tango9
+tango: added try/catch to get_tango_host
+QT: Added Qt Decorators for DoubleClickable/Dragable/Dropable widgets
+dynamic: added functional conversion methods to locals(), DynamicDS renamed to DynamicServer
+fun: added bool2int([bool]) method
+qt: added GetFramedTaurusValue, QWidgetWithLayout to allow TaurusValue integration on QTableOnWidget
+qt: QTableOnWidget now is search/filter enabled (beta)
+
 -------------------------------------------------
 August 2015 - 11.6 New QEvaluator tool for debugging PyQt
 -------------------------------------------------
