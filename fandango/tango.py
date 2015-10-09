@@ -123,7 +123,7 @@ def get_tango_host(dev_name='',use_db=False):
             host = os.getenv('TANGO_HOST') 
             return host or get_tango_host(use_db=True) 
     except:
-        print('ERROR: get_tango_host(): '+traceback.print_exc())
+        print('ERROR: get_tango_host(): '+traceback.format_exc())
         return 'localhost:10000'
     
 def get_database(host='',port='',use_tau=False): 
