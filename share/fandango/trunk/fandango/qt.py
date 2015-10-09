@@ -721,10 +721,13 @@ TauEmitterThread = QWorker #For backwards compatibility
 ###############################################################################
 # QT Helping Classes
 
+TEXT_MIME_TYPE = 'text/plain'
 try:
-    import taurus, taurus.qt, taurus.qt.qtcore
-    from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
-except: pass
+  import taurus, taurus.qt, taurus.qt.qtcore
+  from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
+except: 
+  print('WARNING: fandango.qt: Importing taurus.qt.qtcore.mimetypes failed!')
+  TAURUS_ATTR_MIME_TYPE = TAURUS_DEV_MIME_TYPE = TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE = TEXT_MIME_TYPE
 
 @ClassDecorator
 def Dropable(QtKlass):
@@ -1281,6 +1284,47 @@ class QDictToolBar(Qt.QToolBar):
             print('Unable to add toolbar to MainWindow(%s)'%MainWindow)
             print traceback.format_exc()
             
+class QDictTextBrowser(Qt.QWidget):
+
+    textChanged = Qt.pyqtSignal(str)
+    
+    def __init__(self,parent=None):
+        Qt.QWidget.__init__(self,parent)
+        self.model = {}
+        self.setupUi()
+        
+    def setupUi(self):
+        self.top = Qt.QListWidget()
+        self.top.itemClicked.connect(self.updateText)
+        self.bottom = Qt.QTextBrowser()
+        self.setLayout(Qt.QVBoxLayout())
+        map(self.layout().addWidget,(self.top,self.bottom))
+        
+    def setModel(self,model):
+        self.model = model
+        self.top.clear()
+        for k in sorted(self.model.keys()):
+            self.top.addItem(k)
+        self.top.setMinimumHeight(125)
+        self.top.setMaximumHeight(max((125,len(self.model)*25)))
+    
+    def updateText(self,item):
+        txt = self.model.get(str(item.text()))
+        txt = str(txt).replace('\t','    ')
+        self.textChanged.emit(txt)
+        self.bottom.setHtml('<pre>%s</pre>'%txt)
+    
+    @staticmethod
+    def test():
+        app = getApplication()
+        w = QDictTextBrowser()
+        w.setModel({'1':'na\na'*100,'2':'no\nsi'})
+        w.show()
+        
+        
+        
+        app.exec_()
+    
 def GetFramedTaurusValue(model=None,label=True,hook=None):
 
     from taurus.qt.qtgui.panel import TaurusValue
@@ -1314,8 +1358,10 @@ class QWidgetWithLayout(Qt.QWidget):
             
         self.setLayout(layout)
         
-        if child is not None:
-            self.addChildWidget(child)
+        child = fandango.toList(child)
+        for c in child:
+            if c is not None:
+                self.addChildWidget(c)
     
     def addChildWidget(self,child,row=None,column=None):
         child.setParent(self)
@@ -1366,6 +1412,10 @@ class QTableOnWidget(Qt.QWidget):
         if data: self.setData()
 
     def setData(self,data=None):
+        self.data = data or []
+        self.setCells()
+        
+    def setCells(self,data=None):
         data = fandango.notNone(data,self.data)
         if data and not isSequence(data[0]): data = [fandango.toList(r) for r in data]
         height,width = len(data),max(len(r) for r in (data or [[]]))
@@ -1391,7 +1441,17 @@ class QTableOnWidget(Qt.QWidget):
         
     def setFiltered(self):
         data = [d for d in self.data if fandango.searchCl(str(self.bar.text()),str(d))]
-        self.setData(data)
+        self.setCells(data)
+
+    @staticmethod
+    def test(csvfile):
+        #import fandango.qt;fandango.qt.QTableOnWidget.__test__(csvfile)
+        data = fandango.CSVArray(csvfile)
+        app = getApplication()
+        w = QTableOnWidget()
+        w.setData(data.rows)
+        w.show()
+        app.exec_()
             
 class QEvaluator(Qt.QWidget):
     """
