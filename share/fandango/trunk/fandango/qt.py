@@ -721,6 +721,11 @@ TauEmitterThread = QWorker #For backwards compatibility
 ###############################################################################
 # QT Helping Classes
 
+try:
+    import taurus, taurus.qt, taurus.qt.qtcore
+    from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
+except: pass
+
 @ClassDecorator
 def Dropable(QtKlass):
     """ 
@@ -733,8 +738,6 @@ def Dropable(QtKlass):
             try: 
                 self.setAcceptDrops(True)
                 if not hasattr(self,'TAURUS_DEV_MIME_TYPE'):
-                    import taurus, taurus.qt, taurus.qt.qtcore
-                    from taurus.qt.qtcore.mimetypes import TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE
                     self.TAURUS_DEV_MIME_TYPE = TAURUS_DEV_MIME_TYPE
                     self.TAURUS_ATTR_MIME_TYPE = TAURUS_ATTR_MIME_TYPE
                     self.TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_MIME_TYPE
