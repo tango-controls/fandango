@@ -1286,7 +1286,7 @@ class QDictToolBar(Qt.QToolBar):
             
 class QDictTextBrowser(Qt.QWidget):
 
-    textChanged = Qt.pyqtSignal(str)
+    #textChanged = Qt.pyqtSignal(str) #API 2
     
     def __init__(self,parent=None):
         Qt.QWidget.__init__(self,parent)
@@ -1311,7 +1311,7 @@ class QDictTextBrowser(Qt.QWidget):
     def updateText(self,item):
         txt = self.model.get(str(item.text()))
         txt = str(txt).replace('\t','    ')
-        self.textChanged.emit(txt)
+        self.emit(Qt.SIGNAL('textChanged'),txt)
         self.bottom.setHtml('<pre>%s</pre>'%txt)
     
     @staticmethod
@@ -1320,9 +1320,6 @@ class QDictTextBrowser(Qt.QWidget):
         w = QDictTextBrowser()
         w.setModel({'1':'na\na'*100,'2':'no\nsi'})
         w.show()
-        
-        
-        
         app.exec_()
     
 def GetFramedTaurusValue(model=None,label=True,hook=None):
