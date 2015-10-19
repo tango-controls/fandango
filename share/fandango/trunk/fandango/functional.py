@@ -741,6 +741,16 @@ def retry(callable,retries=3,pause=0,args=[],kwargs={}):
             if i==(retries-1): raise e
             elif pause: time.sleep(pause)
     return r
+  
+def retried(retries=3,pause=0):
+  """
+  
+  """
+  def retrier(f):
+    def retried_f(*args,**kwargs):
+      return retry(f,retries=retries,pause=pause,args=args,kwargs=kwargs)
+    return retried_f
+  return retrier
     
 def evalF(formula):
     """
