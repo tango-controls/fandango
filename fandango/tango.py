@@ -91,7 +91,7 @@ def TGet(*args):
         return get_database()
     arg0 = args[0]
     if arg0.count('/')==1:
-        return fandango.Servers.ServersDict(arg0)
+        return fandango.servers.ServersDict(arg0)
     if arg0.count('/')>(2+(':' in arg0)):
         return sorted(get_matching_attributes(arg0)) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else check_attribute(arg0,brief=True)
     else:
