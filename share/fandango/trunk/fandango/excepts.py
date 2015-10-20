@@ -87,11 +87,14 @@ except:
 def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
     """ This method executes a try,except clause in a single line
     :param tries: may be a callable or a list of callables
-    :param excepts: it can be a callable, a list of callables or a map of {ExceptionType:[callables]}
+    :param excepts: it can be a callable, a list of callables, a map of {ExceptionType:[callables]} or just a default value to return	
+	:param args,kwargs: arguments to be passed to the callable
+	:return exception: whether to return exception or None (default)
     """
     try:
+        return_exception = return_exception or (excepts is not None and not any(fun.isCallable(x) for x in fun.toSequence(excepts)))
         tries = fun.toSequence(tries)
-        args = fun.notNone(args,[])
+        args = fun.toSequence(fun.notNone(args,[]))
         kwargs = fun.notNone(kwargs,{})
         excepts = fun.notNone(excepts,lambda e: log.printf(str(e)))
         result = [t(*args,**kwargs) for t in tries if fun.isCallable(t)]
@@ -99,7 +102,7 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
     except Exception,e:
         if fun.isCallable(excepts):
             v = excepts(e)
-            return return_exception and v
+            return v if return_exception else None
         else:
             if fun.isDictionary(excepts):
                 if type(e) in excepts: excepts = excepts.get(type(e))
@@ -108,9 +111,9 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
                     candidates = [t for t in excepts if isinstance(e,t)]
                     if candidates: excepts = excepts[candidates[0]]
                     else: excepts = excepts.get('') or excepts.get(None) or []
-            excepts = fun.toSequence(excepts)
-            vals = [x(e) for x in excepts if fun.isCallable(x)]
-            return return_exception and vals
+            vals = [x(e) for x in fun.toSequence(excepts) if fun.isCallable(x)]
+            if return_exception:
+               return vals or fun.notNone(excepts,None)
 
 exLogger = log.Logger()
 

@@ -43,12 +43,12 @@ import socket
 
 import PyTango
 
-import functional as fun
-from objects import Object
-from dicts import CaselessDefaultDict,CaselessDict
+import fandango.functional as fun
+from fandango.objects import Object
+from fandango.dicts import CaselessDefaultDict,CaselessDict
 from fandango.log import Logger
-
 from fandango.tango import ProxiesDict,get_device_info
+from fandango.excepts import trial
     
 ####################################################################################################################
 
@@ -113,7 +113,7 @@ class TServer(Object):
         """ It only initializes the values, does not get values from database. """
         self.controlled = True if host or level else False
         if type(level) is str: level=level.strip()
-        if self.controlled: self.host,self.level = host.split('.')[0].strip(),int(level or 0)
+        if self.controlled: self.host,self.level = host.split('.')[0].strip(),trial(int,args=level,excepts=0)
         else: self.host,self.level = '',0
         
     def get_classes(self,load=False):
