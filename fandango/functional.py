@@ -731,6 +731,21 @@ def mysql2time(mysql_time):
 ## Extended eval
 ########################################################################
 
+def ifThen(condition,callback,falsables=tuple()):
+    """
+    This function allows to execute a callable on an object only if it has a valid value.
+    ifThen(value,callable) will return callable(value) only if value is not in falsables.
+    
+    It is a List-like method, it can be combined with fandango.excepts.trial
+    """
+    if condition not in falsables:
+        if not isSequence(callback):
+          return callback(condition)
+        else:
+          return ifThen(callback[0](condition),callback[1:],falsables)
+    else:
+        return condition
+
 def retry(callable,retries=3,pause=0,args=[],kwargs={}):
     r = None
     for i in range(retries):
