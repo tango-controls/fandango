@@ -307,14 +307,14 @@ class ServersDict(CaselessDict,Object):
                 else:
                     self.log.warning('No server matches with %s (family=%s).'%(server_name,family))
                     return 0
-        return
+        return self
         
     def load_by_host(self,host):
         """ Initializes the dict with all the servers assigned to a given host. """
         servers = self.get_db_device().DbGetHostServerList(host)
         self.log.warning("%d servers assigned in DB to host %s: %s" % (len(servers),host,servers))
         if servers: self.load_from_servers_list(servers)
-        return len(servers)
+        return self
     
     def load_from_devs_list(self,devs_list):
         ''' Initializes the dict using a list of devices; a query to the database is used to identify the server for each device.  '''
@@ -326,6 +326,7 @@ class ServersDict(CaselessDict,Object):
             [servers_list.add(self.get_device_server(dev)) for dev in devs if dev]
         self.log.info('Loading %d servers matching %s devices'%(len(servers_list),len(devs_list)))
         self.load_from_servers_list([s for s in servers_list if s])
+        return self
     
     def load_from_servers_list(self,servers_list,check=True):
         """ Initializes the dictionary using a list of server_names like ['Exec/Instance'] """
@@ -342,6 +343,7 @@ class ServersDict(CaselessDict,Object):
                 self.log.warning('exception loading %s server: %s' % (s,str(e)[:100]+'...'))
                 print traceback.format_exc()
         #print 'load_from_servers_list(%d) took %f seconds' % (len(servers_list),time.time()-t0)
+        return self
                     
     def check_servers_names(self,servers_list):
         """ Crosschecks the name of servers (case sensitive) with names retrieved by self.db.get_server_list() """
