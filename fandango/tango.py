@@ -406,7 +406,7 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties)) for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
     
-def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=10000):
+def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=10000,trace=False):
     """
     get_matching_device_properties enhanced with multi-host support
     @props: regexp are enabled!
@@ -427,14 +427,14 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         result[h] = {}
         db = get_database(h)
         exps  = [h+'/'+e if ':' not in e else e for e in devs]
-        print exps
+        if trace: print(exps)
         hdevs = [d.replace(h,'') for d in get_matching_devices(exps,fullname=False)]
-        print '%s: %s'%(h,hdevs)
+        if trace: print('%s: %s'%(h,hdevs))
         for d in hdevs:
             if exclude and fun.matchCl(exclude,d): continue
             dprops = [p for p in db.get_device_property_list(d,'*') if fun.matchAny(props,p)]
             if not dprops: continue
-            print d,dprops
+            if trace: print(d,dprops)
             vals = db.get_device_property(d,dprops)
             if len(hosts)==1 and len(hdevs)==1:
                 return vals
