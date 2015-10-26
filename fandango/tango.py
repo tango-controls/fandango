@@ -432,7 +432,7 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         print '%s: %s'%(h,hdevs)
         for d in hdevs:
             if exclude and fun.matchCl(exclude,d): continue
-            dprops = [p for p in db.get_device_property_list(d,'*') if fun.matchCl(props,p)]
+            dprops = [p for p in db.get_device_property_list(d,'*') if fun.matchAny(props,p)]
             if not dprops: continue
             print d,dprops
             vals = db.get_device_property(d,dprops)
