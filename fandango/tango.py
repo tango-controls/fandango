@@ -391,12 +391,14 @@ def put_device_property(device,property,value=None,db=None):
                 property[p] = v[0]
     return (db or get_database()).put_device_property(device,property)
             
-def get_devices_properties(expr,properties,hosts=[],port=10000):
+def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     """
-    get_matching_device_properties enhanced with multi-host support
-    
     get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
+    props must be an string as passed to Database.get_device_property(); regexp are not enabled!
+    get_matching_device_properties enhanced with multi-host support
+    @TODO: Compare performance of this method with get_matching_device_properties
     """
+    expr = device_expr
     if not fun.isSequence(properties): properties = [properties]
     get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fun.matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
@@ -407,7 +409,9 @@ def get_devices_properties(expr,properties,hosts=[],port=10000):
 def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=10000):
     """
     get_matching_device_properties enhanced with multi-host support
+    @props: regexp are enabled!
     get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
+    @TODO: Compare performance of this method with get_devices_properties
     """    
     db = get_database()
     result = {}
@@ -417,18 +421,7 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         hosts = [h if ':' in h else '%s:%s'%(h,port) for h in hosts]
     else:
         hosts = set(get_tango_host(d) for d in devs)
-    print 'hosts: %s'%hosts
-    #if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
-    #else: tango_dbs = {get_tango_host():get_database()}
-    
-    #for h,db in tango_dbs.items():
-        #pass
-    
-    #devs = [d for for h in hosts for d in (dev if fun.isSequence(dev) else get_matching_devices(dev))] #devs if fun.isSequence(dev) else [devs]
-    #props = prop if fun.isSequence(prop) else list(set(s for d in devs for s in db.get_device_property_list(d,prop)))
-    
-    #print 'devs: %s'%devs
-    #print 'props: %s'%props
+
     result = {}
     for h in hosts:
         result[h] = {}
@@ -439,7 +432,7 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         print '%s: %s'%(h,hdevs)
         for d in hdevs:
             if exclude and fun.matchCl(exclude,d): continue
-            dprops = [t for p in props for t in db.get_device_property_list(d,p)]
+            dprops = [p for p in db.get_device_property_list(d,'*') if fun.matchCl(props,p)]
             if not dprops: continue
             print d,dprops
             vals = db.get_device_property(d,dprops)
