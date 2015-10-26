@@ -11,12 +11,16 @@ PENDING:
 
 ONGOING ......... preparing next PyAlarm release
 
+fun: added bool2int([bool]) method
+fun: Added ifThen(condition,callable) to allow conditioned execution of methods
+excepts: trial method enhanced to return default values
 tango: solved bug in TangoEval that caused exception on parsing None types
 tango: solved bug in get_tango_host that caused weird eval values on Panic and Tango9
+tango: Enabled regexp in get_matching_device_properties
 tango: added try/catch to get_tango_host
-QT: Added Qt Decorators for DoubleClickable/Dragable/Dropable widgets
+servers: Helper methods (load_from*) now return the Astor object itself
 dynamic: added functional conversion methods to locals(), DynamicDS renamed to DynamicServer
-fun: added bool2int([bool]) method
+QT: Added Qt Decorators for DoubleClickable/Dragable/Dropable widgets
 qt: added GetFramedTaurusValue, QWidgetWithLayout to allow TaurusValue integration on QTableOnWidget
 qt: QTableOnWidget now is search/filter enabled (beta)
 
