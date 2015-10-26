@@ -104,8 +104,9 @@ class TServer(Object):
         """ Gets name, classes, devices, host, level information from Tango Database. """
         #print ('init_from_db(%s,%s)'%(self.name,load_devices))
         self._db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
-        self.info = get_device_info('dserver/'+self.name,db=self._db) #get_server_info() replaced by DbGetServerInfo to obtain the real name of the launcher
-        self.name = self.info.server
+        self.info = self._db.get_server_info(self.name)
+        di = get_device_info('dserver/'+self.name,db=self._db) #get_server_info() must be combined with get_device_info to obtain the real name of the launcher
+        self.name = di.server
         self.update_level(self.info.host,self.info.level)
         if load_devices: self.get_classes()
     

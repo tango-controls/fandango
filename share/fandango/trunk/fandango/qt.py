@@ -1600,6 +1600,9 @@ class QEvaluator(Qt.QWidget):
         self.mledit.setText('\n'.join(self.history))
         
     def execute(self,cmd=None,args=None):
+        """
+        (Ctrl+Enter) Send the current command,arguments to the eval engine and process the output.
+        """
         if not cmd and not args:
             cmd,args = str(self.combo.currentText()),str(self.args.currentText()) #text())
         print('execute: %s(%s)'%(cmd,args))
