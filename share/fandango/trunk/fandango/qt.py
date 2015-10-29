@@ -66,6 +66,13 @@ def getStateLed(model):
     print 'In TaurusStateLed.setModel(%s)'%model
     return led
 
+def checkApplication(args=None):
+    try:
+      assert Qt.QApplication.instance(),'QApplication not running!'
+      return True
+    except:
+      return False
+
 def getApplication(args=None):
     app = Qt.QApplication.instance()
     return app or Qt.QApplication(args or [])
