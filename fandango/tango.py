@@ -403,7 +403,8 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fun.matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
     else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
-    return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties)) for host,db in tango_dbs.items() for d in get_devs(db,expr))
+    return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties))
+                 for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
     
 def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=10000,trace=False):
@@ -436,7 +437,7 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
             if not dprops: continue
             if trace: print(d,dprops)
             vals = db.get_device_property(d,dprops)
-            if fun.isSequence(vals): vals = list(vals)
+            vals = dict((k,list(v) if fun.isSequence(v) else v) for k,v in vals.items())
             if len(hosts)==1 and len(hdevs)==1:
                 return vals
             else: 
@@ -838,6 +839,7 @@ def export_commands_to_dict(device,target='*'):
     
             
 def export_properties_to_dict(device,target='*'):
+    """ export device or class properties to dictionary """
     if '/' in device:
         return get_matching_device_properties(device,target)
     else:
@@ -846,6 +848,16 @@ def export_properties_to_dict(device,target='*'):
         return dict((k,v if fun.isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
     
 def export_device_to_dict(device):
+    """
+    This method can be used to export the current configuration of devices, attributes and properties to a file.
+    The dictionary will get properties, class properties, attributes, commands, attribute config, event config, alarm config and pollings.
+    
+    .. code-block python:
+    
+        data = dict((d,fandango.tango.export_device_to_dict(d)) for d in fandango.tango.get_matching_devices('*00/*/*'))
+        pickle.dump(data,open('bl00_devices.pck','w'))
+        
+    """
     i = get_device_info(device)
     dct = Struct(fandango.obj2dict(i,fltr=lambda n: n in 'dev_class host level name server'.split()))
     dct.attributes,dct.commands = {},{}
@@ -1754,21 +1766,25 @@ class TangoCommand(object):
             raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
         return result
 
-def __test__(args):
+def __test__(args=None):
     print __name__,'test',args
-    if not args: return
-    if args and args[0] == 'help':
-        help(globals().get(args[1]))
-    elif args[0] in globals():
-        f = globals().get(args[0])
-        try:
-            if callable(f):
-                args = [fandango.trial(lambda:eval(a) if isString(a) else a,excepts=a) for a in args[1:]]
-                print f(*args)
-            return 0
-        except:
-            traceback.print_exc()
-            return 1
+    if args:
+      if args and args[0] == 'help':
+          help(globals().get(args[1]))
+      elif args[0] in globals():
+          f = globals().get(args[0])
+          try:
+              if callable(f):
+                  args = [fandango.trial(lambda:eval(a) if isString(a) else a,excepts=a) for a in args[1:]]
+                  print f(*args)
+              return 0
+          except:
+              traceback.print_exc()
+              return 1
+    else:
+      pass
+    print 'TEST PASSED'
+    return 0
             
         
 if __name__ == '__main__':
