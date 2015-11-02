@@ -1,9 +1,17 @@
 
 """
-this module will be used to document lots of things
+this module will be used to document lots of things with sphinx
+
+Just do that at the end of your modules:
+
+    from fandango.doc import get_autodoc
+    __doc__ = get_autodoc(__name__,vars())
+
 """
 
-import vacca,inspect,fandango,os
+import inspect,fandango,os
+
+__all__ = ['get_autodoc','get_class_docs','get_function_docs','get_vars_docs']
 
 DEFAULT_MODULE = """
 %s
@@ -45,12 +53,12 @@ TM2 = '-',False
 TM3 = '~',False
 TM4 = '.',False
 
-def generate_rest_files(path='source'):
+def generate_rest_files(module,path='source'):
   print '\n'*5
   print 'Writing documentation settings to %s/*rst' % (path)
-
-  submodules = [(o,v) for o,v in vars(vacca).items()
-    if inspect.ismodule(v) and v.__name__.startswith('vacca')]
+  if fandango.isString(module): module = fandango.loadModule(module)
+  submodules = [(o,v) for o,v in vars(module).items()
+    if inspect.ismodule(v) and v.__name__.startswith(module.__name__)]
 
   for o,v in submodules:
     filename = path+'/'+o+'.rst'
@@ -103,6 +111,10 @@ def get_class_docs(module_name,module_vars,title='Classes',subtitle=True):
     return ''
 
 def get_autodoc(module_name,module_scope,module_vars=[],module_doc='',module_postdoc='\n----\n'):
+    """
+    from fandango import get_autodoc
+    __doc__ = get_autodoc(__name__,vars())
+    """
     module_doc = module_doc or module_scope.get('__doc__','') or ''
     #if not module_doc:
         #module_doc = get_rest_title(module_name,'=',double_line=True)
@@ -114,6 +126,7 @@ def get_autodoc(module_name,module_scope,module_vars=[],module_doc='',module_pos
     return module_doc+module_postdoc
 
 if __name__ == '__main__':
-  generate_rest_files()
+  import sys
+  generate_rest_files(sys.argv[1])
     
 __doc__ = get_autodoc(__name__,vars())

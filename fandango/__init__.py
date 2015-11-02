@@ -82,6 +82,10 @@ try:
 except: print 'Unable to import arrays module'
 
 try:
+    from doc import *
+except: print('Unable to import doc module')
+
+try:
     from dicts import ThreadDict,CaselessDict,ReversibleDict,CaselessDefaultDict,DefaultThreadDict,Enumeration,SortedDict,CaselessList
     from dicts import defaultdict,defaultdict_fromkey,fuzzyDict,reversedict,collections
 except: print 'Unable to import dicts module'
