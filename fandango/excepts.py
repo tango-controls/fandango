@@ -118,6 +118,7 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
 exLogger = log.Logger()
 
 def getLastException():
+    """ returns last exception traceback """
     return str(traceback.format_exc())
 
 """
@@ -151,10 +152,10 @@ def getPreviousExceptions(limit=0):
         exinfo = sys.exc_info()
         if exinfo[0] is not None:
             stack = traceback.format_tb(exinfo[2])
-            return '\n'.join(['Tracebacks (most recent call last):',
+            return str('\n'.join(['Tracebacks (most recent call last):',
                                 ''.join(stack[(len(stack)>1 and 1 or 0):]),
                                 ': '.join([str(exinfo[0].__name__),str(exinfo[1])])
-                                ])
+                                ]))
         else:
             return ''
     except Exception,e:
@@ -166,8 +167,15 @@ class RethrownException(Exception):
     
 
 #@decorator_with_args #This decorator disturbed stdout!!!! ... There's a problem calling nested decorators!!!
-def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose=False,rethrow=False):
-    ''' Example:
+def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose=False,rethrow=False,default=None):
+    ''' 
+    Implementation of the popular Catched() decorator:
+    
+    * it will execute your method within a a try/except
+    * it will print the traceback
+    * if :rethrow: is False it will return :default: in case of exception
+     
+    Example:
     @ExceptionWrapper
     def funny():
         print 'what?'
@@ -199,7 +207,9 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
                 #Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
                 Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
             else:
-                Except.throw_exception(err.reason,err.desc,err.origin)
+                #Except.throw_exception(err.reason,err.desc,err.origin)
+                logger.warning(str((err.reason,err.desc,err.origin)))
+                return default
         except Exception,e:
             #exstring = traceback.format_exc()
             exstring=getPreviousExceptions()
@@ -211,7 +221,10 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
                 except:pass
                 print '-'*80                                 
             if postmethod: postmethod(exstring)
-            Except.throw_exception('Exception',exstring,"%s(...)"%fun.__name__)
+            if rethrow:
+              Except.throw_exception('Exception',exstring,"%s(...)"%fun.__name__)
+            else:
+              return default
         pass    
     
     #ExceptionWrapper behaves like a decorator
@@ -219,9 +232,13 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
     return wrapper
     
 Catched = ExceptionWrapper
-Catched2 = decorator_with_args(ExceptionWrapper)
+CatchedArgs = decorator_with_args(ExceptionWrapper)
 
 class ExceptionManager(object):
+    """
+    This was a version of ExceptionWrapper to be used as ContextManager together with *with* statement.
+    Not really tested nor used, just a proof of concept.
+    """
     def __init__(self,logger=exLogger,origin=None,postmethod=None,verbose=True,rethrow=True):
         self.logger=logger
         self.postmethod=postmethod
@@ -229,8 +246,10 @@ class ExceptionManager(object):
         self.rethrow=rethrow
         self.origin=origin
         pass
+
     def __enter__(self):
         pass
+
     #@Catched
     def __exit__(self,etype,e,tb): #Type of exception, exception instance, traceback
         if not e and not etype:
