@@ -865,9 +865,10 @@ def Draggable(QtKlass):
     class DraggableQtKlass(QtKlass): #,Decorated):
         __doc__ = Draggable.__doc__
         
-        def setDragEventCallback(self,hook):
+        def setDragEventCallback(self,hook,Mimetype=None):
             self._drageventcallback = hook
-            
+            self.Mimetype = Mimetype 
+
         def getDragEventCallback(self):
             if not getattr(self,'_drageventcallback',None):
                 self.setDragEventCallback(lambda s=self:str(s.text() if hasattr(s,'text') else ''))
@@ -885,11 +886,16 @@ def Draggable(QtKlass):
             QtKlass.mouseMoveEvent(self,event)
             if not event.buttons() & Qt.Qt.LeftButton:
                 return
-            mimeData = self.getDragEventCallback()()
+            call_back = self.getDragEventCallback()
+            mimeData = call_back()
             if not isinstance(mimeData,Qt.QMimeData):
                 txt = str(mimeData)
                 mimeData = Qt.QMimeData()
                 mimeData.setText(txt)
+
+                if getattr(self,'Mimetype',None):
+                    mimeData.setData(self.Mimetype, txt)
+
             drag = Qt.QDrag(self)
             drag.setMimeData(mimeData)
             drag.setHotSpot(event.pos() - self.rect().topLeft())
