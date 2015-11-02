@@ -68,10 +68,15 @@ def dirClasses(module,owned=False):
     if owned: return [a for a in dirModule(module) if a in v]
     else: return v
     
-def obj2dict(obj,type_check=True):
+def obj2dict(obj,type_check=True,class_check=False,fltr=None):
+    """ Converts a python object to a dictionary with all its members as python primitives 
+    
+    :param fltr: a callable(name):bool method"""
     dct = {}
     try:
         for name in dir(obj):
+            if fltr and not fltr(name):
+                continue
             try:
                 attr = getattr(obj,name)
                 if hasattr(attr,'__call__'): continue
@@ -89,10 +94,12 @@ def obj2dict(obj,type_check=True):
                 dct[name] = attr
             except Exception,e:
                 print(e)
-        klass = obj.__class__
-        if '__class__' not in dct: dct['__class__'] = klass.__name__
-        if '__bases__' not in dct: dct['__bases__'] = [b.__name__ for b in klass.__bases__]
-        if '__base__' not in dct: dct['__base__'] = klass.__base__.__name__
+
+        if class_check:
+            klass = obj.__class__
+            if '__class__' not in dct: dct['__class__'] = klass.__name__
+            if '__bases__' not in dct: dct['__bases__'] = [b.__name__ for b in klass.__bases__]
+            if '__base__' not in dct: dct['__base__'] = klass.__base__.__name__
     except Exception,e:
         print(e)
     return(dct)
