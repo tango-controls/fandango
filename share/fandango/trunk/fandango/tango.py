@@ -428,14 +428,15 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         db = get_database(h)
         exps  = [h+'/'+e if ':' not in e else e for e in devs]
         if trace: print(exps)
-        hdevs = [d.replace(h,'') for d in get_matching_devices(exps,fullname=False)]
-        if trace: print('%s: %s'%(h,hdevs))
+        hdevs = [d.replace(h+'/','') for d in get_matching_devices(exps,fullname=False)]
+        if trace: print('%s: %s vs %s'%(h,hdevs,props))
         for d in hdevs:
             if exclude and fun.matchCl(exclude,d): continue
             dprops = [p for p in db.get_device_property_list(d,'*') if fun.matchAny(props,p)]
             if not dprops: continue
             if trace: print(d,dprops)
             vals = db.get_device_property(d,dprops)
+            if fun.isSequence(vals): vals = list(vals)
             if len(hosts)==1 and len(hdevs)==1:
                 return vals
             else: 
@@ -508,7 +509,7 @@ metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+':[0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
+rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
 reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)' #Matches attribute and extension
 retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
@@ -603,15 +604,17 @@ class get_all_devices(objects.SingletonMap):
         instance = objects.SingletonMap.__new__(cls,*p,**k)
         return instance.get_all_devs()
     
-def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
+def get_matching_devices(expressions,limit=0,exported=False,fullname=False,trace=False):
     """ 
     Searches for devices matching expressions, if exported is True only running devices are returned 
     Tango host will be included in the matched name if fullname is True
     """
     if not fun.isSequence(expressions): expressions = [expressions]
-    hosts = set((m.groups()[0] if m else None) for m in (fun.matchCl(rehost,e) for e in expressions))
-    all_devs = []
     defhost = get_tango_host()
+    hosts = list(set((m.groups()[0] if m else None) for m in (fun.matchCl(rehost,e) for e in expressions)))
+    fullname = fullname or ':' in str(expressions) or len(hosts)>1 or hosts[0] not in (defhost,None) #Dont count slashes, as regexps may be complex
+    all_devs = []
+    if trace: print(hosts,fullname)
     for host in hosts:
         if host in (None,defhost):
             db_devs = get_all_devices(exported)
@@ -623,8 +626,9 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False):
         all_devs.extend(prefix+d for d in db_devs)
         
     expressions = map(fun.toRegexp,fun.toList(expressions))
-    result = filter(lambda d: any(fun.matchCl("(%s/)?"%defhost+e,d,terminate=True) for e in expressions),all_devs)
-    if not fullname: result = [r if r.count('/')<=2 else r.split('/',1)[-1] for r in result]
+    if trace: print(expressions)
+    if not fullname: all_devs = [r.split('/',1)[-1] if fun.matchCl(rehost,r) else r for r in all_devs]
+    result = filter(lambda d: any(fun.matchCl("(%s/)?(%s)"%(defhost,e),d,terminate=True) for e in expressions),all_devs)
     return result[:limit] if limit else result
     
 def find_devices(*args,**kwargs):
@@ -781,7 +785,81 @@ def reduce_distinct(group1,group2):
  
 
 ########################################################################################
+## Methods to export device/attributes/properties to dictionaries
+
+def export_attribute_to_dict(device,target,value=False):
+    """
+    get attribute config, format and value from Tango and return it as a dictionary:
+    
+    keys: min_alarm,name,data_type,format,max_alarm,ch_event,data_format,value,
+          label,writable,device,polling,alarms,arch_event,unit
+    """
+    attr = Struct()
+    name,proxy = (device,get_device(device)) if fun.isString(device) else (device.name(),device)
+    attr.device,attr.name = name,target
+    try:
+        v = check_attribute(name+'/'+target)
+        if v and 'DevFailed' not in str(v):
+            ac = proxy.get_attribute_config(target)
+            attr.data_format,attr.data_type = str(ac.data_format),str(PyTango.CmdArgType.values[ac.data_type])
+            attr.writable = str(ac.writable)
+            attr.label,attr.min_alarm,attr.max_alarm = ac.label,ac.min_alarm,ac.max_alarm
+            attr.unit,attr.format = ac.unit,ac.format
+            attr.ch_event = fandango.obj2dict(ac.events.ch_event)
+            attr.arch_event = fandango.obj2dict(ac.events.arch_event)
+            attr.alarms = fandango.obj2dict(ac.alarms)
+            if attr.data_format!='SCALAR': 
+                attr.value = list(v.value if v.value is not None and v.dim_x else [])
+            elif attr.data_type=='DevState':
+                attr.value = int(v.value)
+            else:
+                attr.value = v.value
+            attr.polling = proxy.get_attribute_poll_period(target)
+        else: 
+            print((name,target,'unreadable!'))
+            attr.value = None
+        if attr.value is None:
+            attr.datatype = None
+    except Exception,e:
+        print(str((name,target,traceback.format_exc())))
+        raise(e)
+    return dict(attr)
             
+def export_commands_to_dict(device,target='*'):
+    """ export all device commands config to a dictionary """
+    name,proxy = (device,get_device(device)) if fun.isString(device) else (device.name(),device)
+    dct = {}
+    for c in proxy.command_list_query():
+        if not fandango.matchCl(target,c.cmd_name): continue
+        dct[c.cmd_name] = fandango.obj2dict(c)
+        dct[c.cmd_name]['device'] = name
+        dct[c.cmd_name]['name'] = c.cmd_name
+    return dct
+    
+            
+def export_properties_to_dict(device,target='*'):
+    if '/' in device:
+        return get_matching_device_properties(device,target)
+    else:
+        db = get_database()
+        props = [p for p in db.get_class_property_list(device) if fandango.matchCl(target,p)]
+        return dict((k,v if fun.isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
+    
+def export_device_to_dict(device):
+    i = get_device_info(device)
+    dct = Struct(fandango.obj2dict(i,fltr=lambda n: n in 'dev_class host level name server'.split()))
+    dct.attributes,dct.commands = {},{}
+    if check_device(device):
+      try:
+        proxy = get_device(device)
+        dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) for a in proxy.get_attribute_list())
+        dct.commands = export_commands_to_dict(proxy)
+      except:
+        traceback.print_exc()
+    dct.properties = export_properties_to_dict(device)
+    dct.class_properties = export_properties_to_dict(dct.dev_class)
+    return dict(dct)
+    
 ########################################################################################
 ## Methods for checking device/attribute availability
    
@@ -1675,3 +1753,24 @@ class TangoCommand(object):
         if self.timeout < time.time()-t0: 
             raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
         return result
+
+def __test__(args):
+    print __name__,'test',args
+    if not args: return
+    if args and args[0] == 'help':
+        help(globals().get(args[1]))
+    elif args[0] in globals():
+        f = globals().get(args[0])
+        try:
+            if callable(f):
+                args = [fandango.trial(lambda:eval(a) if isString(a) else a,excepts=a) for a in args[1:]]
+                print f(*args)
+            return 0
+        except:
+            traceback.print_exc()
+            return 1
+            
+        
+if __name__ == '__main__':
+    import sys
+    __test__(sys.argv[1:])
