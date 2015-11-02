@@ -1,5 +1,5 @@
-RELEASE = (11,5)
-RELEASE_NOTE = "Bugs solved for better simulations"
+RELEASE = (11,7)
+RELEASE_NOTE = "Drag/Drop/Pickle devices from anywhere"
 
 """
 PENDING:
@@ -8,8 +8,11 @@ PENDING:
   NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
   ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
 
-
 ONGOING ......... preparing next PyAlarm release
+
+-------------------------------------------------
+November 2015 - 11.7 Drag/Drop/Pickle devices from anywhere
+-------------------------------------------------
 
 fun: added bool2int([bool]) method
 fun: Added ifThen(condition,callable) to allow conditioned execution of methods
@@ -18,11 +21,14 @@ tango: solved bug in TangoEval that caused exception on parsing None types
 tango: solved bug in get_tango_host that caused weird eval values on Panic and Tango9
 tango: Enabled regexp in get_matching_device_properties
 tango: added try/catch to get_tango_host
+tango: added export_to_dict methods for pickling tango devices
+doc: added methods for sphinx autodocumenting
 servers: Helper methods (load_from*) now return the Astor object itself
 dynamic: added functional conversion methods to locals(), DynamicDS renamed to DynamicServer
 QT: Added Qt Decorators for DoubleClickable/Dragable/Dropable widgets
 qt: added GetFramedTaurusValue, QWidgetWithLayout to allow TaurusValue integration on QTableOnWidget
 qt: QTableOnWidget now is search/filter enabled (beta)
+qt.Draggable: added mimetype argument to setDragEventCallback
 
 -------------------------------------------------
 August 2015 - 11.6 New QEvaluator tool for debugging PyQt
