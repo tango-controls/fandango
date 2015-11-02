@@ -63,7 +63,7 @@ try:
 except Exception,e: print 'Unable to import log module: %s'%e
 
 try:
-    from excepts import trial,getLastException,getPreviousExceptions,ExceptionWrapper,Catched,Catched2
+    from excepts import trial,getLastException,getPreviousExceptions,ExceptionWrapper,Catched,CatchedArgs
 except: print 'Unable to import excepts module'
 
 try:
