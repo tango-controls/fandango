@@ -891,11 +891,9 @@ def Draggable(QtKlass):
             if not isinstance(mimeData,Qt.QMimeData):
                 txt = str(mimeData)
                 mimeData = Qt.QMimeData()
-                mimeData.setText(txt)
-
                 if getattr(self,'Mimetype',None):
                     mimeData.setData(self.Mimetype, txt)
-
+                mimeData.setText(txt) #Order is not trivial, preferred must go first
             drag = Qt.QDrag(self)
             drag.setMimeData(mimeData)
             drag.setHotSpot(event.pos() - self.rect().topLeft())
