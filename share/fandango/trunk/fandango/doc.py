@@ -83,10 +83,10 @@ def get_rest_title(string,char='=',double_line=False):
     return txt
 
 def get_vars_docs(module_name,module_vars,title='Variables',subtitle=True):
-  defs = [(get_rest_title(f,*TM2) if subtitle else '')+DEFAULT_VARIABLE%(module_name,f) 
+  defs = [(get_rest_title(f,*TM3) if subtitle else '')+DEFAULT_VARIABLE%(module_name,f) 
           for f in module_vars]
   if defs:
-    return '\n'+get_rest_title(title,*TM1)+'\n'.join(defs)
+    return '\n'+get_rest_title(title,*TM2)+'\n'.join(defs)
   else:
     return ''
 
