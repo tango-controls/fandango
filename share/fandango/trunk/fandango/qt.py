@@ -47,6 +47,8 @@ def getQt(full=False):
     Choosing between PyQt and Taurus Qt distributions
     """
     try:
+        import taurus
+        taurus.setLogLevel(taurus.Warning)
         from taurus.external.qt import Qt,QtCore,QtGui
     except:
         from PyQt4 import Qt,QtCore,QtGui
@@ -54,7 +56,7 @@ def getQt(full=False):
         return Qt,QtCore,QtGui
     else:
         return Qt
-    
+
 Qt,QtCore,QtGui = getQt(True)
 
 ###############################################################################
@@ -727,7 +729,6 @@ TauEmitterThread = QWorker #For backwards compatibility
 
 ###############################################################################
 # QT Helping Classes
-
 TEXT_MIME_TYPE = 'text/plain'
 try:
   import taurus, taurus.qt, taurus.qt.qtcore
@@ -903,6 +904,52 @@ def Draggable(QtKlass):
 QDraggable = Draggable(object)
 QDraggableLabel = Draggable(Qt.QLabel)
 
+@ClassDecorator
+def MenuContexted(QtKlass):
+    """ 
+    This class decorator provides a simple hook to add context menu options/callables 
+    
+    Example:
+      label = MenuContexted(Qt.QLabel)('a/device/name')
+      label.setContextCallbacks({'Test Device',lambda:show_device_panel('a/device/name')})
+      
+    """
+    class MenuContextedQtKlass(QtKlass):
+        __doc__ = MenuContexted.__doc__
+        
+        def setContextCallbacks(self,hook_dict):
+            self._actions = hook_dict
+        
+        def mousePressEvent(self, event):
+            point = event.pos()
+            widget = Qt.QApplication.instance().widgetAt(self.mapToGlobal(point))
+            # If the widget is a container:
+            if hasattr(widget,'_actions'):
+                #print('onMouseEvent(%s)'%(getattr(widget,'text',lambda:widget)()))
+                self._current_item = widget
+                if event.button()==Qt.Qt.RightButton:
+                    self.onContextMenu(point)
+            elif hasattr(self,'_actions'):
+                self.onContextMenu()
+            getattr(super(type(self),self),'mousePressEvent',lambda e:None)(event)
+            
+        def getContextItem(self):
+            return getattr(self,'_current_item',None)
+            
+        def onContextMenu(self, point=None):
+            try:
+                self._contextmenu = Qt.QMenu()
+                for k,v in self._actions.items():
+                  self._contextmenu.addAction(Qt.QIcon(),k,v)
+                if point:
+                    self._contextmenu.exec_(self.mapToGlobal(point))
+                else:
+                   self._contextmenu.exec_()
+            except:
+                traceback.print_exc()
+
+    return MenuContextedQtKlass
+
 #class QDraggableLabel(!Draggable,Qt.QLabel):
     #def __init__(self,parent=None,text=''):
         #Qt.QLabel.__init__(self,text)
@@ -931,13 +978,13 @@ class QOptionChooser(Qt.QDialog):
         import os
         os.system(cmd)
 
-class TangoHostChooser(Qt.QWidget):
+class TangoHostChooser(Qt.QDialog):
     """
     Allows to choose a tango_host from a list
     """
     def __init__(self,hosts):
         self.hosts = sorted(hosts)
-        Qt.QWidget.__init__(self,None)
+        Qt.QDialog.__init__(self,None)
         self.setLayout(Qt.QVBoxLayout())
         self.layout().addWidget(Qt.QLabel('Choose your TangoHost:'))
         self.chooser = Qt.QComboBox()
@@ -947,12 +994,22 @@ class TangoHostChooser(Qt.QWidget):
         self.layout().addWidget(self.button)
         self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.done)
         self.button.connect(self.button,Qt.SIGNAL('pressed()'),self.close)
-    def done(self):
+    def done(self,*args):
         import os
         os.environ['TANGO_HOST']=str(self.chooser.currentText())
         new_value = os.getenv('TANGO_HOST')
-        print('TANGO_HOST set to %s'% new_value)
-        return new_value
+        self.close()
+        self.hide()
+        
+    @staticmethod
+    def main(args=[]):
+        app = getApplication()
+        thc = TangoHostChooser(args or sys.argv[1:])
+        thc.show()
+        app.exec_()
+        v = str(thc.chooser.currentText())
+        print(v)
+        return v
     
 ###############################################################################
 
@@ -997,8 +1054,8 @@ class QTextBuffer(Qt.QDialog):
     This dialog provides a Text dialog where logs can be inserted from your application in a round buffer.
     It also provides a button to save the logs into a file if needed.
     """
-    def __init__(self,title='TextBuffer',maxlen=1000):
-        Qt.QDialog.__init__(self) #,*args)
+    def __init__(self,title='TextBuffer',maxlen=1000,parent=None):
+        Qt.QDialog.__init__(self,parent) #,*args)
         self.setWindowTitle(title)
         lwidget,lcheck = Qt.QVBoxLayout(),Qt.QHBoxLayout()
         self.setLayout(lwidget)
