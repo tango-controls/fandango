@@ -261,6 +261,9 @@ class WorkerThread(object):
             self.stop()
             object.__del__(self)
         except: pass
+       
+    def locals(self,key=None):
+        return self._locals if key is None else self._locals.get(key)
         
     def put(self,target):
         """Inserting a new object in the Queue."""
