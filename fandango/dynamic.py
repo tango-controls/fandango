@@ -1,5 +1,5 @@
 #!/usr/bin/env python2.5
-""" @if gnuheader
+"""
 #############################################################################
 ##
 ## file :       dynamic.py
@@ -33,7 +33,7 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@endif
+
 """
 
 __doc__ = """
@@ -152,6 +152,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.CheckDependencies = True
         #Internals
         self.dyn_attrs = {}
+        self.dyn_comms = {}
         self.dyn_types = {}
         self.dyn_states = SortedDict()
         self.dyn_values = {} #<- That's the main cache used for attribute management
@@ -271,6 +272,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def delete_device(self):
         self.warning( 'DynamicDS.delete_device(): ... ')
         ('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl).delete_device(self)
+        
+    def locals(self,key=None):
+        return self._locals if key is None else self._locals.get(key)
         
     def get_init_count(self):
         return self._init_count
@@ -1697,6 +1701,8 @@ class DynamicDSType(object):
                 return True
         return False
 
+#: Dictionary that contains the definition of all types available in DynamicDS attributes
+#: Tango Type casting in formulas is done using int(value), SPECTRUM(int,value), IMAGE(int,value) for bool,int,float,str types
 DynamicDSTypes={
             #Labels will be matched at the beginning of formulas using re.match(label+'[(,]',formula)
             'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState',],int),
@@ -2064,6 +2070,8 @@ class DynamicServer(object):
         U = self.util.instance()
         U.server_init()
         U.server_run()
+
+__doc__ = fandango.get_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
         
 if __name__ == '__main__':
     pyds = DynamicServer(add_debug=True)
