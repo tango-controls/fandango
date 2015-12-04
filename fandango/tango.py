@@ -1,5 +1,5 @@
 #!/usr/bin/env python2.5
-""" @if gnuheader
+"""
 #############################################################################
 ##
 ## file :       device.py
@@ -402,7 +402,7 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     if not fun.isSequence(properties): properties = [properties]
     get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fun.matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
-    else: tango_dbs = {os.getenv('TANGO_HOST'):PyTango.Database()}
+    else: tango_dbs = {get_tango_host():get_database()}
     return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties))
                  for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
@@ -636,17 +636,18 @@ def find_devices(*args,**kwargs):
     #A get_matching_devices() alias, just for backwards compatibility
     return get_matching_devices(*args,**kwargs) 
     
-def get_matching_attributes(expressions,limit=0,fullname=None):
+def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
     """ 
     Returns all matching device/attribute pairs. 
     regexp only allowed in attribute names
     :param expressions: a list of expressions like [domain_wild/family_wild/member_wild/attribute_regexp] 
     """
     attrs = []
-    def_host = os.getenv('TANGO_HOST')
-    if not fun.isSequence(expressions): expressions = [expressions]
-    #expressions = map(fun.partial(fun.toRegexp,terminate=True),fun.toList(expressions))
+    def_host = get_tango_host()
     matches = []
+    if not fun.isSequence(expressions): expressions = [expressions]
+    fullname = any(fun.matchCl(rehost,e) for e in expressions)
+    
     for e in expressions:
         match = fun.matchCl(retango,e,terminate=True)
         if not match:
@@ -658,11 +659,16 @@ def get_matching_attributes(expressions,limit=0,fullname=None):
         else:
             host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
+        if trace: print('get_matching_attributes(%s): match:%s,host:%s,dev:%s,attr:%s'%(e,bool(match),host,dev,attr))
         matches.append((host,dev,attr))
     
     fullname = fullname or any(m[0]!=def_host for m in matches)
+
     for host,dev,attr in matches:
-        #print '%s => %s: %s /%s' % (e,host,dev,attr)
+
+        if fullname and host not in dev:
+            dev = host+'/'+dev
+            
         for d in get_matching_devices(dev,exported=True,fullname=fullname):
             if fun.matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
@@ -674,6 +680,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None):
                 except: 
                     print 'Unable to get attributes for %s'%d
                     print traceback.format_exc()
+                    
     result = list(set(attrs))
     return result[:limit] if limit else result
                     
@@ -902,17 +909,17 @@ def check_starter(host):
     else:
         return False
     
-def check_device(dev,attribute=None,command=None,full=False):
+def check_device(dev,attribute=None,command=None,full=False,admin=False):
     """ 
     Command may be 'StateDetailed' for testing HdbArchivers 
     It will return True for devices ok, False for devices not running and None for unresponsive devices.
     """
     try:
-        if full:
+        if full or admin:
             info = get_device_info(dev)
             if not info.exported:
                 return False
-            if not check_host(info.host):
+            if full and not check_host(info.host):
                 return False
             if not check_device('dserver/%s'%info.server,full=False):
                 return False
@@ -926,9 +933,9 @@ def check_device(dev,attribute=None,command=None,full=False):
         else: dp.state()
         return True
     except:
-        return None            
+        return None
 
-def check_attribute(attr,readable=False,timeout=0,brief=False):
+def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
     """ checks if attribute is available.
     :param readable: Whether if it's mandatory that the attribute returns a value or if it must simply exist.
     :param timeout: Checks if the attribute value have been effectively updated (check zombie processes).
@@ -945,10 +952,15 @@ def check_attribute(attr,readable=False,timeout=0,brief=False):
             elif timeout and attvalue.time.totime()<(time.time()-timeout):
                 return None
             else:
-                return attvalue if not brief else getattr(attvalue,'value',None)
+                if not brief:
+                  return attvalue
+                else:
+                  return getattr(attvalue,'value',None)
         except Exception,e: 
+            if trace: traceback.print_exc()
             return None if readable or brief else e
     except:
+        if trace: traceback.print_exc()
         return None
     
 def read_attribute(attr,timeout=0,full=False):
@@ -1424,7 +1436,7 @@ class TangoEval(object):
         """
         exp = target.replace('"','').replace("'",'').strip()
         exp,sep,what = exp.partition('.')
-        res = str(sorted(d.lower()+sep+what for d in get_matching_attributes([exp])))
+        res = str(sorted(d.lower()+sep+what for d in get_matching_attributes([exp],trace=self._trace)))
         return res.replace('"','').replace("'",'')
     
     def add_macro(self,macro_name,macro_expression,macro_function):
@@ -1790,3 +1802,5 @@ def __test__(args=None):
 if __name__ == '__main__':
     import sys
     __test__(sys.argv[1:])
+
+__doc__ = fandango.get_autodoc(__name__,vars())
