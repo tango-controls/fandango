@@ -552,6 +552,16 @@ def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
     
 def doc2str(obj):
     return obj.__name__+'\n\n'+obj.__doc__
+   
+def rtf2plain(t,e='[<][^>]*[>]'):
+    t = re.sub(e,'',t)
+    if re.search(e,t):
+        return rtf2plain(t,e)
+    else:
+        return t
+       
+def html2text(txt):
+    return rtf2plain(txt)
     
 def toList(val,default=[],check=isSequence):
     if val is None: 
