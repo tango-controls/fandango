@@ -136,6 +136,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     ######################################################################################################
     # INTERNAL DYNAMIC DEVICE SERVER METHODS
     ######################################################################################################
+    
+    dyn_comms = {} # To be defined here, not at __init__ nor init_device as it is shared by all instances
 
     def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
         print '> '+'~'*78
@@ -152,7 +154,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.CheckDependencies = True
         #Internals
         self.dyn_attrs = {}
-        self.dyn_comms = {}
         self.dyn_types = {}
         self.dyn_states = SortedDict()
         self.dyn_values = {} #<- That's the main cache used for attribute management
