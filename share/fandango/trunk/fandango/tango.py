@@ -1551,7 +1551,7 @@ class TangoEval(object):
         return self._locals
             
     def parse_tag(self,target,wildcard='_'):
-        return target.replace('/',wildcard).replace('-',wildcard).replace('.',wildcard).replace(':',wildcard).replace('_',wildcard).lower()
+        return wildcard+target.replace('/',wildcard).replace('-',wildcard).replace('.',wildcard).replace(':',wildcard).replace('_',wildcard).lower()
     
     def get_delta(self,target):
         # target = (device+'/'+attribute).lower() ; returns difference between first and last cached value
