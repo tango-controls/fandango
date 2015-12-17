@@ -269,7 +269,13 @@ class defaultdict_fromkey(collections.defaultdict):
     """
     def __missing__(self, key):
         if self.default_factory is None: raise KeyError(key)
-        self[key] = value = self.default_factory(key)
+        try:
+          self[key] = value = self.default_factory(key)
+        except Exception,e:
+          try:
+            self[key] = value = self.default_factory()
+          except:
+            raise e
         return value
         
 class CaselessList(list):
