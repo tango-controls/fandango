@@ -48,7 +48,7 @@ import time,re,os,traceback
 
 #pytango imports
 import PyTango
-from PyTango import AttrQuality
+from PyTango import AttrQuality,EventType,DevState,AttrDataFormat,AttrWriteType,CmdArgType
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
@@ -118,7 +118,11 @@ def get_tango_host(dev_name='',use_db=False):
             return m.groups()[0] if m else get_tango_host(use_db=use_db)
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
-            return "%s:%d"%(use_db.get_db_host().strip().split('.')[0],int(use_db.get_db_port()))
+            host,port = use_db.get_db_host(),int(use_db.get_db_port())
+            if fun.matchCl('.*[a-z].*',host.lower()):
+              #Remove domain name
+              host = host.strip().split('.')[0]
+            return "%s:%d"%(host,port)
         else:
             host = os.getenv('TANGO_HOST') 
             return host or get_tango_host(use_db=True) 
@@ -132,6 +136,7 @@ def get_database(host='',port='',use_tau=False):
     @TODO: host/port is checked only at first creation, once initialized you can't change HOST
     """
     global TangoDatabase
+    global TAU,USE_TAU
     if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
     elif ':' in host: host,port = host.split(':')
     args = [host,int(port)] if host and port else []
@@ -192,7 +197,8 @@ def get_database_device(use_tau=False,db=None):
            dev_name = (db or get_database(use_tau=use_tau)).dev_name()
            dev_name = get_tango_host(use_db=db)+'/'+dev_name if db else dev_name
            TangoDevice = get_device(dev_name,use_tau=use_tau)
-        except: pass
+        except: 
+           traceback.print_exc()
     return TangoDevice
 
 def add_new_device(server,klass,device):
@@ -510,7 +516,7 @@ metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
+rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
 reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)' #Matches attribute and extension
 retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
