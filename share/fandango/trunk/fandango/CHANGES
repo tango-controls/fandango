@@ -14,8 +14,10 @@ dynamic: added locals() method; solved dyn_comms bug at startup
 functional: added html2text, rtf2plain
 qt: Added MenuContexted widget decorator and TangoHostChooser utility for bash scripts
 tango: solved bug in multi-host support in get_matching_devices and get_matching_attributes
+tango: solved bug that didn't allowed ip addresses in tango hosts.
 threads: added locals method to WorkerThread (needed by WorkerDS)
 dicts: CaselessDefaultDict: solved missing key exception
+
 
 
 -------------------------------------------------
