@@ -213,12 +213,17 @@ def get_device_info(dev,db=None):
     This method provides an alternative to DeviceProxy.info() for those devices that are not running
     """
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
-    dd = get_database_device(db=db)
-    vals = dd.DbGetDeviceInfo(dev)
-    di = Struct([(k,v) for k,v in zip(('name','ior','level','server','host','started','stopped'),vals[1])])
-    di.exported,di.PID = vals[0]
-    di.dev_class = dd.DbGetClassForDevice(dev)
-    return di
+    vals = None
+    try:
+      dd = get_database_device(db=db)
+      vals = dd.DbGetDeviceInfo(dev)
+      di = Struct([(k,v) for k,v in zip(('name','ior','level','server','host','started','stopped'),vals[1])])
+      di.exported,di.PID = vals[0]
+      di.dev_class = dd.DbGetClassForDevice(dev)
+      return di
+    except:
+      raise Exception('get_device_info(%s,%s,%s): %s'%(
+        dev,db,vals,traceback.format_exc()))
 
 def get_device_host(dev):
     """
