@@ -430,6 +430,9 @@ ptext = iPiped(lambda input: '\n'.join(imap(str,input)))
 """ Note of the author:
  This methods are not intended to be universal, are just practical for general Tango application purposes.
 """
+
+reint = '[0-9]+'
+refloat = '[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?'
         
 def isString(seq):
     if isinstance(seq,basestring): return True # It matches most python str-like classes
@@ -519,11 +522,11 @@ def isDate(seq):
 
 def str2int(seq):
     """ It returns the first integer encountered in the string """
-    return int(re.search('[0-9]+',seq).group())
+    return int(re.search(reint,seq).group())
 
 def str2float(seq):
     """ It returns the first float (x.ye-z) encountered in the string """
-    return float(re.search('[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?',seq).group())
+    return float(re.search(refloat,seq).group())
 
 def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
