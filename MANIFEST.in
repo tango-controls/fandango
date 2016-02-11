@@ -1,0 +1,7 @@
+
+
+include AUTHORS
+include LICENSE
+include README
+include fandango/CHANGES*
+
