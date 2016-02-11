@@ -55,6 +55,15 @@ except Exception,e:
     print 'Unable to load RELEASE number: %s'%e
 
 try:
+    import pkg_resources
+    __version__ = pkg_resources.get_distribution(__name__).version
+except Exception, e:
+    __version__ = None
+    print traceback.format_exc()
+    print ('Unable to get distribution version number, fandango has '
+           'probably not been installed as a package')
+
+try:
     from functional import *
 except Exception,e: print 'Unable to import functional module: %s'%e
 
