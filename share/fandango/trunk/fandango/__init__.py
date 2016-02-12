@@ -59,9 +59,8 @@ try:
     __version__ = pkg_resources.get_distribution(__name__).version
 except Exception, e:
     __version__ = None
-    print traceback.format_exc()
-    print ('Unable to get distribution version number, fandango has '
-           'probably not been installed as a package')
+    #print ('Unable to get distribution version number, fandango has '
+    #       'probably not been installed as a package')
 
 try:
     from functional import *
