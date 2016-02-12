@@ -55,7 +55,7 @@ if 'Device_4Impl' not in dir(PyTango):
 import fandango
 import objects
 import threading
-import functional as fun
+from fandango.functional import *
 from dicts import CaselessDefaultDict,CaselessDict
 from objects import Object,Struct
 from log import Logger,except2str,printf
@@ -93,9 +93,9 @@ def TGet(*args):
     if arg0.count('/')==1:
         return fandango.servers.ServersDict(arg0)
     if arg0.count('/')>(2+(':' in arg0)):
-        return sorted(get_matching_attributes(arg0)) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else check_attribute(arg0,brief=True)
+        return sorted(get_matching_attributes(arg0)) if isRegexp(arg0,WILDCARDS+' ') else check_attribute(arg0,brief=True)
     else:
-        return sorted(get_matching_devices(arg0)) if fun.isRegexp(arg0,fun.WILDCARDS+' ') else get_device(arg0)
+        return sorted(get_matching_devices(arg0)) if isRegexp(arg0,WILDCARDS+' ') else get_device(arg0)
         
 ####################################################################################################################
 
@@ -114,12 +114,15 @@ def get_tango_host(dev_name='',use_db=False):
     """
     try:
         if dev_name:
-            m  = fun.matchCl(rehost,dev_name)
+            if isString(dev_name):
+              m  = matchCl(rehost,dev_name)
+            else: 
+              m,use_db = None,dev_name
             return m.groups()[0] if m else get_tango_host(use_db=use_db)
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
-            if fun.matchCl('.*[a-z].*',host.lower()):
+            if matchCl('.*[a-z].*',host.lower()):
               #Remove domain name
               host = host.strip().split('.')[0]
             return "%s:%d"%(host,port)
@@ -133,12 +136,19 @@ def get_tango_host(dev_name='',use_db=False):
 def get_database(host='',port='',use_tau=False): 
     """
     Method to get a singleton instance of the Tango Database
+    host/port can be a host,port tuple; a 'host:port' string or a taurus model.
     @TODO: host/port is checked only at first creation, once initialized you can't change HOST
     """
     global TangoDatabase
     global TAU,USE_TAU
     if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
-    elif ':' in host: host,port = host.split(':')
+    else:
+      if '/' in host: 
+        # Parsing a taurus model
+        host = get_tango_host(host)
+      if ':' in host: 
+        # Parsing a host:port string
+        host,port = host.split(':')
     args = [host,int(port)] if host and port else []
     
     ### DISABLED, CRUSHED WITH BAD_INV_ORDER CORBA in Tango8
@@ -192,14 +202,18 @@ def get_device(dev,use_tau=False,keep=False):
 
 def get_database_device(use_tau=False,db=None): 
     global TangoDevice
-    if TangoDevice is None:
+    if db is None and TangoDevice is not None:
+      td = TangoDevice
+    else:
         try:
            dev_name = (db or get_database(use_tau=use_tau)).dev_name()
            dev_name = get_tango_host(use_db=db)+'/'+dev_name if db else dev_name
-           TangoDevice = get_device(dev_name,use_tau=use_tau)
+           td = get_device(dev_name,use_tau=use_tau)
         except: 
            traceback.print_exc()
-    return TangoDevice
+        if db is None: 
+          TangoDevice = td
+    return td
 
 def add_new_device(server,klass,device):
     dev_info = PyTango.DbDevInfo()
@@ -214,6 +228,10 @@ def get_device_info(dev,db=None):
     """
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
     vals = None
+    if ':' in dev:
+      model = fandango.Struct(parse_tango_model(dev))
+      db = get_database(model.host,model.port)
+      dev = model.device
     try:
       dd = get_database_device(db=db)
       vals = dd.DbGetDeviceInfo(dev)
@@ -236,42 +254,56 @@ def get_device_started(target):
     return get_database_device().DbGetDeviceInfo(target)[-1][5]
   
 def get_device_for_alias(alias):
+    """ returns the device name for a given alias """
     try: return get_database().get_device_alias(alias)
     except Exception,e:
         if 'no device found' in str(e).lower(): return None
         return None #raise e
 
 def get_alias_for_device(dev):
+    """ return alias for this device """
     try: return get_database().get_alias(dev) #.get_database_device().DbGetDeviceAlias(dev)
     except Exception,e:
         if 'no alias found' in str(e).lower(): return None
         return None #raise e
 
 def get_alias_dict(exp='*'):
+    """
+    returns an {alias:device} dictionary with all matching alias from Tango DB
+    :param exp:
+    """
     tango = get_database()
     return dict((k,tango.get_device_alias(k)) for k in tango.get_device_alias_list(exp))
 
 def get_real_name(dev,attr=None):
     """
     It translate any device/attribute string by name/alias/label
+    
+    :param device: Expected format is [host:port/][device][/attribute]; where device can be either a/b/c or alias
+    :param attr: optional, when passed it will be regexp matched against attributes/labels
     """
-    if fun.isString(dev):
-        if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): dev,attr = dev.rsplit('/',1)
-        if '/' not in dev: dev = get_device_for_alias(dev)
+    if isString(dev):
+        if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): 
+          dev,attr = dev.rsplit('/',1)
+        if '/' not in dev: 
+          dev = get_device_for_alias(dev)
         if attr is None: return dev
     for a in get_device_attributes(dev):
-        if fun.matchCl(attr,a): return (dev+'/'+a)
-        if fun.matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
+        if matchCl(attr,a): return (dev+'/'+a)
+        if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
     return None
 
 def get_device_commands(dev):
+    """
+    returns a list of device command names
+    """
     return [c.cmd_name for c in get_device(dev).command_list_query()]
 
 def get_device_attributes(dev,expressions='*'):
     """ Given a device name it returns the attributes matching any of the given expressions """
-    expressions = map(fun.toRegexp,fun.toList(expressions))
-    al = (get_device(dev) if fun.isString(dev) else dev).get_attribute_list()
-    result = [a for a in al for expr in expressions if fun.matchCl(expr,a,terminate=True)]
+    expressions = map(toRegexp,toList(expressions))
+    al = (get_device(dev) if isString(dev) else dev).get_attribute_list()
+    result = [a for a in al for expr in expressions if matchCl(expr,a,terminate=True)]
     return result
         
 def get_device_labels(target,filters='*',brief=True):
@@ -282,13 +314,13 @@ def get_device_labels(target,filters='*',brief=True):
     This method works offline, does not need device to be running
     """
     labels = {}
-    if fun.isString(target): d = get_device(target)
+    if isString(target): d = get_device(target)
     else: d,target = target,target.name()
     db = get_database()
     attrlist = db.get_device_attribute_list(target,filters) if brief and hasattr(db,'get_device_attribute_list') else d.get_attribute_list()
     for a in attrlist:
         l = get_attribute_label(target+'/'+a,use_db=True) if brief else d.get_attribute_config(a).label
-        if (not filters or any(map(fun.matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
+        if (not filters or any(map(matchCl,(filters,filters),(a,l)))) and (not brief or l!=a): 
             labels[a] = l
     return labels
     
@@ -323,7 +355,7 @@ def get_attribute_info(device,attribute):
                 'format':"%4d",
              }],
     """
-    if fun.isString(device): device = get_device(device)
+    if isString(device): device = get_device(device)
     ai = device.get_attribute_config(attribute)
     types = [PyTango.CmdArgType.values.get(ai.data_type),ai.data_format,ai.writable]
     if ai.max_dim_x>1: types.append(ai.max_dim_x)
@@ -394,11 +426,11 @@ def put_device_property(device,property,value=None,db=None):
      - put_device_property(device,{property:value})
      - put_device_property(device,property,value)
     """
-    if not fun.isMapping(property):
+    if not isMapping(property):
         property = {property:value}
     else:
         for p,v in property.items():
-            if fun.isSequence(v) and len(v)==1:
+            if isSequence(v) and len(v)==1:
                 property[p] = v[0]
     return (db or get_database()).put_device_property(device,property)
             
@@ -410,8 +442,8 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     @TODO: Compare performance of this method with get_matching_device_properties
     """
     expr = device_expr
-    if not fun.isSequence(properties): properties = [properties]
-    get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and fun.matchCl(reg,d)]
+    if not isSequence(properties): properties = [properties]
+    get_devs = lambda db, reg : [d for d in db.get_device_name('*','*') if not d.startswith('dserver') and matchCl(reg,d)]
     if hosts: tango_dbs = dict(('%s:%s'%(h,port),PyTango.Database(h,port)) for h in hosts)
     else: tango_dbs = {get_tango_host():get_database()}
     return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties))
@@ -427,8 +459,8 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
     """    
     db = get_database()
     result = {}
-    if not fun.isSequence(devs): devs = [devs]
-    if not fun.isSequence(props): props = [props]
+    if not isSequence(devs): devs = [devs]
+    if not isSequence(props): props = [props]
     if hosts:
         hosts = [h if ':' in h else '%s:%s'%(h,port) for h in hosts]
     else:
@@ -443,12 +475,12 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         hdevs = [d.replace(h+'/','') for d in get_matching_devices(exps,fullname=False)]
         if trace: print('%s: %s vs %s'%(h,hdevs,props))
         for d in hdevs:
-            if exclude and fun.matchCl(exclude,d): continue
-            dprops = [p for p in db.get_device_property_list(d,'*') if fun.matchAny(props,p)]
+            if exclude and matchCl(exclude,d): continue
+            dprops = [p for p in db.get_device_property_list(d,'*') if matchAny(props,p)]
             if not dprops: continue
             if trace: print(d,dprops)
             vals = db.get_device_property(d,dprops)
-            vals = dict((k,list(v) if fun.isSequence(v) else v) for k,v in vals.items())
+            vals = dict((k,list(v) if isSequence(v) else v) for k,v in vals.items())
             if len(hosts)==1 and len(hdevs)==1:
                 return vals
             else: 
@@ -460,18 +492,18 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
 def property_undo(dev,prop,epoch):
     db = get_database()
     his = db.get_device_property_history(dev,prop)
-    valids = [h for h in his if fun.str2time(h.get_date())<epoch]
-    news = [h for h in his if fun.str2time(h.get_date())>epoch]
+    valids = [h for h in his if str2time(h.get_date())<epoch]
+    news = [h for h in his if str2time(h.get_date())>epoch]
     if valids and news:
         print('Restoring property %s/%s to %s'%(dev,prop,valids[-1].get_date()))
         db.put_device_property(dev,{prop:valids[-1].get_value().value_string})
-    elif not valids:print('No property values found for %s/%s before %s'%(dev,prop,fun.time2str(epoch)))
-    elif not news: print('Property %s/%s not modified after %s'%(dev,prop,fun.time2str(epoch)))
+    elif not valids:print('No property values found for %s/%s before %s'%(dev,prop,time2str(epoch)))
+    elif not news: print('Property %s/%s not modified after %s'%(dev,prop,time2str(epoch)))
     
 def get_property_history(dev,prop):
     db = get_database()
     his = db.get_device_property_history(dev,prop)
-    return [(fun.str2time(h.get_date()),h.get_value()) for h in his]    
+    return [(str2time(h.get_date()),h.get_value()) for h in his]    
 
 ###############################################################################
 # Property extensions
@@ -504,7 +536,7 @@ def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS,filters=[
             try:
                 #if v.startswith('@COPY:'): parsed.extend(DynamicDS._copy_extension(prop,v))
                 #elif v.startswith('@FILE:'): parsed.extend(DynamicDS._file_extension(prop,v))
-                ext,f = fun.first([(e,f) for e,f in extensions.items() if v.startswith(e)] or [(None,None)])
+                ext,f = first([(e,f) for e,f in extensions.items() if v.startswith(e)] or [(None,None)])
                 if ext: parsed.extend(f(prop,v))
                 else: parsed.append(v)
             except: print('check_property_extensions(%s,%s): %s'%(prop,value,traceback.format_exc()))
@@ -543,8 +575,8 @@ def parse_labels(text):
         return labels
         
 def get_model_name(model):
-    if fun.isString(model): 
-        m = fun.searchCl(retango,str(model).lower())
+    if isString(model): 
+        m = searchCl(retango,str(model).lower())
         return m.group() if m else str(model).lower()
     try: 
         model = model.getFullName()
@@ -597,10 +629,11 @@ TANGO_KEEPTIME = 60 #This variable controls how often the Tango Database will be
 
 class get_all_devices(objects.SingletonMap):
     _keeptime = TANGO_KEEPTIME
-    def __init__(self,exported=False,keeptime=None):
+    def __init__(self,exported=False,keeptime=None,host=''):
         self._all_devs = []
         self._last_call = 0
         self._exported = exported
+        self._host = host and get_tango_host(host)
         if keeptime: self.set_keeptime(keeptime)
     @classmethod
     def set_keeptime(klass,keeptime):
@@ -608,8 +641,11 @@ class get_all_devices(objects.SingletonMap):
     def get_all_devs(self):
         now = time.time()
         if not self._all_devs or now>(self._last_call+self._keeptime):
-            #print 'updating all_devs ..........................................'
-            self._all_devs = sorted(map(str.lower,(get_database().get_device_exported('*') if self._exported else get_database().get_device_name('*','*'))))
+            #print 'updating all_devs ...............................'
+            db = get_database(self._host)
+            self._all_devs = sorted(map(str.lower,
+                (db.get_device_exported('*') if self._exported 
+                 else db.get_device_name('*','*'))))
             self._last_call = now
         return self._all_devs
     def __new__(cls,*p,**k):
@@ -621,9 +657,9 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False,trace
     Searches for devices matching expressions, if exported is True only running devices are returned 
     Tango host will be included in the matched name if fullname is True
     """
-    if not fun.isSequence(expressions): expressions = [expressions]
+    if not isSequence(expressions): expressions = [expressions]
     defhost = get_tango_host()
-    hosts = list(set((m.groups()[0] if m else None) for m in (fun.matchCl(rehost,e) for e in expressions)))
+    hosts = list(set((m.groups()[0] if m else None) for m in (matchCl(rehost,e) for e in expressions)))
     fullname = fullname or ':' in str(expressions) or len(hosts)>1 or hosts[0] not in (defhost,None) #Dont count slashes, as regexps may be complex
     all_devs = []
     if trace: print(hosts,fullname)
@@ -637,11 +673,25 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False,trace
         prefix = '%s/'%(host or defhost)
         all_devs.extend(prefix+d for d in db_devs)
         
-    expressions = map(fun.toRegexp,fun.toList(expressions))
+    expressions = map(toRegexp,toList(expressions))
     if trace: print(expressions)
-    if not fullname: all_devs = [r.split('/',1)[-1] if fun.matchCl(rehost,r) else r for r in all_devs]
-    result = filter(lambda d: any(fun.matchCl("(%s/)?(%s)"%(defhost,e),d,terminate=True) for e in expressions),all_devs)
+    if not fullname: all_devs = [r.split('/',1)[-1] if matchCl(rehost,r) else r for r in all_devs]
+    condition = lambda d: any(matchCl("(%s/)?(%s)"%(defhost,e),d,terminate=True) for e in expressions)
+    result = sorted(filter(condition,all_devs))
     return result[:limit] if limit else result
+  
+def get_matching_servers(expressions,tango_host='',exported=False):
+    """
+    Return all servers in the given tango tango_host matching the given expressions.
+    :param exported: whether servers should be running or not
+    """
+    expressions = toSequence(expressions)
+    servers = get_database(tango_host).get_server_list()
+    servers = sorted(set(s for s in servers if matchAny(expressions,s)))
+    if exported:
+      exported = get_all_devices(exported=True,host=tango_host)
+      servers = [s for s in servers if ('dserver/'+s).lower() in exported]
+    return servers
     
 def find_devices(*args,**kwargs):
     #A get_matching_devices() alias, just for backwards compatibility
@@ -656,11 +706,11 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
     attrs = []
     def_host = get_tango_host()
     matches = []
-    if not fun.isSequence(expressions): expressions = [expressions]
-    fullname = any(fun.matchCl(rehost,e) for e in expressions)
+    if not isSequence(expressions): expressions = [expressions]
+    fullname = any(matchCl(rehost,e) for e in expressions)
     
     for e in expressions:
-        match = fun.matchCl(retango,e,terminate=True)
+        match = matchCl(retango,e,terminate=True)
         if not match:
             if '/' not in e:
                 host,dev,attr = def_host,e.rsplit('/',1)[0],'state'
@@ -681,7 +731,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
             dev = host+'/'+dev
             
         for d in get_matching_devices(dev,exported=True,fullname=fullname):
-            if fun.matchCl(attr,'state',terminate=True):
+            if matchCl(attr,'state',terminate=True):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
                 try: 
@@ -800,7 +850,7 @@ def reduce_distinct(group1,group2):
         vals[target] = [k for k in k1 if k not in k2]
         rates[target] = float(len(vals[target]))/(len(k1))
     except: vals[target],rates[target] = [],0
-    return fun.first((vals[k],rates[k]) for k,r in rates.items() if r == max(rates.values()))
+    return first((vals[k],rates[k]) for k,r in rates.items() if r == max(rates.values()))
  
 
 ########################################################################################
@@ -814,7 +864,7 @@ def export_attribute_to_dict(device,target,value=False):
           label,writable,device,polling,alarms,arch_event,unit
     """
     attr = Struct()
-    name,proxy = (device,get_device(device)) if fun.isString(device) else (device.name(),device)
+    name,proxy = (device,get_device(device)) if isString(device) else (device.name(),device)
     attr.device,attr.name = name,target
     try:
         v = check_attribute(name+'/'+target)
@@ -846,7 +896,7 @@ def export_attribute_to_dict(device,target,value=False):
             
 def export_commands_to_dict(device,target='*'):
     """ export all device commands config to a dictionary """
-    name,proxy = (device,get_device(device)) if fun.isString(device) else (device.name(),device)
+    name,proxy = (device,get_device(device)) if isString(device) else (device.name(),device)
     dct = {}
     for c in proxy.command_list_query():
         if not fandango.matchCl(target,c.cmd_name): continue
@@ -863,7 +913,7 @@ def export_properties_to_dict(device,target='*'):
     else:
         db = get_database()
         props = [p for p in db.get_class_property_list(device) if fandango.matchCl(target,p)]
-        return dict((k,v if fun.isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
+        return dict((k,v if isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
     
 def export_device_to_dict(device):
     """
@@ -1047,7 +1097,7 @@ def read_internal_attribute(device,attribute):
     print 'read_internal_attribute(%s,%s)'%(device,attribute)
     import dynamic
     
-    if fun.isString(device):
+    if isString(device):
         device = get_internal_devices().get(device,(getattr(attribute,'parent',None) or get_device(device,use_tau=False,keep=True)))
     
     attr = attribute if isinstance(attribute,fakeAttributeValue) else fakeAttributeValue(name=attribute,parent=device)
@@ -1111,7 +1161,7 @@ def get_polled_attrs(device,others=None):
     others argument allows to get extra property values in a single DB call; 
     e.g others = ['polled_cmd'] would append the polled commands to the list
     """
-    if fun.isSequence(device):
+    if isSequence(device):
         return CaselessDict(zip(map(str.lower,device[::2]),map(float,device[1::2])))
     elif isinstance(device,PyTango.DeviceProxy):
         attrs = device.get_attribute_list()
@@ -1130,7 +1180,7 @@ def get_polled_attrs(device,others=None):
             device = device.get_name()
         else:
             db = fandango.get_database()
-        props = db.get_device_property(device,['polled_attr']+fun.toSequence(others))
+        props = db.get_device_property(device,['polled_attr']+toSequence(others))
         d = get_polled_attrs(props.pop('polled_attr'))
         if others: d.update(props)
         return d
@@ -1222,9 +1272,9 @@ class fakeAttributeValue(object):
     def set_value(self,value,dim_x=1,dim_y=1):
         self.value = value
         if (dim_x,dim_y) == (1,1):
-            if fun.isSequence(value): 
+            if isSequence(value): 
                 dim_x = len(value)
-                if len(value)>1 and fun.isSequence(value[0]):
+                if len(value)>1 and isSequence(value[0]):
                     dim_y = len(value[0])
         self.dim_x = dim_x
         self.dim_y = dim_y
@@ -1249,7 +1299,7 @@ class fakeAttributeValue(object):
         self.write_value = value
     def get_write_value(self,data = None):
         if data is None: data = []
-        if fun.isSequence(self.write_value):
+        if isSequence(self.write_value):
             [data.append(v) for v in self.write_value]
         else:
             data.append(self.write_value)
@@ -1300,6 +1350,7 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
             except Exception,e:
                 print('ProxiesDict: %s doesnt exist!'%dev_name)
                 #print traceback.format_exc()
+                #raise e
                 dev = None
         return dev
             
@@ -1342,7 +1393,7 @@ def getTangoValue(obj,device=None):
         
         if hasattr(obj,'quality'):
             value,quality,t,name,ty = obj.value,obj.quality,get_attribute_time(obj),obj.name,obj.type
-            if fun.isSequence(value): 
+            if isSequence(value): 
                 value = value.tolist() if hasattr(value,'tolist') else list(value)
         else:
             value,quality,t,name,ty = obj,PyTango.AttrQuality.ATTR_VALID,time.time(),'',type(obj)
@@ -1413,8 +1464,8 @@ class TangoEval(object):
         
         self._trace = trace
         self._defaults = dict([(str(v),v) for v in PyTango.DevState.values.values()]+[(str(q),q) for q in PyTango.AttrQuality.values.values()])
-        self._defaults['T'] = fun.str2time
-        self._defaults['str2time'] = fun.str2time
+        self._defaults['T'] = str2time
+        self._defaults['str2time'] = str2time
         self._defaults['time'] = time
         self._defaults['NOW'] = time.time
         self._defaults['DEVICES'] = self.proxies
@@ -1546,7 +1597,7 @@ class TangoEval(object):
         except Exception,e:
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return e
-            elif _raise and not fun.isNaN(_raise):
+            elif _raise and not isNaN(_raise):
                 raise e
             self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
             self.trace(traceback.format_exc())
@@ -1698,7 +1749,7 @@ class TangoCommand(object):
         print '%s %s fandango.TangoCommand: %s'%(severity,time.ctime(),msg)
     
     def _parse_feedback(self,feedback):
-        if fun.isCallable(feedback):
+        if isCallable(feedback):
             self.feedback = feedback
         elif isinstance(feedback,basestring):
             if '/' in feedback:
@@ -1707,9 +1758,9 @@ class TangoCommand(object):
                 device,target = self.device,feedback
             proxy = TangoCommand.Proxies[device]
             attrs,comms = proxy.get_attribute_list(),[cmd.cmd_name for cmd in proxy.command_list_query()]
-            if fun.inCl(target,comms):
+            if inCl(target,comms):
                 self.feedback = (lambda d=device,c=target: TangoCommand.Proxies[d].command_inout(c))
-            elif fun.inCl(target,attrs):
+            elif inCl(target,attrs):
                 self.feedback = (lambda d=device,a=target: TangoCommand.Proxies[d].read_attribute(a).value)
             else:
                 raise TangoCommand.CommandException('UnknownFeedbackMethod_%s'%feedback)
@@ -1721,18 +1772,18 @@ class TangoCommand(object):
     def execute(self,args=None,timeout=None,feedback=None,expected=None,wait=None,asynch=None):
         self.trace('%s/%s(%s)'%(self.device,self.command,args or ''))
         #args = (args or []) #Not convinient
-        timeout = fun.notNone(timeout,self.timeout)
+        timeout = notNone(timeout,self.timeout)
         if feedback is not None:
             feedback = self._parse_feedback(feedback)
         else:
             feedback = self.feedback
-        expected = fun.notNone(expected,self.expected)
-        wait = fun.notNone(wait,self.wait)
-        asynch = fun.notNone(asynch,self.asynch)
+        expected = notNone(expected,self.expected)
+        wait = notNone(wait,self.wait)
+        asynch = notNone(asynch,self.asynch)
         t0 = time.time()
         result = None
         
-        if fun.isString(self.command):
+        if isString(self.command):
             if not asynch:
                 if args: result = self.proxy.command_inout(self.command,args)
                 else: result = self.proxy.command_inout(self.command)
@@ -1752,7 +1803,7 @@ class TangoCommand(object):
                         else:
                             #BadAsynPollId is received once the command is discarded
                             raise TangoCommand.CommandException(str(e).replace('\n','')[:100])
-        elif fun.isCallable(self.command):
+        elif isCallable(self.command):
             result = self.command(args)
             
         t1 = time.time()

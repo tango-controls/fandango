@@ -47,7 +47,7 @@ import fandango.functional as fun
 from fandango.objects import Object
 from fandango.dicts import CaselessDefaultDict,CaselessDict
 from fandango.log import Logger
-from fandango.tango import ProxiesDict,get_device_info
+from fandango.tango import ProxiesDict,get_device_info,get_database,get_tango_host
 from fandango.excepts import trial
     
 ####################################################################################################################
@@ -102,8 +102,8 @@ class TServer(Object):
             
     def init_from_db(self,db=None,load_devices=False):
         """ Gets name, classes, devices, host, level information from Tango Database. """
-        #print ('init_from_db(%s,%s)'%(self.name,load_devices))
         self._db = db or (self._db if hasattr(self,'_db') else PyTango.Database())
+        #print ('init_from_db(%s,%s,%s)'%(self.name,get_tango_host(self._db),load_devices))
         self.info = self._db.get_server_info(self.name)
         di = get_device_info('dserver/'+self.name,db=self._db) #get_server_info() must be combined with get_device_info to obtain the real name of the launcher
         self.name = di.server
@@ -139,14 +139,19 @@ class TServer(Object):
         '''Returns the name of the server in the Server/Instance format.'''
         name = name or self.name
         return name if name.count('/')==1 else name.split('/',1)[1]
+      
+    def get_tango_host(self):
+        return get_tango_host(self._db)
     
     def get_admin_name(self): 
         '''Returns the name of the server in the dserver/Server/Instance format.'''
-        return 'dserver/'+self.name if self.name.count('/')==1 else self.name
+        n = 'dserver/'+self.name if self.name.count('/')==1 else self.name
+        return self.get_tango_host()+'/'+n
     
     def get_starter_name(self):
         """Returns the starter on charge of controlling this server."""
-        return 'tango/admin/%s' % self.host if self.host else None
+        n = 'tango/admin/%s' % self.host if self.host else None
+        return self.get_tango_host()+'/'+n
     
     def get_device_list(self): 
         '''Returns a list of devices declared for this server.'''
@@ -156,7 +161,10 @@ class TServer(Object):
     
     def get_proxy(self,device=''): 
         '''Returns a proxy to the given device; or the admin device if no device name is provided.'''
-        return self.proxies.get(device or self.get_admin_name())
+        if device and ':' not in device:
+          device = self.get_tango_host()+'/'+device
+        device = device or self.get_admin_name()
+        return self.proxies.get(device)
     
     def get_admin(self): return self.get_proxy()
     def get_device(self,device): return self.get_proxy(device)
@@ -233,17 +241,17 @@ class ServersDict(CaselessDict,Object):
         The ServersDict can be initialized using any of the three argument lists or a wildcard for Database.get_server_list(pattern) 
         ServersDict('*') can be used to load all servers in database
         '''
-        self.call__init__(CaselessDict,self)        
+        self.call__init__(CaselessDict,self)
         if logger is None:
             self.log = Logger('ServersDict')
             self.log.setLogLevel(log)
         else: self.log=logger
+        self.log.debug('ServersDict(%s)'%','.join(map(str,(pattern,klass,devs_list,servers_list,hosts,loadAll,log,logger,tango_host))))
         
         ## proxies will keep a list of persistent device proxies
         self.proxies = ProxiesDict()
         ## db will keep a persistent link to PyTango database
-        self.db = PyTango.Database() if not tango_host else PyTango.Database(*(tango_host.split(':')))
-        
+        self.db = get_database() if not tango_host else get_database(*(tango_host.split(':')))
         self.server_names = self.keys
         self.servers = self.values
                 
@@ -284,6 +292,7 @@ class ServersDict(CaselessDict,Object):
         #classes = self.db.get_device_family('dserver/*')
         #for c in classes:
         #    self.load_by_exec(c)
+        print self.db
         self.load_from_servers_list(self.db.get_server_list())
         
     def load_by_name(self,name):
@@ -292,7 +301,7 @@ class ServersDict(CaselessDict,Object):
             for pattern in name:
                 self.load_by_name(pattern)
         else:
-            if name.count('/')==2 and not name.startswith('dserver/'):
+            if name.count('/')>=2 and not name.startswith('dserver/'):
                 return self.load_from_devs_list([name])
             else:
                 server_name = name.replace('dserver/','')
@@ -336,14 +345,14 @@ class ServersDict(CaselessDict,Object):
         if check: self.check_servers_names(servers_list)
         for s in servers_list:
             try:           
-                self.log.debug('loading from %s server'%s)
+                self.log.debug('loading from %s/%s server'%(get_tango_host(self.db),s))
                 ss=TServer(name=s,parent=self)
                 ss.init_from_db(self.db)
                 self[s] = ss
             except Exception,e:
                 self.log.warning('exception loading %s server: %s' % (s,str(e)[:100]+'...'))
                 print traceback.format_exc()
-        #print 'load_from_servers_list(%d) took %f seconds' % (len(servers_list),time.time()-t0)
+        self.log.debug('load_from_servers_list(%d) took %f seconds' % (len(servers_list),time.time()-t0))
         return self
                     
     def check_servers_names(self,servers_list):
@@ -520,7 +529,10 @@ class ServersDict(CaselessDict,Object):
             import arrays
             result = '\n'.join('\t'.join(map(str,l)) for l in arrays.tree2table(result))
         return result
-    
+      
+    def get_host_starter(self,host):
+        return self.proxies[get_tango_host(self.db)+'/tango/admin/'+host]
+      
     ## @}
     
     ## @name Operation methods
@@ -592,6 +604,7 @@ class ServersDict(CaselessDict,Object):
             servers_list = sorted(self.keys(),key=(lambda s: s in self and self[s].level or 0))
         elif type(servers_list) not in [list,set,tuple]: 
             servers_list = [servers_list]
+            
         done = False
         event = threading.Event()
         new_servers = [s for s in servers_list if s not in self]
@@ -616,19 +629,21 @@ class ServersDict(CaselessDict,Object):
             self.log.info('Server added to list: %s'%[s_level,s_host,s_name])
             
         for level,host,s_name in sorted(full_servers_list):
+            if not host:
+                self.log.error('Host has not been defined; server  %s cannot be started'%s_name)
+                continue
+              
             t0 = time.time()
             target = self[s_name].name #Using the True name as returned by DbGetDeviceInfo()
-            if host:
-                starter = 'tango/admin/%s'%host
-            else:
-                self.log.error('Host has not been defined; server  %s cannot be started'%target)
-                continue
-            self.log.info( 'StartingServer '+target+' using '+starter+' ...')
+            dserver = ('dserver/' if 'dserver' not in s_name else '')+s_name
+            dserver = (get_tango_host(self.db)+'/' if ':' not in dserver else '')+dserver
+            self.log.info( 'StartingServer '+target+' at '+host+' ...')
             try:
                 done = False
-                self.proxies.get(starter).command_inout('DevStart',target)
+                self.get_host_starter(host).command_inout('DevStart',target)
                 ct = int(wait/10.)
-                dp = self.proxies.get(s_name if 'dserver' in s_name else 'dserver/'+s_name)
+                dp = self.proxies.get(dserver)
+
                 while ct>0:
                     event.wait(10.)
                     try: 
@@ -645,9 +660,8 @@ class ServersDict(CaselessDict,Object):
                 self.log.warning('The server %s Start couldnt be verified after %s seconds'%(s_name,(t1-t0)))
             else:
                 self.log.info('The server %s Start verified after %s seconds'%(s_name,(t1-t0)))             
-            if host and 'tango/admin/%s'%host in self.proxies:
-                try: self.proxies['tango/admin/%s'%host].UpdateServersInfo()   
-                except Exception,e: self.log.error('Unable to update %s Starter: %s'%(host,e))
+            try: self.get_host_starter(host).UpdateServersInfo()   
+            except Exception,e: self.log.error('Unable to update %s Starter: %s'%(host,e))
         return done
             
     def start_all_servers(self): 
@@ -664,7 +678,7 @@ class ServersDict(CaselessDict,Object):
         #for cl in self.classes: self.server_StartNForClass(cl,self.MAX_SERVERS_FOR_CLASS,3)
         
     def stop_servers(self,servers_list=None):
-        '''def server_Stop(self,dev_name):
+        '''
         Stops a list of SERVERs by sending a Kill command to the admin device server.
         If the argument is a single device it will kill all the devices running in the same server!
         '''
@@ -698,8 +712,7 @@ class ServersDict(CaselessDict,Object):
         for host in hosts:
             if host:
                 try:
-                    starter = self.proxies['tango/admin/%s'%host]
-                    starter.UpdateServersInfo()
+                    self.get_host_starter(host).UpdateServersInfo()
                 except Exception,e:
                     self.log.warning('Unable to contact with Starter in host %s: %s' % (host,e))
         return done
@@ -734,8 +747,7 @@ class ServersDict(CaselessDict,Object):
             self.log.info( 'KillingServer '+server_name)
             try:
                 host = self[server_name].host
-                starter = self.proxies['tango/admin/%s'%host]
-                starter.HardKillServer(server_name)
+                self.get_host_starter(host).HardKillServer(server_name)
                 done = True
             except Exception,e:
                 self.log.error('Exception in kill_servers(%s): %s'%(server_name,str(e)[:100]+'...'))
@@ -744,8 +756,7 @@ class ServersDict(CaselessDict,Object):
         for host in hosts:
             if host:
                 try:
-                    starter = self.proxies['tango/admin/%s'%host]
-                    starter.UpdateServersInfo()
+                    self.get_host_starter(host).UpdateServersInfo()
                 except Exception,e:
                     self.log.warning('Unable to contact with Starter in host %s: %s' % (host,e))
         return done        
@@ -829,13 +840,13 @@ class ServersDict(CaselessDict,Object):
         print 'ServersDict.set_server_level(%s,%s,%s)'%(server_name,host,level)
         dbserver.DbPutServerInfo([str(s) for s in (server_name,host,mode,level)])
         if server_name in self: self[server_name].update_level(host,level)
-        if host: self.proxies['tango/admin/%s'%host].UpdateServersInfo()
+        if host: self.get_host_starter(host).UpdateServersInfo()
         
     def reset_server_level(self,server_name):
         """ It sets host = '', mode = 0, level = 0 """
         host,level = self.get_server_level(server_name)
         self.set_server_level(server_name,'',None)
-        if host: self.proxies['tango/admin/%s'%host].UpdateServersInfo()
+        if host: self.get_host_starter(host).UpdateServersInfo()
     
     def create_new_server(self,server_name,class_name,devs_list):
         """It creates a new server in the database, using Jive's like input."""
