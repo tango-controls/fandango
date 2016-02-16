@@ -3,7 +3,7 @@ import os, imp
 from setuptools import setup, find_packages
 
 ReleaseNumber = type('ReleaseNumber',(tuple,),
-                     {'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
+                     {'__repr__':(lambda self:'.'.join(map(str,self)))})
 release = ReleaseNumber(
     imp.load_source('changelog',os.path.join('.', 'fandango', 'CHANGES'))
     .RELEASE)
@@ -23,7 +23,8 @@ setup(
         'Development Status :: 5 - Production/Stable',
         'Environment :: Other Environment',
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)',
+        'License :: OSI Approved :: '\
+            'GNU Lesser General Public License v3 or later (LGPLv3+)',
         'Natural Language :: English',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: POSIX',
