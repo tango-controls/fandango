@@ -35,6 +35,6 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     platforms=[ "Linux,Windows XP/Vista/7/8" ],
-    install_requires=['PyTango>=3'],
+    install_requires=[],
     include_package_data=True,
     zip_safe=False)
