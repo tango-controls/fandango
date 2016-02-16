@@ -1,4 +1,4 @@
-RELEASE = (11,7)
+RELEASE = (11,7,1)
 RELEASE_NOTE = "Drag/Drop/Pickle devices from anywhere"
 
 """
