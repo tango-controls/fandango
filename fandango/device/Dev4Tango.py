@@ -402,48 +402,10 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         return
         
     ##@}        
-
-##############################################################################################################
-## DDebug, DS used to have access to DServer internal objects (as a complement of DServer admin device
-
-from fandango.dynamic import DynamicDS,DynamicDSClass
-class DDebug(DynamicDS):
-    def __init__(self,cl, name):
-        U = PyTango.Util.instance()
-        import gc,resource
-        try:
-            import guppy
-            heapy = guppy.hpy()
-        except:guppy,heapy = None,None
-        DynamicDS.__init__(self,cl,name,_locals={'Util':U,'PyUtil':U,'self':self,'fandango':fandango,
-            'resource':resource,'gc':gc,'guppy':guppy,'heapy':heapy},
-            useDynStates=False)
-        DDebug.init_device(self)
-    def init_device(self):
-        self.set_state(PyTango.DevState.ON)
-        #self.get_DynDS_properties()
-    def always_executed_hook(self): pass #DynamicDS.always_executed_hook(self)
-    def read_attr_hardware(self,data): pass
-    @staticmethod
-    def addToServer(py,server,instance):
-        name = '%s/%s'%(server,instance)
-        add_new_device(name,'DDebug','sys/%s/%s_%s'%('DDebug',server,instance))
-        py.add_TgClass(DDebugClass,DDebug,'DDebug')
-        
-class DDebugClass(DynamicDSClass):
-    class_property_list={}
-    device_property_list={}
-    cmd_list={'evaluateFormula':[[PyTango.DevString, "formula to evaluate"],[PyTango.DevString, "formula to evaluate"],],}  
-    attr_list={}
         
 ##############################################################################################################
 ## DevChild ... DEPRECATED and replaced by Dev4Tango + TAU
 
 class DevChild(Dev4Tango):
     pass
-
-def pickle_device(dev_name):
-    dp = get_device(dev_name)
-    attrs = dp.get_attribute_list()
-    commands = get_device_commands(dp)
 
