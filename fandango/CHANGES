@@ -2,6 +2,10 @@ RELEASE = (11,9,0)
 RELEASE_NOTE = "Compact dynamic attributes with VAR/GET/SET"
 
 """
+IMPORTANT:
+
+  Due to fandango.device module refactoring you may need to remove previous package before installing this one
+
 PENDING:
 
   NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not supported in python 2.6 we will wait to next OS upgrade)
