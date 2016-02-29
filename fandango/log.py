@@ -55,10 +55,10 @@ message
 
 """
 
-import time, logging, weakref, traceback
-from objects import Object
+import time, logging, weakref, traceback, sys
+from objects import Object,Decorator
 from pprint import pprint
-from functional import time2str
+from functional import time2str,first,matchCl
 import warnings
 
 
@@ -84,7 +84,10 @@ def except2str(e=None,max_len=int(7.5*80)):
     else: 
         result = str(e)[-(max_len-3):]+'...'
     return result or e[:max_len]
-    
+
+ERROR,WARNING,INFO,DEBUG = logging.ERROR,logging.WARNING,logging.INFO,logging.DEBUG
+LogLevels = {'ERROR':ERROR,'WARNING':WARNING,'INFO':INFO,'DEBUG':DEBUG,}
+  
 class FakeLogger():
     """
     This class just simulates a Logger using prints with date and header, it doesn't allow any customization
@@ -119,15 +122,18 @@ class Logger(Object):
     """
     
     root_inited    = False
-    Error    = logging.ERROR
-    Warning  = logging.WARNING
-    Info     = logging.INFO
-    Debug    = logging.DEBUG
+    Error    = ERROR
+    Warning  = WARNING
+    Info     = INFO
+    Debug    = DEBUG
     
-    def __init__(self, name='fandango.Logger', parent=None,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',use_tango=True,use_print=True,level='INFO',max_len=0):
+    def __init__(self, name='fandango.Logger', parent=None,\
+          format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',\
+          use_tango=True,use_print=True,level='INFO',max_len=0):
+      
         self.max_len = max_len
         self.call__init__(Object)
-        self.__levelAliases    = {'ERROR':self.Error,'WARNING':self.Warning,'INFO':self.Info,'DEBUG':self.Debug}
+        self.__levelAliases = LogLevels.copy()
         
         self.log_name = name
         if parent is not None:
@@ -273,6 +279,9 @@ class Logger(Object):
     
     def debug(self, msg, *args, **kw):
         self.sendToStream(msg,'debug',3,*args,**kw)
+        
+    def trace(self, msg, *args, **kw):
+        self.sendToStream(msg,'debug',3,*args,**kw)
     
     def info(self, msg, *args, **kw):
         self.sendToStream(msg,'info',2,*args,**kw)
@@ -350,3 +359,38 @@ class LogFilter(logging.Filter):
     def filter(self, record):
         ok = (record.levelno == self.filter_level)
         return ok
+
+__doc__ += """
+fandango.logger submodule provides a default Logger instance
+and its info/debug/warning/error/trace methods directly available
+as module methods.
+
+  import fandango.log
+  fandango.log.info('just a test')
+  fandango.Logger.INFO    2016-02-19 11:49:55.609 just a test
+"""
+
+_LogLevel = 'INFO'
+for a in sys.argv:
+  if a.startswith('--log-level='):
+    _LogLevel = a.split('=')[-1].upper()
+    
+_Logger = Logger(level=_LogLevel)
+info = _Logger.info
+debug = _Logger.debug
+warning = _Logger.warning
+error = _Logger.error
+trace = _Logger.trace
+
+
+class InOutLogged(Decorator):
+  """
+  This class provides an easy way to trace whenever python enter/leaves
+  a function.
+  """
+  
+  def __call__(self,*args,**kwargs):
+    debug('In %s(%s,%s)'%(self.f.__name__,args,kwargs,))
+    r = self.f(*args,**kwargs)
+    debug('Out of '+self.f.__name__)
+    return r
