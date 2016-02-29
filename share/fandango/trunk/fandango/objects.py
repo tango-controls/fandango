@@ -438,6 +438,8 @@ class Decorator(object):
     """
     def __init__(self,f):
         self.f = f
+        self.call = wraps(f,self.__call__)
+        
     def __call__(self,*args,**kwargs):
         return self.f(*args,**kwargs)
     
