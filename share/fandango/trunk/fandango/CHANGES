@@ -1,22 +1,39 @@
-RELEASE = (11,7,2)
-RELEASE_NOTE = "Drag/Drop/Pickle devices from anywhere"
+RELEASE = (11,9,0)
+RELEASE_NOTE = "Compact dynamic attributes with VAR/GET/SET"
 
 """
 PENDING:
 
   NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not supported in python 2.6 we will wait to next OS upgrade)
   NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
-  ONGOING: dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
+  ONGOING: 
+    dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
+    StructDict with sort/get/filter methods like Panic api
+    preparing next PyAlarm release with None not allowed in comparisons
 
-ONGOING ......... preparing next PyAlarm release
+-------------------------------------------------
+February 2016 - 11.9 Compact dynamic attributes with VAR/GET/SET. Bug patches.
+-------------------------------------------------
 
 dynamic: added locals() method; solved dyn_comms bug at startup
+dynamic: added VAR(WRITE=WRITE), GET, SET  keywords to simplify attribute declaration
+dynamic: solved issues with is_attribute_allowed in subclasses
+dynamic: ForceVar enabled to allow single-command read-write attributes
+device: device module refactored as subpackage
+log: refactored to be usable as any-time logger
 functional: added html2text, rtf2plain
+functional: added regexp boolean argument to matchMap and replaceCl methods
 qt: Added MenuContexted widget decorator and TangoHostChooser utility for bash scripts
 tango: solved bug in multi-host support in get_matching_devices and get_matching_attributes
 tango: solved bug that didn't allowed ip addresses in tango hosts.
 threads: added locals method to WorkerThread (needed by WorkerDS)
 dicts: CaselessDefaultDict: solved missing key exception
+objects: added bound-class wrapper hook, still not usable 
+excepts: Solved bug with Catched2 being deprecated
+
+
+
+
 
 
 
