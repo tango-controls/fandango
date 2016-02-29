@@ -233,6 +233,7 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
     
 Catched = ExceptionWrapper
 CatchedArgs = decorator_with_args(ExceptionWrapper)
+Catched2 = CatchedArgs #For backwards compatibility
 
 class ExceptionManager(object):
     """
