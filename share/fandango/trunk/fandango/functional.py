@@ -252,9 +252,12 @@ def matchAny(exprs,seq):
             return seq
     return None
     
-def matchMap(mapping,key,regexp=True):
+def matchMap(mapping,key,regexp=True,default=Exception):
     """ from a mapping type (dict or tuples list) with strings as keys it returns the value from the matched key or raises KeyError exception """
-    if not mapping: raise ValueError('mapping')    
+    if not mapping: 
+      if default is not Exception:
+        return default
+      raise ValueError('mapping')    
     if hasattr(mapping,'items'): mapping = mapping.items()
     if not isSequence(mapping) or not isSequence(mapping[0]): raise TypeError('dict or tuplelist required')
     if not isString(key): key = str(key)
@@ -262,6 +265,8 @@ def matchMap(mapping,key,regexp=True):
     for tag,value in mapping:
         if (matchCl(tag,key) if regexp else (key in tag)):
             return value
+    if default is not Exception:
+      return default
     raise KeyError(key)
     
 def matchTuples(mapping,key,value):
@@ -308,12 +313,16 @@ def searchCl(exp,seq,terminate=False,extend=False):
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
 
-def replaceCl(exp,repl,seq):
+def replaceCl(exp,repl,seq,regexp=True):
     """ 
     Replaces caseless expression exp by repl in string seq 
     repl can be string or callable(matchobj) ; to reuse matchobj.group(x) if needed in the replacement string
     """
-    return re.sub(exp.lower(),repl.lower() if hasattr(repl,'lower') else repl,seq.lower())
+    if regexp:
+        return re.sub(exp.lower(),repl.lower() if hasattr(repl,'lower') else repl,seq.lower())
+    else:
+        return seq.lower().replace(exp.lower(),repl.lower())
+    
 clsub = replaceCl
 
 def sortedRe(iterator,order):
