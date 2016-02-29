@@ -46,15 +46,15 @@ and are not part of the Astor api (ServersDict)
 import PyTango
 import types
 #fandango imports
-import functional as fun
-from log import Logger,except2str,printf
-from excepts import *
-from callbacks import *
-import tango #Double import to avoid ambiguous naming of some methods
-from tango import * #USE_TAU imported here, get_polled_attrs and other useful methods
-from dicts import CaselessDefaultDict,CaselessDict
-from arrays import TimedQueue
-from dynamic import DynamicDS,USE_STATIC_METHODS
+import fandango as fun
+from fandango.log import Logger,except2str,printf
+from fandango.excepts import *
+from fandango.callbacks import *
+import fandango.tango as tango #Double import to avoid ambiguous naming of some methods
+from fandango.tango import * #USE_TAU imported here, get_polled_attrs and other useful methods
+from fandango.dicts import CaselessDefaultDict,CaselessDict
+from fandango.arrays import TimedQueue
+from fandango.dynamic import DynamicDS,USE_STATIC_METHODS
 
 
 ##############################################################################################################
