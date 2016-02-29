@@ -181,7 +181,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._external_listeners = CaselessDict() #CaselessDefaultDict(set)
         self._external_commands = CaselessDict()
 
-        self.time0 = time.time()
+        self.time0 = time.time() #<< Used by child devices to check startup time
         self.simulationMode = False #If it is enabled the ForceAttr command overwrites the values of dyn_values
         self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
         self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
@@ -217,7 +217,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['COMM'] = lambda _name,_argin=None,feedback=None,expected=None: self.getXCommand(_name,_argin,feedback,expected)
         self._locals['XDEV'] = lambda _name: self.getXDevice(_name)
         self._locals['ForceAttr'] = lambda a,v=None: self.ForceAttr(a,v)
-        self._locals['VAR'] = lambda a,v=None,default=None: self.ForceVar(a,v,default=default)
+        self._locals['VAR'] = lambda a,v=None,default=None,WRITE=None: self.ForceVar(a,v,default=default,WRITE=WRITE)
+        self._locals['GET'] = lambda a,default=None: self.ForceVar(a,default=default)
+        self._locals['SET'] = lambda a,v: self.ForceVar(a,v)
         #self._locals['RWVAR'] = (lambda read_exp=(lambda arg=NAME:self.ForceVar(arg)),
                                 #write_exp=(lambda arg=NAME,val=VALUE:self.ForceVar(arg,val)),
                                 #aname=NAME, 
@@ -342,7 +344,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     if any(d.startswith(aname) for d in self.DynamicAttributes):
                         self.info('StaticAttribute %s overriden by DynamicAttributes Property'%(aname))
                     else:
-                        self.info('Adding StaticAttribute %s to DynamicAttributes list'%(aname))
+                        self.debug('Adding StaticAttribute %s to DynamicAttributes list'%(aname))
                         self.DynamicAttributes.append(a)
                 if keep:
                     #Adds to KeepAttributes if default value is overriden, works if dyn_attr is called after init_device (Tango7)
@@ -648,7 +650,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         new_polled_attrs = set(self.get_polled_attrs().keys())
         self.info('In %s.dyn_attr(): inspecting %d attributes ...' %(self.get_name(),len(self.DynamicAttributes)))
         for line in self.DynamicAttributes:
-            print '\t%s'%line
             if not line.strip() or line.strip().startswith('#'): continue
             fields=[]
             # The character '#' is used for comments in Attributes specification
@@ -676,15 +677,27 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.info('\tAttribute %s already exists'%aname)
                     create = False
 
-                is_allowed = (lambda s,req_type,a=aname: type(self).is_dyn_allowed(s,req_type,a))
+                #These 3 options may vary depending on PyTango>3; don't remove them from the code yet
+                if 0: 
+                  #Works on PyTango7
+                  is_allowed = (lambda s,req_type,a=aname: type(self).is_dyn_allowed(s,req_type,a))
+                elif 0:
+                  is_allowed = self.is_dyn_allowed #May trigger exceptions because attr_name is None
+                else:
+                  #Works on PyTango8
+                  def is_allowed(req_type, attr_name=aname,s=self):
+                    return s.is_dyn_allowed(req_type,attr_name)
+                  is_allowed.__name__ = 'is_%s_allowed'%aname.lower()
+                  setattr(self,is_allowed.__name__,is_allowed)
+                
                 max_size = hasattr(self,'DynamicSpectrumSize') and self.DynamicSpectrumSize
-                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) else PyTango.AttrWriteType.READ
+                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ =,\+]',formula) else PyTango.AttrWriteType.READ
                 for typename,dyntype in DynamicDSTypes.items():
                     if dyntype.match(formula):
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
                         if formula.startswith(typename+'('): #DevULong should not match DevULong64
                             formula=formula.lstrip(typename)
-                        self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
+                        self.debug('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                         if dyntype.dimx==1:
                             if (create): self.add_attribute(PyTango.Attr(aname,dyntype.tangotype, AttrType), \
                                 self.read_dyn_attr,self.write_dyn_attr,is_allowed)
@@ -710,7 +723,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                                 #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
                     else:
                         dyntype = DynamicDSTypes['DevDouble']
-                        self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
+                        self.debug('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                         if (create): self.add_attribute(PyTango.Attr(aname,PyTango.ArgType.DevDouble, AttrType), \
                             self.read_dyn_attr,self.write_dyn_attr,is_allowed)
                             #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
@@ -1272,18 +1285,43 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else: value = self.dyn_values[aname].forced
         return value
         
-    def ForceVar(self,argin,VALUE=None,default=None):
-        ''' Description: The arguments are VariableName and an optional Value.<br>
-            This command will force the value of a Variable or will return the last forced value
-            (if only one argument is passed). '''
+    def ForceVar(self,argin,VALUE=None,default=None,WRITE=None):
+        ''' 
+        Management of "Forced Variables" in dynamic servers
+        
+        Description: The arguments are VariableName and an optional Value.<br>
+        This command will force the value of a Variable or will return the last forced value
+        (if only one argument is passed). 
+        
+        There are several syntaxes that can be used to call variables.
+        - VAR("MyVariable",default=0) : return Value if initialized, else 0
+        - VAR("MyVariable",VALUE) : Writes Value into variable
+        - VAR("MyVariable",WRITE=True) : Writes VALUE as passed from a write_attribute() call; reads otherwise
+        - This syntax replaces (VAR("MyVar",default=0) if not WRITE else VAR("MyVar",VALUE))
+        - GET("MyVariable") : helper to read variable
+        - SET("MyVariable",VALUE) : helper to write variable
+        
+        :param default: value to initialize variable at first read
+        :param WRITE: if True, VALUE env variable will overwrite VALUE argument
+        '''
+        
         if type(argin) is not list: argin = [argin]
         if len(argin)<1: raise Exception('At least 1 argument required (AttributeName)')
         if len(argin)<2: value=VALUE
         else: value=argin[1]
         aname = argin[0]
-
-        if value is not None: self.variables[aname] = value
-        elif self.variables.get(aname) is None: self.variables[aname] = default
+        
+        self.debug('%s vs %s'%(WRITE,self._locals.get('WRITE')))
+        if WRITE and self._locals.get('WRITE'):
+            value = self._locals.get('VALUE')
+            self.debug('Writing %s into %s'%(value,aname))
+            
+        if value is not None: 
+            self.variables[aname] = value
+            
+        elif self.variables.get(aname) is None: 
+            self.variables[aname] = default
+            
         value = self.variables[aname]
         return value
 
