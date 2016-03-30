@@ -99,6 +99,13 @@ def TGet(*args):
         
 ####################################################################################################################
 
+TANGO_STATES = \
+  'ON OFF CLOSE OPEN INSERT EXTRACT MOVING STANDBY FAULT INIT RUNNING ALARM DISABLE UNKNOWN'.split()
+TANGO_COLORS = \
+  'Lime White White Lime White Lime LightBlue Yellow Red Brown LightBlue Orange Magenta Grey'.split()
+
+TANGO_STATE_COLORS = dict(zip(TANGO_STATES,TANGO_COLORS))
+
 ####################################################################################################################
 ##@name Access Tango Devices and Database
 
@@ -364,18 +371,20 @@ def get_attribute_info(device,attribute):
         for k,v in (('label',''),('unit','No unit'),('format',''))
         if getattr(ai,k)!=v)
     return [types,formats]
+  
+def get_attribute_config(target):
+    return PyTango.AttributeProxy(target).get_config()
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
     if not use_db: #using AttributeProxy
         if attr.lower() in ('state','status'): 
             return attr
-        ap = PyTango.AttributeProxy(target)
-        cf = ap.get_config()
+        cf = get_attribute_config(target)
         return cf.label
     else: #using DatabaseDevice
         return (get_database().get_device_attribute_property(dev,[attr])[attr].get('label',[attr]) or [''])[0]
-    
+      
 def set_attribute_label(target,label='',unit=''):
     if target.lower().rsplit('/')[-1] in ('state','status'): 
         return
@@ -555,7 +564,7 @@ no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception))?)' #Matches attribute and extension
+reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)' #Matches attribute and extension
 retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
 
 def parse_labels(text):
@@ -856,41 +865,87 @@ def reduce_distinct(group1,group2):
 ########################################################################################
 ## Methods to export device/attributes/properties to dictionaries
 
-def export_attribute_to_dict(device,target,value=False):
+def export_attribute_to_dict(model,attribute=None,value=None,keep=False):
     """
     get attribute config, format and value from Tango and return it as a dictionary:
+    
+    :param model: can be a full tango model, a device name or a device proxy
     
     keys: min_alarm,name,data_type,format,max_alarm,ch_event,data_format,value,
           label,writable,device,polling,alarms,arch_event,unit
     """
-    attr = Struct()
-    name,proxy = (device,get_device(device)) if isString(device) else (device.name(),device)
-    attr.device,attr.name = name,target
+    attr,proxy = Struct(),None
+    if not isString(model):
+        model,proxy = model.name(),model
+      
+    model = parse_tango_model(model)
+    attr.device = model['device']
+    proxy = proxy or get_device(attr.device,keep=keep)
+    attr.database = '%s:%s'%(model['host'],model['port'])
+    attr.name = model.get('attribute',None) or attribute or 'state'
+    attr.model = '/'.join((attr.database,attr.device,attr.name))
+    attr.color = 'Lime'
+    attr.time = 0
+    
+    def vrepr(v):
+      try: return str(attr.format)%(v)
+      except: return str(v)
+    def cleandict(d):
+      for k,v in d.items():
+        if v in ('Not specified','No %s'%k):
+          d[k] = ''
+      return d
+
     try:
-        v = check_attribute(name+'/'+target)
+        v = value or check_attribute(attr.database+'/'+attr.device+'/'+attr.name)
+
         if v and 'DevFailed' not in str(v):
-            ac = proxy.get_attribute_config(target)
-            attr.data_format,attr.data_type = str(ac.data_format),str(PyTango.CmdArgType.values[ac.data_type])
+            ac = proxy.get_attribute_config(attr.name)
+            attr.description = ac.description if ac.description!='No description' else ''
+            attr.data_format = str(ac.data_format)
+            attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
             attr.writable = str(ac.writable)
             attr.label,attr.min_alarm,attr.max_alarm = ac.label,ac.min_alarm,ac.max_alarm
             attr.unit,attr.format = ac.unit,ac.format
+            attr.standard_unit,attr.display_unit = ac.standard_unit,ac.display_unit
             attr.ch_event = fandango.obj2dict(ac.events.ch_event)
             attr.arch_event = fandango.obj2dict(ac.events.arch_event)
             attr.alarms = fandango.obj2dict(ac.alarms)
+            attr.quality = str(v.quality)
+            attr.time = ctime2time(v.time)
+              
             if attr.data_format!='SCALAR': 
                 attr.value = list(v.value if v.value is not None and v.dim_x else [])
-            elif attr.data_type=='DevState':
-                attr.value = int(v.value)
+                attr.string = map(vrepr,attr.value)
             else:
-                attr.value = v.value
-            attr.polling = proxy.get_attribute_poll_period(target)
+              if attr.data_type in ('DevState','DevBoolean'):
+                  attr.value = int(v.value)
+                  attr.string = str(v.value)
+              else:
+                  attr.value = v.value
+                  attr.string = vrepr(v.value)
+            if attr.unit.strip() not in ('','No unit'):
+              attr.string += ' %s'%(attr.unit)
+            attr.polling = proxy.get_attribute_poll_period(attr.name)
         else: 
-            print((name,target,'unreadable!'))
+            print((attr.device,attr.name,'unreadable!'))
             attr.value = None
+            attr.string = str(v)
+            
         if attr.value is None:
-            attr.datatype = None
+            attr.data_type = None
+            attr.color = TANGO_STATE_COLORS['UNKNOWN']
+        elif attr.data_type == 'DevState':
+            attr.color = TANGO_STATE_COLORS.get(attr.string,'Grey')
+        elif 'ALARM' in attr.quality:
+            attr.color = TANGO_STATE_COLORS['FAULT']
+        elif 'WARNING' in attr.quality:
+            attr.color = TANGO_STATE_COLORS['ALARM']
+        elif 'INVALID' in attr.quality:
+            attr.color = TANGO_STATE_COLORS['OFF']
+            
     except Exception,e:
-        print(str((name,target,traceback.format_exc())))
+        print(str((attr,traceback.format_exc())))
         raise(e)
     return dict(attr)
             
@@ -1427,6 +1482,7 @@ class TangoEval(object):
         Out: 2.6307095848792521 #A value multiplied by delta of S in its last 3 values
     
     Attributes in the formulas may be (it is recommended to insert spaces between attribute names and operators):
+    THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; IT IS TAKEN AS PART OF THE DEVICE NAME!!
     
         dom/fam/memb/attrib >= V1 #Will evaluate the attribute value
         d/f/m/a1 > V2 and d/f/m/a2 == V3 #Comparing 2 attributes
@@ -1445,6 +1501,17 @@ class TangoEval(object):
         T() < T('YYYY/MM/DD hh:mm') allow to compare actual time with any time
     """
     FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)' #FIND( optional quotes and whatever is not ')' )
+    
+    #operators = '[><=][=>]?|and|or|in|not in|not'
+    #l_split = re.split(operators,formula)#.replace(' ',''))
+    alnum = '[a-zA-Z0-9-_]+'
+    no_alnum = '[^a-zA-Z0-9-_]'
+    no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
+    #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; IT IS TAKEN AS PART OF THE DEVICE NAME!!
+    redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+    reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|hist))?)?' #Matches attribute and extension
+    retango = redev+reattr#+'(?!/)'
+    regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods    
     
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,trace=False, proxies=None, attributes=None, cache=0, use_tau = False):
         self.formula = formula
@@ -1541,16 +1608,7 @@ class TangoEval(object):
             - a None value if the alarm is not parsable
             - a list of (device,attribute,value/time/quality) tuples
         '''            
-        #operators = '[><=][=>]?|and|or|in|not in|not'
-        #l_split = re.split(operators,formula)#.replace(' ',''))
-        alnum = '[a-zA-Z0-9-_]+'
-        no_alnum = '[^a-zA-Z0-9-_]'
-        no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-        #redev = '(?:^|[^/a-zA-Z0-9_])(?P<device>(?:'+alnum+':[0-9]+/)?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-        reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all))?)?' #Matches attribute and extension
-        retango = redev+reattr#+'(?!/)'
-        regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods
+
         #self.trace( regexp)
         idev,iattr,ival = 0,1,2 #indexes of the expression matching device,attribute and value
         
@@ -1558,7 +1616,7 @@ class TangoEval(object):
         
         ##@var all_vars list of tuples with (device,/attribute) name matches
         #self.variables = [(s[idev],s[iattr],s[ival] or 'value') for s in re.findall(regexp,formula) if s[idev]]
-        variables = [s for s in re.findall(regexp,formula)]
+        variables = [s for s in re.findall(self.regexp,formula)]
         self.trace('parse_variables(...): %s'%(variables))
         return variables
         
