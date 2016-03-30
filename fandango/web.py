@@ -108,7 +108,7 @@ def dicts2table(dcts,keys=None,formatter=None):
     :param dcts:  a list of dictionaries
     :param keys: an alternative list of keys
     """
-    if not keys: keys = sorted(set(k for k in dct.keys() for dct in dcts))
+    if not keys: keys = sorted(set(k for dct in dcts for k in dct.keys()))
     if not formatter: formatter = lambda s:s
     lines = [keys,]
     for dct in dcts:
@@ -135,17 +135,31 @@ def dict2dict2table(seq,keys=None,formatter=None):
 
 MULTIPLIER = 10
 OFFSETS = [-15,-30,-45,-60,-75,-90,-105,-120]
-fg,bg = QColor('red'),QColor('blue')
-FECOLORS = [
-    QColor('grey'),
-    QColor('brown'),
-    QColor('darkgreen'),
-    QColor('violet'),
-    QColor('lightblue'),
-    QColor('lightgreen'),
-    QColor('orange'),
-    QColor('magenta'),
-    ]
+COLORS = {
+ 'red': (255, 0, 0, 255),  
+ 'blue': (0, 0, 255, 255),
+ 'darkgreen': (0, 100, 0, 255),
+ 'grey': (128, 128, 128, 255),
+ 'lightblue': (173, 216, 230, 255),
+ 'lightgreen': (144, 238, 144, 255),
+ 'magenta': (255, 0, 255, 255),
+ 'orange': (255, 165, 0, 255),
+ 'violet': (238, 130, 238, 255)
+ }
+HEXs = {
+ 'red': '#ff0000',
+ 'blue': '#0000ff',
+ 'darkgreen': '#006400',
+ 'grey': '#808080',
+ 'lightblue': '#add8e6',
+ 'lightgreen': '#90ee90',
+ 'magenta': '#ff00ff',
+ 'orange': '#ffa500',
+ 'violet': '#ee82ee'
+ }
+
+all_colors = COLORS.values()
+
 
 #ats = [CURRENT]+FRONTENDS
 #all_colors = [fg]+FECOLORS
@@ -232,7 +246,7 @@ def jqplot(title,ats):
             }
         """#.replace('$ATTR',CURRENT).replace('$COLOR','rgba(255, 0, 0, 0.5)')
     series = 'series:[\n%s\n]'%',\n'.join([
-        serie.replace('$ATTR',a).replace('$COLOR','rgba(%d,%d,%d,1)'%all_colors[i].getRgb()[:3])
+        serie.replace('$ATTR',a).replace('$COLOR','rgba(%d,%d,%d,1)'%all_colors[i][:3])
         for i,a in enumerate(ats)
         ])
     #data = """[[[1, 2],[3,5.12],[5,13.1],[7,33.6],[9,85.9],[11,219.9]]]"""
