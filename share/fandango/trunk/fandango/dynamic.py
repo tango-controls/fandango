@@ -292,9 +292,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try:
             if self.myClass is None:
                 self.myClass = self.get_device_class()
-            #Check polled to be repeated here but using admin (not allowed at Init()); not needed with Tango8
-            if getattr(PyTango,'__version_number__',0) < 804:
-                self.check_polled_attributes(use_admin=True)
+            #Check polled to be repeated here but using admin (not allowed at Init()); not needed with Tango8 but needed again in Tango9!! (sigh)
+            #if getattr(PyTango,'__version_number__',0) < 804:
+            self.check_polled_attributes(use_admin=True)
         except Exception,e:
             print 'prepare_DynDS failed!: %s' % str(e).replace('\n',';') #traceback.format_exc()
         finally:
