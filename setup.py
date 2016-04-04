@@ -13,10 +13,12 @@ setup(
     version=str(release),
     packages=find_packages(),
     description="Simplify the configuration of big Tango control systems",
-    long_description="Simplify the configuration of big Tango control systems; "
-    "implementing the behavior of Jive (configuration) and/or Astor (deployment) "
-    "tools in methods that could be called from scripts using regexp and "
-    "wildcards.",
+    long_description="Fandango is a Python module created to simplify the "
+    "configuration of big control systems; implementing the behavior of Jive "
+    "(configuration) and/or Astor (deployment) tools in methods that could "
+    "be called from scripts using regexp and wildcards. Fandango provides "
+    "functional methods, classes and utilities to develop high-level device "
+    "servers and APIs for Tango control system.",
     author="Sergi Rubio",
     author_email="srubio@cells.es",
     classifiers=[

@@ -7,9 +7,9 @@ Description
 
 Fandango is a Python module created to simplify the configuration of big control systems; implementing the behavior of Jive (configuration) and/or Astor (deployment) tools in methods that could be called from scripts using regexp and wildcards.
 
-It has been later extended with methods commonly usied in some of our python API's (archiving, CCDB, alarms, vacca) or generic devices (composers, simulators, facades).
+It has been later extended with methods commonly used in some of our python API's (archiving, CCDB, alarms, vacca) or generic devices (composers, simulators, facades).
 
-Fandango python modules provides functional methods, classes and utilities to develop high-level device servers for Tango control system.
+Fandango python modules provides functional methods, classes and utilities to develop high-level device servers and APIs for Tango control system.
 
 Fandango is published using the same licenses than other TANGO projects; the license will be kept up to date in the LICENSE file.
 
