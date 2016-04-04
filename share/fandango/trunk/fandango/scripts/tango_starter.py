@@ -16,6 +16,9 @@ Examples:
   tango_starter.py status              # Will display status of devices in localhost
   tango_starter.py hostname.you.org stop "*hdb*"    # Will stop all *hdb* devices in hostname.you.org
   tango_starter.py restart "pyalarm/*"     # Will restart PyAlarm devices in ALL hosts
+  
+NOTE: ctds and tango_admin scripts provide similar functionality
+
 """
 
 def main():
