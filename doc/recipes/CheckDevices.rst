@@ -1,4 +1,3 @@
-==================================
 Check status of Devices Attributes
 ==================================
 
@@ -7,6 +6,8 @@ Check status of Devices Attributes
 
 At server level
 ---------------
+
+.. code-block:: python
 
   astor = fn.Astor('PyAttributeProcessor/*')
   astor.states()
@@ -19,6 +20,8 @@ At server level
   
 At device level
 ---------------
+
+.. code-block:: python
 
   devices = astor.get_all_devices()
   
@@ -39,6 +42,8 @@ At device level
 At attribute level
 ------------------
 
+.. code-block:: python
+
   d = 'sr/di/calc'
   
   [(d,a,ft.read_attribute(a)) for a in fn.get_matching_attributes(d+'/*')]
@@ -47,3 +52,23 @@ At attribute level
   ('sr/di/calc', 'sr/di/calc/Alpha', 0.00096000000000000002)
   ('sr/di/calc', 'sr/di/calc/MeasProduct', 2799.8000000000002)
   ('...
+  
+From Unix Shell
+---------------
+
+Using fandango.sh::
+
+  for attr in $(fandango.sh get_matching_attributes "sr/di/calc/*Coup*"); do 
+     echo "$attr : $(fandango.sh read_attribute ${attr})" ; 
+     done
+  
+  sr/di/calc/SimulatorCoupling : 0.6
+  sr/di/calc/UserDefCoupling : 0.6
+  sr/di/calc/Coupling : 0.0
+  sr/di/calc/SetMachineCoupling : False
+
+See more Unix shell examples at :ref:`fandango_scripts`
+
+  
+   
+
