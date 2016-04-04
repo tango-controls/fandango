@@ -1,6 +1,8 @@
 Check status of Devices Attributes
 ==================================
 
+.. code-block:: python
+
   import fandango as fn
   import fandango.tango as ft
 
