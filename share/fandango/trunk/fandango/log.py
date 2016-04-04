@@ -1,15 +1,10 @@
-#!/usr/bin/env python2.5
-"""
+#!/usr/bin/env python
+
 #############################################################################
-##
-## file :       log.py
-##
-## description : see below
 ##
 ## project :     Tango Control System
 ##
-## $Author: tcoutinho@cells.es, extended by srubio@cells.es $
-##
+## $Author: Sergi Rubio Manrique, srubio@cells.es $
 ##
 ## $Revision: 2008 $
 ##
@@ -34,6 +29,8 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
+
+"""
     
 Example of usage:
 class logged_class(Logger):

@@ -1,10 +1,6 @@
-#!/usr/bin/env python2.5
-"""
+#!/usr/bin/env python
+
 #############################################################################
-##
-## file :       device.py
-##
-## description : CLASS FOR Enhanced TANGO DEVICE SERVERs
 ##
 ## project :     Tango Control System
 ##
@@ -33,10 +29,9 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@endif
-@package tango
-@brief provides tango utilities for fandango, like database search methods and emulated Attribute Event/Value types
-@todo @warning IMPORTING THIS MODULE IS CAUSING SOME ERRORS WHEN CLOSING PYTHON DEVICE SERVERS,  BE CAREFUL!
+
+"""
+provides tango utilities for fandango, like database search methods and emulated Attribute Event/Value types
 
 This module is a light-weight set of utilities for PyTango.
 Classes dedicated for device management will go to fandango.device
