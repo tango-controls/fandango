@@ -1,7 +1,36 @@
+#!/usr/bin/env python
 
-#some Linux utilities
+#############################################################################
+##
+## $Author: Sergi Rubio Manrique, srubio@cells.es $
+##
+## $Revision: 2008 $
+##
+## copyleft :    ALBA Synchrotron Controls Section, CELLS
+##               Bellaterra
+##               Spain
+##
+#############################################################################
+##
+## This file is part of Tango Control System
+##
+## Tango Control System is free software; you can redistribute it and/or
+## modify it under the terms of the GNU General Public License as published
+## by the Free Software Foundation; either version 3 of the License, or
+## (at your option) any later version.
+##
+## Tango Control System is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program; if not, see <http://www.gnu.org/licenses/>.
+###########################################################################
 
 """
+#some Linux utilities
+
 <pre>
 Executing shell commands and getting the stdout
 
@@ -353,10 +382,10 @@ def ping(ips,threaded = False, timeout = 1):
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import time
 
-def timefun(fun):
+def timefun(f):
     """ This function allow to get time spent by some method calls, use timefun(lambda:f(args)) if needed """
     now = time.time()
-    result = fun()
+    result = f()
     return (time.time()-now,result)
 
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
@@ -364,10 +393,16 @@ def timefun(fun):
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
 
-def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
+def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True,lazy=True):
     ''' 
     It parses the command line arguments into an understandable dict
     defaults is the list of anonymous arguments to accept (would be False if not specified)
+    
+    @param split: if True: args,kwargs are returned; if False then {None:[defaults],'option':value} is returned instead
+    
+    @param cast: will try to cast all strings to python types
+    
+    @param lazy: will accept any A=B as an alternative to -A B
     
     > command H=1 --option=value --parameter VALUE -test default_arg1 default_arg2
     
@@ -383,8 +418,18 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
     cast_arg = lambda x: fun.str2type(x,use_eval=True) if cast else x
     
     ##Separate parameter/options and default arguments
-    [(vargs if ('=' in a or a.startswith('-') or (i and args[i-1].startswith('--') and '=' not in args[-1])) else defargs).append(a) 
-        for i,a in enumerate(args)]
+    [(vargs if (lazy and '=' in a 
+        or a.startswith('-') 
+        or (i and args[i-1].startswith('--') and '=' not in args[i-i])) else defargs
+        ).append(a) 
+      for i,a in enumerate(args)]
+
+    #Parsing multiflag like -xHaB
+    extend = [a for a in vargs if fun.re.match('[-][a-zA-Z]+',a)]
+    for e in extend:
+      vargs.remove(e)
+      [vargs.append('-'+a) for a in e[1:]]
+      
     defargs = map(cast_arg,defargs)
     if trace: print('defargs: %s'%defargs)
     for n,a in enumerate(vargs):
@@ -403,10 +448,10 @@ def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True):
             result[a]=True
     if trace: print('defaults: %s'%defaults)
     if not defaults:
-        if not vargs:
-            return {} #defargs
-        else:
-            result[None] = defargs
+        result[None] = defargs
+        #if not vargs:
+            #return defargs
+        #else:
         #if not vargs and defargs: #Arguments do not parse
             #return sysargs_to_dict(None,args) #Defaulting to sys.argv
     else: #Assigning arguments using defaults as keys

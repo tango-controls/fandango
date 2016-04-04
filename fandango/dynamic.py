@@ -1,10 +1,6 @@
-#!/usr/bin/env python2.5
+#!/usr/bin/env python
 """
 #############################################################################
-##
-## file :       dynamic.py
-##
-## description : see below
 ##
 ## project :     Tango Control System
 ##

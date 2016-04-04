@@ -1,10 +1,6 @@
-#!/usr/bin/env python2.5
+#!/usr/bin/env python
 """
 #############################################################################
-##
-## file :       logic.py
-##
-## description : see below
 ##
 ## project :     Tango Control System
 ##
@@ -227,6 +223,9 @@ def setitem(mapping,key,value):
 
 def getitem(mapping,key):
     return mapping[key]
+  
+def setlocal(key,value):
+    setitem(locals(),key,value)
 
 ########################################################################
 ## Regular expressions 
@@ -916,3 +915,4 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             raise _exception('targetMustBeCallable, not %s(%s)'%(type(target),target))
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
+  

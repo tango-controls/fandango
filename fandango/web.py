@@ -1,16 +1,10 @@
-#!/usr/bin/env python2.5
-"""
+#!/usr/bin/env python
+
 #############################################################################
-##
-## file :       web.py
-##
-## description : see below
-##
-## project :     Tango Control System
 ##
 ## $Author: Sergi Rubio Manrique, srubio@cells.es $
 ##
-## $Revision: 2010 $
+## $Revision: 2008 $
 ##
 ## copyleft :    ALBA Synchrotron Controls Section, CELLS
 ##               Bellaterra
@@ -33,7 +27,8 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@package dicts
+
+"""
 
 Some extensions to python dictionary
 ThreadDict: Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.
