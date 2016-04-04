@@ -1,5 +1,5 @@
-#!/usr/bin/env python2.5
-""" @if gnuheader
+#!/usr/bin/env python
+
 #############################################################################
 ##
 ## file :       device.py
@@ -33,11 +33,8 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@endif
-@package device
-@brief provides Dev4Tango, StateQueue, DevChild
-@todo @warning IMPORTING THIS MODULE IS CAUSING SOME ERRORS WHEN CLOSING PYTHON DEVICE SERVERS,  BE CAREFUL!
 
+""" 
 This module is used to have all those classes used inside DeviceServers or to control/configure them 
 and are not part of the Astor api (ServersDict)
 """
