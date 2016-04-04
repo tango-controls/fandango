@@ -31,11 +31,33 @@
 import fandango
 
 __doc__ = """
+
 Usage:
 
-  fandango [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1] [...]
+  fandango.sh [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1] [...]
 
   Objects and Generators will not be allowed as arguments, only python primitives, lists and tuples
+  
+Examples:
+
+  fandango.sh findModule fandango
+  
+  fandango.sh get_tango_host
+  
+  fandango.sh --help get_matching_devices | less
+  
+  fandango.sh get_matching_devices "tango/admin/*"
+  
+  fandango.sh get_matching_attributes "lab/ct/plctest16/*_af"
+  
+  fandango.sh -h | grep propert
+  
+  fandango.sh get_matching_device_properties "lab/ct/plctest16" "*modbus*"
+  
+  fandango.sh read_attribute "tango/admin/pctest/status"
+  
+  for attr in $(fandango.sh get_matching_attributes "tango/admin/pctest/*"); do echo "$attr : $(fandango.sh read_attribute ${attr})" ; done
+  
 """
 
 """
@@ -56,6 +78,7 @@ if __name__ == '__main__':
     from fandango.tango import *
     from fandango.servers import *
     from fandango.linos import *
+    from fandango.objects import *
     
     if opts.get('-x',opts.get('extra',0)):
       try: 

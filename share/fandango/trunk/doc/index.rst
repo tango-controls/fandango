@@ -8,7 +8,9 @@
 Welcome to fandango's documentation!
 ====================================
 
-:ref:`description`
+See an Introduction to fandango: :ref:`description`
+
+Or try it directly from console: :ref:`fandango_scripts`
 
 Contents:
 =========
