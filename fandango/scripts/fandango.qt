@@ -1,0 +1,4 @@
+#!/usr/bin/sh
+
+python $(fandango.sh findModule fandango)/qt.py $*
+

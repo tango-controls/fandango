@@ -15,6 +15,14 @@ PENDING:
     StructDict with sort/get/filter methods like Panic api
     preparing next PyAlarm release with None not allowed in comparisons
     
+-------------------------------------------------
+April 2016 - 11.10 Compact dynamic attributes with VAR/GET/SET.
+-------------------------------------------------
+
+Added fandango.sh command line executor
+Several improvements in command line arguments management
+Added files for autodocumentation
+Solved bugs in scripts that caused sphinx to trigger script execution
 Several enhancements in tango.py to improve .json file generation
 
 -------------------------------------------------

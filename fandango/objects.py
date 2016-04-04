@@ -55,6 +55,10 @@ except: pass
 def dirModule(module):
     return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
 
+def findModule(module):
+    from imp import find_module
+    return find_module(module)[1]
+
 def loadModule(source,modulename=None):
     #Loads a python module either from source file or from module
     from imp import load_source,find_module,load_module
@@ -426,12 +430,14 @@ class Decorator(object):
     To modify your wrapper reimplement __call__
     
     A decorator __init__ with a single argument can be called like:
+    
       @D
       def f(x): 
         pass
-      
+    
     If you need a Decorator with arguments then __init__ will manage the 
     arguments and __call__ will take the function and return a wrapper instead.
+    
       @D(x,y)
       def f(z):
         pass
@@ -453,7 +459,7 @@ class BoundDecorator(Decorator):#object):
         Class method decorator specific to the instance.
         It uses a descriptor to delay the definition of the
         method wrapper.
-        
+    
     To use it, just inherit from it and rewrite the wrapper method
     
     Example:
