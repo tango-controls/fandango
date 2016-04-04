@@ -4,18 +4,18 @@ import sys,time,traceback
 import fandango
 
 __doc__ = """
-tango_starter
+tango_servers
 -------------
 
 This script uses fandango.servers.ServersDict class to start/stop devices on any point of the control system using Tango Starters.
 
-  tango_starter.py [host] start|stop|restart|status [server_name_expression_list]
+  tango_servers.py [host] start|stop|restart|status [server_name_expression_list]
 
 Examples:
 
-  tango_starter.py status              # Will display status of devices in localhost
-  tango_starter.py hostname.you.org stop "*hdb*"    # Will stop all *hdb* devices in hostname.you.org
-  tango_starter.py restart "pyalarm/*"     # Will restart PyAlarm devices in ALL hosts
+  tango_servers.py status              # Will display status of devices in localhost
+  tango_servers.py hostname.you.org stop "*hdb*"    # Will stop all *hdb* devices in hostname.you.org
+  tango_servers.py restart "pyalarm/*"     # Will restart PyAlarm devices in ALL hosts
   
 NOTE: ctds and tango_admin scripts provide similar functionality
 
