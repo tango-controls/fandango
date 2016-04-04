@@ -45,7 +45,7 @@ def main():
           astor.load_by_host(h)
           
       sts = astor.states()
-      running = [s for s,st in sts.items() if st is not None]
+
       if action in ('status',):
           #if targets:
               #print '\n'.join(sorted('%s:\t%s'%(k,str(v)) for k,v in sts.items()))
@@ -58,13 +58,15 @@ def main():
                       for d,st in sorted(devs.items()):
                           print '\t\t%s:\t%s'%(d,st)
 
+      matched = [s for s in astor if not targets or fandango.clmatch(targets[0],s)]
+      running = [s for s,st in sts.items() if s in matched and st is not None]
+      
       if action in ('stop','restart'):
           astor.stop_servers(running)
       if action in ('restart',):
           time.sleep(5)
-          sts = astor.states()
-      if action in ('start',):
-          astor.start_servers(running,**(host and {'host':host} or {}))
+      if action in ('start','restart'):
+          astor.start_servers(matched,**(host and {'host':host} or {}))
       
       print '-'*80
       print(' '.join(sys.argv)+': Done')  

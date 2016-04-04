@@ -5,8 +5,8 @@
 
 .. Later edited by srubio
 
-Welcome to fandango's documentation!
-====================================
+Welcome to fandango 11+ documentation!
+======================================
 
 See an Introduction to fandango: :ref:`description`
 
@@ -19,6 +19,7 @@ Contents:
    :maxdepth: 4
 
    description
+   changes
    recipes
    fandango.arrays
    fandango.callbacks
