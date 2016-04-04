@@ -1,8 +1,7 @@
-=============================
-ctds start/stop/search/create
-=============================
+use ctds to start/stop/search/create devices
+============================================
 
-Using fandango/scripts/ctds to start/stop/search/create devices
+Using fandango/scripts/ctds to start/stop/search/create devices::
 
    91  ./ctds list "*"
    92  ./ctds status "*"

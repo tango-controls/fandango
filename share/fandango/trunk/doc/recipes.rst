@@ -1,8 +1,10 @@
-
+================
 Fandango Recipes
 ================
 
 .. contents::
+
+.. include:: ../recipes/fandango_shell.rst
 
 .. include:: ../recipes/CheckDevices.rst
 
