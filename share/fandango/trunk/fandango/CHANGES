@@ -16,7 +16,7 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
     
 -------------------------------------------------
-April 2016 - 11.10 Compact dynamic attributes with VAR/GET/SET.
+April 2016 - 11.10 fandango.sh command line
 -------------------------------------------------
 
 Added fandango.sh command line executor
