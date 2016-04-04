@@ -4,8 +4,8 @@ import sys,time,traceback
 import fandango
 
 __doc__ = """
-tango_starter.py
-----------------
+tango_starter
+-------------
 
 This script uses fandango.servers.ServersDict class to start/stop devices on any point of the control system using Tango Starters.
 
