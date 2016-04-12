@@ -1,4 +1,4 @@
-RELEASE = (11,10,0)
+RELEASE = (11,11,0)
 RELEASE_NOTE = "Compact dynamic attributes with VAR/GET/SET"
 
 """
