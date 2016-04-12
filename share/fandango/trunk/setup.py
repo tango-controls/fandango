@@ -4,11 +4,18 @@ import os, imp
 from setuptools import setup, find_packages
 
 __doc__ = """
+
 To install as system package:
 
   python setup.py install
   
-To install as local package:
+To install as local package, just run:
+
+  mkdir /tmp/builds/
+  python setup.py install --root=/tmp/builds
+  /tmp/builds/usr/bin/$DS -? -v4
+
+To tune some options:
 
   RU=/opt/control
   python setup.py egg_info --egg-base=tmp install --root=$RU/files --no-compile \
@@ -31,6 +38,13 @@ scripts = [
 './fandango/scripts/DynamicDS',
 './fandango/scripts/tango_servers',
 ]
+
+entry_points = {
+        'console_scripts': [
+            'CopyCatDS = fandango.interface.CopyCatDS:main',
+            'WorkerDS = fandango.device.WorkerDS:main',
+        ],
+}
 
 
 setup(
@@ -64,5 +78,7 @@ setup(
     platforms=[ "Linux,Windows XP/Vista/7/8" ],
     install_requires=[],
     scripts=scripts,
+    entry_points=entry_points,
     include_package_data=True,
-    zip_safe=False)
+    zip_safe=False
+  )

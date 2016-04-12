@@ -12,10 +12,15 @@ else
  INSTANCE=$1
 fi
 
-DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])")
+DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
 
 if [ ! "$DSPATH" ] ; then
- DSPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")/device
+ DSPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")
+ if [ -e "$DSPATH/device/$DS.py" ] ; then
+  DSPATH=$DSPATH/device
+ elif [ -e "$DSPATH/interface/$DS.py" ] ; then
+  DSPATH=$DSPATH/interface
+ fi
 fi
 
 DSPATH=$(readlink -f $DSPATH)

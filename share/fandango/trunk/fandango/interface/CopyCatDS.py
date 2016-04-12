@@ -232,8 +232,9 @@ def __test_CopyCatDS(target = 'sys/tg_test/1'):
     ds = CopyCatServer('CopyCatDS/test',log='-v4')
     ds.main()
     
-if __name__ == '__main__':
+def main(args=None):
     import sys
+    args = args or sys.argv
     if '--test' in sys.argv:
         __test_Doppelganger('sys/tg_test/1')
         print '\n'
@@ -241,3 +242,7 @@ if __name__ == '__main__':
     else:
         ds = CopyCatServer('CopyCatDS/'+sys.argv[1],log=(sys.argv[2:] or ['-v2'])[0])
         ds.main()
+    
+if __name__ == '__main__':
+    main()
+

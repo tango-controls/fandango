@@ -398,15 +398,19 @@ class WorkerDSClass(PyTango.DeviceClass):
         PyTango.DeviceClass.__init__(self, name)
         self.set_type(name);
         print "In WorkerDSClass  constructor"
-
+        
 #==================================================================
 #
 #    WorkerDS class main method
 #
 #==================================================================
-if __name__ == '__main__':
+        
+WorkerDS,WorkerDSClass = FullTangoInheritance('WorkerDS',WorkerDS,WorkerDSClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
+        
+def main(args=None):
+    args = args or sys.argv
     try:
-        py = PyTango.Util(sys.argv)
+        py = PyTango.Util(args)
         # Adding all commands/properties from fandango.DynamicDS
         WorkerDS,WorkerDSClass = FullTangoInheritance('WorkerDS',WorkerDS,WorkerDSClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
         py.add_TgClass(WorkerDSClass,WorkerDS,'WorkerDS')
@@ -417,8 +421,7 @@ if __name__ == '__main__':
     except PyTango.DevFailed,e:
         print '-------> Received a DevFailed exception:',e
     except Exception,e:
-        print '-------> An unforeseen exception occured....',e
-        
-else:
-    #Enabling subclassing
-    WorkerDS,WorkerDSClass = FullTangoInheritance('WorkerDS',WorkerDS,WorkerDSClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
+        print '-------> An unforeseen exception occured....',e  
+
+if __name__ == '__main__':
+    main()
