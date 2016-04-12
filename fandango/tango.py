@@ -682,7 +682,7 @@ def get_matching_devices(expressions,limit=0,exported=False,fullname=False,trace
     if not fullname: all_devs = [r.split('/',1)[-1] if matchCl(rehost,r) else r for r in all_devs]
     condition = lambda d: any(matchCl("(%s/)?(%s)"%(defhost,e),d,terminate=True) for e in expressions)
     result = sorted(filter(condition,all_devs))
-    return result[:limit] if limit else result
+    return sorted(result[:limit] if limit else result)
   
 def get_matching_servers(expressions,tango_host='',exported=False):
     """
@@ -695,7 +695,7 @@ def get_matching_servers(expressions,tango_host='',exported=False):
     if exported:
       exported = get_all_devices(exported=True,host=tango_host)
       servers = [s for s in servers if ('dserver/'+s).lower() in exported]
-    return servers
+    return sorted(servers)
     
 def find_devices(*args,**kwargs):
     #A get_matching_devices() alias, just for backwards compatibility
@@ -746,7 +746,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                     print 'Unable to get attributes for %s'%d
                     print traceback.format_exc()
                     
-    result = list(set(attrs))
+    result = sorted(set(attrs))
     return result[:limit] if limit else result
                     
 def find_attributes(*args,**kwargs):
