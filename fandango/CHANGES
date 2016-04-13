@@ -15,6 +15,12 @@ PENDING:
     StructDict with sort/get/filter methods like Panic api
     preparing next PyAlarm release with None not allowed in comparisons
     
+----------------------------------------------------
+April 2016 - 11.11 Added CopyCatDS/WorkerDS devices
+----------------------------------------------------
+
+Added WorkerDS, added DynamicDS launchers
+    
 -------------------------------------------------
 April 2016 - 11.10 fandango.sh command line
 -------------------------------------------------
