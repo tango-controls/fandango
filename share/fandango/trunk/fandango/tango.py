@@ -1291,6 +1291,7 @@ class fakeAttributeValue(object):
         self.error = error
         self.keeptime = keeptime*1e3 if keeptime<10. else keeptime
         self.lastread = 0
+        self.type = type(value)
         
     def __repr__(self):
         return 'fakeAttributeValue(%s,%s,%s,%s,error=%s)'%(self.name,fandango.log.shortstr(self.value),time.ctime(self.get_time()),self.quality,self.error)
