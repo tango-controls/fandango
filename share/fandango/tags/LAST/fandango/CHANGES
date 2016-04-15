@@ -1,0 +1,715 @@
+RELEASE = (11,12,0)
+RELEASE_NOTE = "Solved bugs in Tango 9*"
+
+"""
+IMPORTANT:
+
+  Due to fandango.device module refactoring you may need to remove previous package before installing this one
+
+PENDING:
+
+  NOT-TODO-YET(tiago): replace dicts.Enumeration by python Enum (but as it is not supported in python 2.6 we will wait to next OS upgrade)
+  NOTE: Some bugs where found in new multi-host capablities of tango.* methods; I did some patches but play with care.
+  ONGOING: 
+    dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
+    StructDict with sort/get/filter methods like Panic api
+    preparing next PyAlarm release with None not allowed in comparisons
+    
+----------------------------------------------------
+April 2016 - 11.12 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
+----------------------------------------------------
+
+Added WorkerDS, added DynamicDS launchers
+Solved bug with fakeAttributeValue.type
+Solved bug with put_device_property in Tango9
+Disabled check_polled_attributes in running devices (caused crashes)
+Added DynamicDS.StartupDelay
+DynamicDS runs on specific port using ORBEndPoint property
+
+-------------------------------------------------
+April 2016 - 11.10 fandango.sh command line
+-------------------------------------------------
+
+Added fandango.sh command line executor
+Several improvements in command line arguments management
+Added files for autodocumentation
+Solved bugs in scripts that caused sphinx to trigger script execution
+Several enhancements in tango.py to improve .json file generation
+TangoEval!!: Now regexps are exported as members of the TangoEval class
+
+-------------------------------------------------
+February 2016 - 11.9 Compact dynamic attributes with VAR/GET/SET. Bug patches.
+-------------------------------------------------
+
+dynamic: added locals() method; solved dyn_comms bug at startup
+dynamic: added VAR(WRITE=WRITE), GET, SET  keywords to simplify attribute declaration
+dynamic: solved issues with is_attribute_allowed in subclasses
+dynamic: ForceVar enabled to allow single-command read-write attributes
+device: device module refactored as subpackage
+log: refactored to be usable as any-time logger
+functional: added html2text, rtf2plain
+functional: added regexp boolean argument to matchMap and replaceCl methods
+qt: Added MenuContexted widget decorator and TangoHostChooser utility for bash scripts
+tango: solved bug in multi-host support in get_matching_devices and get_matching_attributes
+tango: solved bug that didn't allowed ip addresses in tango hosts.
+threads: added locals method to WorkerThread (needed by WorkerDS)
+dicts: CaselessDefaultDict: solved missing key exception
+objects: added bound-class wrapper hook, still not usable 
+excepts: Solved bug with Catched2 being deprecated
+
+
+
+
+
+
+
+-------------------------------------------------
+November 2015 - 11.7 Drag/Drop/Pickle devices from anywhere
+-------------------------------------------------
+
+fun: added bool2int([bool]) method
+fun: Added ifThen(condition,callable) to allow conditioned execution of methods
+excepts: trial method enhanced to return default values
+tango: solved bug in TangoEval that caused exception on parsing None types
+tango: solved bug in get_tango_host that caused weird eval values on Panic and Tango9
+tango: Enabled regexp in get_matching_device_properties
+tango: added try/catch to get_tango_host
+tango: added export_to_dict methods for pickling tango devices
+doc: added methods for sphinx autodocumenting
+servers: Helper methods (load_from*) now return the Astor object itself
+dynamic: added functional conversion methods to locals(), DynamicDS renamed to DynamicServer
+QT: Added Qt Decorators for DoubleClickable/Dragable/Dropable widgets
+qt: added GetFramedTaurusValue, QWidgetWithLayout to allow TaurusValue integration on QTableOnWidget
+qt: QTableOnWidget now is search/filter enabled (beta)
+qt.Draggable: added mimetype argument to setDragEventCallback
+
+-------------------------------------------------
+August 2015 - 11.6 New QEvaluator tool for debugging PyQt
+-------------------------------------------------
+
+dynamic: added getDynamicConfig to have external access to the current DynamicAttributes engine configuration
+dynamic: first step for quality/timestamp forwarding on attributes (under test, DevLong only)
+dynamic: solved bug on parsing CORBA endpoint on sys args
+dynamic: changed order of local variables initialization on init()
+functional: evalX, get/import module refactored to be usable from QEvaluator
+objects: Struct upgraded to be more dict-alike and callable
+qt: ApiBrowser upgraded to QEvaluator, to be used for PyQt debugging
+qt: added QTableOnWidget
+qt: QWorker modified to be usable from sqlite
+tango: added read_attribute alias to check_attribute(brief=True)
+
+-------------------------------------------------
+July 2015 - 11.5 Improvements for 64 bits support and simulations
+-------------------------------------------------
+
+dynamic: Added image attributes and SCALAR,SPECTRUM,IMAGE keywords for conversion
+dynamic: Added argument data types in commands (using SCALAR(int,ARGs) or SPECTRUM(bool,ARGS))
+dynamic: Added castDynamicType method
+dynamic: enabled @COPY and @FILE extensions to DynamicCommands syntax.
+dynamic: Added 64 bits types support.
+dynamic: Solved bug on VALUE parsing on attribute reading.
+dynamic: Solved bug with Spectrum attributes in tango8
+
+arrays: array methods from PyTangoArchiving.reader: correlate_values, values2text, choose_*_value
+tango: Added property extensions (COPY/FILE) to fill properties with external values.
+tango: @COPY:device or @FILE:filename.txt; To enable it, file methods have been changed to static methods.
+tango: Added 64 bits support as python long.
+tango: Solved bugs on tango_host parsing.
+server: Solved bug on getting executable names
+qt: Solved bug in QExceptionMessage, added QDropable meta class
+functional: Added retry(callable) method
+interface/CopyCatDS: added retries on attribute list querying (sometimes fails due to locks)
+
+-------------------------------------------------
+April 2015 - 11.4 Bugs solved for better simulations
+-------------------------------------------------
+
+debug: timeit method added
+functional: anyone bug solved
+qt: Solved bug on QGridLayout
+dynamic: Added MATCH and DELAY keywords to formulas
+CopyCatDS: import bug solved, without this fix the Gateway devices do not start!
+interface: Added DeviceClassInheritance decorator
+dynamic: solved case bug on evaluating variables #<<<< ADD TO TESTING
+functional: Add NaN, isNaN, isFalse methods, solved bug in END_OF_TIME
+qt: added ApiBrowser widget
+tango: enabled fake CacheAttributeProxy on TangoEval read attribute
+
+-------------------------------------------------
+January 2015 - 11.3 New DynamicServer,CopyCatDS classes, interface submodule refactored, Taurus/PyTango independent, needed for PyTangoArchiving.widget>5.2 and PyTango>8.1
+-------------------------------------------------
+
+arrays:Solved exceptions in filter_array
+dbs:Added default_cursor to FriendlyDB creator (to avoid conflicts between
+Cursor/SSCursor), fetchall replaced by sequencial fetchone()
+dynamic:guppy,heapy added to locals() when PYMEMCHECK=True
+sendmail: added character cleanup
+tango: added device class to get_device_info
+dicts: removed unnecessary time imports
+functional: toRegexp replaced by toCl (careless and caseless extended expression)
+linos: check_process/kill_process methods added #Used by latest PyTangoArchiving.Reader
+threads: Solved bug in WorkerThread.process
+device:DDebug:fandango/resource/gc/guppy/heapy modules added to DDebug local path
+qt:Solved bug in QExceptionMessage
+
+-------------------------------------------------
+November 2014 - 11.2 needed for PyTangoArchiving>5.2 and PyTango>8.1
+-------------------------------------------------
+Major Changes:
+  dynamic: added DynamicServer main class to load new device classes on runtime
+  dynamic: added parseStaticAttributes method to check subclasses
+  functional: Added extended regexps (&,!) to all *chCl methods
+  interface: moved to subdirectory to put there new device templates (Processor, CopyCat, Player/Recorder, Dev4Tango, DevChild, ...)
+  interface: Added check on import fandango to remove deprecated files (if allowed by OS)
+  interface: Added CopyCatDS (aka gateway/simulator/doppleganger)
+  tango: get_database() bypassed to avoid BAD_INV corba crahes in Tango8  when using get/put_device_property within device servers.
+  tango: added TGet and get_proxy helper methods (accept/return both devices and attributes, proxies and lists)
+  test: added test sub module for continuous integration
+  scripts: added tango_*py to manage/start/stop devices from shell using Astor/Starter
+
+arrays: added notNone decimation, solved bug in maxmin
+dynamic: solved bug parsing DevFloat attributes
+excepts: PyTango independent, trial() adapted to return values
+functional: Added default arg to first,last methods
+functional: Solved bug in str2time to accept 0 as a valid time argument
+functional: Added WILDCARDS attribute as default argument to isRegexp
+functional: using negative timestamps as relative time from now 
+linos: sendmail, added from argument
+linos: solved bug in sysargs_todict when returning a list instead of dict
+log: log exception management centralized in sendToStream()
+objects: Added methods: obj2dict, Struct.updateAttrsDict
+objects: Solved bug in BoundDecorator when calling as an unbound method
+qt: taurus independent
+qt: QWorker replaces TauEmitterThread
+qt: new getQwtPlot() method
+servers: Solved bug in ComposersDict.set_property
+
+October 2014 - 11.1 needed for PyTangoArchiving>5.0 and PyTango>8.1
+-------------------------------------------------
+Major Changes:
+  dynamic: DynamicDS devices capable of use init() to reload dynamic attributes
+  servers: ComposersDict updated to PyTango>8
+  TangoEval: Added DEVICES dict and DEV command to access device proxies from formulas
+
+dicts: fixed bug when keys are QStrings instead of python strings
+arrays: bug in calcullating range from float instead of int
+dynamic: added LoadFromFile property and load_from_file command to be able to load attribute lists from files
+log: bugs in logging when using last pytango releases
+device: Dev4Tango polling thread exception replaced by error message
+objects: loadModule method improved to search by module name instead of path
+
+
+July 2014 - 11.00, needed by PyTangoArchiving 5.0
+-------------------------------------------------
+Major Changes (needed by PyTangoArchiving 5.0 and ArchivingBrowser widget):
+  arrays: tested and documented decimation methods, filter_array is the best of them
+  arrays: filter_array, improved comparison methods
+  db: enabled tuples and dictionaries as row types on returned queries; bug solved in Select()
+  interface: added getDeviceClassObjects and addAllClasses methods to append dynamically new classes to servers\
+  objects: added Decorator and BoundDecorator classes to manage class-bound decoration
+  qt: Added getQt, QConfirmAction decorator, DialogCloser connector and QTextBuffer widget for logging
+  tango: get_matching_devices; set fullname=False due to several bugs found in beamlines ... waiting for more conflicts to appear
+  tango: get_matching_devices(fullname=False) by default #It solved the bugs in Vacca 
+  threads: Added SubProcess method to execute DB queries in a background process with timeout
+
+functional: str2time: solved bug in RAW_TIME regexp
+functional: added str2bool and str2type (any) methods, added minutes as time units in str2time
+objects: Added items() method to Struct objects
+qt: Solved bugs in QDialogWidget, added Ok/Cancel buttons
+linos: sys_args_to_dict refactored, added MyMachine to get platform/machine information
+
+May 2014 - 10.9
+-------------------------------------------------
+Major Changes:
+  dynamic: XATTR acceps tango_host:/... URL's
+  tango: added get_tango_host method and adapted fandango.tango.* to work in multiple hosts.
+  tango: improved Delta and Cache management in TangoEval
+  tango: added suport for defining FIND-alike macros in TangoEval
+
+taurus enum dependency removed
+dynamic: #37002 Fake R/W attributes solved using  if 'WRITE' in fun.re.split('[\[\(\]\)\ ]',formula) to check for WRITE formulas.
+dynamic: it was causing the "Bool not iterable" bug when reading empty R/W spectrums (WRITE returned instead of []).
+servers: Waittime increased for start_servers
+servers: improved text reports
+qt: Added QDialogWidget and QOptionChosser dialogs
+log: printf to accept same arguments than print
+functional: Added evalF and testF to use evaluable strings as lambdas
+functional: str2time returning current time by default
+
+
+November 2013 - 10.8
+-------------------------------------------------
+Major Changes:
+  Added DDebug device server to have "online debugging" on fandango devices.
+  Logger: added use_tango as an option to use tango_stream instead of log_obj or print
+
+Added keeptime argument to TangoEval
+Solved bug that caused long keeptimes on TangoEval attribute proxies
+ServersDict tuned for faster loading.
+Functional: solved bug in replaceCl that failed when using tuples for replacement
+Qt: Added DoubleClick hook to DropTextEdit widget
+
+October 2013 - 10.7
+-------------------------------------------------
+Better DynamicAttribute conversion to strings
+Removed traces from arg parsing
+Added timestamp to log traces
+Solved bug in except2str
+
+Threading still has a lot of problems, release pending to solve it
+
+tango/device::
+Removed pre-initalization of TangoDatabase object, use get_database() instead
+Solved bugs in get_matching_devices/attributes
+
+September 2013 - 10.6
+-------------------------------------------------
+arrays: Added methods to get histograms
+tango: Solved bugs in TangoEval, get_Device() and read_internal_attribute
+threads: Solved bugs in WorkerProcess (needed by PyAlarm), added PAUSE() behavior to stop refreshing
+
+
+August 2013 - 10.5
+-------------------------------------------------
+
+dynamic: added MemUsage attribute to get memory usage of devices
+dynamic: solved bug on parsing of boolean properties
+dynamic: modified DynamicDSClass.__new__ to force all DynamicDS properties and commands to be inherited
+dynamic: if UseTaurus property is not True neither taurus or events are used
+dynamic: enabled check_polled_attributes to use admin device and update polling periods from prepareDynDS method
+dynamic: when using XATTR read values will be cached KeepTime milliseconds.
+dynamic: solved bug on error event received
+
+linos: get_memory() will return own process memory usage by default
+functional: Added filtersmart(sequence,filters=['any_filter','+all_filter','!neg_filter'])
+
+tango: if use_tau argument is not True neither taurus or events are used
+tango: added CachedAttributeProxy with timed persistence of values, used by TangoEval instead of AttributeProxy
+tango: added proxy persistence to fakeAttributeValue, read_internal_attribute and get_device_property
+tango: added get_model_name method to extract models from tango/taurus objects
+
+device: if use_tau argument is not True neither taurus or events are used
+device: modified name of admin DServer polling methods
+device: added exception triggering on polling thread fail
+
+device: Solved a bug that considered DynamicDS methods always static (they are not in PyTango>7.2.2)
+tango: solved a bug on initialized TangoEval.source
+
+July 2013 - 10.4
+-------------------------------------------------
+__init__: Release number moved to CHANGES file
+__init__: Modified to include methods from fandango.tango 
+arrays: solved bug in decimator, added average/rms/max/diff/min methods
+functional: bugs solved in avg/rms methods, better isNone, added TIME_UNITS and RAW_TIME to parse amounts of time in str2time method.
+objects: added NewClass method to simplify new class creation on demand
+qt: Added QDropTextEdit that allows to drag-and-drop text from other widgets (like attribute labels)
+servers: ComposersDict functionality extended
+tango: TangoedValue and getTangoValue expand the functionality of TangoEval returned objects
+tango: TangoEval and other methods have now a use_tau argument to force them taurus-free if necessary.
+tango: TangoEval, bugs solved in FIND ; added CACHE and DEPTH macros and improved get_delta() method.
+tango: added get_device_property, get_domain, get_family, get_member methods
+
+
+May 2013; 10.3
+-------------------------------------------------
+dynamic: logging, investigating issues with default-polled attributes
+arrays: added filter_array methods
+functional: added some methods like rms (root mean square) or floor
+tango: added default args to get_device_labels
+linos: new methods to send mail, get memory usage, folders and links
+
+February 2012; 10.2
+-------------------------------------------------
+web: adding jqueryPlot generation (still in progress)
+init: loading of modules refactored
+arrays: decimate* methods enabled
+device/tango: TangoEval/TangoCommand moved from device to tango modules
+device: update_attributes thread refactored, Dev4Tango.events_error added
+tango.fakeAttributeValue: solved bug in set_date and added read/throw_exception methods
+tango: added read_internal_attribute/get_internal_devices methods
+read_internal_attributes: any class with read_dyn_attr method will be
+considered dynamic
+dynamic: solved bug when receiving config/error events
+tests: added pycheck for modules
+linos: solved bug in get_file_sizesolved bug in get_file_size
+linos: added methods to get memory usage in a machine
+tango: added get_server_pid method to be runable locally
+
+
+December 2012 010.1
+
+arrays: added decimate_custom / decimate_array methods
+functional: added reldiff,absdiff,seqdiff
+linos: enabled get_proces_pid to get pid of owner process
+dynamic:
+ - exceptions always kept for all attributes
+ - globals/locals removed from evalState and scope searching for memory leaks (although seems not related)
+ - max_peak/min_peak
+log: added headers and persistence to FakeLogger
+qt: Added QSignalHook class to be used in taurusgui or other qt gui's that need signal redirection.
+
+November 2012 10.00
+
+dynamic: 
+ * DynamicDS reimplements dev_state so NO LONGER ATTRIBUTE QUALITIES AFFECT STATE!
+ * You can override this behavior in child classes by setting useDynStates=False in the __init__ call
+ * tau dependency removed
+ * added push arg to set_state to enable/disable event pushing on purpose
+ * Bugs solved in DynamicDS.check_state return value
+ * Added DynamicAttribute.peak recording
+ * Solved bug when calling ATTR() to read an static attribute
+device/dynamic: get_polled_attrs moved to tango module
+objects: Property replaced by NamedProperty to avoid ambiguity
+functional: added randpop(sequence)
+tango: removed taurus dependency for parse_tango_model
+device: Using taurus instead of tau
+device: dev_state() overriden to not have State() calls triggering read_attribute() for every attribute that has a quality config.
+device: lazy _state initialization to prevent bugs when subscribe_attributes is called too early in init_device()
+device: ComposersDict moved to servers module
+excepts: Added RethrownException call, to know in DynamicDS when an exception has been already catched
+
+
+October 2012 9.11
+
+device: TangoEval added cache and delta evaluation.
+tango: bug solved in get_devices_properties, methods for getting/setting alias, translate labes and alias,  
+qt: added NullWidget, getApplication, QColorDictionary, 
+objects: added load_module
+functional: added methods: randomize, djoin/isNested, replaceCl,  toString/ToStringList
+dicts: added reversedict
+arrays: added dict2array,array2dict, tree2table methods
+
+July 2012 - 9.10
+-----------------------
+__init__::
+ more tango.* methods available at fandango
+arrays::
+ improved arguments names to avoid confussions
+device::
+ TangoEval: storing exceptions as last_value
+functional::
+ iPipe,iPiped and many | bash-pipes-like decorators/methods
+tango::
+ bug solved in get_devices_properties
+
+June 2012 - 9.9
+-----------------------
+.qt migrated to taurus
+.functional: bugs solved in anyone/everyone
+servers: tango_host argument added
+tango: added get_devices_properties to get properties in multiple hosts
+tango: re_tango expression modified to accept device names numeric only
+tango: reduced db load in get_matching_devices calls
+
+May 2012 - 9.8
+-----------------------
+Tango: New bugs solved in FIND(), modified to not load database with constant queries.
+dynamic: ATTRIBUTES set as list
+CSV: arrays are iterable
+
+
+May 2012 - 9.7
+-----------------------
+TangoEval: patched bug in FIND()
+functional: small bugs solved
+dynamic: problems with state/status generation solved
+dynamic: ATTRIBUTES added to _locals
+
+
+
+April 2012 - 9.6
+-----------------------
+
+TangoEval: Attribute values overridable using eval(previous=...) argument, CRITICAL BUG SOLVED HERE!
+excepts.trial: Added args/kwargs to trial methods
+fun: setitem/getitem generic methods
+tango:added get_device_started method, find_devices/find_attributes added to fandango root, get_matching_device_attributes renamed to get_matching_attributes
+tango: get_device_commands/attributes methods added (with regexp filter)
+
+April 2012 - 9.5
+------------------------
+
+TangoEval: parsing split in parse_formula, parse_tag, parse_variables to make methods more reusable. Only eval() keeps cache, rest of methods do not keep data. Better management of locals using update_locals(dct).
+ComposersDict: added get/set_property methods
+WorkerProcess: Documentation+Better KeepAlive management
+
+March 2012 - 9.4
+------------------------
+device: _locals dictionary persistent always, even if new _locals is passed by argument
+functional: added methods to convert between text and lists of strings
+bugs solved in TangoEval and except2str methods, the latest caused problems in PyAlarm.
+dynamic: dynamic: added LogLevel parsing
+dynamic: added DynamicCommands for any Tango type
+dynamic: added WPROPERTY
+
+March 2012 - 9.3
+------------------------
+
+device: limited traces in TangoEval, _locals dictionary is now persistent
+log: added except2str methods
+threads: added WorkerProcess, provides WorkerThread+evalX+Process+ThreadDict functionality.
+objects: Added dirModule/dirClasses methods
+
+Jan 2012 - 9.2
+------------------------
+device: ProxiesDict class moved to fandango.tango module to solve import issues
+device: ComposersDict class added to manage DynamicDS-like attributes
+device: Solved bug in PyTango>7.2.2 when reading DynamicDS attributes from Dev4Tango
+
+December 2011 - 9.1
+------------------------
+device: dependencies from Tau removed
+dynamic: solved bug when reading DynDS class properties
+tango: Improved methods for getting attribute labels, commands and parse tango-taurus models.
+arrays: better export from csv to dictionary
+functional:
+ - Added number conversion methods from PyPLC.
+ - Added evalX(dict/class/string) from WorkerThread
+ - Added str2time conversions from PyTangoArchiving.
+ - All functional methods exported to fandango
+threads:
+ - Added CallbackProcess from PyTangoArchiving.reader
+ - evalX method moved from WorkerThread to functional module
+web: added list_to_ulist converter
+
+November 2011 - 9.00 : LIMITED COMPATIBILITY WITH PREVIOUS RELEASES
+------------------------------------------------------------------
+Changes by Tiago: dynamic/objects/dicts: compatible with Tango 7.2.2. Staticmethod decorators removed from Dynamic calls as they are no longer needed; now any decorator has to be wrapped in order to be recognized. Single-line method declaration with decorators is no longer allowed (may affect DynamicCommands?).
+This change is no backwards compatible, so an "if PyTango.__version__ ..." has been added to enable/disable USE_STATIC_METHODS in fandango.dynamic module
+dynamic: get_DynDS_properties and __init__ refactored to load default values also for class properties and do a better parsing of property types.
+dynamic: improved logging and comments parsing in dyn_attr
+dynamic: locks added to check_state to avoid recursive calls from DynamicStates evaluation
+dynamic: added FILE(...) command to formulas to allow .csv file parsing
+device: bug solved when dictionaries in TangoEval are empty
+qt: patched an error in QCustomTabWidget
+qt: added DictToolBar and QGridTable classes
+servers: solved a bug in load_from_servers_list() method
+tango: added methods to manage attribute labels
+
+October 2011 - 8.28
+-------------------
+__init__: default imports reduced
+dynamic: Modified get_DynDS_properties to respect Default values assigned in subclasses
+dynamic: Using taurus instead of Tau for XAttr calls
+dynamic: set_state forces push_event(State) if UseEvents is enabled
+log: shortstr patched
+TangoEval: proxy timeout reduced to 2 seconds
+Qt: Added QCustomPushButton and QCustomTab classes for having extendend StackWidgets.
+qt: Added TauFakeEventReceiver class
+servers: removed Tau dependency
+
+September 2011 - 8.27
+----------------------
+Event configuration check refactored to allow trending of attributes
+tango: added methods for searching attribute in multiple hosts.
+dynamic: added full parsing of all attributes and LogLevel
+log: added .getLogLevel(alias=None) method
+dynamic: refactoring of getDynDS Properties and logging.
+
+August 2011 - 8.26
+-------------------
+
+tango: generic tango methods moved from fandango.device to fandango.tango module
+Dynamic: UseEvent property bug solved, added try/except in check_changed_event to prevent errors in read attribute with PyTango releases that does not support events.
+threads: added CronTab class to manage task schedule
+device: TangoEval.parse_variables modified to get devices not running when using FIND(...); parsing of $(_locals) added
+tango: now able to find devices in multiple hosts.
+
+
+August 2011 - 8.25
+-------------------
+ dynamic: 
+static methods links for dyn_attr/read_dyn_attr/write_dyn_attr reviewed
+LOCALS added to _locals, TangoCommand with feedback added to COMM macro (getXCommand).
+Added UseEvents property and push_event triggered by attribute event config and/or XAttr calls.
+DynamicQualities improved and moved from read_dyn_attr to dyn_attr and evalAttr methods.
+Check_State machine improved to push events if State in UseEvents list.
+
+ device:
+TangoCommand bugs solved to be usable with callables in DynamicDS.DynamicCommands
+added undo_property to restore old property values
+
+ linos:
+added methods for copying and making diff of directories
+
+July 2011 - 8.24
+-----------------------------------------
+
+Changes in modules: 
+init: 
+device,web,threads modules added to all 
+
+ callbacks: 
+All Event/Device management lists changed into protected 
+AsynchronousFunction class moved to threads module 
+
+ device: 
+able to switch between Tau and Taurus 
+Dev4Tango capable of reading dynamic attributes from other devices within the same server. 
+added TangoCommand class for managing Tango commands with feedback. 
+
+ dynamic: 
+assigning default property values in DynamicDS init 
+KeepAttributes, KeepTime, CheckDependencies refactored 
+
+ log: 
+to avoid duplicity of traces with Tau logging the default output (logging or print) can be set using init(use_print=bool) argument. It is set as True by default. 
+
+ objects: 
+Pool class moved to threads module 
+
+ qt: 
+DoubleClickable decorator added 
+TangoHostChooser added 
+
+ threads: 
+SingletonWorker, Pool and AsynchronousFunction classes added 
+
+ servers: 
+Added logger argument to ServersDict()
+
+KeepTime / KeepAttributes / CheckDependencies properties
+--------------------------------------------------------
+
+The values of dynamic attributes will be kept in *dyn_values* dictionary if **KeepAttributes** is equal to '*', 'yes' or 'true'; or if the attribute name appears in the property.
+
+For each **read_dyn_attr(Attribute)** call the values will not be recalculated if interval between read_attribute calls is < **KeepTime** (1s by default).
+
+**ChekDependencies** (True by default) will force a check of which attributes are accessed in other's formulas, creating an index for each attribute with its pre-requisites for evaluation (which will be automatically assigned to be kept). At each *read_dyn_attr* execution the dependency values will be added to *_locals*, and a *read_dyn_attr(dependency)* may be forced if its values are older than **KeepTime**.
+
+
+10th May 2011 - 8.23
+-----------------------------------------
+device: cast_tango_type method added to parse tango types to python 
+cast_tango_type method added to parse tango types to python 
+dynamic: KeepTime property to DynamicDS, values will not be recalculated if interval between read_attribute calls is < KeepTime
+functional: added terminate argument to regexp-related methods
+qt: fireEvent renamed to handleEvent
+servers: solved bug when loading lists of patterns, improved get_device_server method to avoid timeouts with unexported devices
+dicts: solved bug in ThreadDict.__init__ (dict.update not called)
+dicts: ThreadsDict get/set_item methods now lock only during dict update, not while read/write_methods are called; it solves timeout issues
+dynamic: read_attr_hardware commented (unused), polling report format improved
+
+17th March 2011 - 8.22
+-----------------------------------------
+db: Added method to get table sizes
+dynamic: solved bug in updateDynamicAttributes
+dynamic: added KeptTime property to be used in read_dyn_attr: by default no re-evals will be faster than 1 second.
+fun: bug solved in time to date
+log: bug solved in setLogLevel
+
+
+
+10th March 2011
+-----------------------------------------
+Updates in device and servers modules to enable multi-host TangoEval calls.
+dynamic: Added DynamicSpectrumSize class property
+dynamic: improved search for dependencies and property parsing
+log: log levels case independent
+device: Bug solved in get_matching_device_attributes()
+
+2nd March 2011
+-------------------------------------------
+
+qt: added TauColorComponent classes
+objects: improved text representation of Structs
+linos: added get_cpu method
+fun: regular expression methods improved
+bug solved in @Catched decorator
+device: ProxiesDict now supports AttributeProxies
+device: TangoEval supports attributes from multiple hosts
+dynamic: get_DynDS_properties modified to be more efficient
+dynamic: regexp bug solved in DynamicDS.get_quality_for_attribute
+functional: bug solved in imports
+device: added more tango database methods
+
+PyTango_utils 10 December 2010
+-------------------------------------------
+dicts: added CaselessList
+dynamic: dependencies checked using regexps
+functional: added str casting in regular expression conversion; bug solved in isString method
+qt: added a 'thinking' cursor behaviour, added a .wait(sleep) to main thread in the run() method
+objects: added namedtuple
+
+
+PyTango_utils 1st December 2010
+-------------------------------------------
+dynamic: WATTR added for writing external attributes
+dynamic: Added XDEV=getXDevice to access DeviceProxies from dynamic attributes
+dynamic: evalAttr replaced by evalState inside evaluateFormula (no dependencies check, no Write access)
+dynamic: DynamicStatus property parsing added
+dynamic: Tango states added as eval variables
+
+device: Dev4Tango update_attributes changed to be more efficient checking attributes from same server
+device: Added/improved methods to access Tango database
+
+objects: Added Pool ; a class for managing queued-threaded tasks
+
+
+PyTango_utils 9th November 2010
+-------------------------------------------
+device: Added methods to access device info/host
+dynamic: Added property to disable dependencies check between attributes.
+functional: added isGenerator method
+ThreadDict improved
+
+PyTango_utils bliss-8.15, 3rd november 2010
+-------------------------------------------
+ * timeout added to check_attribute
+ * DevChild kept as Dev4Tango alias
+ * poll period added as ThreadDict.append
+
+PyTango_utils bliss-8.14, 18th october 2010
+-------------------------------------------
+device:
+ * Dev4Tango modified to be able to manage internal polling
+ * Fake attribute/event objects improved
+ * Added event-like access to internal device objects within a server and its attributes and commands
+ * DevChild class commented from the module as it will be replaced by Dev4Tango
+dicts/objects:
+ * self_locked decorator moved from dicts to objects module
+dynamic:
+ * self_locked decorator added to always_executed_hoot, read_dyn_attr and write_dyn_attr methods
+servers:
+ * bug solved in get_device_list method
+
+
+PyTango_utils bliss-8.13, 13th october 2010
+-----------------------------
+servers:
+ * Start/Stop of servers improved, checking running status to ignore/kill processes if needed.
+dynamic:
+* Added tau event subscription for XAttr
+* polling_report moved to its own method
+log:
+* bug solved in level aliases
+qt:
+* TauEmitter.next is now public
+* if self.method is None, methods are taken from queue
+
+PyTango_utils bliss-8.12, 16 Sept 2010
+-------------------------------------
+
+arrays.py: Added offset argument to CSVArray creator
+device.py: Better parsing of get_matching_devices/get_all_devices arguments
+dynamic.py: Added DevState type to dynamic attributes
+dynamic.py: Added default argument to getXAttr to manage return types for exceptions and empty arrays
+functional.py: isSequence, toList, and join methods prepared to work with arrays and generators.
+linos.py: whole file refactored, added methods for getting PID and memory usage of processes using /proc/
+servers.py: Now start/stop_servers w/out argument will start/stop all servers
+
+PyTango_utils bliss-8.11, 7 Sept 2010
+-------------------------------------
+
+Changes on fandango modules:
+
+ * device: ProxiesDict and attribute search methods added to device
+ * dicts: SortedDict added in dicts
+ * dynamic: PYMEMCHECK var added to enable heapy debugging in DynamicDS classes
+ * except: trial(...) added for lambdable try...except
+ * linos: timeout added to ping commands
+ * log: filtering  '\r' characters in logs
+ * objects: tuple lists added as Struct argument
+ * servers: methods for attribute/device matching moved to device module.
+ * web: added color tags
+"""

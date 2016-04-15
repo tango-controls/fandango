@@ -1,0 +1,33 @@
+#!/usr/bin/python
+
+"""
+usage: devicemonitor <device name> [ <attr name> ]*
+"""
+
+import sys
+import time
+import PyTango
+
+def main():
+  m = PyTango.DeviceProxy(sys.argv[1])
+
+  cb = PyTango.utils.EventCallBack()
+
+  if len(sys.argv) == 2:
+      attrs = "state",
+  else:
+      attrs = map(str.strip, sys.argv[2:])
+
+  attrs = map(str.strip, attrs)
+
+  eids = [m.subscribe_event(attr, PyTango.EventType.CHANGE_EVENT, cb) for attr in attrs]
+
+  try:
+      while True:
+          time.sleep(1)
+  except KeyboardInterrupt:
+      print "Finsihed monitoring"
+    
+if __name__ == '__main__':
+  main()    
+

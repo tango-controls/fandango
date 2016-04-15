@@ -1,0 +1,110 @@
+
+Fandango is Free Software by the CELLS / ALBA Synchrotron, Barcelona, Spain
+
+SECTION 0: WARRANTY
+===================
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+SECTION 1: GENERAL LICENSE FOR FANDANGO SOURCE CODE
+=================================================
+
+The files in Fandango, except for the cases described in SECTION 2
+are distributed under the GNU Lesser General Public License as published by
+the Free Software Foundation, either version 3 of the License, or 
+(at your option) any later version.
+
+See:
+  <http://www.gnu.org/licenses/>
+  <http://www.gnu.org/licenses/gpl.html>
+  <http://www.gnu.org/licenses/lgpl.html>
+
+
+SECTION 2: EXCEPTIONS
+=====================
+
+Some files (e.g., those authored by 3rd parties or the documentation 
+sources) may be distributed under Free Software / documentation licenses 
+that may differ from the the general one defined in SECTION 1.
+
+Those exceptions will be listed in this same document.
+
+2.1: Explicit copyright info in header/metadata:
+------------------------------------------------
+ 
+If a file contains an explicit license or other copyright information in
+its header or metadata which differs from the one defined in SECTION 1, 
+such license/copyright info mentioned in the header/metadata prevails.
+
+2.2: Documentation:
+-------------------
+
+The .py scripts in the doc directory are treated as per SECTION 1, 
+and the rest of its files are distributed under a Creative Commons 
+Attribution 3.0 License 
+See <http://creativecommons.org/licenses/by/3.0/>
+
+2.3: Snapshots:
+---------------
+
+The image files in fandango/image/snapshots have been 
+created in ALBA/CELLS and are licensed under the Creative Commons 
+Attribution 3.0 License 
+See <http://creativecommons.org/licenses/by/3.0/>
+
+2.4: Icons:
+-----------------
+
+The image files in fandango/image/icons have been 
+created in ALBA/CELLS and are licensed under the Creative Commons 
+Attribution 3.0 License 
+See <http://creativecommons.org/licenses/by/3.0/>
+
+2.4: External Icons:
+--------------------
+
+The following icons in the fandango/image/external
+directory have been adapted from the Spyderlib project 
+(http://code.google.com/p/spyderlib/)and are licensed under the MIT License
+See: http://www.opensource.org/licenses/mit-license.php
+
+class.png
+function.png
+ipython.png
+python-module.png 
+
+The following icons in the fandango/image/external
+directory have been adapted from the Python project
+(http://python.org) and are licensed under the PSF License Agreement.
+"Python" and the Python logo are trademarks or registered
+trademarks of the Python Software Foundation. 
+See:  http://docs.python.org/license.html
+
+python.png 
+python-console.png
+python-file.png   
+python-package.png   
+pythonw-console.png
+
+
+The following icons in the fandango/image/external
+directory are part of the Tango-Controls project 
+(http://www.tango-controls.org) and are licensed under the LGPL v3+ 
+See http://www.gnu.org/licenses/
+(@todo: Confirm This!)
+
+tango.png
+jive/*.png 
+
+
+
