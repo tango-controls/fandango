@@ -12,6 +12,11 @@ else
  INSTANCE=$1
 fi
 
+DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property('ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
+if [ "$DSORB" ] ; then
+ DSORB="-ORBendPoint $DSORB"
+fi
+
 DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
 
 if [ ! "$DSPATH" ] ; then
@@ -25,7 +30,7 @@ fi
 
 DSPATH=$(readlink -f $DSPATH)
 
-echo "Launching $DSPATH/$DS $INSTANCE"
+echo "Launching $DSPATH/$DS $INSTANCE at $DSORB"
 
 # TODO: if it is mandatory to be in the module path 
 cd ${DSPATH}
@@ -41,6 +46,6 @@ else
   CMD=""
 fi
 
-CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $2"
+CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $2 $DSORB"
 echo $CMD
 $CMD
