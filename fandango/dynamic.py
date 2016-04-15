@@ -256,7 +256,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def init_device(self):
         self.info( 'DynamicDS.init_device(%d)'%(self.get_init_count()))
         try:
-            if not self.get_init_count():
+            if not type(self) is DynamicDS and not self.get_init_count():
                 self.get_DynDS_properties()
             else:
                 self.updateDynamicAttributes()
@@ -290,7 +290,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.myClass = self.get_device_class()
             #Check polled to be repeated here but using admin (not allowed at Init()); not needed with Tango8 but needed again in Tango9!! (sigh)
             #if getattr(PyTango,'__version_number__',0) < 804:
-            self.check_polled_attributes(use_admin=True)
+            #self.check_polled_attributes(use_admin=True) ###@TODO REMOVE!!! IT IS CRASHING DEVICES IN TANGO9!!
         except Exception,e:
             print 'prepare_DynDS failed!: %s' % str(e).replace('\n',';') #traceback.format_exc()
         finally:
@@ -793,7 +793,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         return self.dyn_attrs.keys()
 
     def is_dyn_allowed(self,req_type,attr_name=''):
-        return True
+        return (time.time()-self.time0) > 1e-3*self.StartupDelay
 
     #@Catched #Catched decorator is not compatible with PyTango_Throw_Exception
     @self_locked
@@ -1434,6 +1434,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         """Forces dynamic attributes update from properties.
         @warning : It will DELETE all attributes that does not appear in DynamicAttributes property or StaticAttributes list!
         """
+        self.warning('In updateDynamicAttributes(): reloading DynamicDS properties from Database')
         self.get_DynDS_properties()
         
         ##All attributes managed with dyn_attr() that does not appear in DynamicAttributes or StaticAttributes list will be removed!
@@ -1618,6 +1619,10 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevDouble,
             "The kept value will be returned if a kept value is re-asked within this milliseconds time (Cache).",
             [ 200 ] ],
+        'StartupDelay':
+            [PyTango.DevDouble,
+            "The device server will wait this time in milliseconds before starting.",
+            [ 1000 ] ],
         'CheckDependencies':
             [PyTango.DevBoolean,
             "This property manages if dependencies between attributes are used to check readability.",
@@ -2102,6 +2107,7 @@ class DynamicServer(object):
             sys.exit(-1)
         
     def main(self,args=None):
+        print('DynamicDS.main(%s)'%(args or sys.argv))
         U = self.util.instance()
         U.server_init()
         U.server_run()
@@ -2109,7 +2115,9 @@ class DynamicServer(object):
 __doc__ = fandango.get_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
         
 if __name__ == '__main__':
+    print('.'*80)
     pyds = DynamicServer(add_debug=True)
+    print('loaded ...')
     pyds.main()
     print('launched ...')
     
