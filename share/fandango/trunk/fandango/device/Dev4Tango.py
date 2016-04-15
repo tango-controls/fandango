@@ -180,7 +180,10 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 missing_properties[k]=default
             else:
                 value = self.__dict__[k]
-                if not isinstance(value,list): value = [value]
+                if not fun.isSequence(value):
+                    value = [value]
+                elif not isinstance(value,list):
+                    value = list(value)
                 if value==default:
                     missing_properties[k]=value
         if missing_properties:
@@ -198,6 +201,8 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         props = dict([(key,getattr(self,key)) for key in property_list if hasattr(self,key)])
         for key,value in props.items():
             print 'Updating Property %s = %s' % (key,value)
+            if fun.isSequence(value) and not isinstance(value,list):
+                value = list(value)
             self.db.put_device_property(self.get_name(),{key:isinstance(value,list) and value or [value]})                
     ##@}
     
