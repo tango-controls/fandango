@@ -496,8 +496,10 @@ def isDictionary(seq):
     """ It includes dicts and also nested lists """
     if isinstance(seq,dict): return True
     if hasattr(seq,'items') or hasattr(seq,'iteritems'): return True
-    if seq and isSequence(seq) and isSequence(seq[0]):
-        if seq[0] and not isSequence(seq[0][0]): return True #First element of tuple must be hashable
+    try:
+        if seq and isSequence(seq) and isSequence(seq[0]):
+            if seq[0] and not isSequence(seq[0][0]): return True #First element of tuple must be hashable
+    except: pass
     return False
 isMapping = isDictionary
 
