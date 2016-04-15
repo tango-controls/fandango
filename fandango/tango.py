@@ -431,11 +431,16 @@ def put_device_property(device,property,value=None,db=None):
      - put_device_property(device,property,value)
     """
     if not isMapping(property):
+        if isSequence(value) and not isinstance(value,list):
+            value = list(value)
         property = {property:value}
     else:
-        for p,v in property.items():
-            if isSequence(v) and len(v)==1:
-                property[p] = v[0]
+        for p,v in property.items():          
+            if isSequence(v):
+                if len(v)==1:
+                    property[p] = v[0]
+                elif not isinstance(value,list):
+                    property[p] = list(v)
     return (db or get_database()).put_device_property(device,property)
             
 def get_devices_properties(device_expr,properties,hosts=[],port=10000):
