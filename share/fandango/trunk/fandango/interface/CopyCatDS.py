@@ -201,9 +201,10 @@ class CopyCatServer(DynamicServer):
         targets = dict((d,fandango.tango.get_device_property(d,'TargetDevice')) for d in doppels)
         classes = {}
         print 'targets: %s'%targets
-        for t in set(targets.values()):
-            if t: classes[t] = choose_db(t,self.db).get_class_for_device(t if ':' not in t else t.split('/',1)[-1])
-        print 'Devices: \n%s'%"\n".join(sorted('%s = %s(%s)'%(d,t,classes.get(t,None)) for d,t in targets.items()))
+        if class_override:
+            for t in set(targets.values()):
+                if t: classes[t] = choose_db(t,self.db).get_class_for_device(t if ':' not in t else t.split('/',1)[-1])
+            print 'Devices: \n%s'%"\n".join(sorted('%s = %s(%s)'%(d,t,classes.get(t,None)) for d,t in targets.items()))
         if class_override and classes:
             for c in set(classes.values()):
                 print('Adding %s_Copy ...'%c)
