@@ -1,0 +1,5 @@
+
+Changelog
+=========
+
+.. include:: ../../fandango/CHANGES

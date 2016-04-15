@@ -1,0 +1,16 @@
+The main authors of fandango library, ordered by date of first contribution:
+
+Sergi Rubio, ALBA Synchrotron
+Thiago Coutinho, ESRF
+
+Other individuals who contributed with nontrivial code to 
+fandango's codebase, ordered by date of first contribution.:
+
+Ramón Suñé, ALBA Synchrotron
+Carlos Falcón, ALBA Synchrotron
+Daniel Roldán, ALBA Synchrotron
+Neilen Marais, SKA-SA
+
+Other individuals who submitted bug reports or trivial one-line patches are
+generally credited in the commit log and comments in the patched code.
+
