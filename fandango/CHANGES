@@ -1,5 +1,5 @@
-RELEASE = (11,11,0)
-RELEASE_NOTE = "Compact dynamic attributes with VAR/GET/SET"
+RELEASE = (11,12,0)
+RELEASE_NOTE = "Solved bugs in Tango 9*"
 
 """
 IMPORTANT:
@@ -16,11 +16,16 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
     
 ----------------------------------------------------
-April 2016 - 11.11 Added CopyCatDS/WorkerDS devices
+April 2016 - 11.12 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
 ----------------------------------------------------
 
 Added WorkerDS, added DynamicDS launchers
-    
+Solved bug with fakeAttributeValue.type
+Solved bug with put_device_property in Tango9
+Disabled check_polled_attributes in running devices (caused crashes)
+Added DynamicDS.StartupDelay
+DynamicDS runs on specific port using ORBEndPoint property
+
 -------------------------------------------------
 April 2016 - 11.10 fandango.sh command line
 -------------------------------------------------
