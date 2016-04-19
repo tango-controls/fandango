@@ -412,6 +412,7 @@ def main(args=None):
     try:
         py = PyTango.Util(args)
         # Adding all commands/properties from fandango.DynamicDS
+        from fandango.device.WorkerDS import WorkerDS,WorkerDSClass
         WorkerDS,WorkerDSClass = FullTangoInheritance('WorkerDS',WorkerDS,WorkerDSClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
         py.add_TgClass(WorkerDSClass,WorkerDS,'WorkerDS')
         U = PyTango.Util.instance()
