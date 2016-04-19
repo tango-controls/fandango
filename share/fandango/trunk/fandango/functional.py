@@ -341,7 +341,7 @@ def toCl(exp,terminate=False,wildcards=('*',' '),lower=True):
     """ Replaces * by .* and ? by . in the given expression. """
     exp = str(exp).strip()
     if lower: exp = exp.lower()
-    if not any(s in exp for s in ('.*','\*',']*',')*')):
+    if not any(s in exp for s in ('.*','\*',']*')):
         for w in wildcards:
             exp = exp.replace(w,'.*')
     if terminate and not exp.strip().endswith('$'): exp += '$'
