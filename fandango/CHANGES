@@ -1,4 +1,4 @@
-RELEASE = (11,12,0)
+RELEASE = (11,13,0)
 RELEASE_NOTE = "Solved bugs in Tango 9*"
 
 """
@@ -16,7 +16,12 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
     
 ----------------------------------------------------
-April 2016 - 11.12 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
+April 2016 - 11.13 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
+----------------------------------------------------
+    
+Bugs solved in WorkerDS launcher and regexp parsing.
+    
+11.12 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
 ----------------------------------------------------
 
 Added WorkerDS, added DynamicDS launchers
@@ -26,8 +31,7 @@ Disabled check_polled_attributes in running devices (caused crashes)
 Added DynamicDS.StartupDelay
 DynamicDS runs on specific port using ORBEndPoint property
 
--------------------------------------------------
-April 2016 - 11.10 fandango.sh command line
+11.10 fandango.sh command line
 -------------------------------------------------
 
 Added fandango.sh command line executor

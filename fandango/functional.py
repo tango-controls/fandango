@@ -338,7 +338,9 @@ def sortedRe(iterator,order):
     return sorted(iterator,key=sorter)
 
 def toCl(exp,terminate=False,wildcards=('*',' '),lower=True):
-    """ Replaces * by .* and ? by . in the given expression. """
+    """ Replaces * by .* and ? by . in the given expression. 
+    """
+    ## @PROTECTED: DO NOT MODIFY THIS METHOD, MANY, MANY APPS DEPEND ON IT
     exp = str(exp).strip()
     if lower: exp = exp.lower()
     if not any(s in exp for s in ('.*','\*',']*')):
