@@ -8,6 +8,12 @@ TARGET=$(pwd)/autodoc
 
 echo "Generating $MOD documentation at $TARGET"
 
+if [ -e $MOD/.svn ] || [ -e $MOD/.git ] ; then
+ echo "Execute this method only on exports!, not checkouts!!!"
+ echo "exiting ..."
+ exit 1
+fi
+
 if [ ! -e $TARGET ] ; then mkdir $TARGET; fi
 cp *rst $TARGET/
 if [ -e README ] ; then cp README $TARGET ;

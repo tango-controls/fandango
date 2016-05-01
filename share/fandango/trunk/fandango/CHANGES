@@ -1,5 +1,5 @@
 RELEASE = (11,13,0)
-RELEASE_NOTE = "Solved bugs in Tango 9*"
+RELEASE_NOTE = "Solved bugs in Tango 9+ and regexps"
 
 """
 IMPORTANT:
