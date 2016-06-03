@@ -467,11 +467,15 @@ class CaselessSortedDict(SortedDict,CaselessDict):
     """ This class implements a dictionary that returns keys in the same order they were inserted. """
     
     def __init__(self,other=None):
-        CaselessDict.__init__(self)
+        dict.__init__(self)
         self._keys = []
         if other is not None:
-            self.update(other)
+            CaselessDict.__init__(self,other)
         return
+    
+    @staticmethod
+    def caseless(key):
+        return str(key).lower()
     
     def sort(self,key):
         """
@@ -489,9 +493,10 @@ class CaselessSortedDict(SortedDict,CaselessDict):
         return self._keys[:]
         
     def __setitem__(self,k,v):
+        k = self.caseless(k)
         if k not in self._keys:
             self._keys.append(k)
-        CaselessDict.__setitem__(self,k,v)
+        dict.__setitem__(self,k,v)
         
     def update(self,other):
         if hasattr(other,'items'):
@@ -501,17 +506,15 @@ class CaselessSortedDict(SortedDict,CaselessDict):
     
     @staticmethod
     def fromkeys(S,v=None):
-        return CaselessSortedDict((s,v) for s in S)
+        S = map(self.caseless,S)
+        return SortedDict((s,v) for s in S)
             
     def pop(self,k,d=None):
         """Removes key and returns its (self[key] or d or None)"""
+        k = self.caseless(k)
         if k not in self: return d
         self._keys.remove(k)
-        return CaselessDict.pop(self,k)
-    
-    def clear(self):
-        self._keys = []
-        return CaselessDict.clear(self)
+        return dict.pop(self,k)
 
     
 ##################################################################################################
