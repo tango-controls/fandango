@@ -463,6 +463,56 @@ class SortedDict(dict):
         return (self[k] for k in self._keys)
     
 
+class CaselessSortedDict(SortedDict,CaselessDict):
+    """ This class implements a dictionary that returns keys in the same order they were inserted. """
+    
+    def __init__(self,other=None):
+        CaselessDict.__init__(self)
+        self._keys = []
+        if other is not None:
+            self.update(other)
+        return
+    
+    def sort(self,key):
+        """
+        This method modifies the sorting of the dictionary overriding the existing sort key.
+        :param key: it can be a sequence containing all the keys already existing in the dictionary 
+                    or a callable providing a sorting key algorithm.
+        """
+        import operator
+        if operator.isCallable(key):
+            self._keys = sorted(self._keys,key=key)
+        else:
+            for k in self._keys:
+                if k not in self._keys: raise KeyError(k)
+            self._keys = list(key)
+        return self._keys[:]
+        
+    def __setitem__(self,k,v):
+        if k not in self._keys:
+            self._keys.append(k)
+        CaselessDict.__setitem__(self,k,v)
+        
+    def update(self,other):
+        if hasattr(other,'items'):
+            other = other.items()
+        for k,v in other:
+            self.__setitem__(k,v)
+    
+    @staticmethod
+    def fromkeys(S,v=None):
+        return CaselessSortedDict((s,v) for s in S)
+            
+    def pop(self,k,d=None):
+        """Removes key and returns its (self[key] or d or None)"""
+        if k not in self: return d
+        self._keys.remove(k)
+        return CaselessDict.pop(self,k)
+    
+    def clear(self):
+        self._keys = []
+        return CaselessDict.clear(self)
+
     
 ##################################################################################################
 
