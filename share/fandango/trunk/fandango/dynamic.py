@@ -872,11 +872,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         except:
             data = []
             attr.get_write_value(data)
-            if self.dyn_types[aname].dimx==1: 
-                data = data[0]
-            elif self.dyn_types[aname].dimy!=1:
-                x = attr.get_max_dim_x()
-                data = [data[i:i+x] for i in range(len(data))[::x]]            
+        if fun.isSequence(data) and self.dyn_types[aname].dimx==1: 
+            data = data[0]
+        elif self.dyn_types[aname].dimy!=1:
+            x = attr.get_max_dim_x()
+            data = [data[i:i+x] for i in range(len(data))[::x]]
         self.setAttr(aname,data)
         #self.dyn_values[aname].update(result,time.time(),PyTango.AttrQuality.ATTR_VALID)
         ##if fire_event: self.fireAttrEvent(aname,data)
@@ -936,21 +936,28 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self._locals[k]=v.value
             
             self.debug("In evalAttr ... updating locals defaults")
-            self._locals.update({
-                't':time.time()-self.time0,
-                'WRITE':WRITE,
-                'READ':bool(not WRITE),
-                'ATTRIBUTE':aname,
-                'NAME':self.get_name(),
-                'VALUE':VALUE if VALUE is None or aname not in self.dyn_types else self.dyn_types[aname].pytype(VALUE),
-                'STATE':self.get_state(),
-                'LOCALS':self._locals,
-                #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
-                'ATTRIBUTES':sorted(self.dyn_values.keys()),
-                'XATTRS':self._external_attributes,
-                }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
-            if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
-            
+            try:
+              self._locals.update({
+                  't':time.time()-self.time0,
+                  'WRITE':WRITE,
+                  'READ':bool(not WRITE),
+                  'ATTRIBUTE':aname,
+                  'NAME':self.get_name(),
+                  'VALUE':VALUE if VALUE is None or aname not in self.dyn_types else self.dyn_types[aname].pytype(VALUE),
+                  'STATE':self.get_state(),
+                  'LOCALS':self._locals,
+                  #'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
+                  'ATTRIBUTES':sorted(self.dyn_values.keys()),
+                  'XATTRS':self._external_attributes,
+                  }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
+              if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
+            except Exception,e:
+              self.error('<'*80)
+              self.error(traceback.format_exc())
+              for t in (VALUE,type(VALUE),aname,self.dyn_types.get(aname,None),aname in self.dyn_types and self.dyn_types[aname].pytype):
+                self.warning(str(t))
+              self.error('<'*80)
+              raise e
             if WRITE: self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
             elif aname in self.dyn_values: self.debug('%s::evalAttr(READ): Attribute=%s; formula=%s;'%(self.get_name(),aname,formula,))
             else: self.info('%s::evalAttr(COMMAND): formula=%s;'%(self.get_name(),formula,))
