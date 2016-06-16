@@ -1,4 +1,4 @@
-RELEASE = (11,13,0)
+RELEASE = (11,14,0)
 RELEASE_NOTE = "Solved bugs in Tango 9+ and regexps"
 
 """
@@ -16,7 +16,19 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
     
 ----------------------------------------------------
-April 2016 - 11.13 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
+11.14 - June 2016 Solved Bugs with Dev4Tango/tango_servers
+----------------------------------------------------
+
+Solved bug in DynamicDS/Dev4Tango that didn't allowed to move PLCValve in Tango<8
+Added qt.ModelRefresher class for Taurus
+Added wildcards to tango_servers launcher
+Added fun.dict2json method
+Added Test modules methods
+
+    
+    
+----------------------------------------------------
+11.13 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
 ----------------------------------------------------
     
 Bugs solved in WorkerDS launcher and regexp parsing.
