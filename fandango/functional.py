@@ -577,6 +577,33 @@ def rtf2plain(t,e='[<][^>]*[>]'):
        
 def html2text(txt):
     return rtf2plain(txt)
+  
+def dict2json(dct,filename=None,throw=False,recursive=True):
+    """
+    It will check that all objects in dict are serializable.
+    If throw is False, a corrected dictionary will be returned.
+    If filename is given, dict will be saved as a .json file.
+    """
+    import json
+    result = {}
+    for k,v in dct.items():
+        try:
+            json.dumps(v)
+            result[k] = v
+        except Exception,e:
+            if throw: raise e
+            if isString(v): result[k] = ''
+            elif isSequence(v):
+                try:
+                    result[k] = toList(v)
+                    json.dumps(result[k])
+                except:
+                    result[k] = []
+            elif isMapping(v) and recursive:
+                result[k] = dict2json(v,None,False,True)
+    if filename:
+        json.dump(result,open(filename,'w'))
+    return result
     
 def toList(val,default=[],check=isSequence):
     if val is None: 
