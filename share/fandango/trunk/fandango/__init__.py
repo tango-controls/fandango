@@ -61,6 +61,8 @@ except Exception, e:
     __version__ = None
     #print ('Unable to get distribution version number, fandango has '
     #       'probably not been installed as a package')
+    
+__test__ = ['tango']
 
 try:
     from functional import *
@@ -141,4 +143,5 @@ if False: #Disabled to avoid extra dependencies!!
     except: print 'Unable to import db module'
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads','dynamic','callbacks','arrays','servers','linos','functional','interface','qt']
+
 #print 'module reloaded'
