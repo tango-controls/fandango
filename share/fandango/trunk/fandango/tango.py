@@ -55,6 +55,8 @@ from dicts import CaselessDefaultDict,CaselessDict
 from objects import Object,Struct
 from log import Logger,except2str,printf
 
+__test__ = {}
+
 #taurus imports, here USE_TAU is defined for all fandango
 global TAU,USE_TAU,TAU_LOGGER
 TAU,USE_TAU = None,False
@@ -91,6 +93,8 @@ def TGet(*args):
         return sorted(get_matching_attributes(arg0)) if isRegexp(arg0,WILDCARDS+' ') else check_attribute(arg0,brief=True)
     else:
         return sorted(get_matching_devices(arg0)) if isRegexp(arg0,WILDCARDS+' ') else get_device(arg0)
+        
+__test__['fandango.tango.TGet'] = ('sys/database/2',['sys/database/2'],{})
         
 ####################################################################################################################
 
@@ -960,7 +964,6 @@ def export_commands_to_dict(device,target='*'):
         dct[c.cmd_name]['name'] = c.cmd_name
     return dct
     
-            
 def export_properties_to_dict(device,target='*'):
     """ export device or class properties to dictionary """
     if '/' in device:
@@ -1675,7 +1678,9 @@ class TangoEval(object):
         return wildcard+target.replace('/',wildcard).replace('-',wildcard).replace('.',wildcard).replace(':',wildcard).replace('_',wildcard).lower()
     
     def get_delta(self,target):
-        # target = (device+'/'+attribute).lower() ; returns difference between first and last cached value
+        """
+        target = (device+'/'+attribute).lower() ; returns difference between first and last cached value
+        """
         if self.cache and target in self.cache:
             cache = self.cache.get(target)
         else:
@@ -1899,7 +1904,7 @@ class TangoCommand(object):
             raise TangoCommand.CommandTimeout(str(self.timeout*1000)+' ms')
         return result
 
-def __test__(args=None):
+def __test_method__(args=None):
     print __name__,'test',args
     if args:
       if args and args[0] == 'help':
@@ -1922,6 +1927,6 @@ def __test__(args=None):
         
 if __name__ == '__main__':
     import sys
-    __test__(sys.argv[1:])
+    __test_method__(sys.argv[1:])
 
 __doc__ = fandango.get_autodoc(__name__,vars())
