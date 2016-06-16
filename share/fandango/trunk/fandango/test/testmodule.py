@@ -7,6 +7,13 @@ FANDANGO_TEST['.servers.Astor'] = (None,[],{})
 
 class TestModule(fn.Object):
   """
+  The TestModule allows generic testing of modules and classes.
+  
+  Specific tests will be setup using the __test__ dictionary declared on each module.
+  
+  on __init__.py : __test__ = ['submodule','submodule2']
+  on submodule.py : __test__ = {'method1':[result,callable,callable],'method2':[result,args,kwargs]}
+  
   aliases = {'hdb':'PyTangoArchiving.ArchivingAPI'}
   tests = {}
   tests['module.class.method'] = [
@@ -18,6 +25,8 @@ class TestModule(fn.Object):
   tc = TestModule('PyTangoArchiving',tests)
   tc.test()
   
+  
+  
   """
   
   def __init__(self,module,tests={}):
@@ -28,11 +37,19 @@ class TestModule(fn.Object):
     self.tests = tests
     
   def get_module_callables(self,module):
-    m = self.modules[module]
-    result = set()
-    for o in dir(m):
-      if self.is_local(getattr(m,o),module):
-        result.add(module+'.'+o)
+    print('get_module_callables(%s)'%module)
+    try:
+      m = self.modules[module]
+      result = set()
+      l = list(getattr(m,'__test__',dir(m)))
+      for o in l:
+        o = o.split('.')[-1]
+        if self.is_local(getattr(m,o),module):
+          result.add(module+'.'+o)
+    except Exception,e:
+      print('get_module_callables(%s)'%module)
+      traceback.print_exc()
+      raise e
     return result
   
   def get_all_callables(self,module=None):
@@ -43,19 +60,29 @@ class TestModule(fn.Object):
     return sorted(result)
     
   def get_submodules(self,module=None,nr=0):
-    module = module or self.module
-    if fn.isString(module):
-      m = self.load_module(module)
-    else:
-      m,module = module,module.__name__
-    result = set()
-    for o in dir(m):
-      n = getattr(m,o)
-      if self.is_module(n) and module == n.__package__:
-        o = module+'.'+o
-        result.add(o)
-        if nr<10:
-          result = result.union(self.get_submodules(n,nr=nr+1))
+    print('get_submodules(%s)'%module)
+    try:
+      module = module or self.module
+      if fn.isString(module):
+        m = self.load_module(module)
+      else:
+        m,module = module,module.__name__
+      result = set()
+      l = getattr(m,'__test__',dir(m))
+      print m,l
+      l = list(l)
+      for o in l:
+        o = o.split('.')[-1]
+        n = getattr(m,o)
+        if self.is_module(n) and module == n.__package__:
+          o = module+'.'+o
+          result.add(o)
+          if nr<10:
+            result = result.union(self.get_submodules(n,nr=nr+1))
+    except Exception,e:
+      print('get_submodules(%s)'%module)
+      traceback.print_exc()
+      raise e
     return result 
   
   @staticmethod
@@ -78,6 +105,7 @@ class TestModule(fn.Object):
 
   @staticmethod
   def load_module(module):
+    print('load_module(%s)'%module)
     path = module.replace('.','/')
     obj = imp.load_module(module,*imp.find_module(path))
     return obj
@@ -98,33 +126,41 @@ class TestModule(fn.Object):
       r = obj(*args,**kwargs)
       self.results[obj] = r
       if result is None or r == result:
+        print("test_object('%s : %s == %s')"%(obj,r,result))
         return r or True
     except:
       traceback.print_exc()
       return False
     
   def test(self,tests=[]):
-    tests = tests or self.tests
-    if not fn.isSequence(tests): tests = [tests]
-    passed = 0
-    if fn.isMapping(tests):
-      tests = [[k]+list(t) for k,t in tests.items()]
-    for t in tests:
-      t = fn.toList(t)
-      t = t[0],(t[1:] or [None])[0],(t[2:] or [[]])[0],(t[3:] or [{}])[0]
-      v = self.test_object(t[0],t[1],*t[2],**t[3])
-      if v: passed += 1
-      self.results[t[0]] = v
-      
-    print('-'*80)
-    for t in tests:
-      v = self.results[fn.toList(t)[0]]
-      print('%s testing: %s : %s' % (self.module,t,['Failed','Ok'][bool(v)]))
-      
-    print('%s : %d / %d tests passed'%(self.module,passed,len(tests)))
+    """
+    Tests would be a list of (name,result,args,kwargs) values
+    """
+    try:
+      tests = tests or self.tests
+      if not fn.isSequence(tests): tests = [tests]
+      passed = 0
+      if fn.isMapping(tests):
+        tests = [[k]+list(t) for k,t in tests.items()]
+      for t in tests:
+        t = fn.toList(t)
+        t = t[0],(t[1:] or [None])[0],(t[2:] or [[]])[0],(t[3:] or [{}])[0]
+        v = self.test_object(t[0],t[1],*t[2],**t[3])
+        if v: passed += 1
+        self.results[t[0]] = v
+        
+      print('-'*80)
+      for t in tests:
+        v = self.results[fn.toList(t)[0]]
+        print('%s testing: %s : %s' % (self.module,t,['Failed','Ok'][bool(v)]))
+        
+      print('%s : %d / %d tests passed'%(self.module,passed,len(tests)))
+    except:
+      traceback.print_exc()
+      print(tests)
     return passed
   
-  def test_all(self,module):
+  def test_all(self,module=None):
     module = module or self.module
     ms = self.get_submodules()
     cs = self.get_all_callables(module)
@@ -152,4 +188,11 @@ class TestModuleSet(TestModule):
     r = fn.filtersmart(r,fs)
     return r    
     
-    
+def main(args):
+  m = args[0]
+  tc = TestModule(m)
+  tc.test_all()
+  
+if __name__ == '__main__':
+  import sys
+  main(sys.argv[1:])
