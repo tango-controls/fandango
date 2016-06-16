@@ -25,7 +25,8 @@ def main():
   actions = 'start stop restart status'.split()
 
   try:
-      host = sys.argv[1] if not sys.argv[1] in actions else ''
+      assert 'help' not in sys.argv[1]
+      host = sys.argv[1] if not sys.argv[1] in actions else ''      
       action = fandango.first([a for a in sys.argv if a in actions] or 'status')
       targets = sys.argv[(2 if sys.argv[1] in actions else 3):]
   except:
@@ -47,25 +48,28 @@ def main():
       sts = astor.states()
 
       if action in ('status',):
-          #if targets:
-              #print '\n'.join(sorted('%s:\t%s'%(k,str(v)) for k,v in sts.items()))
-          #else:
-          for h,ls in sorted(astor.get_host_overview().items()):
-              for l,ds in sorted(ls.items()):
-                  print '%s:%s'%(h,l)
-                  for s,devs in sorted(ds.items()):
-                      print '\t'+s
-                      for d,st in sorted(devs.items()):
-                          print '\t\t%s:\t%s'%(d,st)
+          if targets:
+              print '\n'.join(sorted('%s:\t%s'%(k,str(v)) for k,v in sts.items()))
+          else:
+            for h,ls in sorted(astor.get_host_overview().items()):
+                print('Note: Devices not controlled by Astor will not appear in this report\n\n')
+                for l,ds in sorted(ls.items()):
+                    print '%s:%s'%(h,l)
+                    for s,devs in sorted(ds.items()):
+                        print '\t'+s
+                        for d,st in sorted(devs.items()):
+                            print '\t\t%s:\t%s'%(d,st)
 
-      matched = [s for s in astor if not targets or fandango.clmatch(targets[0],s)]
-      running = [s for s,st in sts.items() if s in matched and st is not None]
+      matched = [s for s in astor] # if not targets or fandango.clmatch(targets[0],s)]
+      running = [s for s,st in sts.items() if st is not None]
       
       if action in ('stop','restart'):
+          print('Stopping : %s'%running)
           astor.stop_servers(running)
       if action in ('restart',):
           time.sleep(5)
       if action in ('start','restart'):
+          print('Starting : %s'%matched)
           astor.start_servers(matched,**(host and {'host':host} or {}))
       
       print '-'*80
