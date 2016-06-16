@@ -295,7 +295,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         return
         
     def write_external_attribute(self,device,attribute,data):
-        self.info('===================> In write_external_attribute(%s,%s)'%(device,attribute))
+        self.info('===================> In write_external_attribute(%s,%s,%s)'%(device,attribute,str(data)[:40]))
         device,attribute = device.lower(),attribute.lower()
         deviceObj = self.get_devs_in_server().get(device,None)
         if deviceObj is None:
