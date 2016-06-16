@@ -2,6 +2,8 @@
 """
 this module will be used to document lots of things with sphinx
 
+to see more about sphinx generation, check fandango/scripts/generate-sphinx-docs.sh
+
 Just do that at the end of your modules:
 
     from fandango.doc import get_autodoc
