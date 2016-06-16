@@ -26,11 +26,7 @@ To tune some options:
 
 print(__doc__)
 
-ReleaseNumber = type('ReleaseNumber',(tuple,),
-                     {'__repr__':(lambda self:'.'.join(map(str,self)))})
-release = ReleaseNumber(
-    imp.load_source('changelog',os.path.join('.', 'fandango', 'CHANGES'))
-    .RELEASE)
+release = open('fandango/VERSION').read()
 
 scripts = [
 './fandango/scripts/fandango.sh',
