@@ -569,6 +569,67 @@ class NullWidget(TaurusWidget):
         print 'In NullWidget.setInput(%s)'%value
         self.emit(Qt.SIGNAL('Output'), value or 'sys/database/2')
 
+import threading
+
+class ModelRefresher(threading.Thread,fandango.objects.SingletonMap):
+
+  def __init__(self,period=30):
+    threading.Thread.__init__(self)
+    self.period = period
+    self.targets = []
+    self.stop_event = threading.Event()
+    print('ModelRefresher.init()')
+    
+  def run(self):
+    while not self.stop_event.isSet():
+      self.targets = self.get_targets()
+      for t in self.targets:
+        self.fire_targets([t])
+        self.stop_event.wait(float(self.period)/len(self.targets))
+        if self.stop_event.isSet(): break
+    print('Model Refresh finished')
+    
+  def stop(self):
+    self.stop_event.set()
+    self.join()
+    
+  def get_targets(self,widgets=[]):
+    print('ModelRefresher.getTargets()')
+    widgets = widgets or getApplication().allWidgets()
+    targets = []
+    for w in widgets:
+      try:
+        if hasattr(w,'getModelObj') and w.getModelObj():
+            targets.append(w)
+      except:
+        pass
+      try:
+        if hasattr(w,'getCurveNames'):
+          for ts in w.getCurveNames():
+            ts = w.getCurve(ts)
+            if ts.getModelObj():
+              targets.append(ts)
+        if hasattr(w,'getTrendSetNames'):
+          for ts in w.getTrendSetNames():
+            ts = w.getTrendSet(ts)
+            if ts.getModelObj():
+              targets.append(ts)
+      except:
+        print w,w.getModel()
+        traceback.print_exc()
+    self.targets = targets
+    return targets
+    
+  def fire_targets(self,targets=[]):
+    targets = targets or self.targets
+    for ts in targets:
+      try:
+        ts.fireEvent(ts,taurus.core.TaurusEventType.Change,ts.getModelValueObj(cache=False))
+      except:
+        print ts
+        traceback.print_exc()
+    return
+
 #############################################################################################
 ## DO NOT EDIT THIS CLASS HERE, THE ORIGINAL ONE IS IN taurus utils emitter!!!
 #############################################################################################
