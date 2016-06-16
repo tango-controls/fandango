@@ -32,13 +32,15 @@ scripts = [
 './fandango/scripts/fandango.sh',
 './fandango/scripts/fandango.qt',
 './fandango/scripts/DynamicDS',
+'./fandango/scripts/WorkerDS',
+'./fandango/scripts/CopyCatDS',
 './fandango/scripts/tango_servers',
 ]
 
 entry_points = {
         'console_scripts': [
-            'CopyCatDS = fandango.interface.CopyCatDS:main',
-            'WorkerDS = fandango.device.WorkerDS:main',
+            #'CopyCatDS = fandango.interface.CopyCatDS:main',
+            #'WorkerDS = fandango.device.WorkerDS:main',
         ],
 }
 
