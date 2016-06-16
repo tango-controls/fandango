@@ -110,13 +110,13 @@ def addAllClasses(obj,servername='',db=None,classes=None):
         
 
 def updateChildClassDicts(Child,Parent,Exclude=[]):
-    print 'Updating %s from %s'%(Child.__name__,Parent.__name__)
+    #print 'Updating %s from %s'%(Child.__name__,Parent.__name__)
     for attribute in dir(Child):
         cattr = getattr(Child,attribute)
         if (not attribute.startswith('__')) and isinstance(cattr,dict) and hasattr(Parent,attribute):
             pattr = getattr(Parent,attribute)
             if isinstance(pattr,dict): 
-                print 'Updating %s.%s from %s'%(Child.__name__,attribute,Parent.__name__)
+                #print 'Updating %s.%s from %s'%(Child.__name__,attribute,Parent.__name__)
                 cattr.update((k,v) for k,v in pattr.items() if k not in Exclude and k not in cattr)
 #updateChildClassDicts(AlbaPLCClass,PyPLCClass)        
         
@@ -185,7 +185,7 @@ def addCommandToTgClass(dev,dev_class,cmd_name,cmd_def,cmd_fun):
     @param cmd_def should be like [[argintype,"desc"],[argouttype,"desc"],{'property':value}]
     e.g: [[PyTango.DevString, "formula to evaluate"],[PyTango.DevString, "formula to evaluate"],{'Display level':PyTango.DispLevel.EXPERT,}]
     """
-    print 'Adding command %s to %s,%s device class' % (cmd_name,dev,dev_class)
+    #print 'Adding command %s to %s,%s device class' % (cmd_name,dev,dev_class)
     setattr(dev,cmd_name,cmd_fun)
     dev_class.cmd_list[cmd_name] = cmd_def
     return
