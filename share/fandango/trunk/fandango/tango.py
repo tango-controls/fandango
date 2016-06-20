@@ -372,7 +372,8 @@ def get_attribute_info(device,attribute):
     return [types,formats]
   
 def get_attribute_config(target):
-    return PyTango.AttributeProxy(target).get_config()
+    d,a = target.rsplit('/',1)
+    return get_device(d).get_attribute_config(a)
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
