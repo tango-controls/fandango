@@ -732,7 +732,15 @@ def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
 epoch2str = time2str
     
 def str2time(seq='',cad=''):
-    """ Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format"""
+    """ 
+    :param seq: Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format or -N [d/m/y/s/h]
+    
+    See RAW_TIME and TIME_UNITS to see the units used for pattern matching.
+    
+    The conversion itself is done by time.strptime method.
+    
+    :param cad: You can pass a custom time format
+    """
     if seq in (None,''): return time.time()
     seq = str(seq).strip()
     m = re.match(RAW_TIME,seq) 
