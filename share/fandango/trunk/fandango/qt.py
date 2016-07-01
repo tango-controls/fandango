@@ -149,6 +149,52 @@ class QDialogWidget(Qt.QDialog):
         """connect the accepted() signal to a callable"""
         self.connect(self.buttons or self,Qt.SIGNAL('accepted()'),f)
         
+class QOptionDialog(QDialogWidget):
+    """
+    This class provides a fast way to update a dictionary from a Qt dialog
+    
+    s = fandango.Struct(name='test',value=7.8)
+    qo = QOptionDialog(model=s,cast=s.cast,title='Options')
+    qo.show()
+    #Edit and save the values
+    s.value : 5.0
+    
+    Using plain dicts:
+    d = {'name':'A','value':4}
+    qo = QOptionDialog(model=d,cast=fandango.str2type,title='Options')
+    qo.exec()
+    """
+  
+    def __init__(self,parent=None,model={},title='',cast=None):
+      QDialogWidget.__init__(self,parent,buttons=True)
+      self.accepted = False
+      self.cast = cast
+      if model: self.setModel(model)
+      if title: self.setWindowTitle(title)
+      self.connect(self,Qt.SIGNAL('accepted'),self.close)
+      
+    def setModel(self,model):
+      self._model = model
+      self._widget = Qt.QWidget()
+      self._widget.setLayout(Qt.QGridLayout())
+      self._edits = {}
+      for i,t in enumerate(self._model.items()):
+        k,w = str(t[0]),Qt.QLineEdit(str(t[1]))
+        self._widget.layout().addWidget(Qt.QLabel(k),i,0,1,1)
+        self._edits[k] = w
+        self._widget.layout().addWidget(w,i,1,1,1)
+      self.setWidget(self._widget)
+        
+    def accept(self):
+      self.accepted = True
+      for k,w in self._edits.items():
+        v = str(w.text())
+        self._model[k] = (self.cast or str)(v)
+      QDialogWidget.accept(self)
+        
+    def getModel(self):
+      return self._model
+        
 class QExceptionMessage(object):
     def __init__(self,*args):
         import traceback
@@ -256,6 +302,9 @@ class QCustomPushButton(Qt.QPushButton):
     pass
 
 class QCustomTabWidget(Qt.QWidget):
+    """
+    A reimplementation of QTabWidget but using custom buttons to manage tabs
+    """
     __pyqtSignals__ = ("currentChanged(int)",)
     def __init__(self,parent=None,icon_builder=None):
         Qt.QWidget.__init__(self,parent)
@@ -1017,6 +1066,9 @@ def MenuContexted(QtKlass):
         #Draggable.__init__(self)
                 
 class QOptionChooser(Qt.QDialog):
+    """ 
+    Dialog used to trigger several options from a bash launch script
+    """
     def __init__(self,title,text,command,args,parent=None):
         Qt.QDialog.__init__(self,parent)
         self.command = command
@@ -1415,7 +1467,9 @@ class QDictToolBar(Qt.QToolBar):
             
 class QDictTextBrowser(Qt.QWidget):
 
-    #textChanged = Qt.pyqtSignal(str) #API 2
+    """
+    Easy widget, it just shows a dictionary in a text shape
+    """
     
     def __init__(self,parent=None):
         Qt.QWidget.__init__(self,parent)
