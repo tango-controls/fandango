@@ -48,6 +48,8 @@ from itertools import dropwhile,takewhile,ifilter,ifilterfalse,izip
 try: from itertools import combinations,permutations,product
 except: pass
 
+__test__ = {}
+
 #Load all by default
 #__all__ = [
     #'partial','first','last','anyone','everyone',
@@ -191,6 +193,13 @@ def djoin(a,b):
     for k,v in other.items():
         dct[k] = v if not k in dct else djoin(dct[k],v)
     return dct
+  
+def kmap(method,keys,values=None,sort=True):
+    g = ((k,method((values or keys)[i])) for i,k in enumerate(keys))
+    return sorted(g) if sort else list(g)
+__test__['kmap'] = [
+  {'args':[str.lower,'BCA','YZX',False],'result':[('A', 'x'), ('B', 'y'), ('C', 'z')]}
+]
         
 def splitList(seq,split):
     """splits a list in lists of 'split' size"""
