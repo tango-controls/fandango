@@ -114,6 +114,13 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
 class Struct(object):
     """
     Metamorphic class to pass/retrieve data objects as object or dictionary
+    
+    s = Struct(name='obj1',value=3.0)
+    s.setCastMethod(lambda k,v: str2type)
+    s.cast('3.0') : 3.0
+    s.keys() : ['name', 'value']
+    s.to_str() : "fandango.Struct({'name': obj1,'value': 3.0,})"
+    s.dict() : {'name': 'obj1', 'value': 3.0}
     """
     def __init__(self,*args,**kwargs):
         self.load(*args,**kwargs)
@@ -122,11 +129,19 @@ class Struct(object):
         if isSequence(dct) and not isDictionary(dct): dct = dict.fromkeys(dct) #isDictionary also matches items lists
         [setattr(self,k,v) for k,v in (dct.items() if hasattr(dct,'items') else dct)]
         
+    #Overriding dictionary methods
+    def update(self,*args,**kwargs): return self.load(*args,**kwargs)
     def keys(self): return self.__dict__.keys()
     def values(self): return self.__dict__.values()
     def items(self): return self.__dict__.items()
+    def dict(self): return self.__dict__
+    def get(self,k,default=None): return getattr(self,k,default)
+    def set(self,k,v): return setattr(self,k,v)
+    def setdefault(self,v): self.dict().setdefault(v)
+    def pop(self,k): return self.__dict__.pop(k)
+    def has_key(self,k): return self.__dict__.has_key(k)
     def __getitem__(self,k): return getattr(self,k)
-    def __setitem__(self,k): return setattr(self,k,v)
+    def __setitem__(self,k,v): return setattr(self,k,v)
     def __contains__(self,k): return hasattr(self,k)
 
     def __call__(self,*args,**kwargs):
@@ -142,6 +157,29 @@ class Struct(object):
     def to_str(self,order=None,sep=','):
         """ This method provides a formatable string for sorting""" 
         return self.__str__() if order is None else (sep.join('%s'%self[k] for k in order))
+      
+    def default_cast(self,key=None,value=None):
+        if key not in self.keys() and not value:
+          key,value = None,key
+        value = notNone(value,key and self.get(key))
+        if not isString(value): 
+          return value
+        else:
+          return str2type(value)
+        
+    def cast(self,key=None,value=None,method=None):
+        """
+        Use set_cast_method(f) to override this call.
+        The cast method must accept both key and value keyword arguments.
+        """      
+        return (method or self.default_cast)(key,value)
+        
+    def cast_items(self,items=[],update=True):
+        items = items or self.items()
+        items = [(k,self.cast(value=v)) for k,v in self.items()]
+        if update:
+          [self.set(k,v) for k,v in items]
+        return items
         
 def _fget(self,var):
     return getattr(self,var)
