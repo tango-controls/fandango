@@ -1,4 +1,4 @@
-RELEASE = (11,14,0)
+RELEASE = (11,15,0)
 RELEASE_NOTE = "Solved bugs in Tango 9+ and regexps"
 
 """
@@ -16,6 +16,15 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
     
 ----------------------------------------------------
+11.15 - July 2016, required by PyTangoArchiving 7.1
+----------------------------------------------------
+
+New QOptionDialog widget
+New functional.kmap method
+Added extra dictionary/casting methods to Structs
+
+    
+----------------------------------------------------
 11.14 - June 2016 Solved Bugs with Dev4Tango/tango_servers
 ----------------------------------------------------
 
@@ -24,8 +33,6 @@ Added qt.ModelRefresher class for Taurus
 Added wildcards to tango_servers launcher
 Added fun.dict2json method
 Added Test modules methods
-
-    
     
 ----------------------------------------------------
 11.13 Solved bugs in Tango9, Added CopyCatDS/WorkerDS devices
