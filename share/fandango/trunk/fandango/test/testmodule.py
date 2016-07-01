@@ -12,7 +12,12 @@ class TestModule(fn.Object):
   Specific tests will be setup using the __test__ dictionary declared on each module.
   
   on __init__.py : __test__ = ['submodule','submodule2']
-  on submodule.py : __test__ = {'method1':[result,callable,callable],'method2':[result,args,kwargs]}
+  on submodule.py : 
+      __test__ = {'method1':[result,callable,callable],'method2':[result,args,kwargs]}
+      __test__['kmap'] = [
+        {'args':[str.lower,'BCA','YZX',False],
+        'result':[('A', 'x'), ('B', 'y'), ('C', 'z')]}
+        ]
   
   aliases = {'hdb':'PyTangoArchiving.ArchivingAPI'}
   tests = {}
@@ -54,8 +59,9 @@ class TestModule(fn.Object):
   
   def get_all_callables(self,module=None):
     module = module or self.module
+    print 'get_all_callables(%s)'%module
     result = set()
-    for s in self.get_submodules():
+    for s in [self.module]+list(self.get_submodules()):
       result = result.union(self.get_module_callables(s))
     return sorted(result)
     
@@ -136,15 +142,24 @@ class TestModule(fn.Object):
     """
     Tests would be a list of (name,result,args,kwargs) values
     """
+    print('test(',tests,')')
     try:
       tests = tests or self.tests
       if not fn.isSequence(tests): tests = [tests]
       passed = 0
       if fn.isMapping(tests):
-        tests = [[k]+list(t) for k,t in tests.items()]
+        tests = [
+          [k]+list(t if not isMapping(t) else 
+            (t.get('result',None),t.get('args',[]),t.get('kwargs',[]))
+            )
+          for k,t in tests.items()]
       for t in tests:
         t = fn.toList(t)
-        t = t[0],(t[1:] or [None])[0],(t[2:] or [[]])[0],(t[3:] or [{}])[0]
+        print t
+        t[0] = t[0]
+        t[1] = (t[1:] or [None])[0]
+        t[2] = (t[2:] or [[]])[0]
+        t[3] = (t[3:] or [{}])[0]
         v = self.test_object(t[0],t[1],*t[2],**t[3])
         if v: passed += 1
         self.results[t[0]] = v
@@ -164,6 +179,8 @@ class TestModule(fn.Object):
     module = module or self.module
     ms = self.get_submodules()
     cs = self.get_all_callables(module)
+    print '%d submodules'%len(ms)
+    print '%d callables'%len(cs)
     self.test(list(ms)+list(cs))
     
 class TestModuleSet(TestModule):
