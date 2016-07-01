@@ -35,6 +35,9 @@ scripts = [
 './fandango/scripts/WorkerDS',
 './fandango/scripts/CopyCatDS',
 './fandango/scripts/tango_servers',
+'./fandango/scripts/tango_host',
+'./fandango/scripts/tango_property',
+'./fandango/scripts/tango_monitor',
 ]
 
 entry_points = {
