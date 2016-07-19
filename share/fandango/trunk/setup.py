@@ -50,7 +50,7 @@ entry_points = {
 
 setup(
     name="fandango",
-    version=str(release),
+    version=str(release).strip(),
     packages=find_packages(),
     description="Simplify the configuration of big Tango control systems",
     long_description="Fandango is a Python module created to simplify the "
