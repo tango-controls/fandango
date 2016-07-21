@@ -74,9 +74,11 @@ Requirements
 Downloading
 ===========
 
-Fandango module is available at sourceforge:
+Fandango module is available from github (>=T9) and sourceforge (<=T9):
 
-svn co https://tango-cs.svn.sourceforge.net/svnroot/tango-cs/share/fandango/trunk fandango.src
+ git clone https://github.com/sergirubio/fandango
+
+ svn co https://tango-cs.svn.sourceforge.net/svnroot/tango-cs/share/fandango/trunk fandango.src
 
 Warranty
 ========
