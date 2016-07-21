@@ -1,0 +1,7 @@
+#!/bin/sh
+
+PENDING
+
+ - clean_exported_devices
+ - clean_polled_attr [device]
+ - clean_attr_config [device]
