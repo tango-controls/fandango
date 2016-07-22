@@ -9,6 +9,8 @@ Check status of Devices Attributes
 At server level
 ---------------
 
+This code allows to visualize the state of all servers matching a *regular expression*
+
 .. code-block:: python
 
   astor = fn.Astor('PyAttributeProcessor/*')
