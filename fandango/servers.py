@@ -47,7 +47,8 @@ import fandango.functional as fun
 from fandango.objects import Object
 from fandango.dicts import CaselessDefaultDict,CaselessDict
 from fandango.log import Logger
-from fandango.tango import ProxiesDict,get_device_info,get_database,get_tango_host
+from fandango.tango import ProxiesDict,get_device_info,get_database,\
+    get_tango_host,get_class_devices
 from fandango.excepts import trial
     
 ####################################################################################################################
@@ -256,7 +257,7 @@ class ServersDict(CaselessDict,Object):
         self.servers = self.values
                 
         if loadAll: self.load_all_servers()
-        elif klass: self.load_by_exec(klass)
+        elif klass: self.load_by_class(klass)
         elif devs_list: self.load_from_devs_list(devs_list)
         elif servers_list: self.load_from_servers_list(servers_list)
         #elif pattern: self.load_from_servers_list(self.db.get_server_list(pattern))
@@ -318,6 +319,10 @@ class ServersDict(CaselessDict,Object):
                     self.log.warning('No server matches with %s (family=%s).'%(server_name,family))
                     return 0
         return self
+    
+    def load_by_class(self,klass):
+        """ Initializes the ServersDict using all the devices from a given class """
+        self.load_from_devs_list(get_class_devices(klass))
         
     def load_by_host(self,host):
         """ Initializes the dict with all the servers assigned to a given host. """
@@ -445,6 +450,12 @@ class ServersDict(CaselessDict,Object):
     def get_host_servers(self,host):
         """It inspects all pre-loaded servers and returns those controlled in the specified host."""
         return [ss.name for ss in self.values() if ss.host.lower() == host.lower().split('.')[0].strip()]
+    
+    def get_host_devices(self,host):
+        l = []
+        for s in self.get_host_servers(host):
+            l.extend(self[s].get_device_list())
+        return l
     
     def get_host_level_servers(self,host,level=0,controlled=True):
         """It inspects all pre-loaded servers and returns those controlled in the specified host and level."""
@@ -802,7 +813,7 @@ class ServersDict(CaselessDict,Object):
                     #self.server_Stop(d)
                        
     def get_report(self):
-        '''def server_Report(self): The status of Servers '''
+        ''' get the status of Servers '''
         self.states()
         report='The status of device servers is:\n\n'
         hosts = map(str,set(v.host for v in self.values()))
