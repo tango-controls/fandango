@@ -376,7 +376,7 @@ def filtersmart(seq,filters):
         '$' : matches the end of strings
     """
     seq = seq if isSequence(seq) else (seq,)
-    filters = filters if isSequence(seq) else (filters,)
+    filters = filters if isSequence(filters) else (filters,)
     raw,comp,neg = [],[],[]
     def parse(s):
         s = toRegexp(s)
