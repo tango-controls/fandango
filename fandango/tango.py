@@ -666,6 +666,16 @@ class get_all_devices(objects.SingletonMap):
         instance = objects.SingletonMap.__new__(cls,*p,**k)
         return instance.get_all_devs()
     
+def get_class_devices(klass,db=None):
+    """ Returns all registered devices for a given class 
+    """
+    if not db:
+        db = get_database()
+    if isString(db): 
+        db = get_database(db)
+    return sorted(str(d).lower() for d in db.get_device_name('*',klass))
+    
+    
 def get_matching_devices(expressions,limit=0,exported=False,fullname=False,trace=False):
     """ 
     Searches for devices matching expressions, if exported is True only running devices are returned 
