@@ -1,14 +1,12 @@
-#    "$Name:  $";
-#    "$Header: /cvsroot/tango-ds/Simulators/SaverDS/SaverDS.py,v 1.4 2008/11/21 11:51:44 sergi_rubio Exp $";
 #=============================================================================
 #
-# file :        SaverDS.py
+# file :        FolderDS.py
 #
-# description : Python source for the SaverDS and its commands. 
+# description : Python source for the FolderDS and its commands. 
 #                The class is derived from Device. It represents the
 #                CORBA servant object which will be accessed from the
 #                network. All commands which can be executed on the
-#                SaverDS are implemented in this file.
+#                FolderDS are implemented in this file.
 #
 # project :     TANGO Device Server
 #
@@ -37,23 +35,23 @@ from fandango.servers import ServersDict
 from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 
 #==================================================================
-#   SaverDS Class Description:
+#   FolderDS Class Description:
 #
 #         <p>This device requires <a href="http://www.tango-controls.org/Documents/tools/fandango/fandango">Fandango module<a> to be available in the PYTHONPATH.</p>
 #
 #==================================================================
 
-class SaverAPI(ServersDict):
+class FolderAPI(ServersDict):
     """
-    The SaverAPI object will allow to access all SaverDS instances in the system.
-    This will allow to easily save, read, list files in the Saver ecosystem.
+    The FolderAPI object will allow to access all FolderDS instances in the system.
+    This will allow to easily save, read, list files in the Folder ecosystem.
     Files can be tracked by any host, using get_all_hosts() and get_host_devices() methods.
     """
     
     def __init__(self,mask=None):
-        #mask = mask or 'SaverDS/*'
+        #mask = mask or 'FolderDS/*'
         ServersDict.__init__(self)
-        devs = fn.tango.get_class_devices('SaverDS')
+        devs = fn.tango.get_class_devices('FolderDS')
         if mask: devs = fn.filtersmart(devs,mask)
         self.load_from_devs_list(devs)
         self.hosts = fn.defaultdict(list)
@@ -92,12 +90,12 @@ class SaverAPI(ServersDict):
                 r.append((d+':' if len(m)>1 else '')+f)
         return r
 
-class SaverDS(DynamicDS): #PyTango.Device_4Impl):
+class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 
 #--------- Add you global variables here --------------------------
 
     def save_text_file(self,filename,data):
-        print('In SaverDS.save_text_file(%s,%d)'%(filename,sys.getsizeof(data)))
+        print('In FolderDS.save_text_file(%s,%d)'%(filename,sys.getsizeof(data)))
         #if self.SaveFolder and not filename.startswith('/'):
         filename = self.SaveFolder + '/' + filename #SAFER TO FORCE  ALWAYS PATH
         f = open(filename,'w')
@@ -133,7 +131,7 @@ class SaverDS(DynamicDS): #PyTango.Device_4Impl):
         ##Loading special methods to be available in formulas
         _locals = {}        
         DynamicDS.__init__(self,cl,name,_locals=_locals,useDynStates=True)
-        SaverDS.init_device(self)
+        FolderDS.init_device(self)
         self.worker = fandango.threads.WorkerThread()
         self.worker.start()
         self.worker.put('1')
@@ -163,7 +161,7 @@ class SaverDS(DynamicDS): #PyTango.Device_4Impl):
 
 #==================================================================
 #
-#    SaverDS read/write attribute methods
+#    FolderDS read/write attribute methods
 #
 #==================================================================
 #------------------------------------------------------------------
@@ -175,7 +173,7 @@ class SaverDS(DynamicDS): #PyTango.Device_4Impl):
 
 #==================================================================
 #
-#    SaverDS command methods
+#    FolderDS command methods
 #
 #==================================================================
 
@@ -205,10 +203,10 @@ class SaverDS(DynamicDS): #PyTango.Device_4Impl):
     
 #==================================================================
 #
-#    SaverDSClass class definition
+#    FolderDSClass class definition
 #
 #==================================================================
-class SaverDSClass(DynamicDSClass):
+class FolderDSClass(DynamicDSClass):
 
     #    Class Properties
     class_property_list = {
@@ -224,7 +222,7 @@ class SaverDSClass(DynamicDSClass):
        'SaveFolder':
             [PyTango.DevString,
             "Folder for saving/retrieving data files",
-            [ '/tmp/' ] ],            
+            [ '/tmp/folderds' ] ],            
         }
 
 
@@ -269,22 +267,22 @@ class SaverDSClass(DynamicDSClass):
 
 
 #------------------------------------------------------------------
-#    SaverDSClass Constructor
+#    FolderDSClass Constructor
 #------------------------------------------------------------------
     def __init__(self, name):
         PyTango.DeviceClass.__init__(self, name)
         self.set_type(name);
-        print "In SaverDSClass  constructor"
+        print "In FolderDSClass  constructor"
 
 #==================================================================
 #
-#    SaverDS class main method
+#    FolderDS class main method
 #
 #==================================================================
 def main(args = None):
     try:
         py = PyTango.Util(args or sys.argv)
-        py.add_TgClass(SaverDSClass,SaverDS,'SaverDS')
+        py.add_TgClass(FolderDSClass,FolderDS,'FolderDS')
         U = PyTango.Util.instance()
         U.server_init()
         U.server_run()
@@ -297,7 +295,7 @@ def main(args = None):
 def test(args = None):
     print sys.argv
     args = args or sys.argv[2:]
-    api = SaverAPI()
+    api = FolderAPI()
     print(api.states())
     if args:
         c = args[0]
