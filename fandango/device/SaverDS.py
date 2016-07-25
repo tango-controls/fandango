@@ -33,7 +33,7 @@ import traceback
 import PyTango
 import fandango
 import fandango as fn
-from fandango import ServersDict
+from fandango.servers import ServersDict
 from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 
 #==================================================================

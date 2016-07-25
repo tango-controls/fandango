@@ -48,8 +48,7 @@ try:
     import objects,imp
     PATH = os.path.dirname(objects.__file__)
     ReleaseNumber = type('ReleaseNumber',(tuple,),{'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
-    #print 'Fandango Release number: %s, loaded from %s/CHANGES' % (ReleaseNumber,PATH)
-    RELEASE = ReleaseNumber(imp.load_source('changelog',PATH+'/CHANGES').RELEASE)
+    RELEASE = ReleaseNumber(map(int,open(PATH+'/VERSION').read().strip().split('.')))
 except Exception,e: 
     print traceback.format_exc()
     print 'Unable to load RELEASE number: %s'%e
