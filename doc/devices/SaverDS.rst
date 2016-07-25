@@ -3,15 +3,15 @@ SaverDS
 =======
 
 
-SaverAPI
-========
+SaverAPI(ServersDict)
+=====================
 
 The SaverAPI object will allow to access all SaverDS instances in the system.
 This will allow to easily save, read, list files in the Saver ecosystem.
 Files can be tracked by any host, using get_all_hosts() and get_host_devices() methods.
 
-SaverDS Device Class
-====================
+SaverDS(DynamicDS)
+==================
 
 Properties
 ----------
@@ -38,3 +38,6 @@ Attributes
 ----------
 
 :State: Not Implemented
+
+Other Methods
+-------------
