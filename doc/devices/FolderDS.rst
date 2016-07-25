@@ -1,22 +1,22 @@
-=======
-SaverDS
-=======
+========
+FolderDS
+========
 
 
-SaverAPI(ServersDict)
-=====================
+FolderAPI(ServersDict)
+======================
 
-The SaverAPI object will allow to access all SaverDS instances in the system.
-This will allow to easily save, read, list files in the Saver ecosystem.
+The FolderAPI object will allow to access all FolderDS instances in the system.
+This will allow to easily save, read, list files in the FolderDS system.
 Files can be tracked by any host, using get_all_hosts() and get_host_devices() methods.
 
-SaverDS(DynamicDS)
-==================
+FolderDS(DynamicDS)
+===================
 
 Properties
 ----------
 
-:SaveFolder: Folder where to save data; /tmp/ by default
+:SaveFolder: Folder where to save data; /tmp/folderds by default
 
 :DefaultMethod: Command to be called when from SaveFile(); SaveText by default.
 
@@ -41,3 +41,5 @@ Attributes
 
 Other Methods
 -------------
+
+save_text_file
