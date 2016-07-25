@@ -17,7 +17,9 @@ PENDING:
 
 Next:
 
-Added multiline strings when exporting to json dictionary
+Add multiline strings when exporting to json dictionary
+Add SaverDS and SaverAPI for remote writing/reading log files
+Add load_by_class get_device_host methods to ServersDict (for better device-based API's)
     
 ----------------------------------------------------
 11.15 - July 2016, required by PyTangoArchiving 7.1
