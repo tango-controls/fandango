@@ -91,10 +91,17 @@ class FakeLogger():
     """
     _instances = []
     def __init__(self,header='',keep=False):
+        self.LogLevel = 1
         self.header = '%s: '%header if header else ''
         if keep: self._instances.append(self)
-    def trace(self,s):print time2str()+' '+'TRACE\t'+self.header+s
-    def debug(self,s):print time2str()+' '+'DEBUG\t'+self.header+s
+    def setLogLevel(self,s):
+        self.LogLevel = str(s).lower()!='DEBUG'
+    def trace(self,s):
+        if not self.LogLevel:
+          print time2str()+' '+'TRACE\t'+self.header+s
+    def debug(self,s):
+        if not self.LogLevel:
+          print time2str()+' '+'DEBUG\t'+self.header+s
     def info(self,s):print time2str()+' '+'INFO\t'+self.header+s
     def warning(self,s):print time2str()+' '+'WARNING\t'+self.header+s
     def error(self,s):print time2str()+' '+'ERROR\t'+self.header+s
