@@ -444,6 +444,15 @@ class SingletonMap(object):
 ###############################################################################
 from functools import wraps
 
+class nullDecorator(object):
+    """
+    Empty decorator with null arguments, used to replace pyqtSignal,pyqtSlot
+    """
+    def __init__(self,*args): 
+      pass
+    def __call__(self,f): 
+      return f
+
 def decorator_with_args(decorator):
     '''
     Decorator with Arguments must be used with parenthesis: @decorated() 
