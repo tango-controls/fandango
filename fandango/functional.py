@@ -525,11 +525,13 @@ def isNested(seq,strict=False):
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
     
-def isBool(seq):
+def isBool(seq,is_zero=True):
+    codes = ['true','yes','false','no']
+    if is_zero: codes+=['0','1']
     if seq in (True,False):
         return True
     elif isString(seq):
-        return seq.lower() in ('true','yes','1','false','no','0') #none/nan will not be considered boolean
+        return seq.lower() in codes #none/nan will not be considered boolean
     else:
         return False
     
@@ -562,7 +564,7 @@ def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
     m = re.match(sep_exp,seq) 
     if m:
         return [str2type(s,use_eval) for s in str2list(seq,m.groups()[0])]
-    elif isBool(seq):
+    elif isBool(seq,is_zero=False):
         return str2bool(seq)
     elif use_eval:
         try:

@@ -932,7 +932,10 @@ def export_attribute_to_dict(model,attribute=None,value=None,keep=False):
             if attr.data_format!='SCALAR': 
                 attr.value = list(v.value if v.value is not None and v.dim_x else [])
                 sep = '\n' if attr.data_type == 'DevString' else ','
-                attr.string = sep.join(map(vrepr,attr.value))
+                svalue = map(vrepr,attr.value)
+                attr.string = sep.join(svalue)
+                if 'numpy' in str(type(v.value)): 
+                  attr.value = map(fandango.str2type,svalue)
             else:
               if attr.data_type in ('DevState','DevBoolean'):
                   attr.value = int(v.value)
@@ -1040,7 +1043,7 @@ def check_starter(host):
     else:
         return False
     
-def check_device(dev,attribute=None,command=None,full=False,admin=False):
+def check_device(dev,attribute=None,command=None,full=False,admin=False,bad_state=False):
     """ 
     Command may be 'StateDetailed' for testing HdbArchivers 
     It will return True for devices ok, False for devices not running and None for unresponsive devices.
@@ -1061,7 +1064,11 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False):
     try:
         if attribute: dp.read_attribute(attribute)
         elif command: dp.command_inout(command)
-        else: dp.state()
+        else: 
+          s = dp.state()
+          if bad_state:
+            assert s not in bad_state and str(s) not in bad_state
+          return str(s) #True
         return True
     except:
         return None
