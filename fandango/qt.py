@@ -1478,7 +1478,10 @@ class QDictTextBrowser(Qt.QWidget):
         
     def setupUi(self):
         self.top = Qt.QListWidget()
-        self.top.itemClicked.connect(self.updateText)
+        try:
+          self.top.itemClicked.connect(self.updateText)
+        except:
+          self.top.connect(self.top,Qt.SIGNAL('itemClicked(item)'),self.updateText)
         self.bottom = Qt.QTextBrowser()
         self.setLayout(Qt.QVBoxLayout())
         map(self.layout().addWidget,(self.top,self.bottom))
@@ -1620,6 +1623,7 @@ class QTableOnWidget(Qt.QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         
     def setFiltered(self):
+        self.data = self.data or []
         data = [d for d in self.data if fandango.searchCl(str(self.bar.text()),str(d))]
         self.setCells(data)
 
