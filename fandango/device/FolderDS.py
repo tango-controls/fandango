@@ -89,7 +89,7 @@ class FolderAPI(ServersDict):
             for f in l:
                 r.append((d+':' if len(m)>1 else '')+f)
         return r
-
+      
 class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 
 #--------- Add you global variables here --------------------------
@@ -306,5 +306,8 @@ def test(args = None):
 if __name__ == '__main__':
     if '--test' in sys.argv:
         test()
+    if '--gui' in sys.argv:
+        from FolderGUI import FolderGUI
+        FolderGUI.main()
     else:
         main()
