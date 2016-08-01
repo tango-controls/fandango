@@ -1437,6 +1437,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 #   DynamicAttribute manipulation methods
 #------------------------------------------------------------------------------------------------------
 
+    def Help(self,str_format='text'):
+        """This command returns help for this device class and its parents"""
+        return tango.get_device_help(self,str_format)
+
     def updateDynamicAttributes(self):
         """Forces dynamic attributes update from properties.
         @warning : It will DELETE all attributes that does not appear in DynamicAttributes property or StaticAttributes list!
@@ -1662,6 +1666,9 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
+        'Help':
+            [[PyTango.DevVoid, ""],
+            [PyTango.DevString, "python docstring"],],
         'getDynamicConfig':
             [[PyTango.DevVoid, "Print current property values"],
             [PyTango.DevString, "Print current property values"],
