@@ -50,7 +50,7 @@ class FolderGUI(Qt.QSplitter):
       put(self.data,2,0,5,2)
       put(self.new,7,1,1,1)
       #put(self.save,7,1,1,1)
-      self.save.setEnabled(False)
+      #self.save.setEnabled(False)
       self.data.setReadOnly(True)
       self.filename.setEnabled(False)
       
@@ -90,3 +90,6 @@ class FolderGUI(Qt.QSplitter):
       fgui = FolderGUI(mask=args and args[0] or None)
       fgui.show()
       app.exec_()
+      
+if __name__ == '__main__':
+  FolderGUI.main()

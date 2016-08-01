@@ -91,6 +91,7 @@ class FolderAPI(ServersDict):
         return r
       
 class FolderDS(DynamicDS): #PyTango.Device_4Impl):
+    """ The FolderDS Device Server will allow to write/save/list text files between tango devices """
 
 #--------- Add you global variables here --------------------------
 
@@ -257,7 +258,8 @@ class FolderDSClass(DynamicDSClass):
             [PyTango.DevVarStringArray, "file list"],
             {
                 'Display level':PyTango.DispLevel.EXPERT,
-             } ],                    
+             } ],         
+        'Help':DynamicDSClass.cmd_list['Help'],
         }
 
 
