@@ -1147,6 +1147,32 @@ def cast_tango_type(value_type):
         return int
     else: 
         return str
+      
+def get_device_help(self,str_format='text'):
+    """This command returns help text for this device class and its parents"""
+    if str_format=='text' or True:
+      linesep,docsep,item = '\n','\n\n------------\n\n',' * %s'
+    try:
+      doc = ''
+      parents = []
+      for b in type(self).__bases__:
+        parents.append(b.__name__)
+        if b.__doc__:
+          doc = b.__name__+':'+b.__doc__
+          break
+      docs = [type(self).__name__+'(%s)'%','.join(parents),doc]
+      for t,o in (
+        ('Class Properties','class_property_list'),('Device Properties','device_property_list'),
+        ('Commands','cmd_list'),('Attributes','attr_list')
+        ):
+        c = self.get_device_class()
+        d = getattr(c,o).keys()
+        if d:
+          docs.append(t+linesep+linesep+linesep.join(item%k for k in d))
+    except Exception,e:
+      traceback.print_exc()
+      raise e
+    return docsep.join(docs)
     
 def get_internal_devices():
     """ Gets all devices declared in the current Tango server """
