@@ -321,15 +321,24 @@ def searchCl(exp,seq,terminate=False,extend=False):
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
 
-def replaceCl(exp,repl,seq,regexp=True):
+def replaceCl(exp,repl,seq,regexp=True,lower=False):
     """ 
     Replaces caseless expression exp by repl in string seq 
     repl can be string or callable(matchobj) ; to reuse matchobj.group(x) if needed in the replacement string
+    lower argument controls whether replaced string should be always lower case or not
     """
+    if lower and hasattr(repl,'lower'):
+      repl = repl.lower()
     if regexp:
-        return re.sub(exp.lower(),repl.lower() if hasattr(repl,'lower') else repl,seq.lower())
+      r,s = '',1
+      while s:
+        s = searchCl(exp,seq)
+        if s:
+          r+=seq[:s.start()]+repl
+          seq=seq[s.end():]
+      return r+seq
     else:
-        return seq.lower().replace(exp.lower(),repl.lower())
+      return seq.lower().replace(exp.lower(),repl)
     
 clsub = replaceCl
 
@@ -589,7 +598,7 @@ def rtf2plain(t,e='[<][^>]*[>]'):
 def html2text(txt):
     return rtf2plain(txt)
   
-def dict2json(dct,filename=None,throw=False,recursive=True):
+def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
     """
     It will check that all objects in dict are serializable.
     If throw is False, a corrected dictionary will be returned.
@@ -599,7 +608,7 @@ def dict2json(dct,filename=None,throw=False,recursive=True):
     result = {}
     for k,v in dct.items():
         try:
-            json.dumps(v)
+            json.dumps(v,encoding=encoding)
             result[k] = v
         except Exception,e:
             if throw: raise e
