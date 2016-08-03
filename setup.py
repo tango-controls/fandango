@@ -34,6 +34,7 @@ scripts = [
 './fandango/scripts/DynamicDS',
 './fandango/scripts/WorkerDS',
 './fandango/scripts/CopyCatDS',
+'./fandango/scripts/FolderDS',
 './fandango/scripts/tango_servers',
 './fandango/scripts/tango_host',
 './fandango/scripts/tango_property',
