@@ -1,5 +1,5 @@
-RELEASE = (11,15,0)
-RELEASE_NOTE = "Solved bugs in Tango 9+ and regexps"
+RELEASE = (12,0,0)
+RELEASE_NOTE = "Added FolderDS, moved to GitHub, many bugs fixed"
 
 """
 IMPORTANT:
@@ -15,12 +15,34 @@ PENDING:
     StructDict with sort/get/filter methods like Panic api
     preparing next PyAlarm release with None not allowed in comparisons
 
-Next:
+----------------------------------------------------
+12.0 - August 2016, required by latest PyPLC/Panic
+----------------------------------------------------
 
+MIGRATED TO GITHUB: https://github.com/sergirubio/fandango
+
+FolderDS: remote writing/reading log files
+Add FolderGUI tool for managing FolderDS devices
+Added FolderDS device class and documentation
+Add Help() command to DynamicDS
+
+Enhanced json exports:
 Add multiline strings when exporting to json dictionary
-Add SaverDS and SaverAPI for remote writing/reading log files
+Solve bug in replaceCl, dict2json
+Add code2atoms, allow str2list to keep separator
+Solve numpy bug on export_attribute_to_dict (using str2type)
+Add verbose state on check_device()
+
+Solve bug in QEvaluator.setModel()
 Add load_by_class get_device_host methods to ServersDict (for better device-based API's)
-    
+Add nullDecorator to objects
+Add logLevel to FakeLogger
+Add caseless option to listdir()
+Add get_device_help internal DS method
+Add get_class_devices method
+solve bug in filtersmart()
+Adding custom test scripts
+
 ----------------------------------------------------
 11.15 - July 2016, required by PyTangoArchiving 7.1
 ----------------------------------------------------
