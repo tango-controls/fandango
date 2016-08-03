@@ -570,6 +570,7 @@ def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
     If use_eval is True, then it tries to evaluate as code.
     """
     if not use_eval: sep_exp = '(?:^[^\(\[\{])'+sep_exp #Get non-evaluable lists
+    seq = str(seq).strip()
     m = re.match(sep_exp,seq) 
     if m:
         return [str2type(s,use_eval) for s in str2list(seq,m.groups()[0])]
@@ -620,10 +621,10 @@ def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
                 except:
                     result[k] = []
             elif isMapping(v) and recursive:
-                result[k] = dict2json(v,None,False,True)
+                result[k] = dict2json(v,None,False,True,encoding=encoding)
     if filename:
-        json.dump(result,open(filename,'w'))
-    return result
+        json.dump(result,open(filename,'w'),encoding=encoding)
+    return result if not filename else filename
     
 def toList(val,default=[],check=isSequence):
     if val is None: 
@@ -648,8 +649,41 @@ def toString(val):
 def toStringList(seq):
     return map(toString,seq)
 
-def str2list(s,separator=''): 
-    return map(str.strip,s.split(separator) if separator else s.split())
+def str2list(s,separator='',regexp=False,sep_offset=0): 
+    """ Arguments allow to split by regexp and to keep or not the separator character 
+    sep_offset = 0 : do not keep
+    sep_offset = -1 : keep with posterior
+    sep_offset = 1 : keep with precedent
+    """
+    if not regexp:
+      return map(str.strip,s.split(separator) if separator else s.split())
+    elif not sep_offset:
+      return map(str.strip,re.split(separator,s) if separator else re.split('[\ \\n]',s))
+    else:
+      r,seps,m = [],[],1
+      while m:
+        m = clsearch(separator,s)
+        if m:
+          r.append(s[:m.start()])
+          seps.append(s[m.start():m.end()])
+          s = s[m.end():]
+      r.append(s)
+      for i,p in enumerate(seps):
+        if sep_offset<0: r[i]+=p
+        else: r[i+1] = p+r[i+1]
+      return r
+    
+def code2atoms(code):
+    begin = '[\[\(\{]'
+    end = '[\]\)\}]'
+    #ops = '[,]'
+    l0 = str2list(code,begin,1,1)
+    l0 = filter(bool,map(str.strip,l0))
+    l1 = [a for l in l0 for a in str2list(l,end,1,-1)]
+    l1 = filter(bool,map(str.strip,l1))
+    #l2 = [a for l in l1 for a in str2list(l,ops,1,-1)]
+    return l1
+    
 
 def text2list(s,separator='\n'):
     return filter(bool,str2list(s,separator))
