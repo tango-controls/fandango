@@ -1704,13 +1704,21 @@ class QEvaluator(Qt.QWidget):
         self._eval = m or self.evalQ
         
     def setModel(self,model=None):
+        """
+        setModel(obj) will set the last element of a sequence of commands as Model for the shell
+        The Model can be either an object, class, module, ...
+        """
         print 'QEvaluator.setModel(%s)'%model
         try:
             if model:
                 if isString(model):
                     for c in model.split(';'):
                         try: model,o = c,self.evalQ(c)
-                        except: model,o = 'import '+c,self.evalQ('import '+c)
+                        except: 
+                          if len(c.split())==1:
+                            model,o = 'import '+c,self.evalQ('import '+c)
+                          else:
+                            traceback.print_exc()
                     if '=' in model:
                         self.model,dct = model.split()[0],self._locals
                     elif 'import' in model:
@@ -1841,9 +1849,14 @@ class QEvaluator(Qt.QWidget):
             traceback.print_exc()
     
     @staticmethod
-    def main():
+    def main(args=[]):
         qapp = getApplication()
-        kw = sys.argv[1:] and {'model':';'.join(sys.argv[1:])} or {}
+        print(len(args),args)
+        args = args or sys.argv[1:]
+        if args and os.path.isfile(args[0]):
+          args = filter(bool,map(str.strip,open(args[0]).readlines()))
+        kw = args and {'model':';'.join(args)} or {}
+        print('model',kw.get('model'))
         w = QEvaluator(**kw)
         w.show()
         qapp.exec_()        
@@ -1852,4 +1865,4 @@ class QEvaluator(Qt.QWidget):
 class ApiBrowser(QEvaluator): pass #For backwards compatibility
         
 if __name__ == '__main__':
-    QEvaluator.main()
+    QEvaluator.main(sys.argv[1:])
