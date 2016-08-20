@@ -299,6 +299,15 @@ def get_real_name(dev,attr=None):
         if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
     return None
 
+def get_full_name(model):
+    """ Returns full schema name as needed by HDB++ api
+    """
+    if ':' not in model:
+      model = get_tango_host()+'/'+model
+    if not model.startswith('tango://'):
+      model = 'tango://'+model
+    return model
+
 def get_device_commands(dev):
     """
     returns a list of device command names
@@ -374,6 +383,31 @@ def get_attribute_info(device,attribute):
 def get_attribute_config(target):
     d,a = target.rsplit('/',1)
     return get_device(d).get_attribute_config(a)
+  
+def get_attribute_events(target,polled=True,throw=False):
+    try:
+      d,a = target.rsplit('/',1)
+      dp = get_device(d)
+      polling = dp.get_attribute_poll_period(a)
+      if polled and not polling:
+        return None
+      aei = dp.get_attribute_config(a).events
+      r = {'polling':polling}
+      for k,t in (
+        ('arch_event',('archive_abs_change','archive_rel_change','archive_period')),
+        ('ch_event',('abs_change','rel_change')),
+        ('per_event',('period',))):
+        r[k],v = [None]*len(t),None
+        for i,p in enumerate(t):
+          try: 
+            v = str2float(getattr(getattr(aei,k),p))
+            r[k][i] = v
+          except: pass #print(k,i,p,v)
+        if not any(r[k]): r.pop(k)
+      return r
+    except Exception,e:
+      if throw: raise e
+      return None
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
