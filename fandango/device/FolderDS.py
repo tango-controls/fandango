@@ -41,7 +41,7 @@ from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 #
 #==================================================================
 
-class FolderAPI(ServersDict):
+class FolderAPI(fandango.SingletonMap,ServersDict):
     """
     The FolderAPI object will allow to access all FolderDS instances in the system.
     This will allow to easily save, read, list files in the Folder ecosystem.
@@ -66,15 +66,33 @@ class FolderAPI(ServersDict):
         device = device or '*'
         if '*' in device:
             m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]
-            device = m[random.randint(0,len(m)-1)]        
+            device = m[random.randint(0,len(m)-1)]      
+        elif device.startswith('folderds:'):
+            device = device.replace('folderds:','')
+            device = device.strip('/')
+            if device.count('/')>(2,3)[':' in device]:
+                #Remove attribute/filename from URI
+                device = device.rsplit('/',1)[0]
         return fn.get_device(device)
     
-    def save(self,device,filename,data,add_timestamp=False):
+    def save(self,device,filename,data,add_timestamp=False,asynch=True):
+        """
+        FolderDS device, filename WITHOUT PATH!, data to be saved
+        add_timestamp: whether to add or not timestamp at the end of filename
+        asynch: if True, the save() call will not wait for the command to complete
+        """
+        # Remove device path from filename
+        filename = (filename or device).split('/')[-1]
         if add_timestamp:
             t = fn.time2str().replace(' ','_').replace(':','').replace('-','')
             p,s = (filename.rsplit('.',1)) if '.' in filename else (filename,'')
             filename = '.'.join(filter(bool,(p,t,s)))
-        r = self.get_device(device).SaveFile([filename,data])
+        d = self.get_device(device) #
+        if asynch:
+          d.command_inout_asynch('SaveFile',[filename,data],True)
+          r = len(data)
+        else:
+          r = d.SaveFile([filename,data])
         print('%s.SaveFile() : %s)'%(device,r))
         return r
 
