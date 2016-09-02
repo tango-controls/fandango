@@ -872,6 +872,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         except:
             data = []
             attr.get_write_value(data)
+            
         if fun.isSequence(data) and self.dyn_types[aname].dimx==1: 
             data = data[0]
         elif self.dyn_types[aname].dimy!=1:
@@ -880,6 +881,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.setAttr(aname,data)
         #self.dyn_values[aname].update(result,time.time(),PyTango.AttrQuality.ATTR_VALID)
         ##if fire_event: self.fireAttrEvent(aname,data)
+    
+    ##This hook has been used to force self to be passed always as argument and avoid dynattr missmatching
     if USE_STATIC_METHODS: write_dyn_attr=staticmethod(write_dyn_attr)
 
     #------------------------------------------------------------------------------------------------------
