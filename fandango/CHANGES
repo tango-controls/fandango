@@ -16,32 +16,45 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
 
 ----------------------------------------------------
+12.1 - August 2016, required by latest PyPLC/Panic
+----------------------------------------------------
+
+device.FolderAPI is now Singleton, capable of parsing folderds:/tango: URI's
+functional: Solved bug on str2type(list)
+
+----------------------------------------------------
 12.0 - August 2016, required by latest PyPLC/Panic
+Adds FolderDS device/api and solves JSON export issues
 ----------------------------------------------------
 
 MIGRATED TO GITHUB: https://github.com/sergirubio/fandango
 
-FolderDS: remote writing/reading log files
-Add FolderGUI tool for managing FolderDS devices
-Added FolderDS device class and documentation
-Add Help() command to DynamicDS
+device/FolderDS: 
+ - remote writing/reading log files
+ - FolderGUI tool for managing FolderDS devices
+ - FolderDS device class and documentation
 
-Enhanced json exports:
-Add multiline strings when exporting to json dictionary
-Solve bug in replaceCl, dict2json
-Add code2atoms, allow str2list to keep separator
-Solve numpy bug on export_attribute_to_dict (using str2type)
-Add verbose state on check_device()
+functional:
+ - Add multiline strings when exporting to json dictionary
+ - Solve bug in replaceCl, dict2json
+ - Add code2atoms, allow str2list to keep separator
+ - solve bug in filtersmart()
+ - Add is_zero argument to isBool (enable 0 as a valid boolean by default)
+ 
+tango: 
+ - Solve numpy bug on export_attribute_to_dict (using str2type)
+ - Add verbose state on check_device()
+ - Add load_by_class get_device_host methods to ServersDict (for better device-based API's) 
+ - Add get_device_help internal DS method
+ - Add get_class_devices method
+ - Add get_full_name method
 
-Solve bug in QEvaluator.setModel()
-Add load_by_class get_device_host methods to ServersDict (for better device-based API's)
-Add nullDecorator to objects
-Add logLevel to FakeLogger
-Add caseless option to listdir()
-Add get_device_help internal DS method
-Add get_class_devices method
-solve bug in filtersmart()
-Adding custom test scripts
+linos: Add caseless option to listdir()
+dynamic: Add Help() command to DynamicDS
+qt: Solve bug in QEvaluator.setModel()
+objects: Add nullDecorator to objects
+log: Add logLevel to FakeLogger
+test: Adding custom test scripts
 
 ----------------------------------------------------
 11.15 - July 2016, required by PyTangoArchiving 7.1

@@ -41,7 +41,7 @@ from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 #
 #==================================================================
 
-class FolderAPI(fandango.SingletonMap,ServersDict):
+class FolderAPI(ServersDict,fandango.SingletonMap):
     """
     The FolderAPI object will allow to access all FolderDS instances in the system.
     This will allow to easily save, read, list files in the Folder ecosystem.
@@ -67,8 +67,8 @@ class FolderAPI(fandango.SingletonMap,ServersDict):
         if '*' in device:
             m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]
             device = m[random.randint(0,len(m)-1)]      
-        elif device.startswith('folderds:'):
-            device = device.replace('folderds:','')
+        elif ':' in device: #device.startswith('folderds:'):
+            device = device.split(':',1)[-1] #replace('folderds:','')
             device = device.strip('/')
             if device.count('/')>(2,3)[':' in device]:
                 #Remove attribute/filename from URI
@@ -96,8 +96,10 @@ class FolderAPI(fandango.SingletonMap,ServersDict):
         print('%s.SaveFile() : %s)'%(device,r))
         return r
 
-    def read(self,device,filename):
-        return self.get_device(device).GetFile(filename)
+    def read(self,uri,filename=''):
+        if not filename: 
+          uri,filename = uri.rsplit('/',1)
+        return self.get_device(uri).GetFile(filename)
     
     def find(self,device,mask):
         m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]

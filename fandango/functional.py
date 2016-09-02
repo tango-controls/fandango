@@ -564,16 +564,16 @@ def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
     return seq.lower().strip() not in ('false','0','none','no')
 
-def str2type(seq,use_eval=True,sep_exp='(?:.*)([\ ,])(?:.*$)'):
+def str2type(seq,use_eval=True,sep_exp='(,;\ ]+'):
     """ 
     Tries to convert string to an standard python type.
     If use_eval is True, then it tries to evaluate as code.
+    Lines separated by sep_exp will be automatically split
     """
-    if not use_eval: sep_exp = '(?:^[^\(\[\{])'+sep_exp #Get non-evaluable lists
     seq = str(seq).strip()
-    m = re.match(sep_exp,seq) 
+    m = sep_exp and (seq[0] not in '{[(') and re.search(sep_exp,seq)
     if m:
-        return [str2type(s,use_eval) for s in str2list(seq,m.groups()[0])]
+        return [str2type(s,use_eval) for s in str2list(seq,m.group())]
     elif isBool(seq,is_zero=False):
         return str2bool(seq)
     elif use_eval:
