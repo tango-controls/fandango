@@ -22,11 +22,9 @@ You may need to setup the path to device servers executables:
  
 Create the servers to be run in the host::
 
-```python 
-# fn.tango.add_new_device('Server/Instance','Class','dev/ice/name')
-fn.tango.add_new_device('PySignalSimulator/1','PySignalSimulator','test/test/A')
-fn.tango.add_new_device('PySignalSimulator/2','PySignalSimulator','test/test/B')
-```
+ # fn.tango.add_new_device('Server/Instance','Class','dev/ice/name')
+ fn.tango.add_new_device('PySignalSimulator/1','PySignalSimulator','test/test/A')
+ fn.tango.add_new_device('PySignalSimulator/2','PySignalSimulator','test/test/B')
 
 Start the servers using your already created starter::
 
