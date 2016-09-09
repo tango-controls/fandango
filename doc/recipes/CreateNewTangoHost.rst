@@ -1,13 +1,14 @@
 Creating a New Host with Fandango
 ---------------------------------
 
-To create a new host in we will follow the same steps done by Astor:
+To create a new Tango host (an Starter instance managing a collection of servers running in the same network host) we will follow the same steps done by Astor:
 
-- create a new Starter in tango database
-- create the servers that will run in this host
-- assign devices to run-levels in the host
+- Create and launch a new Starter in tango database
+- Create the servers that will run in this host
+- Launch them using the Starter service
+- Assign devices to permanent run-levels in the host
 
-Astor locates hosts by searching all tango/admin/* devices:
+Astor locates hosts by searching all Starter devices (named as tango/admin/hostname)
 
 .. code-block:: python
 
