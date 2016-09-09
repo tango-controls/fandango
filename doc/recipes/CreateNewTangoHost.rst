@@ -16,6 +16,10 @@ Astor locates hosts by searching all tango/admin/* devices::
 
  fn.tango.add_new_device('Starter/'+myhost,'Starter','tango/admin/'+myhost)
  
+You may need to setup the path to device servers executables:
+
+ fn.tango.put_device_property('tango/admin/'+myhost,'StartDsPath',['/opt/bin'])
+ 
 Before starting your servers, launch Starter (manually) in the host ...
  
 Create the servers to be run in this host::
