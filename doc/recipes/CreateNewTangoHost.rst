@@ -3,30 +3,31 @@ Creating a New Host with Fandango
 
 To create a new host in we will follow the same steps done by Astor:
 
- - create a new Starter in tango database
- - create the servers that will run in this host
- - assign devices to run-levels in the host
+- create a new Starter in tango database
+- create the servers that will run in this host
+- assign devices to run-levels in the host
  
-Code::
 
- import fandango as fn
- myhost = 'hostname'
- 
-Astor locates hosts by searching all tango/admin/* devices::
+Astor locates hosts by searching all tango/admin/* devices:
+```python 
+import fandango as fn
+myhost = 'hostname'
+fn.tango.add_new_device('Starter/'+myhost,'Starter','tango/admin/'+myhost)
+```
 
- fn.tango.add_new_device('Starter/'+myhost,'Starter','tango/admin/'+myhost)
- 
 You may need to setup the path to device servers executables:
 
  fn.tango.put_device_property('tango/admin/'+myhost,'StartDsPath',['/opt/bin'])
  
-Before starting your servers, launch Starter (manually) in the host ...
+**NOW**: launch Starter (manually) in your host!
  
-Create the servers to be run in this host::
- 
- # fn.tango.add_new_device('Server/Instance','Class','dev/ice/name')
- fn.tango.add_new_device('PySignalSimulator/1','PySignalSimulator','test/test/A')
- fn.tango.add_new_device('PySignalSimulator/2','PySignalSimulator','test/test/B')
+Create the servers to be run in the host::
+
+```python 
+# fn.tango.add_new_device('Server/Instance','Class','dev/ice/name')
+fn.tango.add_new_device('PySignalSimulator/1','PySignalSimulator','test/test/A')
+fn.tango.add_new_device('PySignalSimulator/2','PySignalSimulator','test/test/B')
+```
 
 Start the servers using your already created starter::
 
