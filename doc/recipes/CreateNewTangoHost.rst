@@ -15,20 +15,20 @@ Code::
  # Astor locates hosts by searching all tango/admin/* devices
  fn.tango.add_new_device('Starter/'+myhost,'Starter','tango/admin/'+myhost)
  
+  # Before starting your servers, launch Starter (manually) in the host ...
+ 
  # Create the servers to be run in this host
- # fn.tango_add_new_device('Server/Instance','Class','dev/ice/name')
- fn.tango_add_new_device('MyServer/Inst-A','MyClass','test/test/test-01')
- fn.tango_add_new_device('MyServer2/Inst-B','MyClass2','test/test/test-02')
+ # fn.tango.add_new_device('Server/Instance','Class','dev/ice/name')
  
- # Assing host and runlevels using fandango.Astor object
+ fn.tango.add_new_device('PySignalSimulator/1','PySignalSimulator','test/test/A')
+ fn.tango.add_new_device('PySignalSimulator/2','PySignalSimulator','test/test/B')
+
+ # Start the servers using your already created starter
  astor = fn.Astor()
- astor.load_from_devs_list(['test/test/test-01','test/test/test-02')
- astor.set_server_level('MyServer/Inst-A',host=myhost,level=1)
- astor.set_server_level('MyServer2/Inst-B',host=myhost,level=2)
- 
- # Before starting your servers, launch Starter in the host
- 
- # Then, start the servers using Starter:
- 
- astor.start_servers()
+ astor.load_from_devs_list(['test/test/A','test/test/B')
+ astor.start_servers(host=myhost)
+
+ # Assing host and runlevels using fandango.Astor object
+ astor.set_server_level('PySignalSimulator/1',host='controls03',level=2)
+ astor.set_server_level('PySignalSimulator/2',host='controls03',level=3) 
  
