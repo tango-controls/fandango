@@ -7,7 +7,7 @@ To create a new host in we will follow the same steps done by Astor:
 - create the servers that will run in this host
 - assign devices to run-levels in the host
 
-Astor locates hosts by searching all tango/admin/* devices::
+Astor locates hosts by searching all tango/admin/* devices:
 
 .. code-block:: python
 
@@ -23,7 +23,7 @@ You may need to setup the path to device servers executables:
  
 **NOW**: launch Starter (manually) in your host!
  
-Create the servers to be run in the host::
+Create the servers to be run in the host:
 
 .. code-block:: python
 
@@ -31,7 +31,7 @@ Create the servers to be run in the host::
  fn.tango.add_new_device('PySignalSimulator/1','PySignalSimulator','test/test/A')
  fn.tango.add_new_device('PySignalSimulator/2','PySignalSimulator','test/test/B')
 
-Start the servers using your already created starter::
+Start the servers using your already created starter:
 
 .. code-block:: python
 
@@ -39,7 +39,7 @@ Start the servers using your already created starter::
  astor.load_from_devs_list(['test/test/A','test/test/B')
  astor.start_servers(host=myhost)
 
-Assing host and runlevels using fandango.Astor object::
+Assing host and runlevels using fandango.Astor object:
 
 .. code-block:: python
 
