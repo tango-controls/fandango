@@ -9,6 +9,7 @@ To create a new host in we will follow the same steps done by Astor:
  
 
 Astor locates hosts by searching all tango/admin/* devices:
+
 ```python 
 import fandango as fn
 myhost = 'hostname'
