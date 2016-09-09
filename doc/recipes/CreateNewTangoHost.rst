@@ -6,9 +6,8 @@ To create a new host in we will follow the same steps done by Astor:
 - create a new Starter in tango database
 - create the servers that will run in this host
 - assign devices to run-levels in the host
- 
 
-Astor locates hosts by searching all tango/admin/* devices:
+Astor locates hosts by searching all tango/admin/* devices::
 
  import fandango as fn
  myhost = 'hostname'
