@@ -13,6 +13,11 @@ Fandango python modules provides functional methods, classes and utilities to de
 
 Fandango is published using the same licenses than other TANGO projects; the license will be kept up to date in the LICENSE file.
 
+For more comprehensive documentation:
+
+* http://pythonhosted.org/fandango/
+* https://github.com/tango-controls/fandango/blob/master/doc/recipes
+
 Authors
 =======
 
