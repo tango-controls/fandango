@@ -81,7 +81,7 @@ Downloading
 
 Fandango module is available from github (>=T9) and sourceforge (<=T9):
 
- git clone https://github.com/sergirubio/fandango
+ git clone https://github.com/tango-controls/fandango
 
  svn co https://tango-cs.svn.sourceforge.net/svnroot/tango-cs/share/fandango/trunk fandango.src
 
