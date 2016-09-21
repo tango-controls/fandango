@@ -2,6 +2,8 @@
 Fandango, functional tools for Tango Control System
 ---------------------------------------------------
 
+Fandango is now on github! https://github.com/tango-controls/fandango/
+
 Description
 ===========
 
