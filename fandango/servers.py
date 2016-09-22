@@ -464,22 +464,12 @@ class ServersDict(CaselessDict,Object):
     def get_class_servers(self,klass):
         """This method gets the servers related to a Class."""
         result = [s.name for s in self.itervalues() if klass in s.classes];
-        if not result:
-            #Use the Database to get the values
-            self.log.error('Impossible to retrieve server for class %s'%(klass))
-            self.log.warning('Try ServersDict.load4class')
-            pass
         return result
             
     def get_class_devices(self,klass):
         """This method gets the devices related to a Class."""
         result = set()
         [result.update(s.classes[klass]) for s in self.values() if klass in s.classes];
-        if not result:
-            #Use the Database to get the values
-            self.log.error('Impossible to retrieve server for class %s'%(klass))
-            self.log.warning('Try ServersDict.load4class')
-            pass
         return list(result)
             
     def get_all_classes(self):
