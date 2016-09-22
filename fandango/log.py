@@ -63,6 +63,9 @@ def printf(*args):
     # This is a 'lambdable' version of print
     print(''.join(map(str,args)))
     
+def printerr(*args):
+    sys.stderr.write(*args)
+    
 def shortstr(s,max_len=144):
     s = str(s)
     if max_len>0 and len(s) > max_len:
