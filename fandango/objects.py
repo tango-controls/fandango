@@ -71,6 +71,20 @@ def dirClasses(module,owned=False):
     v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
     if owned: return [a for a in dirModule(module) if a in v]
     else: return v
+  
+def copy(obj):
+    """ 
+    This method will return a copy for a python primitive object.
+    It will not work for class objects unless they implement the __init__(other) constructor
+    """
+    if hasattr(obj,'copy'):
+      o = obj.copy()
+    else:
+      try:
+        o = type(obj)(other=obj)
+      except:
+        o = type(obj)(obj)
+    return o
     
 def obj2dict(obj,type_check=True,class_check=False,fltr=None):
     """ Converts a python object to a dictionary with all its members as python primitives 
