@@ -5,6 +5,7 @@ from setuptools import setup, find_packages
 
 DS = os.getenv('DS','DynamicDS')
 description = '%s Tango Device Server'%DS
+package = DS
 
 __doc__ = """
 Generic Device Server setup.py file copied from fandango/scripts/setup.ds.py
@@ -12,6 +13,10 @@ Generic Device Server setup.py file copied from fandango/scripts/setup.ds.py
 To install as system package:
 
   python setup.py install
+  
+To build src package:
+
+  python setup.py sdist
   
 To install as local package, just run:
 
@@ -63,7 +68,7 @@ entry_points = {
 
 
 setup(
-    name=DS,
+    name=package,
     version=version,
     license=license,
     description=description,
