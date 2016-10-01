@@ -83,6 +83,8 @@ class ThreadedObject(Object):
   Statistics and execution hooks are provided
   """
   
+  INSTANCES = []
+  
   def __init__(self,target=None,period=1.,nthreads=1,min_wait=1e-5):
 
     self._event = threading.Event()
@@ -113,9 +115,24 @@ class ThreadedObject(Object):
     for t in self._threads: 
       t.start()
       
+    ThreadedObject.INSTANCES.append(self)
+      
   def __del__(self):
     self.kill()
     
+  @classmethod
+  def __test__(klass):
+      """ returns True if performs 2 successful cycles """
+      to = klass(period=.1)
+      to.set_target(
+        lambda o=to:setattr(o,'SUCCESS',
+          not getattr(o,'SUCCESS',True)))
+      to.start()
+      wait(2*to.get_period())
+      try: v = to.SUCCESS
+      except: v = False
+      to.stop()
+      return v  
   ## HELPERS
     
   def get_count(self): return self._count
@@ -131,6 +148,7 @@ class ThreadedObject(Object):
   def is_alive(self,i=0): return self.get_thread().is_alive()
     
   def set_period(self,period): self._timewait = period
+  def get_period(self): return self._timewait  
   def set_queue(self,queue): self._queue = queue
   def set_target(self,target): self._target = target
   def set_start_hook(self,target): self._start_hook = target
@@ -151,11 +169,23 @@ class ThreadedObject(Object):
     if not wait: wait = .1e-5
     self._done.wait(wait)
     self._done.clear()
-    self._event.clear()
+    self._event.clear
+    
+  @staticmethod
+  def stop_all():
+    for i in ThreadedObject.INSTANCES:
+        try: i.stop()
+        except: pass
       
   def kill(self,wait=3.):
     self._kill.set()
     self.stop(wait)
+    
+  @staticmethod
+  def kill_all():
+    for i in ThreadedObject.INSTANCES:
+        try: i.kill()
+        except: pass    
       
   def start_hook(self,*args,**kwargs):
     """ redefine at convenience, it will return the arguments for target method """
