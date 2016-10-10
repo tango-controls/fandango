@@ -199,12 +199,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._globals={} #globals().copy()
         if _globals: self._globals.update(_globals)
         self._locals = {}
-        self._locals['self'] = self
-        self._locals['time2str'] = fandango.time2str
-        self._locals['ctime2time'] = fandango.ctime2time
-        for k in dir(fandango.functional):
-            if '2' in k or k.startswith('to') or k.startswith('is'):
-                self._locals[k] = getattr(fandango.functional,k)
+                
+        # Methods to access other device servers
         self._locals['Attr'] = lambda _name: self.getAttr(_name)
         self._locals['ATTR'] = lambda _name: self.getAttr(_name)
         self._locals['XAttr'] = lambda _name,default=None: self.getXAttr(_name,default=default)
@@ -212,6 +208,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['WATTR'] = lambda _name,value: self.getXAttr(_name,wvalue=value,write=True)
         self._locals['COMM'] = lambda _name,_argin=None,feedback=None,expected=None: self.getXCommand(_name,_argin,feedback,expected)
         self._locals['XDEV'] = lambda _name: self.getXDevice(_name)
+        
+        # Methods to manipulate internal variables
         self._locals['ForceAttr'] = lambda a,v=None: self.ForceAttr(a,v)
         self._locals['VAR'] = lambda a,v=None,default=None,WRITE=None: self.ForceVar(a,v,default=default,WRITE=WRITE)
         self._locals['GET'] = lambda a,default=None: self.ForceVar(a,default=default)
@@ -223,16 +221,29 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                                     #(_read and read_exp or write_exp))
         self._locals['SetStatus'] = lambda status: [True,self.set_status(status)]
         self._locals['Add2Status'] = lambda status: [True,self.set_status(self.get_status()+status)]
+        
+        # Advance methods for evaluating formulas
+        self._locals['self'] = self
         self._locals['EVAL'] = lambda formula: self.evaluateFormula(formula)
         self._locals['MATCH'] = lambda expr,cad: fun.matchCl(expr,cad)
         self._locals['DELAY'] = lambda secs: fandango.wait(secs)
+        self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
+        self._locals['time2str'] = fandango.time2str
+        self._locals['ctime2time'] = fandango.ctime2time
+        for k in dir(fandango.functional):
+            if '2' in k or k.startswith('to') or k.startswith('is'):
+                self._locals[k] = getattr(fandango.functional,k)
+        
+        # Methods for getting/writing properties
         self._locals['PROPERTY'] = lambda property,update=False: self.get_device_property(property,update)
         self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
-        self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
+        
+        # Methods for managing attribute types
         self._locals['DYN'] = DynamicAttribute
         self._locals['SCALAR'] = lambda t,v: castDynamicType(dims=0,klass=t,value=v)
         self._locals['SPECTRUM'] = lambda t,v: castDynamicType(dims=1,klass=t,value=v)
         self._locals['IMAGE'] = lambda t,v: castDynamicType(dims=2,klass=t,value=v)
+
         if MEM_CHECK:
             self._locals['guppy'] = guppy
             self._locals['heapy'] = HEAPY
@@ -548,6 +559,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     def check_attribute_events(self,aname,poll=False):
         self.UseEvents = [u.lower().strip() for u in self.UseEvents]
+        self.info('check_attribute_events(%s,%s,%s)'%(aname,poll,self.UseEvents))
         if not len(self.UseEvents): return False
         elif self.UseEvents[0] in ('','no','false'): return False
         elif aname.lower().strip() == 'state': 
@@ -743,7 +755,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 #Setting up change events:
                 if self.check_attribute_events(aname):
                     self._locals[aname] = None
-                    if aname.lower() in new_polled_attrs: self.set_change_event(aname,True,False)
+                    if aname.lower() in new_polled_attrs: 
+                      #THIS IS CONFIGURING EVENTS TO BE "MANUAL", pushed and unfiltered by Jive settings
+                      self.set_change_event(aname,True,False)
                     else: new_polled_attrs.add(aname.lower())
                 elif self.dyn_values[aname].keep:
                     self._locals[aname] = None
@@ -772,6 +786,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         print traceback.format_exc()
                         
         #Setting up state events:
+        #THESE SETTINGS MAY BE NO LONGER NEEDED IN TANGO >= 7
         if self.check_attribute_events('State'): 
             if 'state' in new_polled_attrs: #Already polled
                 self.warning('State events will be managed always by polling') 
@@ -1052,27 +1067,36 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     #   Methods usable inside Attributes declaration
     #------------------------------------------------------------------------------------------------------
 
-    def getAttr(self,aname):
+    def getAttr(self,aname,default=None,write=False,wvalue=None):
         """Evaluates an attribute and returns its Read value."""
-        al = aname.lower()
-        if al=='state': 
-            value = self.get_state()
-        elif al=='status': 
-            value = self.get_status()
-        elif al in map(str.lower,self.dyn_values.keys()):
-            value = self.evalAttr(aname)
-        else:
-            #Getting an Static attribute that match:
-            method = getattr(self,'read_%s'%aname,getattr(self,'read_%s'%al,None))
-            if method is not None:
-                self.warning('DynamicDS.getAttr: %s is an static attribute ...'%aname)
-                attr = tango.fakeAttributeValue(aname)
-                method(attr)
-                value = attr.value
-            else:
-                self.warning('DynamicDS.getAttr: %s doesnt match any Attribute name, trying to evaluate ...'%aname)
-                value = None
-        return value
+        try:
+          al = aname.lower()
+          if '/' in aname:
+              value = self.getXAttr(aname,default,write,wvalue)
+          elif al=='state': 
+              value = self.get_state()
+          elif al=='status': 
+              value = self.get_status()
+          elif al in map(str.lower,self.dyn_values.keys()):
+              value = self.evalAttr(aname,WRITE=write,VALUE=fun.notNone(wvalue,default))
+          else:
+              #Getting an Static attribute that match:
+              method = getattr(self,'read_%s'%aname,getattr(self,'read_%s'%al,None))
+              if method is not None:
+                  self.warning('DynamicDS.getAttr: %s is an static attribute ...'%aname)
+                  attr = tango.fakeAttributeValue(aname)
+                  method(attr)
+                  value = attr.value
+              else:
+                  self.warning('DynamicDS.getAttr: %s doesnt match any Attribute name, trying to evaluate ...'%aname)
+                  value = default
+          return value
+        except Exception,e:
+          if default is not None:
+            return default
+          else:
+            traceback.print_exc()
+            raise e
 
     def setAttr(self,aname,VALUE):
         """Evaluates the WRITE part of an Attribute, passing a VALUE."""
