@@ -38,9 +38,12 @@ by Sergi Rubio,
 srubio@cells.es, 
 2010
 """
-import time,Queue,threading,multiprocessing,traceback
+import time,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
 from threading import Event,RLock,Thread
+
+try: import Queue
+except: import queue as Queue
 
 from log import except2str,shortstr
 from functional import *
@@ -85,7 +88,7 @@ class ThreadedObject(Object):
   
   INSTANCES = []
   
-  def __init__(self,target=None,period=1.,nthreads=1,min_wait=1e-5):
+  def __init__(self,target=None,period=1.,nthreads=1,min_wait=1e-5,start=False):
 
     self._event = threading.Event()
     self._stop = threading.Event()
@@ -99,6 +102,7 @@ class ThreadedObject(Object):
     self._acc_delay = 0
     self._usage = 1.
     self._next = time.time()+period
+    self._last = 0
     self._queue = []
     self._start_hook = self.start_hook
     self._loop_hook = self.loop_hook
@@ -111,6 +115,8 @@ class ThreadedObject(Object):
     self.set_period(period)
     self.set_target(target)
     self.stop(wait=False)
+    if start:
+        self.start()
     
     for t in self._threads: 
       t.start()
@@ -141,6 +147,7 @@ class ThreadedObject(Object):
   def get_acc_delay(self): return self._acc_delay
   def get_usage(self): return self._usage
   def get_next(self): return self._next
+  def get_last(self): return self._last
   def get_started(self): return self._started
       
   def get_thread(self,i=0): return self._threads[i]
@@ -151,6 +158,7 @@ class ThreadedObject(Object):
   def get_period(self): return self._timewait  
   def set_queue(self,queue): self._queue = queue
   def set_target(self,target): self._target = target
+  def get_target(self): return self._target
   def set_start_hook(self,target): self._start_hook = target
   def set_loop_hook(self,target): self._loop_hook = target
   
@@ -159,7 +167,7 @@ class ThreadedObject(Object):
   def start(self):
     #self._event.clear()
     if self._started: 
-      self._stop()
+      self.stop()
     self._done.clear()
     self._stop.clear()
     
@@ -206,73 +214,77 @@ class ThreadedObject(Object):
     pass  
     
   def loop(self):
+    try:
+        self._done.set() #Will not be cleared until stop/start() are called
 
-    self._done.set() #Will not be cleared until stop/start() are called
+        while not self._kill.isSet():
 
-    while not self._kill.isSet():
+            while self._stop.isSet():
+                self._event.wait(.01)
 
-      while self._stop.isSet():
-        self._event.wait(.01)
+            self._done.clear()
+            self._count = 0
+            self._errors = 0
+            self._delay = 0
+            self._acc_delay = 0
+            self._last  = 0
+            
+            ts = time.time()
+            try:
+                args,kwargs = self._start_hook(ts)
+            except:
+                if self._errors < 10:
+                    traceback.print_exc()        
+                self._errors += 1
+                args,kwargs = [],{}
 
-      self._done.clear()
-      self._count = 0
-      self._errors = 0
-      self._delay = 0
-      self._acc_delay = 0
-      
-      ts = time.time()
-      try:
-        args,kwargs = self._start_hook(ts)
-      except:
-        if self._errors < 10:
-          traceback.print_exc()        
-        self._errors += 1
-        args,kwargs = [],{}
+            print('ThreadedObject.Start() ...')
+            self._started = time.time()
+            self._next = self._started + self._timewait
+            while not self._stop.isSet():
+                self._event.clear()
+                try:
+                    if self._target:
+                        self._target(*args,**kwargs)
+                except:
+                    if self._errors < 10:
+                        traceback.print_exc()          
+                    self._errors += 1
 
-      print('ThreadedObject.Start() ...')
-      self._started = time.time()
-      self._next = self._started + self._timewait
-      while not self._stop.isSet():
-        self._event.clear()
-        try:
-          if self._target:
-            self._target(*args,**kwargs)
-        except:
-          if self._errors < 10:
-            traceback.print_exc()          
-          self._errors += 1
-
-        t1,tn = time.time(),ts+self._timewait
-        if self._queue:
-          while self._queue and self._queue[0]<self._next:
-            self._queue.pop(0)
-          if self._queue:
-            tn = self._queue[0]
-        
-        self._next = tn
-        tw = self._next-t1
-        self._usage = (t1-ts)/self._timewait
-        self._event.wait(max((tw,self._min_wait)))
-        
-        ts = time.time()
-        self._delay = ts>self._next and ts-self._next or 0
-        self._acc_delay = self._acc_delay + self._delay
-        try:
-          args,kwargs = self._loop_hook(ts)
-        except:
-          if self._errors < 10:
-            traceback.print_exc()
-          self._errors += 1
-          args,kwargs = [],{}
-          
-        self._count += 1
-        
-      print('ThreadedObject.Stop(...)')
-      self._started = 0
-      self._done.set() #Will not be cleared until stop/start() are called
-  
-    print('ThreadedObject.Kill() ...')
-    return #<< Will never get to this point
+                t1,tn = time.time(),ts+self._timewait
+                if self._queue:
+                    while self._queue and self._queue[0]<self._next:
+                        self._queue.pop(0)
+                    if self._queue:
+                        tn = self._queue[0]
+                
+                self._next = tn
+                tw = self._next-t1
+                self._usage = (t1-ts)/self._timewait
+                #print('waiting %s'%tw)
+                self._event.wait(max((tw,self._min_wait)))
+                
+                ts = self._last = time.time()
+                self._delay = ts>self._next and ts-self._next or 0
+                self._acc_delay = self._acc_delay + self._delay
+                try:
+                    args,kwargs = self._loop_hook(ts)
+                except:
+                    if self._errors < 10:
+                        traceback.print_exc()
+                    self._errors += 1
+                    args,kwargs = [],{}
+                
+                self._count += 1
+                
+            print('ThreadedObject.Stop(...)')
+            self._started = 0
+            self._done.set() #Will not be cleared until stop/start() are called
+    
+        print('ThreadedObject.Kill() ...')
+        return #<< Will never get to this point
+    except:
+        traceback.print_exc()
 
 ###############################################################################
 
