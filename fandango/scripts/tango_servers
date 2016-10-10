@@ -47,7 +47,7 @@ def main():
           
       sts = astor.states()
 
-      if action in ('status',):
+      if action in ('status','states','info','list'):
           if targets:
               print '\n'.join(sorted('%s:\t%s'%(k,str(v)) for k,v in sts.items()))
           else:
