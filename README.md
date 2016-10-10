@@ -15,6 +15,8 @@ Fandango python modules provides functional methods, classes and utilities to de
 
 Fandango is published using the same licenses than other TANGO projects; the license will be kept up to date in the LICENSE file.
 
+FANDANGO IS TESTED ON LINUX ONLY, WINDOWS/MAC MAY NOT BE FULLY SUPPORTED IN MASTER BRANCH
+
 For more comprehensive documentation:
 
 * http://pythonhosted.org/fandango/
