@@ -465,9 +465,9 @@ class EventSource(Logger,Object):
             return self.read(cache=False)
 
     def read(self, cache=True):
-        #if hasattr(self.attr_value,'time') and \
-          #self.keep_time<(time.time()-ctime2time(self.attr_value.time)):
-            #cache = True
+        if hasattr(self.attr_value,'time') and \
+          self.keep_time>(time.time()-ctime2time(self.attr_value.time)):
+            cache = True
         if cache:
             if self.attr_value is not None:
                 return self.attr_value
