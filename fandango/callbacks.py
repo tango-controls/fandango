@@ -39,15 +39,17 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
 """
-
-import PyTango
-import sys
-import os
-import time
-import threading
-import re
+import sys,os,time,re
+import threading,weakref
 from copy import *
+
 from excepts import getLastException
+from objects import *
+from functional import *
+from dicts import *
+from tango import PyTango,EventType,fakeAttributeValue, CachedAttributeProxy
+from threads import ThreadedObject,Queue
+from log import Logger
 
 """
 @package callbacks
@@ -63,6 +65,456 @@ It provides persistent storage.
 lock.acquire and lock.release should be used to prevent threading problems!, 
 Use of the lists inside push_event is safe
 """
+
+###############################################################################
+
+# Lightweight implementation of TaurusListener/TaurusAttribute
+
+EVENT_TO_POLLING_EXCEPTIONS = (
+    'API_AttributePollingNotStarted',
+    'API_DSFailedRegisteringEvent',
+    'API_NotificationServiceFailed',
+    'API_EventChannelNotExported',
+    'API_EventTimeout',
+    'API_EventPropertiesNotSet',
+    'API_CommandNotFound')
+
+class EventListener(Logger,Object):
+    
+    def __init__(self, name, parent=None):
+        self.name, self.parent = name,parent
+        #self.call__init__(Logger,name=name, parent=parent)
+
+    def eventReceived(self, src, type_, value):
+        """ 
+        Method to implement the event notification
+        Source will be an object, type a PyTango EventType, evt_value an AttrValue
+        """
+        if getattr(value,'error',False):
+            print('%s: eventReceived(%s,ERROR,%s)'%(self.name,src,value))
+        else:
+            print('%s: eventReceived(%s,%s,%s)'%(self.name,src,type_,type(value)))
+    
+class EventManager(ThreadedObject):
+    """
+    All listeners should implement eventReceived method
+    All sources must have a listeners list
+    Filters are not implemented
+    """
+    DefaultPolling = 3000.
+    KeepAlive = 15000.
+    MinWait = 5e-4
+    EVENT_POLLING_RATIO = 100 #How many events to process before checking polled attributes
+    
+    def __init__(self):
+        self.queue = Queue.Queue()
+        #self.listeners = CaselessDefaultDict(lambda k:CaselessList())
+        self.sources = CaselessDict()
+        self.event = threading.Event()
+        self.counters = CaselessDefaultDict(int)
+        
+        ThreadedObject.__init__(self,target=self.process,period=self.MinWait)
+        
+    def put(self,*args): self.queue.put(*args)
+    def get(self,*args,**kwargs):  return self.queue.get(*args,**kwargs)
+
+    def get_source(self,source): 
+        if isString(source):
+            name = source
+        else:
+            name = getattr(source,'name',getattr(source,'model',''))
+            self.sources[name] = source
+        return name
+    
+    def get_object(self,source):
+        return self.sources.get(source,None) if isString(source) else source
+
+    def process(self):
+        """ 
+        Currently, this implementation will process 1 event and one polling
+        each time as max.
+        """
+        #print('ProcessingEvent').
+        WAS_EMPTY = False
+        for i in range(self.EVENT_POLLING_RATIO):
+            try:
+                data = self.queue.get(block=False)
+                if isSequence(data):
+                    source,args = data[0],data[1:]
+                else: 
+                    source,args = data,[]
+                name = self.get_source(source)
+                source = self.get_object(source)
+                source.last_poll = time.time()
+                self.fireEvent(source,*args)
+            except Queue.Empty,e:
+                WAS_EMPTY = True
+                break
+            except Exception,e:
+                #The queue is empty, long period attributes can be processed
+                if 'empty' not in str(e).lower():
+                    traceback.print_exc()
+                #WAS_EMPTY = True
+                break
+       
+        #print('Executing polling')
+        now = time.time()
+        pollings = []
+        for s in self.sources.values():
+            nxt = s.last_poll+(s.polling_period if s.isPollingEnabled() else self.KeepAlive)/1e3
+            pollings.append((nxt,s))
+            
+        for nxt,source in reversed(sorted(pollings)):
+            if now > nxt and (s.isPollingEnabled() or WAS_EMPTY):
+                try: 
+                    source.poll()
+                except Exception,e:
+                    traceback.print_exc()
+                    if WAS_EMPTY: break
+                source.last_poll = now
+                break
+        return
+                
+    def fireEvent(self,source,*args):
+        """ 
+        It just retriggers every EventSource fireEvent method 
+        If there's no method nor listeners, a callable is launched
+        """
+        try:
+            if hasattr(source,'fireEvent'):
+                source.fireEvent(*args)
+            elif hasattr(source,'listeners'):
+                for l in source.listeners:
+                    try: getattr(l,'eventReceived',l)(*([source]+list(args))) 
+                    except: traceback.print_exc()
+                    finally: self.event.wait(self.MinWait/len(source.listeners))
+            elif isCallable(source):
+                source(*data[1:0])        
+        except:
+            print('fireEvent',source,args)
+            traceback.print_exc()
+        
+    def addListener(self,source,listener):
+        source,name = self.get_object(source),self.get_name(source)
+        if name not in self.sources:
+            self.sources[name] = source
+        source.addListener(listener)
+            
+    def removeListener(self,source,listener=None):
+        source,name = self.get_object(source),self.get_name(source)
+        source.removeListener(listener)
+        if not source.hasListeners(): self.sources.pop(name)
+        
+    #def addAttributeToPolling(...)
+    
+    #def removeAttributeFromPolling(...)
+
+class EventSource(Logger,Object):
+    """ 
+    Simplified implementation of Taurus Attribute/Model classes 
+    
+    Polling will be always enabled, as a KeepAlive is always kept reading
+    the attribute values at an slow rate.
+    
+    In this implementation, just a faster polling will be enabled if the 
+    attribute provides no events. But the slow polling will never be fully disabled.
+    
+    It will also subscribe to all attribute events, not only CHANGE and CONFIG
+    
+    All types are: 'CHANGE_EVENT,PERIODIC_EVENT,QUALITY_EVENT,ARCHIVE_EVENT,ATTR_CONF_EVENT,DATA_READY_EVENT,USER_EVENT'
+    
+    @TODO: Listeners should be assignable to only one type of eventl.
+    @TODO: read(cache=False) should trigger fireEvent if not called from poll()
+    """
+    
+    DftTimeToLive = 10000  # 10s
+    QUEUE = None
+    
+    #States
+    UNSUBSCRIBED = 0
+    PENDING = 1
+    SUBSCRIBING = 2
+    SUBSCRIBED = 3
+    FAILED = -1
+     
+    def __init__(self, name, parent=None, **kwargs):
+        self.call__init__(Object)        
+        self.simple_name = name.split('/')[-1]
+        # just to keep it alive
+        if not parent and '/' in name:
+            parent = name.rsplit('/',1)[0]
+        if isString(parent):
+            self.device = parent
+            self.proxy = PyTango.DeviceProxy(parent)
+        else:
+            try:
+                self.device = parent.name()
+                self.proxy = parent
+            except:
+                raise Exception('A valid device name is needed')
+        self.full_name = self.device + '/' + self.simple_name
+        self.call__init__(Logger,self.full_name)
+        self.setLogLevel('DEBUG')
+        
+        assert self.proxy,'A valid device name is needed'
+        
+        self.attr_value = None
+        self.attr_time = 0
+        self.listeners = []       
+        self.event_ids = dict() # An {EventType:ID} dict      
+
+        self.state = self.UNSUBSCRIBED
+        # Indicates if the attribute is being polled periodically
+        self.forced = kwargs.get('enablePolling', False)
+        self.polled = self.forced
+        # current polling period
+        self.polling_period = kwargs.get("pollingPeriod", EventManager.DefaultPolling)
+        # stores if polling has been forced by user API
+        self.last_event = None
+        self.last_error = None
+        self.err_count = 0
+        self.last_poll = 0
+        self.counters = defaultdict(int)
+                          
+        if kwargs.get('enablePolling', False):
+            self.activatePolling()
+            
+    def __del__(self):
+        self.cleanUp()
+        
+    def cleanUp(self):
+        self.info("cleanUp")
+        self.deactivatePolling()
+        self.unsubscribeEvents()
+        
+    @staticmethod
+    def manager():
+        if EventSource.QUEUE is None:
+            EventSource.QUEUE = EventManager()
+        return EventSource.QUEUE            
+
+    def write(self, value, with_read=True):
+        self.counters['write']+=1
+        self.proxy.write_attribute(self.simple_name,value)
+        if with_read:
+            return self.read(cache=False)
+
+    def read(self, cache=True):
+        
+        if cache:
+            if self.attr_value is not None:
+                return self.attr_value
+            else:
+                self.info('Attribute first reading (no events received yet)')
+        
+        self.counters['read']+=1
+        self.attr_value = self.proxy.read_attribute(self.simple_name)
+        return self.attr_value
+    
+    def getValueObj(self):
+        return self.attr_value
+
+    def poll(self):
+        self.counters['poll']+=1
+        now = time.time()
+        self.debug('poll(+%s): %s'%(now-self.last_poll,self.counters['poll']))
+        if self.state == self.SUBSCRIBING:
+            self.manager().lasts[self.full_name] = self.last_poll = now
+            return
+        try:
+            prev = self.attr_value and self.attr_value.value
+            self.attr_value = self.read(cache=False) #(self.attr_value is not None))
+            if self.state == self.SUBSCRIBED and prev != self.attr_value.value:
+                self.err_count+=1
+                if self.err_count > 3:
+                    self.warning('Value differred after KeepAlive period, reactivating Polling')
+                    self.activatePolling()
+        except Exception,e:
+            # fakeAttributeValue initialized with full_name
+            traceback.print_exc()
+            self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
+        self.last_poll = now
+        self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
+
+    def subscribeEvents(self):
+        self.debug('subscribeEvents(state=%s)'%(self.state))
+        if self.state == self.SUBSCRIBED:
+            raise Exception('AlreadySubscribed!')
+        
+        self.state = self.SUBSCRIBING
+        for type_ in EventType.names.values():
+            try:
+                if self.event_ids.get(type_) is not None:
+                    self.debug('\tevent %s already subscribed'%type_)
+                    continue
+                self.event_ids[type_] = self.proxy.subscribe_event(
+                    self.simple_name,type_,self,[],False)
+                self.state = self.SUBSCRIBED
+            except:
+                self.debug('\tevent %s not subscribed'%type_)
+        
+        if not self.state == self.SUBSCRIBED:
+            self.debug('event subscribing failed, switching to polling')
+            self.state = self.PENDING
+            self.activatePolling()
+            for type_ in (EventType.CHANGE_EVENT,EventType.ATTR_CONF_EVENT):
+                self.event_ids[type_] = self.proxy.subscribe_event(
+                    self.simple_name,type_,self,[],True)
+                
+    def unsubscribeEvents(self):
+        for type_,ID in  self.event_ids.items():
+            try:
+                self.proxy.unsubscribe_event(ID)
+                self.event_ids.pop(type_)
+            except:
+                pass
+        if not self.hasListeners() and not self.isPollingForced:
+            self.deactivatePolling()
+        self.state = self.UNSUBSCRIBED
+
+    def isUsingEvents(self):
+        return self.state == self.SUBSCRIBED
+    
+    def enablePolling(self):
+        self.activatePolling()
+
+    def disablePolling(self):
+        self.deactivatePolling()
+
+    def isPollingEnabled(self):
+        return self.isPollingActive()
+
+    def activatePolling(self,period = None):
+        self.polling_period = period or self.polling_period
+        self.polled = True
+        print('activatePolling(%s,%s)'%(self.full_name,self.polling_period))
+        if self.isUsingEvents():
+            self.forced = True
+        if not self.manager().get_started(): self.manager().start()
+        #self.factory().addAttributeToPolling(self, self.getPollingPeriod())
+
+    def deactivatePolling(self):
+        print('deactivatePolling(%s,%s)'%(self.full_name,self.state))        
+        self.polled = False
+        self.forced = False
+        #self.factory().removeAttributeFromPolling(self)
+
+    def isPollingActive(self):
+        return self.polled
+
+    def isPollingForced(self):
+        return self.forced
+
+    def changePollingPeriod(self, period):
+        """change polling period to period miliseconds """
+        self.polling_period = period
+        self.activatePolling()
+
+    def getPollingPeriod(self):
+        """returns the polling period """
+        return self.polling_period
+
+    def _listenerDied(self, weak_listener):
+        try:
+            self.listeners.remove(weak_listener)
+        except Exception, e:
+            pass
+
+    def addListener(self, listener):
+        self.debug('addListener(%s)'%listener)
+        if not self.manager().get_started():
+            self.manager().start()
+        if self.full_name not in self.manager().sources:
+            self.manager().sources[self.full_name] = self
+            self.last_poll = time.time()
+        if self.state == self.UNSUBSCRIBED:
+            self.subscribeEvents()
+        import weakref
+        weak = weakref.ref(listener,self._listenerDied)
+        if weak not in self.listeners:
+            self.listeners.append(weak)
+            return True
+        else:
+            return False
+
+    def removeListener(self, listener):
+        weak = weakref.ref(listener,self._listenerDied)
+        try:
+            self.listeners.remove(weak)
+        except Exception, e:
+            return False
+        if not self.listeners:
+            self.unsubscribeEvents()
+        return True
+
+    def hasListeners(self):
+        """ returns True if anybody is listening to events from this attribute """
+        if self.listeners is None:
+            return False
+        return len(self.listeners) > 0
+    
+    def decodeAttrInfoEx(self,attr_conf):
+        pass
+    
+    def push_event(self,event):
+        #source,type_,value):
+        try:           
+            self.counters['total_events']+=1
+            now = time.time()
+            type_ = event.event       
+            self.counters[type_]+=1
+            delay = now-ctime2time(event.reception_date)
+            if delay > 1e3 : print('push_event was %f seconds late'%delay)            
+            self.state = self.SUBSCRIBED
+
+            if event.err:
+                self.last_error = event
+                value = event.errors[0]
+                reason = event.errors[0].reason
+                print('ERROR in %s(%s): %s(%s)'%(self.full_name,type_,type(value),reason))
+                if reason in EVENT_TO_POLLING_EXCEPTIONS:
+                    self.state = self.PENDING
+                    self.activatePolling()
+                    return
+            elif isinstance(event,PyTango.AttrConfEventData):
+                value = event.attr_conf
+                self.decodeAttrInfoEx(value)
+                #(Taurus sends here a read cache=False instead of AttrConf)
+            else:
+                try:
+                    value = event.attr_value
+                except:
+                    self.warning('push_event(%s): no value in %s'%(type_,dir(event)))
+                    value = None
+
+            if self.isPollingActive() and not self.isPollingForced():
+                self.deactivatePolling()
+            self.last_event = event    
+            #Instead of firingEvent, I return and pass the value to the queue
+            self.manager().put((self,type_,value))
+        except:
+            print(type(event),dir(event))
+            traceback.print_exc()
+
+    def fireEvent(self, event_type, event_value, listeners=None):
+        """sends an event to all listeners or a specific one"""
+        listeners = listeners or self.listeners
+
+        for l in listeners:
+            try:
+                if isinstance(l, weakref.ref):
+                    l = l()
+                if hasattr(l,'eventReceived'):
+                    l.eventReceived(self, event_type, event_value)
+                elif isCallable(l):
+                    l(self, event_type, event_value)
+            except:
+                traceback.print_exc()
+                
+class TangoEventSource(EventSource):
+        pass
+
+###############################################################################
 
 _EventsList = {}
 _EventReceivers = {}
@@ -350,3 +802,9 @@ def subscribeDeviceAttributes(self,dev_name,attrs):
                     callbacks._AttributesList[dev_name]=_EventsList[att_name].attr_value.value    
     return
 
+if __name__ == '__main__':
+    import fandango.callbacks as fb
+    es = fb.EventSource('test/events/1/currenttime')
+    el = fb.EventListener('tester')
+    es.addListener(el)
+    
