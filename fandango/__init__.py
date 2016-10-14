@@ -100,7 +100,7 @@ try:
 except: print 'Unable to import dicts module'
 
 try:
-    from threads import WorkerProcess,WorkerThread,SingletonWorker
+    from threads import WorkerProcess,WorkerThread,SingletonWorker,wait,timed_range
 except: print 'Unable to import threads module'
 
 #TANGO related modules
