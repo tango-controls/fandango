@@ -211,14 +211,21 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
         # Methods to manipulate internal variables
         self._locals['ForceAttr'] = lambda a,v=None: self.ForceAttr(a,v)
-        self._locals['VAR'] = lambda a,v=None,default=None,WRITE=None: self.ForceVar(a,v,default=default,WRITE=WRITE)
-        self._locals['GET'] = lambda a,default=None: self.ForceVar(a,default=default)
+        self._locals['VAR'] = (lambda a=None,v=None,default=None,WRITE=None: 
+                              self.ForceVar((a or self._locals.get('ATTRIBUTE')),VALUE=v,default=default,WRITE=WRITE))
+        self._locals['VARS'] = self.variables
+        self._locals['GET'] = (lambda a,default=None: 
+                                self.ForceVar(a,default=default) 
+                                if (a in self.variables or default is not None) 
+                                else self._locals.get(a,default))
         self._locals['SET'] = lambda a,v: self.ForceVar(a,v)
+        
         #self._locals['RWVAR'] = (lambda read_exp=(lambda arg=NAME:self.ForceVar(arg)),
                                 #write_exp=(lambda arg=NAME,val=VALUE:self.ForceVar(arg,val)),
                                 #aname=NAME, 
                                 #_read=READ: 
                                     #(_read and read_exp or write_exp))
+                                    
         self._locals['SetStatus'] = lambda status: [True,self.set_status(status)]
         self._locals['Add2Status'] = lambda status: [True,self.set_status(self.get_status()+status)]
         
@@ -230,6 +237,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
         self._locals['time2str'] = fandango.time2str
         self._locals['ctime2time'] = fandango.ctime2time
+        self._locals['now'] = fandango.now
         for k in dir(fandango.functional):
             if '2' in k or k.startswith('to') or k.startswith('is'):
                 self._locals[k] = getattr(fandango.functional,k)
@@ -1340,10 +1348,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if len(argin)<2: value=VALUE
         else: value=argin[1]
         aname = argin[0]
+        is_write = self._locals.get('WRITE') 
         
-        self.debug('%s vs %s'%(WRITE,self._locals.get('WRITE')))
-        if WRITE and self._locals.get('WRITE'):
-            value = self._locals.get('VALUE')
+        self.debug('VAR(%s,%s,%s,%s & %s)'%(aname,value,default,WRITE,is_write))
+
+        if WRITE and is_write:
+            value = fun.notNone(self._locals.get('VALUE'),value)
             self.debug('Writing %s into %s'%(value,aname))
             
         if value is not None: 
