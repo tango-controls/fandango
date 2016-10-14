@@ -48,7 +48,7 @@ from objects import *
 from functional import *
 from dicts import *
 from tango import PyTango,EventType,fakeAttributeValue, CachedAttributeProxy, get_full_name
-from threads import ThreadedObject,Queue
+from threads import ThreadedObject,Queue,timed_range,wait
 from log import Logger
 
 """
@@ -79,12 +79,33 @@ EVENT_TO_POLLING_EXCEPTIONS = (
     'API_EventPropertiesNotSet',
     'API_CommandNotFound')
 
+class AttrCallback(Logger,Object):
+  
+  #def __call__(self,*args,**kwargs):
+      #self.attr_read(args,kwargs)
+  
+  def attr_read(self,*args,**kwargs):
+    try:
+      print('Callback at %s'%time2str())
+      print('Received %d arguments'%len(args))
+      for a in args:
+          print('\t%s'%str(a)[:80])
+          for k,v in a.__dict__.items():
+            print('\t%s: %s'%(k,v))
+          return
+    except:
+      traceback.print_exc()
+
 class EventListener(Logger,Object):
     
     def __init__(self, name, parent=None):
         self.name, self.parent = name,parent
         self.last_event = 0
         #self.call__init__(Logger,name=name, parent=parent)
+        self.value_hook = None
+        
+    def set_value_hook(self,callable=None):
+      self.value_hook = callable
 
     def eventReceived(self, src, type_, value):
         """ 
@@ -100,6 +121,9 @@ class EventListener(Logger,Object):
         else:
             value = getattr(value,'value',getattr(value,'rvalue',type(value)))
             print('%s: eventReceived(%s,%s,%s): +%s(+%s ms)'%(self.name,src,type_,value,inc,delay))
+            if value is not None and self.value_hook is not None:
+              try:self.value_hook(value)
+              except: traceback.print_exc()
         self.last_event = now
     
 class EventThread(ThreadedObject):
@@ -188,13 +212,23 @@ class EventThread(ThreadedObject):
             
         for nxt,source in reversed(sorted(pollings)):
             if now > nxt and (s.isPollingEnabled() or WAS_EMPTY):
-                try: 
-                    source.poll()
-                except Exception,e:
-                    traceback.print_exc()
-                    if WAS_EMPTY: break
+                try:
+                  t0 = time.time()
+                  source.poll()
+                except:
+                  traceback.print_exc()
+                  if WAS_EMPTY: break
                 source.last_poll = now
-                break
+                
+        asynchs = [s[1] for s in pollings if getattr(s,'pending_request') is not None]
+        for source in randomize(asynchs):
+            try: 
+              source.asynch() #<<<< THIS SHOULD BE ASSYNCHRONOUS!
+            except Exception,e:
+              traceback.print_exc()
+            source.last_poll = now #<<< DO NOT UPDATE THAT HERE; DO IT ON POLL()
+            break
+          
         self.wait(0)
         return
                 
@@ -309,9 +343,13 @@ class EventSource(Logger,Object):
         return 'EventSource(%s)'%(self.full_name)
         
     def cleanUp(self):
-        self.info("cleanUp")
-        self.deactivatePolling()
-        self.unsubscribeEvents()
+        self.debug("cleanUp")
+        while self.listeners:
+          self.removeListener(self.listeners.pop(0))
+        if self.isPollingEnabled():
+          self.deactivatePolling()
+        if self.state in (self.SUBSCRIBED,self.PENDING):
+          self.unsubscribeEvents()
         
     @staticmethod
     def thread():
@@ -471,7 +509,7 @@ class EventSource(Logger,Object):
         if cache:
             if self.attr_value is not None:
                 return self.attr_value
-            else:
+            elif self.state != self.UNSUBSCRIBED:
                 self.info('Attribute first reading (no events received yet)')
         
         self.counters['read']+=1
@@ -480,7 +518,9 @@ class EventSource(Logger,Object):
         return self.attr_value
     
     def getValueObj(self):
-        return self.attr_value
+        v = self.read(cache=True)
+        try: return v.value
+        except: return v
 
     def poll(self):
         now = time.time()

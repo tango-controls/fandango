@@ -69,6 +69,23 @@ def wait(seconds,event=True):
         event.wait(seconds)
     else:
         _EVENT.wait(seconds)
+        
+def timed_range(seconds,period):
+    """
+    Method used to execute the content of a for loop at periodic intervals.
+    For X seconds, this method will return each period fragment.
+
+    Usage:
+    
+      for t in trange(15,0.1): 
+        method_executed_at_10Hz_for_15s()
+    """
+    t0 = time.time()
+    diff = 0
+    while diff<seconds:
+      wait(period)
+      diff = time.time()-t0
+      yield diff
     
 class FakeLock(object):
     """ Just for debugging, can replace a Lock when debugging a deadLock issue. """
