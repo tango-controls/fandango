@@ -70,10 +70,11 @@ def wait(seconds,event=True):
     else:
         _EVENT.wait(seconds)
         
-def timed_range(seconds,period):
+def timed_range(seconds,period,event=None):
     """
     Method used to execute the content of a for loop at periodic intervals.
     For X seconds, this method will return each period fragment.
+    event can be used to pass a threading.Event to abort the loop if needed.
 
     Usage:
     
@@ -82,8 +83,9 @@ def timed_range(seconds,period):
     """
     t0 = time.time()
     diff = 0
-    while diff<seconds:
-      wait(period)
+    e = event or threading.Event()
+    while diff<seconds and not e.is_set():
+      e.wait(period)
       diff = time.time()-t0
       yield diff
     
