@@ -53,6 +53,8 @@ class FolderAPI(ServersDict,fandango.SingletonMap):
         ServersDict.__init__(self)
         devs = fn.tango.get_class_devices('FolderDS')
         if mask: devs = fn.filtersmart(devs,mask)
+        extra = fn.get_database().get_class_property('FolderDS',['ExtraDevices'])
+        devs.extend(extra.get(['ExtraDevices'],[]))
         self.load_from_devs_list(devs)
         self.hosts = fn.defaultdict(list)
         for d in self.get_all_devices():
@@ -231,6 +233,9 @@ class FolderDSClass(DynamicDSClass):
 
     #    Class Properties
     class_property_list = {
+            [PyTango.DevVarStringArray,
+            "Devices from other tango hosts to be shown in FolderGUI",
+            [ ] ],                    
         }
 
 
