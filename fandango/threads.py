@@ -87,7 +87,8 @@ def timed_range(seconds,period,event=None):
     while diff<seconds and not e.is_set():
       e.wait(period)
       diff = time.time()-t0
-      yield diff
+      if not e.is_set:
+        yield diff
     
 class FakeLock(object):
     """ Just for debugging, can replace a Lock when debugging a deadLock issue. """
