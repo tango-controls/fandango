@@ -223,8 +223,8 @@ def get_database_device(use_tau=False,db=None):
 
 def add_new_device(server,klass,device):
     for c in (server+klass+device):
-      if re.match('[^a-zA-Z0-9\-\/]',c):
-        raise Exception,"'%s' Character Not Allowed! (only a-z,A-Z,0-9,/,-)"%c
+      if re.match('[^a-zA-Z0-9\-\/_]',c):
+        raise Exception,"'%s' Character Not Allowed! (only a-z,A-Z,0-9,/,-,_)"%c
     dev_info = PyTango.DbDevInfo()
     dev_info.name = device
     dev_info.klass = klass
