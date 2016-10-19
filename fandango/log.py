@@ -55,7 +55,8 @@ message
 import time, logging, weakref, traceback, sys
 from objects import Object,Decorator
 from pprint import pprint
-from functional import time2str,first,matchCl
+from functional import \
+  time2str,first,matchCl,isSequence,isMapping,isCallable,isString
 import warnings
 
 
@@ -84,6 +85,36 @@ def except2str(e=None,max_len=int(7.5*80)):
     else: 
         result = str(e)[-(max_len-3):]+'...'
     return result or e[:max_len]
+  
+def test2str(obj,meth='',args=[],kwargs={}):
+    """
+    Executes a method providing a verbose output.
+    For usage examples see fandango.device.FolderDS.FolderAPI.__test__()
+    """
+    fs = str(obj) if not meth else '%s.%s'%(obj,meth)
+    r = 'Testing %s(*%s,**%s)\n\n' % (fs,args,kwargs)
+    v = None
+    try:
+      f = getattr(obj,meth) if meth and isString(meth) else (meth or obj)
+      v = f(*args,**kwargs)
+      if isMapping(v):
+        s = '\n'.join(map(str,v.items()))
+      elif isSequence(v):
+        s = '\n'.join(map(str,v))
+      else: s = str(v)
+    except:
+      s = traceback.format_exc()
+    r += '\n'.join('\t%s'%l for l in s.split('\n'))+'\n\n'
+    return r,v
+  
+def printtest(obj,meth='',args=[],kwargs={}):
+    """
+    Executes a method providing a verbose output.
+    For usage examples see fandango.device.FolderDS.FolderAPI.__test__()
+    """
+    r,v = test2str(obj,meth,args,kwargs)
+    print(r)
+    return v
 
 ERROR,WARNING,INFO,DEBUG = logging.ERROR,logging.WARNING,logging.INFO,logging.DEBUG
 LogLevels = {'ERROR':ERROR,'WARNING':WARNING,'INFO':INFO,'DEBUG':DEBUG,}
