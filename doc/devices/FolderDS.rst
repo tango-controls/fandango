@@ -15,6 +15,8 @@ To start using the FolderDS API follow these steps:
 
 * Create a FolderDS device:
 
+.. code:: python
+
  import fandango.tango as ft
  ft.add_new_device('FolderDS/test','FolderDS','test/folder/tmp')
  ft.put_device_property('test/folder/tmp','SaveFolder','/tmp/folderds')
@@ -22,11 +24,15 @@ To start using the FolderDS API follow these steps:
 
 * Load the API and save a file:
 
+.. code:: python
+
  import fandango.device
  folders = fandango.device.FolderAPI()
  folders.save('test/folder/tmp','test.txt','Hello World!')
  
 * Retrieve the contents from a client, even from another tango_host
+
+.. code:: python
 
  import fandango.device
  folders = fandango.device.FolderAPI()
@@ -35,6 +41,8 @@ To start using the FolderDS API follow these steps:
    "Hello World!"
    
 * Browse the stored files from FolderGUI (you'll need to add devices from other tango_hosts to FolderDS.ExtraDevices property)
+
+.. code:: python
 
  import fandango.tango as ft
  devs = ft.get_class_property
