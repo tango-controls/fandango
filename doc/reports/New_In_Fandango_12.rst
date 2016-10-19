@@ -7,6 +7,8 @@ Ready to use developments in Fandango 12
  
  * threads.timed_range
  
+ * tango_servers script
+ 
 ----
 
 Introducing new packages for Fandango 13
