@@ -458,6 +458,32 @@ def parse_db_command_array(data,keys=1,depth=2):
         #print '\t%s,%s'%(k,v)
         dict.update([(k,v)])
     return dict
+  
+def get_class_property(klass,property,db=None):
+    """
+    It returns class property value or just first item if value list has lenght==1
+    """
+    prop = (db or get_database()).get_class_property(klass,[property])[property]
+    return prop if len(prop)!=1 else prop[0]
+
+def put_class_property(klass,property,value=None,db=None):
+    """
+    Two syntax are possible:
+     - put_class_property(class,{property:value})
+     - put_class_property(class,property,value)
+    """
+    if not isMapping(property):
+        if isSequence(value) and not isinstance(value,list):
+            value = list(value)
+        property = {property:value}
+    else:
+        for p,v in property.items():          
+            if isSequence(v):
+                if len(v)==1:
+                    property[p] = v[0]
+                elif not isinstance(value,list):
+                    property[p] = list(v)
+    return (db or get_database()).put_class_property(klass,property)
             
 def get_device_property(device,property,db=None):
     """
