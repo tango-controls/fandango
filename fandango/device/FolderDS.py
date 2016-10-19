@@ -29,8 +29,10 @@ import sys,os,re,random
 import traceback
 
 import PyTango
-import fandango
 import fandango as fn
+import fandango.tango as tango
+from fandango.log import printtest
+from fandango.tango import ProxiesDict
 from fandango.servers import ServersDict
 from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 
@@ -41,7 +43,7 @@ from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 #
 #==================================================================
 
-class FolderAPI(ServersDict,fandango.SingletonMap):
+class FolderAPI(ProxiesDict,fn.SingletonMap):
     """
     The FolderAPI object will allow to access all FolderDS instances in the system.
     This will allow to easily save, read, list files in the Folder ecosystem.
@@ -50,32 +52,58 @@ class FolderAPI(ServersDict,fandango.SingletonMap):
     
     def __init__(self,mask=None):
         #mask = mask or 'FolderDS/*'
-        ServersDict.__init__(self)
-        devs = fn.tango.get_class_devices('FolderDS')
-        if mask: devs = fn.filtersmart(devs,mask)
+        self.mask = mask
+        ProxiesDict.__init__(self)
+        devs = tango.get_class_devices('FolderDS')
         extra = fn.get_database().get_class_property('FolderDS',['ExtraDevices'])
         devs.extend(extra.get('ExtraDevices',[]))
-        self.load_from_devs_list(devs)
+        if mask: devs = fn.filtersmart(devs,mask)
         self.hosts = fn.defaultdict(list)
-        for d in self.get_all_devices():
-            i = fn.get_device_info(d)
-            self.hosts[i.host].append(d)
+
+        for d in devs: self[d]; #initialize proxies
+        
+    def __str__(self):
+        return 'FolderAPI(%s[%s])'%(self.mask,len(self))
+    
+    def __setitem__(self,key,value):
+        key = key.replace('folderds:','')
+        key = tango.get_full_name(key)
+        ProxiesDict.__setitem__(self,key,value)
+        try:
+            i = fn.get_device_info(key)
+            self.hosts[i.host].append(key)
+        except: pass
+            
+    def get_all_devices(self,exported=False):
+        devs = self.keys()
+        if exported: 
+          devs = filter(fn.check_device,devs)
+        return devs
             
     def get_host_devices(self,host):
         return self.hosts[host]
     
-    def get_device(self,device):
-        device = device or '*'
-        if '*' in device:
-            m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]
-            device = m[random.randint(0,len(m)-1)]      
-        elif ':' in device: #device.startswith('folderds:'):
-            device = device.split(':',1)[-1] #replace('folderds:','')
-            device = device.strip('/')
-            if device.count('/')>(2,3)[':' in device]:
-                #Remove attribute/filename from URI
-                device = device.rsplit('/',1)[0]
-        return fn.get_device(device)
+    def get_device(self,dev,exported=True):
+        dev = dev or '*'
+        if dev.startswith('folderds:'): #dev.startswith('folderds:'):
+            dev = dev.split(':',1)[-1] #replace('folderds:','')
+        dev = dev.strip('/')
+        if '*' in dev:
+            m = [d for d in self.get_all_devices(exported) if fn.clmatch(dev,d)]
+            dev = m[random.randint(0,len(m)-1)]
+        else:
+            dev = fn.clsub('^tango:/{0,2}','',dev)
+            parts = dev.split('/')
+            dev = '/'.join(parts[0:3+dev.count(':')])
+        return self[dev]
+      
+    def get_device_name(self,proxy):
+        name = proxy.name()
+        if ':' not in name:
+          host = proxy.get_db_host().split('.')[0]
+          port = proxy.get_db_port()
+          name = '%s:%s/%s' % (host,port,name)
+        return tango.get_full_name(name)
     
     def save(self,device,filename,data,add_timestamp=False,asynch=True):
         """
@@ -103,14 +131,31 @@ class FolderAPI(ServersDict,fandango.SingletonMap):
           uri,filename = uri.rsplit('/',1)
         return self.get_device(uri).GetFile(filename)
     
-    def find(self,device,mask):
+    def find(self,device,mask,N=0):
         m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]
         r = []
         for d in m:
             l = fn.get_device(d).ListFiles(mask)
             for f in l:
                 r.append((d+':' if len(m)>1 else '')+f)
+                if N and N>=len(r):
+                  return r
         return r
+      
+    @staticmethod
+    def __test__():
+        import fandango.device
+        try: reload(fandango.device)
+        except: pass
+        folders = fandango.device.FolderAPI('*')
+        printtest(folders,'get_all_devices')
+        printtest(folders,'get_host_devices',args=[folders.hosts.keys()[0]])
+        d = printtest(folders,'get_device',args=['*'])
+        n = folders.get_device_name(d)
+        printtest(folders,'save',[n,'test.txt','----\nHello World!\n----\n'])
+        f = printtest(folders,'find',[n,'test.txt'],{'N':1})
+        printtest(folders,'read',args=[n,f[0] if f else ''])
+        
       
 class FolderDS(DynamicDS): #PyTango.Device_4Impl):
     """ The FolderDS Device Server will allow to write/save/list text files between tango devices """
@@ -321,15 +366,16 @@ def main(args = None):
         print( '-------> An unforeseen exception occured....',traceback.format_exc())
         
 def test(args = None):
-    print sys.argv
+    print('\n')
     args = args or sys.argv[2:]
-    api = FolderAPI()
-    print(api.states())
-    if args:
-        c = args[0]
-        a = args[1:]
-        print(c,a)
-        print(getattr(api,c)(*a))
+    FolderAPI.__test__()
+    #api = FolderAPI()
+    #print(api.states())
+    #if args:
+        #c = args[0]
+        #a = args[1:]
+        #print(c,a)
+        #print(getattr(api,c)(*a))
 
 if __name__ == '__main__':
     if '--test' in sys.argv:
