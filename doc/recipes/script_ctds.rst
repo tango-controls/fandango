@@ -1,6 +1,8 @@
 use ctds to start/stop/search/create devices
 ============================================
 
+*ctds HAS BEEN RENAMED TO tango_servers*
+
 Using fandango/scripts/ctds to start/stop/search/create devices::
 
    91  ./ctds list "*"
