@@ -27,10 +27,16 @@ If you're just trying it, I suggest to use a VirtualEnv (no sudo required)::
 Setup your CopyCatDS 
 --------------------
 
-Create and setup the device (image attributes not well supported yet)::
+Create and setup the device from Jive or shell::
 
   fandango.sh add_new_device CopyCatDS/test CopyCatDS test/copycatds/01
+  
+**TargetDevice** property is used to point to the device to be copied (could belong to other tango_host):
+
   fandango.sh put_device_property test/copycatds/01 TargetDevice SYS/TG_TEST/1
+  
+The **CopyAttributes** can be used to select/filter the attributes to export (* is the default but image attributes are not well supported yet)::
+
   fandango.sh put_device_property test/copycatds/01 CopyAttributes '(?!.*image.*$)'
 
 Start it
