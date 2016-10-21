@@ -13,7 +13,8 @@ Workers
 -------
 
 * evalX
-* WorkerDS
+* Worker / SingletonWorker
+* 
 * ThreadDict
 * ThreadedObject
 
