@@ -41,6 +41,8 @@ Usage:
 Examples:
 
   fandango.sh findModule fandango
+
+  python $(fandango.sh findModule fandango)/interface/CopyCatDS.py 1
   
   fandango.sh get_tango_host
   
