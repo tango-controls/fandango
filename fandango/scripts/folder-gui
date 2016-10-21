@@ -1,0 +1,4 @@
+#!/usr/bin/env python
+
+import fandango.device.FolderGUI
+g = fandango.device.FolderGUI.main()
