@@ -139,7 +139,8 @@ def FullTangoInheritance(name,child,childClass,parent,parentClass,Exclude=[],For
     </pre>
     """
     if parent not in child.__bases__:
-        print 'Applying FullTangoInheritance from %s and %s' % (child, parent)
+        #THIS PRINT OUT BROKE FANDANGO.SH CALLS
+        #print 'Applying FullTangoInheritance from %s and %s' % (child, parent)
         if not ForceDevImpl:
             newdevice = type(name,(child,parent),{})
             newdeviceclass = type(name+'Class',(childClass,parentClass),{})
