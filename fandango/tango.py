@@ -1732,12 +1732,17 @@ class TangoEval(object):
         self.trace('parse_variables(...): %s'%(variables))
         return variables
         
-    def read_attribute(self,device,attribute,what='',_raise=True, timeout=None):
+    def read_attribute(self,device,attribute='',what='',_raise=True, timeout=None):
         """
         Executes a read_attribute and returns the value requested
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         """
         timeout = timeout or self.timeout
+        if not attribute:
+          if device.split(':')[-1].count('/')>2:
+            device,attribute = device.rsplit('/',1)
+          else:
+            attribute = 'state'
         aname = (device+'/'+attribute).lower()
         try:
             if aname not in self.attributes:
