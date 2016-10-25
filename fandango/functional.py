@@ -339,9 +339,27 @@ def replaceCl(exp,repl,seq,regexp=True,lower=False):
       return r+seq
     else:
       return seq.lower().replace(exp.lower(),repl)
-    
 clsub = replaceCl
 
+def splitCl(exp,seq,inclusive=False):
+    """
+    Split an string by occurences of exp
+    """
+    s,e = seq.lower(),exp.lower()
+    matches = re.finditer(e,s)
+    if not matches:
+      r = [seq]
+    else:
+      i,r = 0,[]
+      for m in matches:
+        l = seq[i:m.end() if inclusive else m.start()]
+        if l: r.append(l)
+        i = m.end()
+      if i<len(seq):
+        r.append(seq[i:])
+    return r
+clsplit = splitCl
+    
 def sortedRe(iterator,order):
     """ Returns a list sorted using regular expressions. 
         order = list of regular expressions to match ('[a-z]','[0-9].*','.*')
