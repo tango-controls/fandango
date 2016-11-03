@@ -223,10 +223,10 @@ class EventThread(ThreadedObject):
         asynchs = [s[1] for s in pollings if getattr(s,'pending_request') is not None]
         for source in randomize(asynchs):
             try: 
-              source.asynch() #<<<< THIS SHOULD BE ASSYNCHRONOUS!
+              source.asynch() #<<<< THIS SHOULD BE ASYNCHRONOUS!
             except Exception,e:
               traceback.print_exc()
-            source.last_poll = now #<<< DO NOT UPDATE THAT HERE; DO IT ON POLL()
+            source.last_poll = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
             break
           
         self.wait(0)
@@ -273,6 +273,7 @@ class EventSource(Logger,Object):
     - enablePolling (force polling by default)
     - pollingPeriod (3000)
     - keepTime (1/50.) min. time between HW reads
+    - asynchronous = True/False ; to use asynchronous reading
     
     @TODO: Listeners should be assignable to only one type of eventl.
     @TODO: read(cache=False) should trigger fireEvent if not called from poll()
@@ -319,16 +320,20 @@ class EventSource(Logger,Object):
         self.event_ids = dict() # An {EventType:ID} dict      
 
         self.state = self.UNSUBSCRIBED
+        self.asynchronous = kwargs.get('asynchronous',True)
+        
         # Indicates if the attribute is being polled periodically
+        # stores if polling has been forced by user API        
         self.forced = kwargs.get('enablePolling', False)
         self.polled = self.forced
         # current polling period
         self.polling_period = kwargs.get("pollingPeriod", self.DefaultPolling)
         self.keep_time = kwargs.get("keepTime", 1/50.)
-        # stores if polling has been forced by user API
+
         self.last_event = None
         self.last_error = None
         self.last_poll = 0
+        self.pending_request = None
         self.counters = defaultdict(int)
                           
         if kwargs.get('enablePolling', False):
@@ -507,15 +512,44 @@ class EventSource(Logger,Object):
           self.keep_time>(time.time()-ctime2time(self.attr_value.time)):
             cache = True
         if cache:
+            self.asynch()
             if self.attr_value is not None:
                 return self.attr_value
             elif self.state != self.UNSUBSCRIBED:
                 self.info('Attribute first reading (no events received yet)')
         
         self.counters['read']+=1
-        self.debug('%s.read_attribute(%s)'%(self.device,self.simple_name))
-        self.attr_value = self.proxy.read_attribute(self.simple_name)
+        self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.asynchronous,self.pending_request))
+        if self.pending_request is not None:
+            self.attr_value = notNone(self.asynch(),self.attr_value)
+        elif self.asynchronous:
+            self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
+            self.attr_value = notNone(self.asynch(),self.attr_value)
+        else:
+            self.attr_value = self.proxy.read_attribute(self.simple_name)
         return self.attr_value
+    
+    def asynch(self):
+        if self.pending_request is None:
+            return None
+        try:
+            self.attr_value = self.proxy.read_attribute_reply(self.pending_request[0])
+            self.pending_request = None
+            return self.attr_value
+        except PyTango.AsynReplyNotArrived,e:
+            return None
+        #except PyTango.CommunicationFailed,e:
+            ##Device killed or restarted
+            #self.pending_request = None
+            #return None
+        #except PyTango.AsynCall
+            ##raise Exception,'CHECK HERE FOR EXPIRED REQUEST OR REQUEST NO VALID ANYMORE (e.g. DEVICE RESTARTED)'
+            #self.pending_request = None
+            #return None
+        except Exception, e:
+            self.pending_request = None
+            self.attr_value = e
+        return None
     
     def getValueObj(self):
         v = self.read(cache=True)
