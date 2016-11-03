@@ -1051,7 +1051,7 @@ def export_properties_to_dict(device,target='*'):
         props = [p for p in db.get_class_property_list(device) if fandango.matchCl(target,p)]
         return dict((k,v if isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
     
-def export_device_to_dict(device):
+def export_device_to_dict(device,commands=True,properties=True):
     """
     This method can be used to export the current configuration of devices, attributes and properties to a file.
     The dictionary will get properties, class properties, attributes, commands, attribute config, event config, alarm config and pollings.
@@ -1069,11 +1069,13 @@ def export_device_to_dict(device):
       try:
         proxy = get_device(device)
         dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) for a in proxy.get_attribute_list())
-        dct.commands = export_commands_to_dict(proxy)
+        if commands:
+          dct.commands = export_commands_to_dict(proxy)
       except:
         traceback.print_exc()
-    dct.properties = export_properties_to_dict(device)
-    dct.class_properties = export_properties_to_dict(dct.dev_class)
+    if properties:
+      dct.properties = export_properties_to_dict(device)
+      dct.class_properties = export_properties_to_dict(dct.dev_class)
     return dict(dct)
     
 ########################################################################################
