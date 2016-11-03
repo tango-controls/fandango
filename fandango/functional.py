@@ -582,7 +582,7 @@ def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
     return seq.lower().strip() not in ('false','0','none','no')
 
-def str2type(seq,use_eval=True,sep_exp='(,;\ ]+'):
+def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     """ 
     Tries to convert string to an standard python type.
     If use_eval is True, then it tries to evaluate as code.
