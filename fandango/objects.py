@@ -300,10 +300,8 @@ class Object(object):
         """ default initializer 
         @todo be more clever!
         """
-
-        self.name = None
-        
         pass
+        #self.name = None    
         ## @var name
         # Var does nothing    
         # @todo be more clever!
