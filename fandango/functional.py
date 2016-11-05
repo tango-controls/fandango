@@ -339,9 +339,27 @@ def replaceCl(exp,repl,seq,regexp=True,lower=False):
       return r+seq
     else:
       return seq.lower().replace(exp.lower(),repl)
-    
 clsub = replaceCl
 
+def splitCl(exp,seq,inclusive=False):
+    """
+    Split an string by occurences of exp
+    """
+    s,e = seq.lower(),exp.lower()
+    matches = re.finditer(e,s)
+    if not matches:
+      r = [seq]
+    else:
+      i,r = 0,[]
+      for m in matches:
+        l = seq[i:m.end() if inclusive else m.start()]
+        if l: r.append(l)
+        i = m.end()
+      if i<len(seq):
+        r.append(seq[i:])
+    return r
+clsplit = splitCl
+    
 def sortedRe(iterator,order):
     """ Returns a list sorted using regular expressions. 
         order = list of regular expressions to match ('[a-z]','[0-9].*','.*')
@@ -564,7 +582,7 @@ def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
     return seq.lower().strip() not in ('false','0','none','no')
 
-def str2type(seq,use_eval=True,sep_exp='(,;\ ]+'):
+def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     """ 
     Tries to convert string to an standard python type.
     If use_eval is True, then it tries to evaluate as code.

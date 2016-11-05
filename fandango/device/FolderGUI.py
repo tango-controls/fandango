@@ -93,5 +93,7 @@ class FolderGUI(Qt.QSplitter):
       fgui.show()
       app.exec_()
       
+main = FolderGUI.main
+      
 if __name__ == '__main__':
-  FolderGUI.main()
+  main()

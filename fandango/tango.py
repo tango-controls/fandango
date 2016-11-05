@@ -458,6 +458,32 @@ def parse_db_command_array(data,keys=1,depth=2):
         #print '\t%s,%s'%(k,v)
         dict.update([(k,v)])
     return dict
+  
+def get_class_property(klass,property,db=None):
+    """
+    It returns class property value or just first item if value list has lenght==1
+    """
+    prop = (db or get_database()).get_class_property(klass,[property])[property]
+    return prop if len(prop)!=1 else prop[0]
+
+def put_class_property(klass,property,value=None,db=None):
+    """
+    Two syntax are possible:
+     - put_class_property(class,{property:value})
+     - put_class_property(class,property,value)
+    """
+    if not isMapping(property):
+        if isSequence(value) and not isinstance(value,list):
+            value = list(value)
+        property = {property:value}
+    else:
+        for p,v in property.items():          
+            if isSequence(v):
+                if len(v)==1:
+                    property[p] = v[0]
+                elif not isinstance(value,list):
+                    property[p] = list(v)
+    return (db or get_database()).put_class_property(klass,property)
             
 def get_device_property(device,property,db=None):
     """
@@ -1025,7 +1051,7 @@ def export_properties_to_dict(device,target='*'):
         props = [p for p in db.get_class_property_list(device) if fandango.matchCl(target,p)]
         return dict((k,v if isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
     
-def export_device_to_dict(device):
+def export_device_to_dict(device,commands=True,properties=True):
     """
     This method can be used to export the current configuration of devices, attributes and properties to a file.
     The dictionary will get properties, class properties, attributes, commands, attribute config, event config, alarm config and pollings.
@@ -1043,11 +1069,13 @@ def export_device_to_dict(device):
       try:
         proxy = get_device(device)
         dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) for a in proxy.get_attribute_list())
-        dct.commands = export_commands_to_dict(proxy)
+        if commands:
+          dct.commands = export_commands_to_dict(proxy)
       except:
         traceback.print_exc()
-    dct.properties = export_properties_to_dict(device)
-    dct.class_properties = export_properties_to_dict(dct.dev_class)
+    if properties:
+      dct.properties = export_properties_to_dict(device)
+      dct.class_properties = export_properties_to_dict(dct.dev_class)
     return dict(dct)
     
 ########################################################################################
@@ -1706,12 +1734,17 @@ class TangoEval(object):
         self.trace('parse_variables(...): %s'%(variables))
         return variables
         
-    def read_attribute(self,device,attribute,what='',_raise=True, timeout=None):
+    def read_attribute(self,device,attribute='',what='',_raise=True, timeout=None):
         """
         Executes a read_attribute and returns the value requested
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         """
         timeout = timeout or self.timeout
+        if not attribute:
+          if device.split(':')[-1].count('/')>2:
+            device,attribute = device.rsplit('/',1)
+          else:
+            attribute = 'state'
         aname = (device+'/'+attribute).lower()
         try:
             if aname not in self.attributes:

@@ -1,4 +1,4 @@
-RELEASE = (12,0,0)
+RELEASE = (12,2,1)
 RELEASE_NOTE = "Added FolderDS and FolderGUI, moved to GitHub, many bugs fixed"
 
 """
@@ -14,6 +14,18 @@ PENDING:
     dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
     StructDict with sort/get/filter methods like Panic api
     preparing next PyAlarm release with None not allowed in comparisons
+
+-------------------------------------------------------------------
+12.2.1 - October 2016, Bugfix release, required by latest PyPLC/Panic
+-------------------------------------------------------------------
+
+Solve critical bug in tango.add_new_device that may prevent PyAlarm to start
+
+FolderDS/API/GUI updated to be multi-tango-host capable
+threads: timed_range new time-based iterator
+dynamic: extend DynamicAttribute formula syntax for ATTR/GET/SET
+callbacks: New EventSource/Listener API for registering to Tango events (BETA)
+inheritance: printout that caused problems on fandango.sh
 
 ----------------------------------------------------
 12.1 - August 2016, required by latest PyPLC/Panic
