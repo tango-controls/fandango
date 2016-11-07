@@ -31,6 +31,8 @@ Main differences with TaurusAttribute:
 
 - simplified API:: enablePolling and activatePolling become synonymous.
 - polling works always:: but adapting frequency to received events.
+- event-fail tolerant:: uses slow polling to verify if events are working properly.
+- polling-late tolerant:: if polling is late triggers warning but still returning a value.
 
 As TaurusAttribute
 ..................
