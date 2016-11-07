@@ -96,14 +96,38 @@ class AttrCallback(Logger,Object):
     except:
       traceback.print_exc()
 
-class EventListener(Logger,Object):
+class EventListener(Object): #Logger,
+    """
+    The EventListener class accepts 3 event hooks:
+        self.set_event_hook()
+        self.set_error_hook()
+        self.set_value_hook()
+        
+    All of them need a callable accepting three arguments: src,type,value
     
-    def __init__(self, name, parent=None):
-        self.name, self.parent = name,parent
+    In the case of value_hook it will not pass the event object but event.value/rvalue
+    """
+    
+    def __init__(self, name, parent=None,source=False,loglevel=2):
+        """ 
+        Pass name and parent object for logging.
+        If source is True or an object, this listener will subscribe for source or parent events.
+        If False, then subscription will have to be done using EventSource.addListener(EventListener)
+        """
+        self.name, self.parent,self.source = name,parent,source
+        self.loglevel = loglevel
         self.last_event = 0
         #self.call__init__(Logger,name=name, parent=parent)
-        self.value_hook = None
-        
+        self.set_event_hook()
+        self.set_error_hook()
+        self.set_value_hook()
+        hooks = [o for o in (parent,source) if source and hasattr(o,'addListener')]
+        if hooks: hooks[0].addListener(self)
+
+    def set_event_hook(self,callable=None):
+      self.event_hook = callable
+    def set_error_hook(self,callable=None):
+      self.error_hook = callable      
     def set_value_hook(self,callable=None):
       self.value_hook = callable
 
@@ -117,13 +141,21 @@ class EventListener(Logger,Object):
         delay = int(1e3*(now-(ctime2time(value.time) if hasattr(value,'time') else now)))
         
         if getattr(value,'error',False):
-            print('%s: eventReceived(%s,ERROR,%s): +%s(+%s ms)'%(self.name,src,value,inc,delay))
+            if self.loglevel:
+                print('%s: eventReceived(%s,ERROR,%s): +%s(+%s ms)'%(self.name,src,value,inc,delay))
+            if self.error_hook is not None:
+                try: self.error_hook(src,type_,value)
+                except: traceback.print_exc()
         else:
             value = getattr(value,'value',getattr(value,'rvalue',type(value)))
-            print('%s: eventReceived(%s,%s,%s): +%s(+%s ms)'%(self.name,src,type_,value,inc,delay))
+            if self.loglevel>2:
+                print('%s: eventReceived(%s,%s,%s): +%s(+%s ms)'%(self.name,src,type_,value,inc,delay))
             if value is not None and self.value_hook is not None:
-              try:self.value_hook(value)
+              try:self.value_hook(src,type_,value)
               except: traceback.print_exc()
+        if self.event_hook:
+            try: self.event_hook(src,type_,value)
+            except: traceback.print_exc()
         self.last_event = now
     
 class EventThread(ThreadedObject):
@@ -220,7 +252,7 @@ class EventThread(ThreadedObject):
                   if WAS_EMPTY: break
                 source.last_poll = now
                 
-        asynchs = [s[1] for s in pollings if getattr(s,'pending_request') is not None]
+        asynchs = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
         for source in randomize(asynchs):
             try: 
               source.asynch() #<<<< THIS SHOULD BE ASYNCHRONOUS!
@@ -274,6 +306,10 @@ class EventSource(Logger,Object):
     - pollingPeriod (3000)
     - keepTime (1/50.) min. time between HW reads
     - asynchronous = True/False ; to use asynchronous reading
+    - listeners = a list of listeners to be added at startup
+    
+    Keep in mind that if asynchronous=True; you will not get the latest value 
+    when doing  read(cache=False). You must use read(cache=False,asynch=False) instead.
     
     @TODO: Listeners should be assignable to only one type of eventl.
     @TODO: read(cache=False) should trigger fireEvent if not called from poll()
@@ -294,6 +330,7 @@ class EventSource(Logger,Object):
     FAILED = -1 #Not working at all
      
     def __init__(self, name, parent=None, **kwargs):
+        """ Arguments: loglevel, asynchronous, pollingPeriod, keepTime, enablePolling """
         self.call__init__(Object)        
         self.simple_name = name.split('/')[-1]
         # just to keep it alive
@@ -309,8 +346,9 @@ class EventSource(Logger,Object):
             except:
                 raise Exception('A valid device name is needed')
         self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
+        self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
         self.call__init__(Logger,self.full_name)
-        self.setLogLevel('INFO')
+        self.setLogLevel(kwargs.get('loglevel','ERROR'))
         
         assert self.proxy,'A valid device name is needed'
         
@@ -320,7 +358,7 @@ class EventSource(Logger,Object):
         self.event_ids = dict() # An {EventType:ID} dict      
 
         self.state = self.UNSUBSCRIBED
-        self.asynchronous = kwargs.get('asynchronous',True)
+        self.asynchronous = kwargs.get('asynchronous',False)
         
         # Indicates if the attribute is being polled periodically
         # stores if polling has been forced by user API        
@@ -335,17 +373,21 @@ class EventSource(Logger,Object):
         self.last_poll = 0
         self.pending_request = None
         self.counters = defaultdict(int)
+        EventSource.INSTANCES.append(weakref.ref(self))
                           
         if kwargs.get('enablePolling', False):
             self.activatePolling()
+        #if not kwargs.get('quiet',False):
+            #self.start_thread()
+        listeners = toList(kwargs.get('listeners',[]))
+        map(self.addListener,listeners)
             
-        EventSource.INSTANCES.append(weakref.ref(self))
-            
-    def __del__(self):
+    def __del__(self): 
         self.cleanUp()
-        
-    def __str__(self):
+    def __str__(self): 
         return 'EventSource(%s)'%(self.full_name)
+    def __repr__(self):  
+        return str(self)
         
     def cleanUp(self):
         self.debug("cleanUp")
@@ -360,7 +402,13 @@ class EventSource(Logger,Object):
     def thread():
         if EventSource.QUEUE is None:
             EventSource.QUEUE = EventThread()
-        return EventSource.QUEUE            
+        return EventSource.QUEUE         
+    
+    @staticmethod
+    def start_thread():
+        th = EventSource.thread()
+        if not th.get_started(): 
+            th.start()
 
     def isUsingEvents(self):
         return self.state == self.SUBSCRIBED
@@ -373,7 +421,8 @@ class EventSource(Logger,Object):
 
     def disablePolling(self):
         self.deactivatePolling()
-        self.thread().stop()
+        ##DON'T DO THAT, IT WILL STOP EVENT PROCESSING!
+        #self.thread().stop()
 
     def isPollingEnabled(self):
         return self.isPollingActive()
@@ -383,7 +432,7 @@ class EventSource(Logger,Object):
         self.polled = True
         self.info('activatePolling(%s,%s)'%(self.full_name,self.polling_period))
         self.forced = forced
-        if not self.thread().get_started(): self.thread().start()
+        self.start_thread()
         #self.factory().addAttributeToPolling(self, self.getPollingPeriod())
 
     def deactivatePolling(self):
@@ -480,7 +529,7 @@ class EventSource(Logger,Object):
                 self.debug('\tevent %s not subscribed'%type_)
         
         if not self.state == self.SUBSCRIBED:
-            self.debug('event subscribing failed, switching to polling')
+            self.info('event subscribing failed, switching to polling')
             self.state = self.PENDING
             self.activatePolling()
             for type_ in (EventType.CHANGE_EVENT,EventType.ATTR_CONF_EVENT):
@@ -507,10 +556,21 @@ class EventSource(Logger,Object):
         if with_read:
             return self.read(cache=False)
 
-    def read(self, cache=True):
-        if hasattr(self.attr_value,'time') and \
+    def read(self, cache=True,asynch=None):
+        """ 
+        Read last value acquired, 
+        if cache = False or not polled it will trigger
+        a proxy.read_attribute() call.
+        
+        If asynch=True/False, self.asynchronous will be overriden for this call.
+        """
+        asynch = notNone(asynch,self.asynchronous)
+        if not any((self.isPollingEnabled(),self.isUsingEvents())):
+            cache = False        
+        elif hasattr(self.attr_value,'time') and \
           self.keep_time>(time.time()-ctime2time(self.attr_value.time)):
             cache = True
+
         if cache:
             self.asynch()
             if self.attr_value is not None:
@@ -520,13 +580,17 @@ class EventSource(Logger,Object):
         
         self.counters['read']+=1
         self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.asynchronous,self.pending_request))
-        if self.pending_request is not None:
-            self.attr_value = notNone(self.asynch(),self.attr_value)
-        elif self.asynchronous:
-            self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
-            self.attr_value = notNone(self.asynch(),self.attr_value)
+
+        ## Do not merge these IF's, order matters
+        if asynch:
+            if self.pending_request is not None:
+                self.attr_value = notNone(self.asynch(),self.attr_value)
+            else:
+                self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
+                self.attr_value = notNone(self.asynch(),self.attr_value)
         else:
             self.attr_value = self.proxy.read_attribute(self.simple_name)
+            
         return self.attr_value
     
     def asynch(self):
@@ -566,10 +630,12 @@ class EventSource(Logger,Object):
         try:
             prev = self.attr_value and self.attr_value.value
             self.attr_value = self.read(cache=False) #(self.attr_value is not None))
-            if self.state == self.SUBSCRIBED and prev != self.attr_value.value:
+            av = getattr(self.attr_value,'value',self.attr_value)
+            diff = prev != av
+            if self.state == self.SUBSCRIBED and (diff if not isSequence(diff) else any(diff)):
                 if self.EVENT_TIMEOUT < (now-self.last_event_time):
                     self.warning('EVENT_TIMEOUT:%s!=%s after %s (%s,%s), reactivating Polling'%(
-                      prev,self.attr_value.value,self.EVENT_TIMEOUT,now,self.last_event_time))
+                      prev,av,self.EVENT_TIMEOUT,now,self.last_event_time))
                     self.activatePolling()
         except Exception,e:
             # fakeAttributeValue initialized with full_name
@@ -609,10 +675,10 @@ class EventSource(Logger,Object):
                 #(Taurus sends here a read cache=False instead of AttrConf)
             else:
                 try:
-                    value = event.attr_value
+                    self.attr_value = value = event.attr_value
                 except:
                     self.warning('push_event(%s): no value in %s'%(type_,dir(event)))
-                    value = None
+                    self.attr_value = value = None
 
             if self.isPollingActive() and not self.isPollingForced():
                 self.deactivatePolling()
