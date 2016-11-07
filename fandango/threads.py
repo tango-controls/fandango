@@ -128,6 +128,8 @@ class ThreadedObject(Object):
     self._loop_hook = self.loop_hook
     
     self._threads = []
+    if nthreads>1:
+      print('Warning: ThreadedObject.nthreads>1 Not Implemented Yet!')
     for i in range(nthreads):
       self._threads.append(threading.Thread(target=self.loop))
       self._threads[i].daemon = True
@@ -172,7 +174,7 @@ class ThreadedObject(Object):
       
   def get_thread(self,i=0): return self._threads[i]
   def get_nthreads(self): return len(self._threads)
-  def is_alive(self,i=0): return self.get_thread().is_alive()
+  def is_alive(self,i=0): return self.get_thread(i).is_alive()
     
   def set_period(self,period): self._timewait = period
   def get_period(self): return self._timewait  
@@ -677,49 +679,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     """
     Class that provides a multiprocessing interface to process tasks in a background process and throw callbacks when finished.
     
-    The queries are sent between sender/receiver thread and worker process using tuples.
-    Queries may be: (key,) ; (key,target) ; (key,target,args)
-     - key is just an identifier to internally store data results and callbacks
-     - if target is a callable it will be thrown with args as argument (use [] if target is a void function)
-     - if it isn't, then executor(target) will be called
-     - executor can be fandango.evalX or other object/method assigned using WorkerProcess.bind(class,args)
-    
-    By default fandango.evalX is used to perform tasks, a different executor can be defined as WorkerProcess argument or calling:
-      CP = WorkerProcess(targetClass(initArgs))
-      CP.bind(targetClass,initArgs)
-    
-    Sending tasks to the process:
-      CP.send(key='A1',target) 
-      # Returns immediately and executes target() or executor(*target) in a background process
-      CP.send('A1',target,args,callback=callback) 
-      # Returns immediately, executes x=target(args) in background and launches callback(x) when ready
-      
-    When a (key,target,args) tuple is received the procedure is:
-     * obtain the exec_ method (executor if args is None, 
-     * obtain arguments (target if args is None, if args is map/sequence it is pre-parsed):
-     * if args is None and there's a valid executor: return executor(target)
-     
-    How the executable method is obtained:
-     - if args is None it tries to get a valid executor and target will be args.
-     - if target is string first it tries to get executor.target
-     - if failed, then it evals target (that may return an executable)
-     - if args is not none and target is not string, target is used as executable if callable
-    Return value:
-     - if a valid executable method is found it returns exec_([*/**]args)
-     - if not, it returns what has been found instead (evalX(target), executor.target or target)
-    
-    To use it like a threadDict, allowing a fixed list of keys to be permanently updated:
-      CP.add(key,target,args,period,expire,callback)
-      #This call will add a key to dictionary, which target(args) method will be executed every period, value obtained will expire after X seconds.
-      #Optional Callback will be executed every time value is updated.
-    
-    Throwing commands in a sequential way (it will return when everything already in the queue is done):
-      CP.command('comm') # Execute comm() and returns result
-      CP.command('comm',args=(,)) # Execute comm(*args) and returns result
-    
-    Two different dictionaries will keep track of process results:
-     - data : will store named data with and update period associated
-     - callbacks : will store associated callbacks to throw-1 calls
+    See full description and usage in doc/recipes/Threading.rst
     """
     
     ALIVE_PERIOD = 15
