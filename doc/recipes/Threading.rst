@@ -80,10 +80,10 @@ It enables stop_all() / kill_all() methods to switch off all running threads.
 threads.Worker``*``
 ===================
 
+Classes that provide a threaded/multiprocess queues to execute tasks in the background process and throw callbacks when finished.
+
 WorkerThread
 ------------
-
-Class that provides a multiprocessing interface to process tasks in a background process and throw callbacks when finished.
 
 The queries are sent between sender/receiver thread and worker process using tuples.
 Queries may be: (key,) ; (key,target) ; (key,target,args):
