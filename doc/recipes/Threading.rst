@@ -80,7 +80,7 @@ It enables stop_all() / kill_all() methods to switch off all running threads.
 threads.Worker``*``
 ===================
 
-Classes that provide a threaded/multiprocess queues to execute tasks in the background process and throw callbacks when finished.
+Classes that provide threaded/multiprocess queues to execute tasks in the background and throw callbacks when finished.
 
 WorkerThread
 ------------
