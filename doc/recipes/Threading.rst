@@ -2,6 +2,17 @@
 Threading Classes in Fandango
 =============================
 
+All these classes more or less execute tasks in background and store the date in a cache.
+
+So, to choose one: 
+
+- Periodical function, same arguments: ThreadedObject
+- Periodical function, different arguments and caches: ThreadDict
+- Different functions, callbacks instead of cache: Worker*
+- PyQt application: QWorker
+- Single shot tasks: Tasklets
+
+
 .. contents::
 
 Asynchronous methods / Tasklets
