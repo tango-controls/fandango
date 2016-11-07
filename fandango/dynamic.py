@@ -989,7 +989,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             else: self.info('%s::evalAttr(COMMAND): formula=%s;'%(self.get_name(),formula,))
 
             result = eval(compiled or formula,self._globals,self._locals) #<<<<< EVAL!
-
+            self.debug('eval result: %s'%result)
+            
             #Push/Keep Read Attributes
             if not WRITE and aname in self.dyn_values:
                 quality = self.get_quality_for_attribute(aname,result)
@@ -1026,19 +1027,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 print '\n'.join(['DynamicDS_evalAttr(%s)_WrongFormulaException:'%aname,'\t"%s"'%formula,str(traceback.format_exc())])
                 print '\n'.join([str(e.args[0])]) + '\n'+'*'*80
                 print '-'*80
-            #PyTango.Except.throw_exception('DynamicDS_evalAttr_WrongFormula','%s is not a valid expression!'%formula,str(e))
             err = e.args[0]
-            raise e#Exception,';'.join([err.origin,err.reason,err.desc])
-            #PyTango.Except.throw_exception(str(err.reason),str(err.desc),str(err.origin))
+            self.error(e)
+            raise e #Exception,';'.join([err.origin,err.reason,err.desc])
         except Exception,e:
             if self.last_attr_exception and self.last_attr_exception[0]>tstart:
                 e = self.last_attr_exception[-1]
-            if 1: #self.trace:
-                print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,]) #str(e)])
-                #print '\n'.join(traceback.format_tb(sys.exc_info()[2]))
-                #print traceback.format_exc()
-            raise Exception(str(traceback.format_exc())) #Exception,'DynamicDS_eval(%s): %s'%(formula,traceback.format_exc())
-            #PyTango.Except.throw_exception('DynamicDS_evalAttr_WrongFormula','%s is not a valid expression!'%formula,str(traceback.format_exc()))
+            if 1:
+                print '\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%formula,])
+            s = traceback.format_exc()
+            self.error(s)
+            raise Exception(s)
         finally:
             self._locals['ATTRIBUTE'] = ''
 
@@ -1165,7 +1164,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if params: device,aname = params.get('device',None),params.get('attribute',aname)
         else: device,aname = aname.rsplit('/',1) if '/' in aname else '',aname
         
-        (self.info if write else self.debug)("DynamicDS(%s)::getXAttr(%s,write=%s): ..."%(device or self.get_name(),aname,write and '%s(%s)'%(type(wvalue),wvalue)))
+        (self.info if write else self.debug)("DynamicDS.getXAttr(%s,%s,write=%s): ..."%(device or self.get_name(),aname,write and '%s(%s)'%(type(wvalue),wvalue)))
         result = default #Returning an empty list because it is a False iterable value that can be converted to boolean (and False or None cannot be converted to iterable)
         try:
             if not device:
@@ -1639,15 +1638,22 @@ class DynamicDSClass(PyTango.DeviceClass):
     device_property_list = {
         'DynamicAttributes':
             [PyTango.DevVarStringArray,
-            "Attributes and formulas to create for this device.\n\nThis Tango Attributes will be generated dynamically using this syntax:\n\nT3=int(SomeCommand(7007)/10.)\n\n\nSee the class description to know how to make any method available in attributes declaration.\n\nNOTE:Python generators dont work here, use comprehension lists instead.",
+            "Attributes and formulas to create for this device.\n"\
+            "This Tango Attributes will be generated dynamically using this syntax:\n"\
+            "\tT3=int(SomeCommand(7007)/10.)\n\n"\
+            "See the class description to know how to make any method available in attributes declaration.\n"\
+            "NOTE:Python generators dont work here, use comprehension lists instead.",
             [ '#Write here your Attribute formulas' ] ],
         'DynamicStates':
             [PyTango.DevVarStringArray,
-            "This property will allow to declare new States dinamically based on\n\ndynamic attributes changes. The function Attr will allow to use the\n\nvalue of attributes in formulas.\n\n\n\nALARM=Attr(T1)>70\nOK=1",
+            "This property will allow to declare new States dinamically based on\n"\
+            "dynamic attributes changes. The function Attr will allow to use the\n"\
+            "value of attributes in formulas.\n\n\n\nALARM=Attr(T1)>70\nOK=1",
             [ '#Write here your State formulas' ] ],
         'DynamicCommands':
             [PyTango.DevVarStringArray,
-            "This property will allow to declare new Commands at startup with formulas like: SendStrings=DevLong(WATTR(NAME+'/Channel',SPECTRUM(str,ARGS)))",
+            "This property will allow to declare new Commands at startup with formulas like: \n"\
+            "\tSendStrings=DevLong(WATTR(NAME+'/Channel',SPECTRUM(str,ARGS)))",
             [ '#Write here your Command formulas' ] ],            
         'DynamicQualities':
             [PyTango.DevVarStringArray,
