@@ -2,7 +2,7 @@
 fandango.callbacks.EventSource
 ==============================
 
-.. contents:
+.. contents::
 
 Description
 -----------
