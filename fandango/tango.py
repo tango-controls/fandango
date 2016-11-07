@@ -1634,8 +1634,14 @@ class TangoEval(object):
         self.timeout = timeout
         self.keeptime = keeptime
         self.use_tau = TAU and use_tau
-        self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if self.use_tau else ProxiesDict(use_tau=self.use_tau)
-        self.attributes = attributes or dicts.CaselessDefaultDict(taurus.Attribute if self.use_tau else (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
+        #self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if self.use_tau else ProxiesDict(use_tau=self.use_tau)
+        self.proxies = proxies or ProxiesDict(use_tau=self.use_tau)
+        #self.attributes = attributes or dicts.CaselessDefaultDict(taurus.Attribute if self.use_tau else (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
+        import callbacks as cb
+        self.dummy_listener = cb.EventListener('TangoEval',loglevel=0) if self.use_tau else None
+        self.attributes = attributes or dicts.CaselessDefaultDict(
+            (lambda a:cb.TangoEventSource(a,listeners=self.dummy_listener)) if self.use_tau else 
+            (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
         self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
         self.cache_depth = cache
