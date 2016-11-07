@@ -4,13 +4,26 @@ Threading Classes in Fandango
 
 .. contents::
 
-dicts.ThreadDict
-================
+Asynchronous methods / Greenlets
+================================
+
+threads.AsynchronousFunction
+----------------------------
 
 ...
 
+threads.SubprocessMethod
+------------------------
+
+...
+
+
 threads.ThreadedObject
 ======================
+
+Developed for managing callbacks.EventThread queue within device servers
+
+...
 
 threads.Worker``*``
 ===================
@@ -40,21 +53,6 @@ CronTab
 
 ...
 
-
-
-Asynchronous methods
-====================
-
-threads.AsynchronousFunction
-----------------------------
-
-...
-
-threads.SubprocessMethod
-------------------------
-
-...
-
 QThreads
 ========
 
@@ -68,3 +66,7 @@ qt.QWorker
 
 ...
 
+dicts.ThreadDict / DefaultThreadDict
+====================================
+
+...
