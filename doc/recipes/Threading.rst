@@ -4,8 +4,8 @@ Threading Classes in Fandango
 
 .. contents::
 
-Asynchronous methods / Greenlets
-================================
+Asynchronous methods / Tasklets
+===============================
 
 threads.AsynchronousFunction
 ----------------------------
