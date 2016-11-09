@@ -1627,21 +1627,29 @@ class TangoEval(object):
     retango = redev+reattr#+'(?!/)'
     regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods    
     
-    def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,trace=False, proxies=None, attributes=None, cache=0, use_tau = False):
+    def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,trace=False, proxies=None, attributes=None, cache=0, use_events = False, **kwargs):
         self.formula = formula
         self.source = ''
         self.variables = []
         self.timeout = timeout
         self.keeptime = keeptime
-        self.use_tau = TAU and use_tau
+        #self.use_tau = TAU and use_tau
         #self.proxies = proxies or dicts.defaultdict_fromkey(taurus.Device) if self.use_tau else ProxiesDict(use_tau=self.use_tau)
-        self.proxies = proxies or ProxiesDict(use_tau=self.use_tau)
         #self.attributes = attributes or dicts.CaselessDefaultDict(taurus.Attribute if self.use_tau else (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
-        import callbacks as cb
-        self.dummy_listener = cb.EventListener('TangoEval',loglevel=0) if self.use_tau else None
-        self.attributes = attributes or dicts.CaselessDefaultDict(
-            (lambda a:cb.TangoEventSource(a,listeners=self.dummy_listener)) if self.use_tau else 
-            (lambda a:CachedAttributeProxy(a,keeptime=self.keeptime)))
+        
+        self.proxies = proxies or ProxiesDict() #use_tau=self.use_tau)
+        self.use_events = use_events or kwargs.get('use_tau',False)
+        if attributes:
+          self.attributes = attributes
+        elif self.use_events:
+          import callbacks as cb
+          self.dummy_listener = cb.EventListener('TangoEval',loglevel=0)
+          self.attributes = dicts.CaselessDefaultDict(
+            lambda a:cb.TangoEventSource(a,listeners=self.dummy_listener))
+        else:
+          self.attributes = dicts.CaselessDefaultDict(
+            CachedAttributeProxy(a,keeptime=self.keeptime))
+
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
         self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
         self.cache_depth = cache

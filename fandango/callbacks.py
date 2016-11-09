@@ -375,10 +375,9 @@ class EventSource(Logger,Object):
         self.counters = defaultdict(int)
         EventSource.INSTANCES.append(weakref.ref(self))
                           
-        if kwargs.get('enablePolling', False):
+        if self.forced:
             self.activatePolling()
-        #if not kwargs.get('quiet',False):
-            #self.start_thread()
+
         listeners = toList(kwargs.get('listeners',[]))
         map(self.addListener,listeners)
             
@@ -524,6 +523,7 @@ class EventSource(Logger,Object):
                 else:
                   self.event_ids[type_] = self.proxy.subscribe_event(
                       self.simple_name,type_,self,[],False)
+                  self.debug('\tevent %s SUBSCRIBED'%type_)
                   self.state = self.SUBSCRIBED
             except:
                 self.debug('\tevent %s not subscribed'%type_)
@@ -565,14 +565,17 @@ class EventSource(Logger,Object):
         If asynch=True/False, self.asynchronous will be overriden for this call.
         """
         asynch = notNone(asynch,self.asynchronous)
+
+        # If not polled, force HW reading
         if not any((self.isPollingEnabled(),self.isUsingEvents())):
-            cache = False        
+            cache = False
+        # If it was just updated, return cache
         elif hasattr(self.attr_value,'time') and \
           self.keep_time>(time.time()-ctime2time(self.attr_value.time)):
             cache = True
 
         if cache:
-            self.asynch()
+            self.asynch() # Check for pending asynchronous results
             if self.attr_value is not None:
                 return self.attr_value
             elif self.state != self.UNSUBSCRIBED:
