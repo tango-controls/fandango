@@ -14,7 +14,7 @@ DynamicDS device formulas are declared using four properties:
 Directives and Keywords
 =======================
  
-Those formulas accept special directives and keywords
+Those formulas accept special directives, functions and keywords
 
 Special directives
 ------------------
@@ -23,8 +23,8 @@ Special directives
         
 **@FILE:filename.txt** : It reads the attributes/states/commands from a file instead of properties; for templating hundreds of devices w/out having to go one by one in Jive.
 
-Keywords in Dynamic Properties
-------------------------------
+Functions in Dynamic Properties
+-------------------------------
 
 **DYN/SCALAR/SPECTRUM/IMAGE** : for creating typed attributes ( Attr=SPECTRUM(float,...) instead of Attr=DevVarDoubleArray(...) ) ; the main advantage is that it allows compact syntax and having Images as DynamicAttributes.
 
