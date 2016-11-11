@@ -33,3 +33,8 @@ DynamicQualities
 Change quality of an attribute depending on another one::
 
   (*)_VAL=ATTR_ALARM if ATTR('$_ALRM') else ATTR_VALID
+
+Simulations
+-----------
+
+Some examples available in the SimulatorDS documentation: https://github.com/tango-controls/simulatords
