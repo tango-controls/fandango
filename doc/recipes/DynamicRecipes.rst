@@ -9,9 +9,12 @@ DynamicDS device formulas are declared using four properties:
  - DynamicStates
  - DynamicQualities
  
-Those formulas accept special directives and keywords
-
 .. contents::
+
+Directives and Keywords
+=======================
+ 
+Those formulas accept special directives and keywords
 
 Special directives
 ------------------
@@ -70,6 +73,9 @@ Keywords updated at every call
 **NAME** : current device name
 
 **ATTRIBUTE** : current attribute name
+
+Examples
+========
 
 DynamicCommands
 ---------------
