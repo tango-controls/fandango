@@ -4,9 +4,8 @@ Dynamic Devices and Simulators
 
 .. contents::
 
------------------------------------------
-What DynamicAttributes / DynamicDS allow?
------------------------------------------
+What DynamicAttributes / DynamicDS allow
+========================================
 
 The DynamicAttributes property allows to declare attributes using formulas in a property::
 
@@ -74,12 +73,11 @@ A higher fandango integration (dynamic states, commands, online update) can be a
         U.server_init()
         U.server_run()
 
----------------------------
 Usage of Dynamic Attributes
----------------------------
+===========================
 
 Setting Dynamic Attributes property
-===================================
+-----------------------------------
 
 The DynamicAttributes Property is used to create the read/write attributes of the PyPLC Device or any other device inheriting from DynamicDS.
 
@@ -87,7 +85,6 @@ This is the format that can be used to declare the Dynamic Attributes (more info
 
   ATT_NAME=type(READ and !DevComm1(args) or WRITE and !DevComm2(args,VALUE))
 
-----------------------
 Setting Dynamic States
 ----------------------
 
@@ -100,13 +97,11 @@ The "STATE" clause can be used also; forcing the state returned by the code. (NO
 
   STATE=ON if Voltage>0 else OFF
 
-----------------------
 Setting Dynamic Status
 ----------------------
 
 Every line in Dynamic Status will be evaluated and joined in the result if has a value. Every line of the DynamicStatus property will be evaluated as a new line in the status attribute value. You can use the reserved STATUS keyword to append the default status.
 
----------------------------
 Using different Tango Types
 ---------------------------
 
@@ -123,28 +118,30 @@ equals to::
   AnalogIntsREAD=DevVarLongArray(Regs(7800,100)) #Array of 100 integers read from address 7800
 
 Warning!: DynamicAttributes sometimes fail with python generators; it must be inside list(gen) or between [gen]
-Using Attribute Values (own or external)
 
-    DynamicDS.dyn_values dictionary: 
+Using Attribute Values (own or external)
+----------------------------------------
+
+DynamicDS.dyn_values dictionary::
 
         This dictionary keeps all the information related to dynamic attributes (name,type,value,formula,dependencies,keep).
 
-    Direct access: 
+Direct access::
 
         Reads the last generated value of another dynamic attribute
         NewAttribute = type(Attribute)
 
-    ATTR(): 
+ATTR()::
 
         Forces an eval() execution
         NewAttribute = type(ATTR('Attribute'))
 
-    XATTR():: 
+XATTR()::
 
         Reads an attribute from an external device
         NewAttribute = type(XATTR('Attribute')).
 
-    WATTR():: 
+WATTR()::
 
         Allows to Write a VALUE in an external attribute
         WritableAttribute = type(READ and XATTR('Attribute') or WRITE and WATTR('Attribute',VALUE)).
@@ -152,16 +149,15 @@ Using Attribute Values (own or external)
 Using TAU 
 ---------
 
-        If import tau is available a tau.Attribute object is used to read the attributes. If not then PyTango.AttributeProxy objects are used
+If import tau is available a tau.Attribute object is used to read the attributes. If not then PyTango.AttributeProxy objects are used
 
 The KeepAttributes property
 ---------------------------
 
-        This property may contain 'yes', 'no' or a list of attribute names. It controls if the last attribute values generated are kept for later calculations or not (using .value and .keep variables).
+This property may contain 'yes', 'no' or a list of attribute names. It controls if the last attribute values generated are kept for later calculations or not (using .value and .keep variables).
 
---------------
 Meta Variables
---------------
+==============
 
 Several variables are available by default in DynamicAttributes and DynamicStates declaration::
 
@@ -188,7 +184,7 @@ Several variables are available by default in DynamicAttributes and DynamicState
 Variables, Tango Properties and EVAL
 ====================================
 
-Property values can be read using the PROPERTY('prop_name') command. The EVAL(expression) command can be used to evaluate any string ... including property contents. ::
+Property values can be read using the PROPERTY('prop_name') command. The EVAL(expression) command can be used to evaluate any string ... including property contents::
 
     Property Name 	Value
     DynamicAttributes 	AttributeFromProperty=EVAL(PROPERTY('SomeProperty')))
@@ -206,6 +202,7 @@ Example: for creating a simulated attribute that returns the same value that has
   OP-PNV-01=DevBoolean(READ and VAR('OP-PNV-01') or WRITE and VAR('OP-PNV-01',VALUE))
 
 Using Tango Device Commands to create new Attributes
+----------------------------------------------------
 
 Example: In the case of a PyPLC Device any of the Device Commands can be used in the Attribute declaration:
 
@@ -234,10 +231,10 @@ It uses self._locals dictionary to store the commands of the class to be availab
 
 These commands can be added directly to the self._locals dictionary, using the argument _locals of eval_attr method or in ``DynamicDS.__init__`` call::
 
- self.call__init__(DynamicDS,cl,name,_locals={
-  'Command0': lambda argin: self.Command0(argin),
-  'Command1': lambda _addr,val: self.Command1([_addr,val]), #typical Tango command that requires an array as argument
-  'Command2': lambda argin,VALUE=None: self.Command1([argin,VALUE]), #typical write command, with VALUE defaulting to None only argin is used
+    self.call__init__(DynamicDS,cl,name,_locals={
+      'Command0': lambda argin: self.Command0(argin),
+      'Command1': lambda _addr,val: self.Command1([_addr,val]), #typical Tango command that requires an array as argument
+      'Command2': lambda argin,VALUE=None: self.Command1([argin,VALUE]), #typical write command, with VALUE defaulting to None only argin is used
                     },useDynStates=False)
 
 Dynamic Attributes Qualitites
@@ -298,9 +295,9 @@ But, if UseEvents is yes but the event is not configured or the internal polling
 
 To prevent this I established several UseEvents behaviours:
 
-    :No/False: No change event is set for any attribute
-    :Yes/True: Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set.
-    :reg.*exp: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
+:No/False: No change event is set for any attribute
+:Yes/True: Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set.
+:reg.*exp: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
 
 Example::
 
@@ -322,11 +319,13 @@ Dynamic Commands
 
 fandango.dynamic.CreateDynamicCommands method will modify both device and deviceClass objects. It requires to add a new line in the Device Server main method::
 
-  if __name__ == '__main__':
-    try:
+    if __name__ == '__main__':
+      try:
         py = ('PyUtil' in dir(PyTango) and PyTango.PyUtil or PyTango.Util)(sys.argv)
-     PyStateComposer,PyStateComposerClass=FullTangoInheritance('PyStateComposer',PyStateComposer,PyStateComposerClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
-        py.add_TgClass(PyStateComposerClass,PyStateComposer,'PyStateComposer')
+        PyStateComposer,PyStateComposerClass=FullTangoInheritance(
+          'PyStateComposer',PyStateComposer,PyStateComposerClass,
+          DynamicDS,DynamicDSClass,ForceDevImpl=True)
+          py.add_TgClass(PyStateComposerClass,PyStateComposer,'PyStateComposer')
 
         U = PyTango.Util.instance()
         fandango.dynamic.CreateDynamicCommands(PyStateComposer,PyStateComposerClass) #<=== It enables new Dynamic Commands
@@ -381,7 +380,7 @@ The inheritance is created calling to FullTangoInheritance before any py.add_TgC
 
  
 
-    The ForceDevImpl argument forces that PyTango.Device_3Impl always appear in the DeviceServer.bases list; it doesn't matter the lenght of the inheritance chain.
+The ForceDevImpl argument forces that PyTango.Device_3Impl always appear in the DeviceServer.bases list; it doesn't matter the lenght of the inheritance chain.
 
 The fast way (not Pogo-compatible)
 ----------------------------------
@@ -412,12 +411,12 @@ Import everything from fandango.dynamic module::
 
   from PyTango_utils.dynamic import *
 
-in __init__ : Substitute Device_3Impl by DynamicDS  ::
+in __init__ : Substitute Device_3Impl by DynamicDS::
 
   #PyTango.Device_3Impl.__init__(self,cl,name)
   DynamicDS.__init__(self,cl,name,_locals={},useDynStates=True)
 
-in always_executed_hook : Add a call to DynamicDS.always_executed_hook() ::
+in always_executed_hook : Add a call to ``DynamicDS.always_executed_hook()``::
  
   def always_executed_hook(self):
     print "In ", self.get_name(), "::always_executed_hook()"
@@ -435,7 +434,7 @@ Using DynamicAttributes property
 Or Pseudo Static Attributes (for configurable multiple input / output devices)
 ------------------------------------------------------------------------------
 
-    If you want to create the fixed attributes within your code you can use this method to add an attribute (attributes formula syntax is the same than in the previous case)::
+If you want to create the fixed attributes within your code you can use this method to add an attribute (attributes formula syntax is the same than in the previous case)::
 
     #Add this line for each new attribute:
     self.DynamicAttributes.append('MyNewAttribute=DevVarTangoType(python_code or any_command or any_attribute)')
@@ -443,7 +442,7 @@ Or Pseudo Static Attributes (for configurable multiple input / output devices)
 
     self.updateDynamicAttributes()
 
-    This two lines of code will enable all the features available in the DynamicDS template (use of commands, internal and external attributes, easy type casting, ...).
+This two lines of code will enable all the features available in the DynamicDS template (use of commands, internal and external attributes, easy type casting, ...).
 
   **Note:** When inserted inside init_device these lines must be inserted after self.get_device_properties(self.get_device_class())
 
@@ -462,9 +461,8 @@ This is a typical syntax to be used in DynamicStates property::
 The DynamicDS evaluates sequentially each of the expressions; setting the State to the first one evaluating to True. If nothing is declared the State is set to UNKNOWN by default.
 
 
-####################################################################################################
+----
 
---------
 Examples
 --------
 
