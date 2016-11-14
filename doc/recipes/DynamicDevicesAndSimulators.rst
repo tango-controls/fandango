@@ -4,6 +4,8 @@ Dynamic Devices and Simulators
 
 .. contents::
 
+----
+
 Introduction
 ============
 
@@ -63,6 +65,8 @@ Finally, go to Jive and create the DynamicAttributes property and put there your
 
   SETPOINT=type(READ and SerialComm('SP?') or WRITE and SerialComm('SP=%s'%VALUE))
   
+----
+
 Usage of Dynamic Attributes
 ===========================
 
@@ -158,6 +162,8 @@ The returning type can be explicitly specified:
 :DynamicCommands:
   ReadHoldingRegisters=DevVarLongArray([ARGS[0]]*int(ARGS[1]))        
   
+----
+
 Dynamic States
 ==============
 
@@ -186,6 +192,8 @@ Setting Dynamic Status
 
 Every line in Dynamic Status will be evaluated and joined in the result if has a value. Every line of the DynamicStatus property will be evaluated as a new line in the status attribute value. You can use the reserved STATUS keyword to append the default status.
 
+----
+
 Dynamic Attributes Qualitites
 =============================
 
@@ -213,6 +221,65 @@ or::
   (*)_Status=ATTR_WARNING if '1' in ATTR('$_Status') else ATTR_VALID
 
 Where $ will be equivalent to the expression returned by (*)  
+
+----
+
+Examples
+========
+
+Simple example
+--------------
+
+It will use a command to record a value in the 'C' variable, it can be returned from the C attribute and will affect the State.
+
+DynamicAttributes::
+
+  A = DevString(VAR("Hello World!",WRITE=True))
+  B = t
+  C = DevLong(VAR('C'))
+
+DynamicStates::
+
+  STATE=ON if VAR('C') else OFF
+
+DynamicCommands::
+
+  test_command=str(VAR('C',int(ARGS[0])) or VAR('C'))
+
+
+Creating a Ramp with a SimulatorDS
+----------------------------------
+
+This device will generate a ramp in the **Value** attribute.
+
+The sequence is:
+
+* Write **Setpoint** attribute
+* Write **Period** attribute
+* Launch **Start()**
+
+DynamicAttributes::
+
+  #Settings
+  Setpoint=VAR('SP',WRITE=True)
+  Period=VAR('T1',WRITE=True)
+  #Intermediate values
+  Start=GET('T0')
+  Ramp=VAR('R')
+  Origin=GET('V0')
+  #Output value
+  Value=float(Origin+(t-Start)*Ramp if t<(Start+Period) else (GET('V1') if (Start and t>Start) else Value))
+
+DynamicCommands::
+
+  Start=str((SET('V0',ATTR('Value')),SET('T0',t),SET('V1',ATTR('Setpoint')),SET('R',(ATTR('Setpoint')-GET('V0'))/ATTR('Period'))))
+
+DynamicStates::
+
+  ON=VAR('Init',default=0)
+  INIT=[SET(x,v) for x,v in [('Init',1),('SP',0),('R',0),('T1',1),('V0',0),('V1',1),('T0',0)]]
+
+----
 
 Advanced features / Syntax
 ==========================
@@ -300,6 +367,8 @@ ChekDependencies (True by default)
 
 will force a check of which attributes are accessed in other's formulas, creating an index for each attribute with its pre-requisites for evaluation (which will be automatically assigned to be kept). At each read_dyn_attr execution the dependency values will be added to _locals, and a read_dyn_attr(dependency) may be forced if its values are older than KeepTime.
 
+----
+
 Tango Events
 ============
 
@@ -336,6 +405,8 @@ The attribute will be evaluated (therefore being able to push events) for any of
     The attribute is read using internal polling.
     The attribute uses XAttr to access external attributes and an event from those external attributes is received.
     The property CheckDependencies is True and an attribute depending from this one (having its name in the formula) is evaluated. 
+
+----
 
 Advanced DynamicDS creation
 ===========================
@@ -423,6 +494,8 @@ in always_executed_hook : Add a call to ``DynamicDS.always_executed_hook()``::
     print "In ", self.get_name(), "::always_executed_hook()"
 
     DynamicDS.always_executed_hook(self)
+    
+----
 
 Adding new attributes embedded within the device
 ================================================
@@ -449,57 +522,3 @@ This two lines of code will enable all the features available in the DynamicDS t
 
 ----
 
-Examples
-========
-
-Simple example
---------------
-
-It will use a command to record a value in the 'C' variable, it can be returned from the C attribute and will affect the State.
-
-DynamicAttributes::
-
-  A = DevString("Hello World!")
-  B = t
-  C = DevLong(VAR('C'))
-
-DynamicStates::
-
-  STATE=ON if VAR('C') else OFF
-
-DynamicCommands::
-
-  test_command=str(VAR('C',int(ARGS[0])) or VAR('C'))
-
-
-Creating a Ramp with a SimulatorDS
-----------------------------------
-
-This device will generate a ramp in the **Value** attribute.
-
-The sequence is:
-
-* Write **Setpoint** attribute
-* Write **Period** attribute
-* Launch **Start()**
-
-:DynamicAttributes: ::
-
-  #Settings
-  Setpoint=VAR('SP',WRITE=True)
-  Period=VAR('T1',WRITE=True)
-  #Intermediate values
-  Start=GET('T0')
-  Ramp=VAR('R')
-  Origin=GET('V0')
-  #Output value
-  Value=float(Origin+(t-Start)*Ramp if t<(Start+Period) else (GET('V1') if (Start and t>Start) else Value))
-
-:DynamicCommands: ::
-
-  Start=str((SET('V0',ATTR('Value')),SET('T0',t),SET('V1',ATTR('Setpoint')),SET('R',(ATTR('Setpoint')-GET('V0'))/ATTR('Period'))))
-
-:DynamicStates: ::
-
-  ON=VAR('Init',default=0)
-  INIT=[SET(x,v) for x,v in [('Init',1),('SP',0),('R',0),('T1',1),('V0',0),('V1',1),('T0',0)]]
