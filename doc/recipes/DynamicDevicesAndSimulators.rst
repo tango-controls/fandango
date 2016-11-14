@@ -4,8 +4,13 @@ Dynamic Devices and Simulators
 
 .. contents::
 
+Introduction
+============
+
+The fandango library provides Dynamic Tango Device Classes through the fandango.dynamic module and the DynamicDS class.
+
 What DynamicAttributes / DynamicDS allow
-========================================
+----------------------------------------
 
 The DynamicAttributes property allows to declare attributes using formulas in a property::
 
@@ -19,15 +24,14 @@ It's also possible to write READ/WRITE attributes::
 
   SETPOINT = DevDouble(READ and SerialCommand('SP?') or WRITE and SerialCommand('SP=%s'%VALUE))
 
-Add Dynamic Attributes features to an existing device
-=====================================================
+Add DynamicAttributes to a Tango Device Class
+---------------------------------------------
 
 Modify the following lines of your device::
 
+Declaration of your device, replace DevImpl by DynamicDS::
+
   from fandango.dynamic import *
-
-Declaration of your device, replace DevImpl::
-
   class GaugeController(fandango.DynamicDS):
 
 Class creator, initialize DynamicDS instead of DevImpl; methods added to _locals dictionary will be available in attributes formulas::
@@ -44,35 +48,21 @@ Init() method of device, replace get_device_properties()::
         self.get_DynDS_properties() 
         ...
 
-Always executed hook
---------------------
+Add always executed hook for evaluating states::
 
   def always_executed_hook(self):
         print "In ", self.get_name(), "::always_excuted_hook()"
         fandango.DynamicDS.always_executed_hook(self)
 
-Declaration of class, replace PyTango.DeviceClass::
+In the Tango class declaration, replace PyTango.DeviceClass::
 
   class GaugeControllerClass(fandango.DynamicDSClass): #<--- Declaration of Class
         ...
 
-And then create the DynamicAttributes property and put there your attributes formulas.::
+Finally, go to Jive and create the DynamicAttributes property and put there your attributes formulas.::
 
   SETPOINT=type(READ and SerialComm('SP?') or WRITE and SerialComm('SP=%s'%VALUE))
-
-A higher fandango integration (dynamic states, commands, online update) can be achieved modifying the main method::
-
-  if __name__ == '__main__':
-    try:
-        py = PyTango.Util(sys.argv)
-        from fandango.interface import FullTangoInheritance
-        GaugeController,GaugeControllerClass =  FullTangoInheritance('GaugeController',GaugeController,GaugeControllerClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
-        py.add_TgClass(GaugeControllerClass,GaugeController,'GaugeController')
-        U = PyTango.Util.instance()
-        fandango.dynamic.CreateDynamicCommands(GaugeController,GaugeControllerClass)
-        U.server_init()
-        U.server_run()
-
+  
 Usage of Dynamic Attributes
 ===========================
 
@@ -84,23 +74,6 @@ The DynamicAttributes Property is used to create the read/write attributes of th
 This is the format that can be used to declare the Dynamic Attributes (more information is available in the PyTango_utils module user guide). Remember that it is python code and is Case Sensitive!::
 
   ATT_NAME=type(READ and !DevComm1(args) or WRITE and !DevComm2(args,VALUE))
-
-Setting Dynamic States
-----------------------
-
-For DynamicStates a boolean operation must be set to each state ... but the name of the State should match an standard Tango.DevState name (ON, FAULT, ALARM, OPEN, CLOSE, ...)::
-
-  ALARM=(SomeAttribute > MaxRange)
-  ON=True
-
-The "STATE" clause can be used also; forcing the state returned by the code. (NOTE: States are usable within formulas, so it should not be converted to string!)::
-
-  STATE=ON if Voltage>0 else OFF
-
-Setting Dynamic Status
-----------------------
-
-Every line in Dynamic Status will be evaluated and joined in the result if has a value. Every line of the DynamicStatus property will be evaluated as a new line in the status attribute value. You can use the reserved STATUS keyword to append the default status.
 
 Using different Tango Types
 ---------------------------
@@ -119,8 +92,10 @@ equals to::
 
 Warning!: DynamicAttributes sometimes fail with python generators; it must be inside list(gen) or between [gen]
 
-Using Attribute Values (own or external)
-----------------------------------------
+Reading Tango Attributes
+------------------------
+
+It's allowed to read attributes from the same device or others.
 
 DynamicDS.dyn_values dictionary::
 
@@ -145,97 +120,71 @@ WATTR()::
 
         Allows to Write a VALUE in an external attribute
         WritableAttribute = type(READ and XATTR('Attribute') or WRITE and WATTR('Attribute',VALUE)).
+        
 
-Using TAU 
----------
+Dynamic Commands
+================
 
-If import tau is available a tau.Attribute object is used to read the attributes. If not then PyTango.AttributeProxy objects are used
+fandango.dynamic.CreateDynamicCommands method will modify both device and deviceClass objects. It requires to add a new line in the Device Server main method::
 
-The KeepAttributes property
----------------------------
+    if __name__ == '__main__':
+      try:
+        py = ('PyUtil' in dir(PyTango) and PyTango.PyUtil or PyTango.Util)(sys.argv)
+        PyStateComposer,PyStateComposerClass=FullTangoInheritance(
+          'PyStateComposer',PyStateComposer,PyStateComposerClass,
+          DynamicDS,DynamicDSClass,ForceDevImpl=True)
+          py.add_TgClass(PyStateComposerClass,PyStateComposer,'PyStateComposer')
 
-This property may contain 'yes', 'no' or a list of attribute names. It controls if the last attribute values generated are kept for later calculations or not (using .value and .keep variables).
+        U = PyTango.Util.instance()
+        fandango.dynamic.CreateDynamicCommands(PyStateComposer,PyStateComposerClass) #<=== It enables new Dynamic Commands
+        U.server_init()
+        U.server_run()
 
-Meta Variables
+It will create new commands parsable from the DynamicCommands property:
+
+DynamicAttributes::
+
+  VALS=sum([XAttr('test/test/test/value%d'%i or 0.) for i in range(1,5)])
+
+DynamicCommands::
+
+  TEST=str(COMM('test/test/test/State',[]))+'='+str(VALS)
+  TEST2=str(float(VALS)+float(ARGS[0]))
+
+It will use an ARGS variable to manage the input arguments of the command. If ARGS appear in the formula the Command created will use DevVarStringArray as argin. If not, then it will be a DevVoid command.
+
+The returning type can be explicitly specified:
+
+:DynamicCommands:
+  ReadHoldingRegisters=DevVarLongArray([ARGS[0]]*int(ARGS[1]))        
+  
+Dynamic States
 ==============
 
-Several variables are available by default in DynamicAttributes and DynamicStates declaration::
+  **NOTE:** Using DynamicDS the automatic State generation using Attribute Alarm/Warning Properties is disabled 
+    
+This is a typical syntax to be used in DynamicStates property::
 
-    t : seconds passed since device startup 
+  FAULT=self.last_reading < time.time()-3600
 
-    READ : Boolean set to True when read_attribute is being executed 
+  WARNING=max ([Temperature1,Temperature2])>70
+  OK=1 #State by default
 
-    WRITE : Boolean set to True when write_attribute is being executed 
+The DynamicDS evaluates sequentially each of the expressions; setting the State to the first one evaluating to True. If nothing is declared the State is set to UNKNOWN by default.
 
-    VALUE : Value passed to write_attribute as argument 
+For DynamicStates a boolean operation must be set to each state ... but the name of the State should match an standard Tango.DevState name (ON, FAULT, ALARM, OPEN, CLOSE, ...)::
 
-    STATE : Actual state of the device (although STATE=new_value equals to a set_state() execution) 
+  ALARM=(SomeAttribute > MaxRange)
+  ON=True
 
-    STATUS : Last generated status 
+The "STATE" clause can be used also; forcing the state returned by the code. (NOTE: States are usable within formulas, so it should not be converted to string!)::
 
-    ATTRIBUTE : Name of the attribute being evaluated 
+  STATE=ON if Voltage>0 else OFF
 
- 
+Setting Dynamic Status
+----------------------
 
-    NAME : The device name 
-
-    POLLING(pending) : Actual Polling period of the Attribute (POLLING=new_value is NOT allowed) 
-
-Variables, Tango Properties and EVAL
-====================================
-
-Property values can be read using the PROPERTY('prop_name') command. The EVAL(expression) command can be used to evaluate any string ... including property contents::
-
-    Property Name 	Value
-    DynamicAttributes 	AttributeFromProperty=EVAL(PROPERTY('SomeProperty')))
-    SomeProperty 	3*sin(t/3.1415)
-
-Other usages are::
-
-    PROPERTY(name,True) to force reloading of the value,
-    WPROPERTY(name,VALUE) to store a new value in Tango DB. 
-
-The method VAR('attribute_name',new_value) can be used to store a forced value in an internal mapping of the Dynamic Device Server. This value returned if VAR('attribute_name') is called with a single argument.
-
-Example: for creating a simulated attribute that returns the same value that has been written::
-
-  OP-PNV-01=DevBoolean(READ and VAR('OP-PNV-01') or WRITE and VAR('OP-PNV-01',VALUE))
-
-Using Tango Device Commands to create new Attributes
-----------------------------------------------------
-
-Example: In the case of a PyPLC Device any of the Device Commands can be used in the Attribute declaration:
-
-=======   =====   ======  ====== ===========
-Command 	Argin 	Argout 	Result Description
-=======   =====   ======  ====== ===========
-Reg(Address) 	DevShort 	DevShort 	Value of the given register
-Coil(Address) 	DevShort 	DevShort 	Value of the given coil ()
-Flag(Address,Bit) 	DevVarShortArray 	DevShort 	Value of a bit in the given register
-Bit(Number,Bit) 	DevVarShortArray 	DevShort 	Value of a bit in the given integer
-Regs(Address,N) 	DevVarShortArray 	DevVarShortArray 	Values of N consecutive registers
-Regs32(Address,N) 	DevVarShortArray 	DevVarShortArray 	N 32bit values from 2*N consecutive registers
-Coils(Address,N) 	DevVarShortArray 	DevVarShortArray 	Values of N consecutive coils
-IeeeFloat(Address) 	DevVarShortArray 	DevDouble 	32bit IeeeFloat read from 2 consecutive registers
-IeeeFloat(Int1,Int2) 	DevVarShortArray 	DevDouble 	32bit IeeeFloat build using two 16bit integers
-WriteFloat(Address,Value) 	DevVarStringArray 	DevString 	Writes a IeeeFloat number in two registers
-WriteCoil(Address,Value) 	DevVarShortArray 	DevVoid 	Writes a 0 or 1 in a coil
-WriteBit(Address,Value) 	DevVarShortArray 	DevVoid 	Writes a 0 or 1 in a bit of a register
-WriteInt(Address,Value) 	DevVarShortArray 	DevVoid 	Writes a 16bit value in a register
-WriteLong(Address,Value) 	DevVarLongArray 	DevVoid 	Writes a 32bit value in two registers
-=======   =====   ======  ====== ===========
-
-The commands available in DynamicAttributes will depend on each DynamicDS implementation (it must be explicitly declared in DeviceServer implementation).
-
-It uses self._locals dictionary to store the commands of the class to be available in attributes declaration.
-
-These commands can be added directly to the self._locals dictionary, using the argument _locals of eval_attr method or in ``DynamicDS.__init__`` call::
-
-    self.call__init__(DynamicDS,cl,name,_locals={
-      'Command0': lambda argin: self.Command0(argin),
-      'Command1': lambda _addr,val: self.Command1([_addr,val]), #typical Tango command that requires an array as argument
-      'Command2': lambda argin,VALUE=None: self.Command1([argin,VALUE]), #typical write command, with VALUE defaulting to None only argin is used
-                    },useDynStates=False)
+Every line in Dynamic Status will be evaluated and joined in the result if has a value. Every line of the DynamicStatus property will be evaluated as a new line in the status attribute value. You can use the reserved STATUS keyword to append the default status.
 
 Dynamic Attributes Qualitites
 =============================
@@ -263,17 +212,91 @@ or::
 
   (*)_Status=ATTR_WARNING if '1' in ATTR('$_Status') else ATTR_VALID
 
-Where $ will be equivalent to the expression returned by (*)
+Where $ will be equivalent to the expression returned by (*)  
 
+Advanced features / Syntax
+==========================
+
+Meta Variables
+--------------
+
+Several variables are available by default in DynamicAttributes and DynamicStates declaration::
+
+    t : seconds passed since device startup 
+
+    READ : Boolean set to True when read_attribute is being executed 
+
+    WRITE : Boolean set to True when write_attribute is being executed 
+
+    VALUE : Value passed to write_attribute as argument 
+
+    STATE : Actual state of the device (although STATE=new_value equals to a set_state() execution) 
+
+    STATUS : Last generated status 
+
+    ATTRIBUTE : Name of the attribute being evaluated 
+
+ 
+
+    NAME : The device name 
+
+    POLLING(pending) : Actual Polling period of the Attribute (POLLING=new_value is NOT allowed) 
+
+Variables, Tango Properties and EVAL
+------------------------------------
+
+Property values can be read using the PROPERTY('prop_name') command. The EVAL(expression) command can be used to evaluate any string ... including property contents::
+
+    Property Name 	Value
+    DynamicAttributes 	AttributeFromProperty=EVAL(PROPERTY('SomeProperty')))
+    SomeProperty 	3*sin(t/3.1415)
+
+Other usages are::
+
+    PROPERTY(name,True) to force reloading of the value,
+    WPROPERTY(name,VALUE) to store a new value in Tango DB. 
+
+The method VAR('attribute_name',new_value) can be used to store a forced value in an internal mapping of the Dynamic Device Server. This value returned if VAR('attribute_name') is called with a single argument.
+
+Example: for creating a simulated attribute that returns the same value that has been written::
+
+  OP-PNV-01=DevBoolean(READ and VAR('OP-PNV-01') or WRITE and VAR('OP-PNV-01',VALUE))
+  
+
+Using TAU 
+---------
+
+If import tau is available a tau.Attribute object is used to read the attributes. If not then PyTango.AttributeProxy objects are used
+
+The KeepAttributes property
+---------------------------
+
+This property may contain 'yes', 'no' or a list of attribute names. It controls if the last attribute values generated are kept for later calculations or not (using .value and .keep variables).  
+
+Using Tango Device Commands in attribute formulas
+-------------------------------------------------
+
+The commands available in DynamicAttributes will depend on each DynamicDS implementation (it must be explicitly declared in the DeviceServer implementation). But all the commands declared as DynamicCommands can be used in the Attribute declaration.
+
+It uses self._locals dictionary to store the commands of the class to be available in attributes declaration.
+
+These commands can be added directly to the self._locals dictionary, using the argument _locals of eval_attr method or in ``DynamicDS.__init__`` call::
+
+    self.call__init__(DynamicDS,cl,name,_locals={
+      'Command0': lambda argin: self.Command0(argin),
+      'Command1': lambda _addr,val: self.Command1([_addr,val]), #typical Tango command that requires an array as argument
+      'Command2': lambda argin,VALUE=None: self.Command1([argin,VALUE]), #typical write command, with VALUE defaulting to None only argin is used
+                    },useDynStates=False)
+                    
 KeepTime / KeepAttributes /CheckDependencies properties
-=======================================================
+-------------------------------------------------------
 
 The values of dynamic attributes will be kept in dyn_values dictionary if KeepAttributes is equal to '*', 'yes' or 'true'; or if the attribute name appears in the property.
 
 For each read_dyn_attr(Attribute) call the values will not be recalculated if interval between read_attribute calls is < KeepTime (500 ms by default).
 
 ChekDependencies (True by default)
-----------------------------------
+..................................
 
 will force a check of which attributes are accessed in other's formulas, creating an index for each attribute with its pre-requisites for evaluation (which will be automatically assigned to be kept). At each read_dyn_attr execution the dependency values will be added to _locals, and a read_dyn_attr(dependency) may be forced if its values are older than KeepTime.
 
@@ -314,44 +337,22 @@ The attribute will be evaluated (therefore being able to push events) for any of
     The attribute uses XAttr to access external attributes and an event from those external attributes is received.
     The property CheckDependencies is True and an attribute depending from this one (having its name in the formula) is evaluated. 
 
-Dynamic Commands
-================
+Advanced DynamicDS creation
+===========================
 
-fandango.dynamic.CreateDynamicCommands method will modify both device and deviceClass objects. It requires to add a new line in the Device Server main method::
+A higher fandango integration (dynamic states, commands, online update) can be achieved modifying the main method::
 
-    if __name__ == '__main__':
-      try:
-        py = ('PyUtil' in dir(PyTango) and PyTango.PyUtil or PyTango.Util)(sys.argv)
-        PyStateComposer,PyStateComposerClass=FullTangoInheritance(
-          'PyStateComposer',PyStateComposer,PyStateComposerClass,
-          DynamicDS,DynamicDSClass,ForceDevImpl=True)
-          py.add_TgClass(PyStateComposerClass,PyStateComposer,'PyStateComposer')
-
+  if __name__ == '__main__':
+    try:
+        py = PyTango.Util(sys.argv)
+        from fandango.interface import FullTangoInheritance
+        GaugeController,GaugeControllerClass =  FullTangoInheritance('GaugeController',GaugeController,GaugeControllerClass,DynamicDS,DynamicDSClass,ForceDevImpl=True)
+        py.add_TgClass(GaugeControllerClass,GaugeController,'GaugeController')
         U = PyTango.Util.instance()
-        fandango.dynamic.CreateDynamicCommands(PyStateComposer,PyStateComposerClass) #<=== It enables new Dynamic Commands
+        fandango.dynamic.CreateDynamicCommands(GaugeController,GaugeControllerClass)
         U.server_init()
         U.server_run()
 
-It will create new commands parsable from the DynamicCommands property:
-
-DynamicAttributes::
-
-  VALS=sum([XAttr('test/test/test/value%d'%i or 0.) for i in range(1,5)])
-
-DynamicCommands::
-
-  TEST=str(COMM('test/test/test/State',[]))+'='+str(VALS)
-  TEST2=str(float(VALS)+float(ARGS[0]))
-
-It will use an ARGS variable to manage the input arguments of the command. If ARGS appear in the formula the Command created will use DevVarStringArray as argin. If not, then it will be a DevVoid command.
-
-The returning type can be explicitly specified:
-
-:DynamicCommands:
-  ReadHoldingRegisters=DevVarLongArray([ARGS[0]]*int(ARGS[1]))
-
-Advanced DynamicDS creation
-===========================
 
 Creating the DynamicDS inheritance (as accepted by Pogo!)
 ---------------------------------------------------------
@@ -446,28 +447,13 @@ This two lines of code will enable all the features available in the DynamicDS t
 
   **Note:** When inserted inside init_device these lines must be inserted after self.get_device_properties(self.get_device_class())
 
-Using DynamicStates for changing the device State
-=================================================
-
-  **NOTE:** Using DynamicDS the automatic State generation using Attribute Alarm/Warning Properties is disabled 
-    
-This is a typical syntax to be used in DynamicStates property::
-
-  FAULT=self.last_reading < time.time()-3600
-
-  WARNING=max ([Temperature1,Temperature2])>70
-  OK=1 #State by default
-
-The DynamicDS evaluates sequentially each of the expressions; setting the State to the first one evaluating to True. If nothing is declared the State is set to UNKNOWN by default.
-
-
 ----
 
 Examples
---------
+========
 
-Example using DynamicAttributes, DynamicStates and DynamicCommands
-==================================================================
+Simple example
+--------------
 
 It will use a command to record a value in the 'C' variable, it can be returned from the C attribute and will affect the State.
 
@@ -487,7 +473,7 @@ DynamicCommands::
 
 
 Creating a Ramp with a SimulatorDS
-==================================
+----------------------------------
 
 This device will generate a ramp in the **Value** attribute.
 
