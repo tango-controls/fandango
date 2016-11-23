@@ -7,12 +7,26 @@ Dev4Tango Template Class
 Description
 ===========
 
-    This class provides several new features to TangoDevice implementations.
-    By including log.Logger it also includes objects.Object as parent class.
-    It allows to use call__init__(self, klass, *args, **kw) to avoid multiple inheritance from same parent problems.
-    Therefore, use self.call__init__(PyTango.Device_4Impl,cl,name) instead of PyTango.Device_4Impl.__init__(self,cl,name)
+This class provides several new features to TangoDevice implementations.
+By including log.Logger it also includes objects.Object as parent class.
+It allows to use call__init__(self, klass, *args, **kw) to avoid multiple inheritance from same parent problems.
+Therefore, use self.call__init__(PyTango.Device_4Impl,cl,name) instead of PyTango.Device_4Impl.__init__(self,cl,name)
     
-    It also allows to connect several devices within the same server avoiding the taurus.core dependency.
+It also allows to connect several devices within the same server avoiding the taurus.core dependency.
+
+To enable it just inherit from it and call init_my_Logger right after getting the device properties:
+
+.. code::
+
+  class Agilent4UHV(Dev4Tango):
+   
+   def __init__(self,cl,name):
+     self.call__init__(Dev4Tango,cl,name)
+     self.init_device()
+     
+   def init_device(self):
+     self.get_device_properties(self.get_device_class())
+     self.init_my_Logger(self)
     
 State Machine
 =============
