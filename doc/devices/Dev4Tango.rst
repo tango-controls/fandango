@@ -40,7 +40,7 @@ Overriden methods are set_state, dev_state, State and get_state, default_status,
 Properties Initialization
 =========================
 
-:checkProperties(props): verify that all properties have a proper value
+:check_properties(props): verify that all properties have a proper value
 
 :get_device_properties(class): it reads all properties and, if missing, updates the database with the default values
 
@@ -69,9 +69,11 @@ Methods:
 Helper Methods
 ==============
 
-:init_my_Logger: initialize the internal logger and self.error/warning/info/debug/trace methods.
+:init_logger: initialize the internal logger and self.error/warning/info/debug/trace methods.
 
 :getAttributeTime(any): extract epoch time from any of the different value objects in Tango
+
+:getAttributeTemplate(name,type,rw,unit,format): Returns an Attr object ready to be inserted with self.add_attribute(&Attr,&reader,&writer,&allowed)
 
 :get_devs_in_server(class): obtains the DevImpl objects instantiated in the same server
 
