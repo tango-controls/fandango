@@ -1,6 +1,37 @@
-===================================
-Catching Exceptions with Decorators
-===================================
+===================
+Catching Exceptions
+===================
+.. contents
+
+Methods
+=======
+
+trial
+-----
+
+.. code:: python
+
+  def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
+    """ This method executes a try,except clause in a single line
+    :param tries: may be a callable or a list of callables
+    :param excepts: it can be a callable, a list of callables, a map of {ExceptionType:[callables]} or just a default value to return	
+    :param args,kwargs: arguments to be passed to the callable
+    :return exception: whether to return exception or None (default)
+    """
+
+
+getLastException
+----------------
+
+returns last exception traceback
+
+getPreviousExceptions
+---------------------
+
+returns the full exception stack
+
+Decorators Catched/CatchedArgs
+==============================
 
 The @Catched and @CatchedArgs(verbose,rethrow,postmethod,...) allow to easily catch and print any exception occurring in python methods.
 
