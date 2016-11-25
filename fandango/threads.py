@@ -47,7 +47,7 @@ except: import queue as Queue
 
 from log import except2str,shortstr
 from functional import *
-from excepts import trial
+from excepts import trial,Catched,CatchedArgs
 from operator import isCallable
 from objects import Singleton,Object,SingletonMap
 
@@ -58,14 +58,16 @@ except: pass
 
 _EVENT = threading.Event()
 
-def wait(seconds,event=True):
+def wait(seconds,event=True,hook=None):
     """
     :param seconds: seconds to wait for
     :param event: if True (default) it uses a dummy Event, if False it uses time.sleep, if Event is passed then it calls event.wait(seconds)
     """
+    if hook and isCallable(hook):
+        Catched(hook)()
     if not event:
         time.sleep(seconds)
-    elif isinstance(event,type(_EVENT)):
+    elif hasattr(event,'wait'):
         event.wait(seconds)
     else:
         _EVENT.wait(seconds)
@@ -99,16 +101,33 @@ class FakeLock(object):
 
 class ThreadedObject(Object):
   """
-  An Object with a thread pool that provides safe stop on exit
+  An Object with a thread pool that provides safe stop on exit.
+  
+  It has a permanent thread running, that it's just paused 
   
   Created to allow safe thread usage in Tango Device Servers
   
-  Statistics and execution hooks are provided
+  Some arguments:
+  
+  :target: function to be called
+  :period=1: iteration frequency
+  :nthreads=1: size of thread pool
+  :min_wait=1e-5:  max frequency allowed
+  :first=0: first iteration to start execution
+  :start=False: start processing at object creation
+  
+  Statistics and execution hooks are provided:
+  
+  :start_hook: launched after an start() command, 
+   may return args,kwargs for the target() method
+  :loop_hook: like start_hook, but called at each iteration
+  :stop_hook: called after an stop() call
+  :wait_hook: called before each wait()
   """
   
   INSTANCES = []
   
-  def __init__(self,target=None,period=1.,nthreads=1,min_wait=1e-5,start=False):
+  def __init__(self,target=None,period=1.,nthreads=1,start=False,min_wait=1e-5,first=0):
 
     self._event = threading.Event()
     self._stop = threading.Event()
@@ -116,6 +135,7 @@ class ThreadedObject(Object):
     self._kill = threading.Event()
     self._started = 0
     self._min_wait = 1e-5
+    self._first = first
     self._count = -1
     self._errors = 0
     self._delay = 0
@@ -126,6 +146,8 @@ class ThreadedObject(Object):
     self._queue = []
     self._start_hook = self.start_hook
     self._loop_hook = self.loop_hook
+    self._stop_hook = self.stop_hook
+    self._wait_hook = None
     
     self._threads = []
     if nthreads>1:
@@ -138,7 +160,8 @@ class ThreadedObject(Object):
     self.set_target(target)
     self.stop(wait=False)
     if start:
-        self.start()
+      #Not starting threads, just reset flags
+      self.start()
     
     for t in self._threads: 
       t.start()
@@ -178,18 +201,30 @@ class ThreadedObject(Object):
     
   def set_period(self,period): self._timewait = period
   def get_period(self): return self._timewait  
-  def set_queue(self,queue): self._queue = queue
   def set_target(self,target): self._target = target
   def get_target(self): return self._target
+
   def set_start_hook(self,target): self._start_hook = target
   def set_loop_hook(self,target): self._loop_hook = target
+  def set_stop_hook(self,target): self._stop_hook = target
+  def set_wait_hook(self,target): self._wait_hook = target
+  
+  def set_queue(self,queue): 
+    """
+    A list of timestamps can be passed to the main loop to force
+    a faster or slower processing.
+    This list will override the current periodic execution,
+    target() will be executed at each queued time instead.
+    """
+    self._queue = queue
   
   ## MAIN METHODS
     
   def start(self):
-    #self._event.clear()
     if self._started: 
       self.stop()
+    else: #abort stop wait
+      self._event.clear()
     self._done.clear()
     self._stop.clear()
     
@@ -234,6 +269,13 @@ class ThreadedObject(Object):
   def stop_hook(self,*args,**kwargs):
     """ redefine at convenience """
     pass  
+  
+  def clean_stats(self):
+    self._count = 0
+    self._errors = 0
+    self._delay = 0
+    self._acc_delay = 0
+    self._last  = 0
     
   def loop(self):
     try:
@@ -242,21 +284,18 @@ class ThreadedObject(Object):
         while not self._kill.isSet():
 
             while self._stop.isSet():
-                self._event.wait(.01)
+                wait(self._timewait,self._event,self._wait_hook)
 
             self._done.clear()
-            self._count = 0
-            self._errors = 0
-            self._delay = 0
-            self._acc_delay = 0
-            self._last  = 0
+            self.clean_stats()
             
             ts = time.time()
+            ## Evaluate target() arguments
             try:
                 args,kwargs = self._start_hook(ts)
             except:
                 if self._errors < 10:
-                    traceback.print_exc()        
+                    traceback.print_exc()
                 self._errors += 1
                 args,kwargs = [],{}
 
@@ -265,14 +304,18 @@ class ThreadedObject(Object):
             self._next = self._started + self._timewait
             while not self._stop.isSet():
                 self._event.clear()
-                try:
-                    if self._target:
-                        self._target(*args,**kwargs)
-                except:
-                    if self._errors < 10:
-                        traceback.print_exc()          
-                    self._errors += 1
+                
+                ## Task Execution
+                if count>=self._first:
+                  try:
+                      if self._target:
+                          self._target(*args,**kwargs)
+                  except:
+                      if self._errors < 10:
+                          traceback.print_exc()          
+                      self._errors += 1
 
+                ## Obtain next scheduled execution
                 t1,tn = time.time(),ts+self._timewait
                 if self._queue:
                     while self._queue and self._queue[0]<self._next:
@@ -280,28 +323,32 @@ class ThreadedObject(Object):
                     if self._queue:
                         tn = self._queue[0]
                 
+                ## Wait and Calcullate statistics
                 self._next = tn
                 tw = self._next-t1
                 self._usage = (t1-ts)/self._timewait
-                #print('waiting %s'%tw)
-                self._event.wait(max((tw,self._min_wait)))
-                
+                #self.debug('waiting %s'%tw)
+                wait(max((tw,self._min_wait)),self._event,self._wait_hook)
                 ts = self._last = time.time()
                 self._delay = ts>self._next and ts-self._next or 0
                 self._acc_delay = self._acc_delay + self._delay
-                try:
-                    args,kwargs = self._loop_hook(ts)
-                except:
-                    if self._errors < 10:
-                        traceback.print_exc()
-                    self._errors += 1
-                    args,kwargs = [],{}
+                
+                ## Execute Loop Hook to reevaluate target Arguments
+                if count>=self._first:
+                    try:
+                      args,kwargs = self._loop_hook(ts)
+                    except:
+                      if self._errors < 10:
+                          traceback.print_exc()
+                      self._errors += 1
+                      args,kwargs = [],{}
                 
                 self._count += 1
                 
             print('ThreadedObject.Stop(...)')
             self._started = 0
             self._done.set() #Will not be cleared until stop/start() are called
+            Catched(self._stop_hook)()
     
         print('ThreadedObject.Kill() ...')
         return #<< Will never get to this point
