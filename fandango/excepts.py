@@ -115,7 +115,7 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
             if return_exception:
                return vals or fun.notNone(excepts,None)
 
-exLogger = log.Logger()
+exLogger = log.Logger('fandango',level='WARNING')
 
 def getLastException():
     """ returns last exception traceback """
@@ -167,7 +167,7 @@ class RethrownException(Exception):
     
 
 #@decorator_with_args #This decorator disturbed stdout!!!! ... There's a problem calling nested decorators!!!
-def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose=False,rethrow=False,default=None):
+def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose=True,rethrow=False,default=None):
     ''' 
     Implementation of the popular Catched() decorator:
     
@@ -185,50 +185,70 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
     '''    
     def wrapper(*args,**kwargs):
         try:
-            #logger.debug('Trying %s'%fun.__name__)
+            #logger.trace('Trying %s'%fun.__name__)
             result = fun(*args,**kwargs)
-            #sys.stdout.write('fun DONE!!!\n')
+            #logger.trace('%s Succeed!\n'%fun)
             return result
-        except DevFailed, e:
-            exstring=getPreviousExceptions()            
+          
+        #except DevFailed, e:
+            #exstring=getPreviousExceptions()
+            
+            #if verbose:
+                #logger.warning('-'*80)
+                #logger.warning('DevFailed Exception Catched: \n%s'%exstring)
+                #try:
+                    #if showArgs: logger.info('%s(*args=%s, **kwargs=%s)'%(fun.__name__,args,kwargs))
+                #except:pass
+                #logger.warning('-'*80)
+                #sys.stdout.flush(); sys.stderr.flush()
+            #if postmethod: 
+                #ExceptionWrapper(postmethod)(exstring)
+
+            #err = e.args[0]
+            
+            #if rethrow:
+                ##Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
+                #Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
+            #else:
+                #logger.warning(str((err.reason,err.desc,err.origin)))
+                #return default
+              
+        except Exception,e:
+            etype = type(e).__name__
+            exstring=getPreviousExceptions()
+            
+            elog,eargs = exstring,('Exception',exstring,"%s(...)"%fun.__name__)
+            if isinstance(e,DevFailed):
+              try:
+                err = e.args[0]
+                eargs = (err.reason, exstring, "%s(...)"%fun.__name__)
+                elog = str((err.reason,err.desc,err.origin))
+              except: pass
+
             if verbose:
-                print '-'*80
-                #exstring = traceback.format_exc()
-                logger.warning('DevFailed Exception Catched: \n%s'%exstring)
+                logger.warning('<'*80)
+                logger.error('%s Exception catched: \n%s'%(etype,elog))
                 try:
                     if showArgs: logger.info('%s(*args=%s, **kwargs=%s)'%(fun.__name__,args,kwargs))
                 except:pass
-                sys.stdout.flush(); sys.stderr.flush()
-                print '-'*80
 
-            if postmethod: postmethod(exstring)
-            err = e.args[0]
+            if postmethod: 
+                ExceptionWrapper(postmethod)(exstring)
+                
             if rethrow:
                 #Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
-                Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
+                logger.warning('%s Rethrow!'%etype)
+                Except.throw_exception(*eargs)
             else:
-                #Except.throw_exception(err.reason,err.desc,err.origin)
-                logger.warning(str((err.reason,err.desc,err.origin)))
+                if isinstance(e,DevFailed) and elog and not verbose and not postmethod: 
+                  logger.warning(elog)
                 return default
-        except Exception,e:
-            #exstring = traceback.format_exc()
-            exstring=getPreviousExceptions()
-            if verbose:
-                print '-'*80
-                logger.error('Python Exception catched: \n%s'%exstring)
-                try:
-                    if showArgs: logger.info('%s(*args=%s, **kwargs=%s)'%(fun.__name__,args,kwargs))
-                except:pass
-                print '-'*80                                 
-            if postmethod: postmethod(exstring)
-            if rethrow:
-              Except.throw_exception('Exception',exstring,"%s(...)"%fun.__name__)
-            else:
-              return default
-        pass    
+        finally:
+            if verbose: logger.warning('<'*80)
     
-    #ExceptionWrapper behaves like a decorator
+    ##ExceptionWrapper behaves like a decorator
     functools.update_wrapper(wrapper,fun) #it copies all function information to the wrapper
+    logger.debug('wrapped(%s) => %s'%(fun,wrapper))
     return wrapper
     
 Catched = ExceptionWrapper
@@ -279,4 +299,47 @@ class ExceptionManager(object):
             else: #elif etype is Exception:
                 exstring = self.origin or len(exstring)<125 and exstring or stack[-1]
                 Except.throw_exception(etype.__name__,str(e),exstring)
+                
+def __test__(args=[]):
+  exLogger.setLogLevel('DEBUG')
+  exLogger.info('Testing fandango.excepts')
 
+  print('\n')
+  exLogger.info('Raise ZeroDivError:\n')
+  @Catched
+  def failed_f():
+    return 1/0.
+  failed_f()
+  
+  print('\n')
+  exLogger.info('Show custom message:\n')
+  def custom_msg(s):
+    print('CUSTOM: %s'%s.split('\n')[-1])
+  @CatchedArgs(postmethod=custom_msg,verbose=False)
+  def failed_f():
+    return 1/0
+  failed_f()
+  
+  def devfailed(d,a):
+    import PyTango
+    dp = PyTango.DeviceProxy(d)
+    return dp.read_attribute(a)
+  
+  exLogger.info('Try a good tango call:\n')
+  Catched(devfailed)('sys/tg_test/1','state')
+  print('\n')
+  exLogger.info('Try a bad attribute:\n')
+  Catched(devfailed)('sys/tg_test/1','nanana')
+  print('\n')
+  exLogger.info('Raise DevFailed:\n')
+  Catched(devfailed)('sys/tg_test/1','throw_exception')
+  print('\n')
+  exLogger.info('Try a rethrow:\n')
+  try:
+    CatchedArgs(rethrow=True)(devfailed)('sys/tg_test/1','throw_exception')
+  except DevFailed,e:
+    exLogger.info('Catched!')
+
+if __name__ == '__main__':
+  import sys
+  __test__(sys.argv[1:])
