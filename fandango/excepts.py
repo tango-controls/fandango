@@ -88,8 +88,8 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
     """ This method executes a try,except clause in a single line
     :param tries: may be a callable or a list of callables
     :param excepts: it can be a callable, a list of callables, a map of {ExceptionType:[callables]} or just a default value to return	
-	:param args,kwargs: arguments to be passed to the callable
-	:return exception: whether to return exception or None (default)
+    :param args,kwargs: arguments to be passed to the callable
+    :return exception: whether to return exception or None (default)
     """
     try:
         return_exception = return_exception or (excepts is not None and not any(fun.isCallable(x) for x in fun.toSequence(excepts)))
@@ -121,15 +121,13 @@ def getLastException():
     """ returns last exception traceback """
     return str(traceback.format_exc())
 
-"""
-@TODO: These methods failed with python 2.6; to be checked ...
-
-def get_exception_line(as_str=False):
-    ty,e,tb = sys.exc_info()
-    file,line = tb[-1][:2] if tb else ('',0)
-    result = (file,line,tb)
-    if as_str: return '%s[%d]: %s!'%result
-    else: return result
+#@TODO: These methods failed with python 2.6; to be checked ...
+#def get_exception_line(as_str=False):
+    #ty,e,tb = sys.exc_info()
+    #file,line = tb[-1][:2] if tb else ('',0)
+    #result = (file,line,tb)
+    #if as_str: return '%s[%d]: %s!'%result
+    #else: return result
 
 def exc2str(e):
     if isinstance(e,DevFailed):
@@ -140,8 +138,8 @@ def exc2str(e):
             msg = [s for s in str(e).split('\n') if 'desc' in s][0].strip()
         return 'DevFailed(%s)'%msg
     else:
-        return get_exception_line(as_str=True)
-"""
+        #return get_exception_line(as_str=True)
+        traceback.format_exc(e)
 
 def getPreviousExceptions(limit=0):
     """
@@ -166,7 +164,6 @@ class RethrownException(Exception):
     pass
     
 
-#@decorator_with_args #This decorator disturbed stdout!!!! ... There's a problem calling nested decorators!!!
 def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose=True,rethrow=False,default=None):
     ''' 
     Implementation of the popular Catched() decorator:
@@ -189,29 +186,6 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
             result = fun(*args,**kwargs)
             #logger.trace('%s Succeed!\n'%fun)
             return result
-          
-        #except DevFailed, e:
-            #exstring=getPreviousExceptions()
-            
-            #if verbose:
-                #logger.warning('-'*80)
-                #logger.warning('DevFailed Exception Catched: \n%s'%exstring)
-                #try:
-                    #if showArgs: logger.info('%s(*args=%s, **kwargs=%s)'%(fun.__name__,args,kwargs))
-                #except:pass
-                #logger.warning('-'*80)
-                #sys.stdout.flush(); sys.stderr.flush()
-            #if postmethod: 
-                #ExceptionWrapper(postmethod)(exstring)
-
-            #err = e.args[0]
-            
-            #if rethrow:
-                ##Except.re_throw_exception(e,'','',"%s(...)"%fun.__name__)
-                #Except.throw_exception(err.reason, exstring, "%s(...)"%fun.__name__)
-            #else:
-                #logger.warning(str((err.reason,err.desc,err.origin)))
-                #return default
               
         except Exception,e:
             etype = type(e).__name__
@@ -252,7 +226,7 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
     return wrapper
     
 Catched = ExceptionWrapper
-CatchedArgs = decorator_with_args(ExceptionWrapper)
+CatchedArgs = decorator_with_args(ExceptionWrapper) #stdout may have problems with it
 Catched2 = CatchedArgs #For backwards compatibility
 
 class ExceptionManager(object):
