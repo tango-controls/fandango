@@ -8,7 +8,7 @@ The verbose argument controls system output, while rethrow allows to print and t
 
 See fandango.excepts test code for examples:
 
-.. code::
+.. code:: python
 
   print('Raise ZeroDivError:\n')
   @Catched
