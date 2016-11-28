@@ -205,7 +205,7 @@ class EventThread(ThreadedObject):
         Currently, this implementation will process 1 event and one polling
         each time as max.
         """
-        ## print('Processing Events').
+        #print('Processing Events')
         WAS_EMPTY = False
         for i in range(self.EVENT_POLLING_RATIO):
             try:
@@ -235,7 +235,7 @@ class EventThread(ThreadedObject):
         now = time.time()
         pollings = []
         for s in self.sources.values():
-            s.checkEvents(tdiff=2*s.polling_period)
+            s.checkEvents(tdiff=2e-3*s.polling_period)
             nxt = s.last_poll+(s.polling_period if s.isPollingEnabled() 
                                else s.KeepAlive)/1e3
             pollings.append((nxt,s))
@@ -353,7 +353,7 @@ class EventSource(Logger,Object):
         self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
         self.call__init__(Logger,self.full_name)
         self.setLogLevel(kwargs.get('loglevel','WARNING'))
-        
+        self.info('Init()')
         assert self.proxy,'A valid device name is needed'
         
         self.attr_value = None
@@ -499,6 +499,7 @@ class EventSource(Logger,Object):
       
     def fireEvent(self, event_type, event_value, listeners=None):
         """sends an event to all listeners or a specific one"""
+        self.debug('fireEvent(...)')
         listeners = listeners or self.listeners
 
         for l in listeners:
@@ -521,13 +522,14 @@ class EventSource(Logger,Object):
         
         self.state = self.SUBSCRIBING
         self.last_event_time = now()
+        self.thread().stop()
         for type_ in EventType.names.values():
             try:
                 if self.event_ids.get(type_) is not None:
                     self.debug('\tevent %s already subscribed'%type_)
                 else:
                   self.event_ids[type_] = self.proxy.subscribe_event(
-                      self.simple_name,type_,self,[],False)
+                      self.simple_name,type_,self,[],True)
                   self.debug('\tevent %s SUBSCRIBED'%type_)
                   #self.state = self.SUBSCRIBED
             except:
@@ -537,25 +539,28 @@ class EventSource(Logger,Object):
         ## If nothing arrives after N seconds, polling will be activated
         self.start_thread()
 
-    def checkEvents(self,tdiff=3.,vdiff=None):
-        #if not self.state == self.SUBSCRIBED:
-        if self.state == self.SUBSCRIBING:
-          if now()-self.last_event_time > N*1e-3*self.polling_period:
-            self.info('event subscribing failed, switching to polling')
-            self.state = self.PENDING
-            self.activatePolling()
-            for type_ in (EventType.CHANGE_EVENT,EventType.ATTR_CONF_EVENT):
-                self.event_ids[type_] = self.proxy.subscribe_event(
-                    self.simple_name,type_,self,[],True)
-          return False
-        if self.state == self.SUBSCRIBED and (vdiff if not isSequence(vdiff) else any(vdiff)):
-            if self.EVENT_TIMEOUT < now()-self.last_event_time:
-                self.warning('EVENT_TIMEOUT:%s!=%s after %s (%s,%s), reactivating Polling'%(
-                  prev,av,self.EVENT_TIMEOUT,now,self.last_event_time))
-                self.activatePolling()        
+    def checkEvents(self,tdiff=None,vdiff=None):
+        """
+        tdiff: max time difference allowed between last_event_time and current time
+        vdiff: difference between last event value and current hw value
+        """
+        #self.debug('checkEvents(...)')
+        delta = now()-self.last_event_time 
+        if delta > (tdiff or self.EVENT_TIMEOUT): tdiff = delta
+        ## @TODO: vdiff should be compared against event config
+        vdiff = vdiff if not isSequence(vdiff) else any(vdiff)
+
+        if tdiff and (self.state == self.SUBSCRIBING or (vdiff and self.state == self.SUBSCRIBED)):
+            self.warning('Event subscribing failed (tdiff=%s,vdiff=%s) switching to polling'%(tdiff,vdiff))
+            if self.state==self.SUBSCRIBING:
+                self.state = self.PENDING
+            self.activatePolling()    
+            return False
+
         return True
                 
     def unsubscribeEvents(self):
+        self.debug('unsubscribeEvents(...)')
         for type_,ID in  self.event_ids.items():
             try:
                 self.proxy.unsubscribe_event(ID)
@@ -570,6 +575,7 @@ class EventSource(Logger,Object):
         pass
       
     def write(self, value, with_read=True):
+        self.debug('write(...)')
         self.counters['write']+=1
         self.proxy.write_attribute(self.simple_name,value)
         if with_read:
@@ -583,6 +589,7 @@ class EventSource(Logger,Object):
         
         If asynch=True/False, self.tango_asynch will be overriden for this call.
         """
+        self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
         asynch = notNone(asynch,self.tango_asynch)
 
         # If not polled, force HW reading
@@ -616,6 +623,7 @@ class EventSource(Logger,Object):
         return self.attr_value
     
     def asynch(self):
+        self.debug('asynch()')
         if self.pending_request is None:
             return None
         try:
@@ -711,6 +719,7 @@ class EventSource(Logger,Object):
 class TangoEventSource(EventSource):
         pass
 
+
 ###############################################################################
 # OLD API, DEPRECATED
 
@@ -776,6 +785,8 @@ class TAttr(EventStruct):
     #queue.join()
     #return results
 
+###############################################################################
+# OLD API, DEPRECATED
 
 class EventCallback():
     """ 
@@ -830,6 +841,9 @@ class EventCallback():
             print 'exception in EventCallback.push_event(): ',e, ";", getLastException()
         self.lock.release()
 
+###############################################################################
+# OLD API, DEPRECATED
+
 #THIS IS THE EVENTS CALLBACK SINGLETONE:
 GlobalCallback = EventCallback()
 
@@ -866,6 +880,9 @@ GlobalCallback = EventCallback()
         #if not subscriber.get_name() in _EventsList[att_name].receivers and not subscriber in _EventsList[att_name].receivers:
             #EventsList[att_name].receivers.append(subscriber)
     #pass5
+
+###############################################################################
+# OLD API, DEPRECATED
 
 def inStatesList(devname):
     print 'In callbacks.inStatesList ...'
@@ -936,6 +953,9 @@ def getSubscribedItems(receiver):
     GlobalCallback.lock.release()
     return result
 
+###############################################################################
+# OLD API, DEPRECATED
+
 
 def addTAttr(tattr):
     try:
@@ -1000,9 +1020,14 @@ def subscribeDeviceAttributes(self,dev_name,attrs):
                     callbacks._AttributesList[dev_name]=_EventsList[att_name].attr_value.value    
     return
 
-if __name__ == '__main__':
+###############################################################################
+# TESTING
+
+
+def __test__(args):
     import fandango.callbacks as fb
     es = fb.EventSource('test/events/1/currenttime')
+    es.setLogLevel('DEBUG')
     es.KeepAlive = 5000.
     el = fb.EventListener('tester')
     es.addListener(el)
@@ -1011,3 +1036,5 @@ if __name__ == '__main__':
         try: threading.Event().wait(1.)
         except: break
     
+if __name__ == '__main__':
+    __test__(sys.argv[1:])
