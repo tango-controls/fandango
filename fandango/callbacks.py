@@ -251,10 +251,10 @@ class EventThread(ThreadedObject):
                 source.last_poll = now
                 
         ## print('Check pending HW asynch requests')
-        asynchs = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
-        for source in randomize(asynchs):
+        asynch_hw = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
+        for source in randomize(asynch_hw):
             try: 
-              source.asynch() #<<<< THIS SHOULD BE ASYNCHRONOUS!
+              source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
             except Exception,e:
               traceback.print_exc()
             source.last_poll = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
@@ -331,6 +331,11 @@ class EventSource(Logger,Object):
     SUBSCRIBED = 3 #Using events only
     FORCED = 4 #Polling forced, interlaced with events
     FAILED = -1 #Not working at all
+    
+    #Modes
+    SYNCHRONOUS = 0
+    EVENTS = 1
+    POLLED = 2
      
     def __init__(self, name, parent=None, **kwargs):
         """ Arguments: loglevel, tango_asynch, pollingPeriod, keepTime, enablePolling """
@@ -365,12 +370,14 @@ class EventSource(Logger,Object):
         self.tango_asynch = kwargs.get('tango_asynch',False)
         
         # Indicates if the attribute is being polled periodically
-        # stores if polling has been forced by user API        
+        # stores if polling has been forced by user API
         self.forced = kwargs.get('enablePolling', False)
         self.polled = self.forced #Forced is permanent, polled may change
         # current polling period
         self.polling_period = kwargs.get("pollingPeriod", self.DefaultPolling)
         self.keep_time = kwargs.get("keepTime", 1/50.)
+        # force tango events usage
+        self.use_events = kwargs.get("use_events",False)
 
         self.last_event = None
         self.last_event_time = 0
@@ -413,6 +420,10 @@ class EventSource(Logger,Object):
         th = EventSource.thread()
         if not th.get_started(): 
             th.start()
+            
+    def getEventsMode(self):
+        m = (self.use_events and 1) or (self.forced and 2) or (self.polled and 3)
+        return int(m)
 
     def isUsingEvents(self):
         return self.state == self.SUBSCRIBED
@@ -424,26 +435,24 @@ class EventSource(Logger,Object):
         self.activatePolling(period,force=True)
 
     def disablePolling(self):
-        self.deactivatePolling()
-        ##DON'T DO THAT, IT WILL STOP EVENT PROCESSING!
-        #self.thread().stop()
+        self.deactivatePolling() # DON'T STOP THREADS HERE!
 
     def isPollingEnabled(self):
         return self.isPollingActive()
 
     def activatePolling(self,period = None, forced = False):
+        #self.factory().addAttributeToPolling(self, self.getPollingPeriod())      
         self.polling_period = period or self.polling_period
         self.polled = True
         self.info('activatePolling(%s,%s)'%(self.full_name,self.polling_period))
         self.forced = forced
         self.start_thread()
-        #self.factory().addAttributeToPolling(self, self.getPollingPeriod())
 
     def deactivatePolling(self):
+        #self.factory().removeAttributeFromPolling(self)
         self.info('deactivatePolling(%s,%s)'%(self.full_name,self.state))        
         self.polled = False
         self.forced = False
-        #self.factory().removeAttributeFromPolling(self)
 
     def isPollingActive(self):
         return self.polled
@@ -601,7 +610,7 @@ class EventSource(Logger,Object):
             cache = True
 
         if cache:
-            self.asynch() # Check for pending asynchronous results
+            self.asynch_hook() # Check for pending asynchronous results
             if self.attr_value is not None:
                 return self.attr_value
             elif self.state != self.UNSUBSCRIBED:
@@ -613,17 +622,17 @@ class EventSource(Logger,Object):
         ## Do not merge these IF's, order matters
         if asynch:
             if self.pending_request is not None:
-                self.attr_value = notNone(self.asynch(),self.attr_value)
+                self.attr_value = notNone(self.asynch_hook(),self.attr_value)
             else:
                 self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
-                self.attr_value = notNone(self.asynch(),self.attr_value)
+                self.attr_value = notNone(self.asynch_hook(),self.attr_value)
         else:
             self.attr_value = self.proxy.read_attribute(self.simple_name)
             
         return self.attr_value
     
-    def asynch(self):
-        self.debug('asynch()')
+    def asynch_hook(self):
+        self.debug('asynch_hook()')
         if self.pending_request is None:
             return None
         try:
