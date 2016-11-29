@@ -76,8 +76,10 @@ EVENT_TO_POLLING_EXCEPTIONS = (
     'API_NotificationServiceFailed',
     'API_EventChannelNotExported',
     'API_EventTimeout',
-    'API_EventPropertiesNotSet',
+    #'API_EventPropertiesNotSet', #Typical for archive and data ready event
     'API_CommandNotFound')
+
+EVENT_TYPES = [ 'attr_conf', 'data_ready', 'user_event', 'periodic', 'change', 'archive']
 
 class AttrCallback(Logger,Object):
   
@@ -96,7 +98,7 @@ class AttrCallback(Logger,Object):
     except:
       traceback.print_exc()
 
-class EventListener(Object): #Logger,
+class EventListener(Logger,Object): #Logger,
     """
     The EventListener class accepts 3 event hooks:
         self.set_event_hook()
@@ -108,14 +110,14 @@ class EventListener(Object): #Logger,
     In the case of value_hook it will not pass the event object but event.value/rvalue
     """
     
-    def __init__(self, name, parent=None,source=False,loglevel=2):
+    def __init__(self, name, parent=None,source=False):
         """ 
         Pass name and parent object for logging.
         If source is True or an object, this listener will subscribe for source or parent events.
         If False, then subscription will have to be done using EventSource.addListener(EventListener)
         """
         self.name, self.parent,self.source = name,parent,source
-        self.loglevel = loglevel
+        Logger.__init__(self,type(self).__name__+'(%s)'%self.name)
         self.last_event_time = 0
         #self.call__init__(Logger,name=name, parent=parent)
         self.set_event_hook()
@@ -138,24 +140,22 @@ class EventListener(Object): #Logger,
         delay = int(1e3*(now-(ctime2time(value.time) if hasattr(value,'time') else now)))
         
         if getattr(value,'error',False):
-            if self.loglevel:
-                print('%s: eventReceived(%s,ERROR,%s): +%s(+%s ms)'%(self.name,src,value,inc,delay))
+            self.warning('%s: eventReceived(%s,ERROR,%s): +%s(+%s ms)'%(self.name,src,value,inc,delay))
             if self.error_hook is not None:
                 try: self.error_hook(src,type_,value)
-                except: traceback.print_exc()
+                except: self.warning(traceback.format_exc())
         else:
             value = getattr(value,'value',getattr(value,'rvalue',type(value)))
-            if self.loglevel>2:
-                print('%s: eventReceived(%s,%s,%s): +%s(+%s ms)'%(self.name,src,type_,value,inc,delay))
+            self.debug('%s: eventReceived(%s,%s,%s): +%s(+%s ms)'%(self.name,src,type_,value,inc,delay))
             if value is not None and self.value_hook is not None:
               try:self.value_hook(src,type_,value)
-              except: traceback.print_exc()
+              except: self.error(traceback.format_exc())
         if self.event_hook:
             try: self.event_hook(src,type_,value)
-            except: traceback.print_exc()
+            except: self.error(traceback.format_exc())
         self.last_event_time = now
     
-class EventThread(ThreadedObject):
+class EventThread(Logger,ThreadedObject):
     """
     This class processes both Events and Polling.
     All listeners should implement eventReceived method
@@ -173,6 +173,7 @@ class EventThread(ThreadedObject):
         self.counters = CaselessDefaultDict(int)
         
         ThreadedObject.__init__(self,target=self.process,period=self.MinWait)
+        Logger.__init__(self,type(self).__name__)
         
     def put(self,*args): 
         self.queue.put(*args)
@@ -182,7 +183,7 @@ class EventThread(ThreadedObject):
         self.event.wait(tout or self.MinWait)
 
     def register(self,source):
-        print('EventThread.register(%s)'%source)
+        self.info('EventThread.register(%s)'%source)
         if not self.get_started():
             self.start()
         if source.full_name not in self.sources:
@@ -227,7 +228,7 @@ class EventThread(ThreadedObject):
             except Exception,e:
                 #The queue is empty, long period attributes can be processed
                 if 'empty' not in str(e).lower():
-                    traceback.print_exc()
+                    self.error(traceback.format_exc())
                 #WAS_EMPTY = True
                 break
        
@@ -280,8 +281,8 @@ class EventThread(ThreadedObject):
             elif isCallable(source):
                 source(*data[1:0])        
         except:
-            print('fireEvent',source,args)
-            traceback.print_exc()
+            self.warning('fireEvent',source,args)
+            self.warning(traceback.format_exc())
 
 
 class EventSource(Logger,Object):
@@ -380,7 +381,7 @@ class EventSource(Logger,Object):
         # force tango events usage
         self.use_events = kwargs.get("use_events",False)
 
-        self.last_event = None
+        self.last_event = dict()
         self.last_event_time = 0
         self.last_error = None
         self.last_read_hw = 0
@@ -486,7 +487,7 @@ class EventSource(Logger,Object):
         if self.use_events and self.state == self.UNSUBSCRIBED:
             self.subscribeEvents()
         if self.forced and not self.polled:
-            self.activatePolling()        
+            self.activatePolling()
         weak = weakref.ref(listener,self._listenerDied)
         if weak not in self.listeners:
             self.listeners.append(weak)
@@ -544,7 +545,7 @@ class EventSource(Logger,Object):
                 else:
                   self.event_ids[type_] = self.proxy.subscribe_event(
                       self.simple_name,type_,self,[],True)
-                  self.debug('\tevent %s SUBSCRIBED'%type_)
+                  self.info('\tevent %s SUBSCRIBED'%type_)
                   #self.state = self.SUBSCRIBED
             except:
                 self.debug('\tevent %s not subscribed'%type_)
@@ -573,18 +574,22 @@ class EventSource(Logger,Object):
 
         if self.listeners:
             if not self.polled and (self.forced or self.use_events and self.state != self.SUBSCRIBED):
+                self.info('checkEvents(): events not subscribed, enabling polling')
                 self.activatePolling()    
             
         else:
             if self.polled:
+                self.info('checkEvents(): no clients, stop polling')
                 self.deactivatePolling()
             if self.state == self.SUBSCRIBED:
+                self.info('checkEvents(): no clients, disabling events')
                 self.unsubscribeEvents()
 
         return r
                 
     def unsubscribeEvents(self):
         self.info('unsubscribeEvents(...)')
+        self.use_events = False
         for type_,ID in  self.event_ids.items():
             try:
                 self.proxy.unsubscribe_event(ID)
@@ -710,30 +715,34 @@ class EventSource(Logger,Object):
             now = time.time()
             type_ = event.event
             self.counters[type_]+=1
-            self.last_event_time = ctime2time(event.reception_date)
-            delay = now-self.last_event_time
-            if delay > 1e3 : self.warning('push_event was %f seconds late'%delay)
             self.state = self.SUBSCRIBED
-
+            et = ctime2time(event.reception_date)
+            if et<1e9: 
+              self.warning('%s event time is 0!'%type_)
+              et = now
             if event.err:
                 self.last_error = event
                 value = event.errors[0]
                 reason = event.errors[0].reason
                 
                 if reason in EVENT_TO_POLLING_EXCEPTIONS:
-                    if not self.isPollingEnabled():
-                      self.warning('EVENTS_FAILED! (%s): reactivating Polling'%(reason))
+                    if self.use_events and not self.isPollingEnabled():
+                      self.warning('EVENTS_FAILED! (%s,%s): reactivating Polling'%(type_,reason))
                       self.state = self.PENDING
                       self.activatePolling()
                     return
                 else:
-                    print('ERROR in %s(%s): %s(%s)'%(self.full_name,type_,type(value),reason))
+                    if (type_) not in ('archive','data_ready') \
+                      or reason not in ('API_EventPropertiesNotSet','API_AttributeNotDataReadyEnabled'):
+                    self.warning('ERROR in %s(%s): %s(%s)'%(self.full_name,type_,type(value),reason))
+                    self.last_event_time = et or time.time()
                     
             elif isinstance(event,PyTango.AttrConfEventData):
                 value = event.attr_conf
                 self.decodeAttrInfoEx(value)
                 #(Taurus sends here a read cache=False instead of AttrConf)
             else:
+                self.last_event_time = et or time.time()
                 try:
                     self.attr_value = value = event.attr_value
                 except:
@@ -741,17 +750,38 @@ class EventSource(Logger,Object):
                     self.attr_value = value = None
 
             if self.isPollingActive() and not self.isPollingForced():
+                self.info('push_event(): Event received, deactivating polling')
                 self.deactivatePolling()
-            self.last_event = event    
+
+            delay = now-self.last_event_time
+            if delay > 1e3 : self.warning('push_event was %f seconds late'%delay)
+            self.last_event[type_] = event
             #Instead of firingEvent, I return and pass the value to the queue
             self.thread().put((self,type_,value))
         except:
-            print(type(event),dir(event))
+            self.error(type(event),dir(event))
             traceback.print_exc()
+            
+###############################################################################
 
-                
-class TangoEventSource(EventSource):
-        pass
+class TangoListener(EventListener):
+    pass
+
+class TangoValue(EventSource):
+    pass
+  
+def get_test_objects(model='controls02:10000/test/sim/tonto/Pressure'):
+    """
+    v,tl = fandango.callbacks.get_test_objects()
+    """
+    tv = TangoValue(model)
+    tl = TangoListener('test')
+    tv.setLogLevel('INFO')
+    tl.setLogLevel('INFO')
+    tv.thread().setLogLevel('DEBUG')
+    tv.addListener(tl,use_events=False)
+    return tv,tl
+    
 
 
 ###############################################################################
