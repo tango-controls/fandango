@@ -187,7 +187,7 @@ class EventThread(ThreadedObject):
             self.start()
         if source.full_name not in self.sources:
             self.sources[source.full_name] = source
-            source.last_poll = time.time()
+            source.last_read_hw = time.time()
             
     def get_source(self,source): 
         if isString(source):
@@ -218,7 +218,7 @@ class EventThread(ThreadedObject):
                     source,args = data,[]
                 name = self.get_source(source)
                 source = self.get_object(source)
-                source.last_poll = time.time()
+                source.last_read_hw = time.time()
                 self.fireEvent(source,*args)
                 self.wait(0)
             except Queue.Empty,e:
@@ -236,9 +236,10 @@ class EventThread(ThreadedObject):
         pollings = []
         for s in self.sources.values():
             s.checkEvents(tdiff=2e-3*s.polling_period)
-            nxt = s.last_poll+(s.polling_period if s.isPollingEnabled() 
+            if s.getEventsMode():
+                    nxt = s.last_read_hw+(s.polling_period if s.isPollingEnabled() 
                                else s.KeepAlive)/1e3
-            pollings.append((nxt,s))
+                    pollings.append((nxt,s))
             
         for nxt,source in reversed(sorted(pollings)):
             if now > nxt and (s.isPollingEnabled() or WAS_EMPTY):
@@ -248,7 +249,7 @@ class EventThread(ThreadedObject):
                 except:
                   traceback.print_exc()
                   if WAS_EMPTY: break
-                source.last_poll = now
+                source.last_read_hw = now
                 
         ## print('Check pending HW asynch requests')
         asynch_hw = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
@@ -257,7 +258,7 @@ class EventThread(ThreadedObject):
               source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
             except Exception,e:
               traceback.print_exc()
-            source.last_poll = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
+            source.last_read_hw = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
             break
           
         self.wait(0)
@@ -382,7 +383,7 @@ class EventSource(Logger,Object):
         self.last_event = None
         self.last_event_time = 0
         self.last_error = None
-        self.last_poll = 0
+        self.last_read_hw = 0
         self.pending_request = None
         self.counters = defaultdict(int)
         EventSource.INSTANCES.append(weakref.ref(self))
@@ -477,12 +478,15 @@ class EventSource(Logger,Object):
         except Exception, e:
             pass
 
-    def addListener(self, listener):
-        self.debug('addListener(%s)'%listener)
+    def addListener(self, listener,use_events=True,use_polling=False):
+        self.debug('addListener(%s,use_events=%s,polled=%s)'%(listener,use_events,use_polling))
+        self.use_events = self.use_events or use_events
+        self.forced = self.forced or use_polling
         self.thread().register(self)
-        if self.state == self.UNSUBSCRIBED:
+        if self.use_events and self.state == self.UNSUBSCRIBED:
             self.subscribeEvents()
-        import weakref
+        if self.forced and not self.polled:
+            self.activatePolling()        
         weak = weakref.ref(listener,self._listenerDied)
         if weak not in self.listeners:
             self.listeners.append(weak)
@@ -526,6 +530,7 @@ class EventSource(Logger,Object):
     
     def subscribeEvents(self):
         self.debug('subscribeEvents(state=%s)'%(self.state))
+        self.use_events = True
         if self.state == self.SUBSCRIBED:
             raise Exception('AlreadySubscribed!')
         
@@ -558,18 +563,28 @@ class EventSource(Logger,Object):
         if delta > (tdiff or self.EVENT_TIMEOUT): tdiff = delta
         ## @TODO: vdiff should be compared against event config
         vdiff = vdiff if not isSequence(vdiff) else any(vdiff)
+        r  =  True
+        if self.use_events:
+            if tdiff and (self.state == self.SUBSCRIBING or (vdiff and self.state == self.SUBSCRIBED)):
+                self.warning('Event subscribing failed (tdiff=%s,vdiff=%s) switching to polling'%(tdiff,vdiff))
+                if self.state==self.SUBSCRIBING:
+                    self.state = self.PENDING
+                r = False
 
-        if tdiff and (self.state == self.SUBSCRIBING or (vdiff and self.state == self.SUBSCRIBED)):
-            self.warning('Event subscribing failed (tdiff=%s,vdiff=%s) switching to polling'%(tdiff,vdiff))
-            if self.state==self.SUBSCRIBING:
-                self.state = self.PENDING
-            self.activatePolling()    
-            return False
+        if self.listeners:
+            if not self.polled and (self.forced or self.use_events and self.state != self.SUBSCRIBED):
+                self.activatePolling()    
+            
+        else:
+            if self.polled:
+                self.deactivatePolling()
+            if self.state == self.SUBSCRIBED:
+                self.unsubscribeEvents()
 
-        return True
+        return r
                 
     def unsubscribeEvents(self):
-        self.debug('unsubscribeEvents(...)')
+        self.info('unsubscribeEvents(...)')
         for type_,ID in  self.event_ids.items():
             try:
                 self.proxy.unsubscribe_event(ID)
@@ -600,7 +615,8 @@ class EventSource(Logger,Object):
         """
         self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
         asynch = notNone(asynch,self.tango_asynch)
-
+        now = time.time()
+        
         # If not polled, force HW reading
         if not any((self.isPollingEnabled(),self.isUsingEvents())):
             cache = False
@@ -619,15 +635,22 @@ class EventSource(Logger,Object):
         self.counters['read']+=1
         self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.tango_asynch,self.pending_request))
 
-        ## Do not merge these IF's, order matters
-        if asynch:
-            if self.pending_request is not None:
-                self.attr_value = notNone(self.asynch_hook(),self.attr_value)
+        try:
+            ## Do not merge these IF's, order matters
+            if asynch:
+                if self.pending_request is not None:
+                    self.attr_value = notNone(self.asynch_hook(),self.attr_value)
+                else:
+                    self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
+                    self.attr_value = notNone(self.asynch_hook(),self.attr_value)
             else:
-                self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
-                self.attr_value = notNone(self.asynch_hook(),self.attr_value)
-        else:
-            self.attr_value = self.proxy.read_attribute(self.simple_name)
+                self.attr_value = self.proxy.read_attribute(self.simple_name)
+        except Exception,e:
+            # fakeAttributeValue initialized with full_name
+            traceback.print_exc()
+            self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
+        self.last_read_hw = now
+        self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
             
         return self.attr_value
     
@@ -661,13 +684,14 @@ class EventSource(Logger,Object):
 
     def poll(self):
         now = time.time()
-        self.debug('poll(+%s): %s'%(now-self.last_poll,self.counters['poll']))
+        self.debug('poll(+%s): %s'%(now-self.last_read_hw,self.counters['poll']))
         self.counters['poll']+=1
         if self.state == self.SUBSCRIBING:
-            self.thread().lasts[self.full_name] = self.last_poll = now
+            self.thread().lasts[self.full_name] = self.last_read_hw = now
             return
         try:
             prev = self.attr_value and self.attr_value.value
+            ## The read() call will trigger a fireEvent()
             self.attr_value = self.read(cache=False) #(self.attr_value is not None))
             av = getattr(self.attr_value,'value',self.attr_value)
             diff = prev != av
@@ -675,9 +699,9 @@ class EventSource(Logger,Object):
         except Exception,e:
             # fakeAttributeValue initialized with full_name
             traceback.print_exc()
-            self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
-        self.last_poll = now
-        self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
+            #self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
+        #self.last_read_hw = now
+        #self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
     
     def push_event(self,event):
         #source,type_,value):
@@ -704,6 +728,7 @@ class EventSource(Logger,Object):
                     return
                 else:
                     print('ERROR in %s(%s): %s(%s)'%(self.full_name,type_,type(value),reason))
+                    
             elif isinstance(event,PyTango.AttrConfEventData):
                 value = event.attr_conf
                 self.decodeAttrInfoEx(value)
