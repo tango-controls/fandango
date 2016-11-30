@@ -149,7 +149,20 @@ class Struct(object):
     def values(self): return self.__dict__.values()
     def items(self): return self.__dict__.items()
     def dict(self): return self.__dict__
-    def get(self,k,default=None): return getattr(self,k,default)
+  
+    def get(self,k,default=None): 
+      try: #Some keys may raise exception
+        return getattr(self,k,default)
+      except:
+        return default
+      
+    def get_key(self,value):
+      """ Reverse lookup """
+      for k,v in self.items():
+        if v == value:
+          return k
+      raise Exception('NotFound!')
+      
     def set(self,k,v): return setattr(self,k,v)
     def setdefault(self,v): self.dict().setdefault(v)
     def pop(self,k): return self.__dict__.pop(k)
@@ -173,8 +186,13 @@ class Struct(object):
         return self.__str__() if order is None else (sep.join('%s'%self[k] for k in order))
       
     def default_cast(self,key=None,value=None):
+        """
+        This method checks if key is already defined.
+        If it is, it will return value as an evaluable string.
+        If it is not, then it will do same action on the passed value.
+        """
         if key not in self.keys() and not value:
-          key,value = None,key
+          key,value = None,key #defaults to single argument mode
         value = notNone(value,key and self.get(key))
         if not isString(value): 
           return value
@@ -183,12 +201,16 @@ class Struct(object):
         
     def cast(self,key=None,value=None,method=None):
         """
+        The cast() method is used to convert an struct to a pickable/json object.
         Use set_cast_method(f) to override this call.
         The cast method must accept both key and value keyword arguments.
         """      
         return (method or self.default_cast)(key,value)
         
     def cast_items(self,items=[],update=True):
+        """
+        The cast() method is used to convert an struct to a pickable/json object.
+        """
         items = items or self.items()
         items = [(k,self.cast(value=v)) for k,v in self.items()]
         if update:
