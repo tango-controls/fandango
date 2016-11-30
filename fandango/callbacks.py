@@ -79,7 +79,7 @@ EVENT_TO_POLLING_EXCEPTIONS = (
     #'API_EventPropertiesNotSet', #Typical for archive and data ready event
     'API_CommandNotFound')
 
-EVENT_TYPES = [ 'attr_conf', 'data_ready', 'user_event', 'periodic', 'change', 'archive']
+EVENT_TYPES = [ 'attr_conf', 'data_ready', 'user_event', 'periodic', 'change', 'archive','quality']
 
 class AttrCallback(Logger,Object):
   
@@ -322,6 +322,7 @@ class EventSource(Logger,Object):
     """
     
     EVENT_TIMEOUT = 1800  # 10s
+    DEFAULT_EVENTS = [ 'user_event', 'periodic', 'change', 'archive', 'quality' ]
     QUEUE = None
     DefaultPolling = 3000.
     KeepAlive = 15000.
@@ -377,7 +378,8 @@ class EventSource(Logger,Object):
         self.polling_period = kwargs.get("pollingPeriod", self.DefaultPolling)
         self.keep_time = kwargs.get("keepTime", 1/50.)
         # force tango events usage
-        self.use_events = kwargs.get("use_events",False)
+        self.use_events = kwargs.get("use_events",[])
+        if self.use_events is True: self.use_events = self.DEFAULT_EVENTS
 
         self.last_event = dict()
         self.last_event_time = 0
@@ -453,8 +455,8 @@ class EventSource(Logger,Object):
     def isUsingEvents(self):
         return self.checkState('SUBSCRIBED')
       
-    def gotEvents(self,types=('change','archive','periodic')):
-        types = toList(types) or EVENT_TYPES
+    def gotEvents(self,types=None):
+        types = toList(types) if types else self.DEFAULT_EVENTS
         return dict(t for t in self.last_event.items() if t[0] in types)
     
     def enablePolling(self,force=False):
@@ -507,7 +509,7 @@ class EventSource(Logger,Object):
             pass
 
     def addListener(self, listener,
-                    use_events=('change','attr_conf','periodic','archive'),
+                    use_events=True,
                     use_polling=False):
         """
         Adds a Listener to this EventSource object.
@@ -519,12 +521,15 @@ class EventSource(Logger,Object):
           and not hasattr(listener,'eventReceived') \
             and not hasattr(listener,'event_received'):
               raise Exception('NotAValidListener!')
-            
-        self.use_events = bool(self.use_events or use_events)
+        
+        if not use_events: use_events = []
+        elif use_events is True: use_events = self.DEFAULT_EVENTS
+        self.use_events = toList(use_events or self.use_events)
+        
         self.forced = self.forced or use_polling
         self.thread().register(self)
-        if self.use_events and self.checkState('UNSUBSCRIBED'):
-            self.subscribeEvents()
+        if use_events:
+            self.subscribeEvents(types=use_events)
         if self.forced and not self.polled:
             self.activatePolling()
         weak = weakref.ref(listener,self._listenerDied)
@@ -569,34 +574,39 @@ class EventSource(Logger,Object):
                 
     # TANGO RELATED METHODS
     
-    def subscribeEvents(self,asynchronous=True):
-        self.info('subscribeEvents(asynch=%s)'%(asynchronous))
+    def subscribeEvents(self,types=None,asynchronous=True):
         t0 = now()
-        self.use_events = True
+        types = toList(types) if types else []
+        if not isSequence(self.use_events): self.use_events = []
+        self.use_events = sorted(set((self.use_events+types) or self.DEFAULT_EVENTS))
         
-        if self.checkState('SUBSCRIBED'):
+        if self.checkState('SUBSCRIBED') \
+           and checkEventTypes(self.use_events):
             self.warning('AlreadySubscribed!')
             return False
+          
+        self.info('subscribeEvents(%s,asynch=%s)'%(self.use_events,asynchronous))
 
-        elif asynchronous:
+        if asynchronous:
             # Subscription to be done by checkEvents()
+            #if self.checkState('SUBSCRIBING','PENDING'):
             self.setState('UNSUBSCRIBED')
             return True
         
-        self.setState('SUBSCRIBING')
         self.last_event_time = now()
         ##self.thread().stop() #DONT DO THIS WITHIN THE LOOP HOOK!
 
         try:
-          for type_ in EventType.names.values():
+          for k,type_ in EventType.names.items():
+            if any(clmatch(e,k) for e in self.use_events):
               try:
                   if self.event_ids.get(type_) is not None:
                       self.debug('\tevent %s already subscribed'%type_)
                   else:
                     self.event_ids[type_] = self.proxy.subscribe_event(
                         self.simple_name,type_,self,[],True)
-                    self.info('\tevent %s SUBSCRIBED'%type_)
-                    #self.setState('SUBSCRIBED')
+                    self.info('\tSUBSCRIBING to %s events'%type_)
+                    self.setState('SUBSCRIBING')
               except:
                   self.debug('\tevent %s not subscribed'%type_)
 
@@ -636,7 +646,7 @@ class EventSource(Logger,Object):
                 self.activatePolling()    
             
         else:
-            if self.polled:
+            if self.polled and not self.forced:
                 self.info('checkEvents(): no clients, stop polling')
                 self.deactivatePolling()
             if self.checkState('SUBSCRIBED'):
@@ -647,7 +657,7 @@ class EventSource(Logger,Object):
                 
     def unsubscribeEvents(self):
         self.info('unsubscribeEvents(...)')
-        self.use_events = False
+        self.use_events = []
         for type_,ID in  self.event_ids.items():
             try:
                 self.proxy.unsubscribe_event(ID)
