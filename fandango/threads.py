@@ -107,6 +107,9 @@ class ThreadedObject(Object):
   
   Created to allow safe thread usage in Tango Device Servers
   
+  WARNING DO NOT CALL start()/stop() methods inside target or any hook,
+  it may provoke unexpected behaviors.
+  
   Some arguments:
   
   :target: function to be called
@@ -234,7 +237,7 @@ class ThreadedObject(Object):
     if not wait: wait = .1e-5
     self._done.wait(wait)
     self._done.clear()
-    self._event.clear
+    self._event.clear()
     
   @staticmethod
   def stop_all():
