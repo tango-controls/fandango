@@ -1586,6 +1586,8 @@ def getTangoValue(obj,device=None):
     def __repr__(self):
         return 'v(%s)'%(self.value)
 
+FAILED_VALUE = None
+
 class TangoEval(object):
     """ 
     Class for Tango formula evaluation; used by Panic-like formulas
@@ -1625,7 +1627,7 @@ class TangoEval(object):
     redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
     reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|hist))?)?' #Matches attribute and extension
     retango = redev+reattr#+'(?!/)'
-    regexp = no_quotes + retango + no_quotes.replace('\.','') #Excludes attr_names between quotes, accepts value type methods    
+    regexp = no_quotes + retango + no_quotes.replace('\.','').replace(':','=') #Excludes attr_names between quotes, accepts value type methods    
     
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,trace=False, proxies=None, attributes=None, cache=0, use_events = False, **kwargs):
         self.formula = formula
@@ -1645,9 +1647,9 @@ class TangoEval(object):
           import callbacks as cb
           self.dummy_listener = cb.EventListener('TangoEval',loglevel=0)
           self.attributes = dicts.CaselessDefaultDict(
-            lambda a:cb.TangoEventSource(a,listeners=self.dummy_listener))
+            lambda a:cb.TangoValue(a,listeners=self.dummy_listener))
         else:
-          self.attributes = dicts.CaselessDefaultDict(
+          self.attributes = dicts.CaselessDefaultDict(lambda a:
             CachedAttributeProxy(a,keeptime=self.keeptime))
 
         self.previous = dicts.CaselessDict() #Keeps last values for each variable
@@ -1668,7 +1670,8 @@ class TangoEval(object):
         self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
         self._defaults['PREV'] = self.previous
-        self._defaults['READ'] = self.read_attribute
+        #For ComposerDS syntax compatibility
+        self._defaults['READ'] = self._defaults['ATTR'] = self._defaults['XATTR'] = self.read_attribute
         #self._locals['now'] = time.time() #Updated at execution time
         self._defaults.update((k,v) for k,v in {'get_domain':get_domain,'get_family':get_family,'get_member':get_member,'parse':parse_tango_model}.items())
         #self._defaults.update((k,None) for k in ('os','sys',)) #Updating Not allowed models
@@ -1781,7 +1784,7 @@ class TangoEval(object):
             elif what in ('value',''): 
                 value = getTangoValue(value,device=device)
             elif what == 'time': value = get_attribute_time(value)
-            elif what == 'exception': value = isinstance(getattr(value,'value',None),PyTango.DevFailed) #False
+            elif what == 'exception': value = isinstance(getattr(value,'value',None),PyTango.DevFailed)
             elif what == 'delta': value = self.get_delta(aname)
             else: value = getattr(value,what)
             self.trace('read_attribute(%s/%s.%s) => %s'%(device,attribute,what,value))
@@ -1790,7 +1793,7 @@ class TangoEval(object):
                 return e
             elif _raise and not isNaN(_raise):
                 raise e
-            self.trace('TangoEval: ERROR(%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),what,device,attribute,e))
+            self.trace('TangoEval: ERROR(%s.%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),_raise,what,device,attribute,e))
             self.trace(traceback.format_exc())
             value = _raise
         return value
@@ -1823,7 +1826,7 @@ class TangoEval(object):
         self.trace('get_delta(%s); cache[%d] = %s; delta = %s' % (target,len(cache),[v.value for v in cache],delta))
         return delta
     
-    def eval(self,formula=None,previous=None,_locals=None ,_raise=False):
+    def eval(self,formula=None,previous=None,_locals=None ,_raise=FAILED_VALUE):
         ''' 
         Evaluates the given formula.
         Previous can be used to add extra local values, or predefined values for attributes ({'a/b/c/d':1} that would override its reading
@@ -1853,23 +1856,20 @@ class TangoEval(object):
             #self.trace('\t%s => %s'%(target,var_name))
             try:
                 #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
+                r = _raise if not any(d==device and a==attribute and w=='exception' for t,d,a,w in targets) else FAILED_VALUE
                 self.previous[var_name] = previous.get(target,
-                    self.read_attribute(device,
-                        attribute or 'State',
-                        what, # if what and what!='delta' else 'value',
-                        _raise=_raise if not any(d==device and a==attribute and w=='exception' for t,d,a,w in targets) else False
-                        ))
-                #if what=='delta':
-                    #self.previous[var_name] = self.get_delta((device+'/'+attribute).lower())
-                self.previous.pop(target,None)
-                self.source = self.source.replace(target,var_name,1) #Every occurrence of the attribute is managed separately, read_attribute already uses caches within polling intervals
-                self.last[target] = self.previous[var_name] #Used from alarm messages
+                    self.read_attribute(device,attribute or 'State',what,_raise=r))
+                #Remove attr/name, keep only the variable tag
+                self.previous.pop(target,None)  
+                #Every occurrence of the attribute is managed separately, read_attribute already uses caches within polling intervals
+                self.source = self.source.replace(target,var_name,1) 
+                #Used from alarm messages
+                self.last[target] = self.previous[var_name] 
             except Exception,e:
                 self.last[target] = e
                 raise e
         self.trace('formula = %s' % (self.source))
         self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
-        #self.trace('locals.items():\n'+'\n'.join(str((str(k),str(i)[:40])) for k,i in self._locals.items() if k not in self._defaults))
         self.result = eval(self.source,dict(self.previous),self._locals)
         self.trace('result = %s' % str(self.result))
         return self.result
