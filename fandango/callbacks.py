@@ -47,7 +47,8 @@ from excepts import getLastException
 from objects import *
 from functional import *
 from dicts import *
-from tango import PyTango,EventType,fakeAttributeValue,get_full_name,get_attribute_events
+from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
+from tango import get_full_name,get_attribute_events
 from threads import ThreadedObject,Queue,timed_range,wait
 from log import Logger
 
@@ -187,7 +188,7 @@ class EventThread(Logger,ThreadedObject):
             self.start()
         if source.full_name not in self.sources:
             self.sources[source.full_name] = source
-            source.last_read_hw = time.time()
+            source.last_read_time = time.time()
             
     def get_source(self,source): 
         if isString(source):
@@ -218,7 +219,7 @@ class EventThread(Logger,ThreadedObject):
                     source,args = data,[]
                 name = self.get_source(source)
                 source = self.get_object(source)
-                source.last_read_hw = time.time()
+                source.last_read_time = time.time()
                 self.fireEvent(source,*args)
                 self.wait(0)
             except Queue.Empty,e:
@@ -237,7 +238,7 @@ class EventThread(Logger,ThreadedObject):
         for s in self.sources.values():
             s.checkEvents(tdiff=2e-3*s.polling_period)
             if s.getMode():
-                    nxt = s.last_read_hw+(s.polling_period if s.isPollingEnabled() 
+                    nxt = s.last_read_time+(s.polling_period if s.isPollingEnabled() 
                                else s.KeepAlive)/1e3
                     pollings.append((nxt,s))
             
@@ -249,7 +250,7 @@ class EventThread(Logger,ThreadedObject):
                 except:
                   traceback.print_exc()
                   if WAS_EMPTY: break
-                source.last_read_hw = now
+                source.last_read_time = now
                 
         ## print('Check pending HW asynch requests')
         asynch_hw = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
@@ -258,7 +259,7 @@ class EventThread(Logger,ThreadedObject):
               source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
             except Exception,e:
               traceback.print_exc()
-            source.last_read_hw = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
+            source.last_read_time = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
             break
           
         self.wait(0)
@@ -285,9 +286,12 @@ class EventThread(Logger,ThreadedObject):
             self.warning(traceback.format_exc())
 
 
-class EventSource(Logger,Object):
+class EventSource(Logger,SingletonMap,Object):
     """ 
-    Simplified implementation of Taurus Attribute/Model classes 
+    Simplified implementation of Taurus Attribute/Model and fandango.CachedAttributeProxy classes 
+    
+    It implements CachedAttributeProxy methods but doesnt inherit from it; 
+    this regression is due to the lack of reliability of AttributeProxy in PyTango 9.
     
     Documentation at doc/recipes/EventsAndCallbacks.rst
     
@@ -309,7 +313,7 @@ class EventSource(Logger,Object):
     - parent : device name or proxy
     - enablePolling (force polling by default)
     - pollingPeriod (3000)
-    - keepTime (1/50.) min. time between HW reads
+    - keeptime (500 ms) min. time (in ms!) between HW reads
     - tango_asynch = True/False ; to use asynchronous Tango reading
     - listeners = a list of listeners to be added at startup
     
@@ -321,6 +325,7 @@ class EventSource(Logger,Object):
     """
     
     EVENT_TIMEOUT = 1800  # 10s
+    DEFAULT_LOG = 'INFO'
     DEFAULT_EVENTS = [ 'user_event', 'periodic', 'change', 'archive', 'quality' ]
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
     TAURUS_EVENTS = ['periodic','change','attr_conf']
@@ -328,6 +333,7 @@ class EventSource(Logger,Object):
     DefaultPolling = 3000.
     KeepAlive = 15000.
     INSTANCES = []
+    PROXIES = ProxiesDict()
     
     #States
     STATES = Struct({
@@ -339,16 +345,20 @@ class EventSource(Logger,Object):
       'FAILED': -1, #Not working at all
       })
     
-    def __init__(self, name, parent=None, **kwargs):
-        """ Arguments: loglevel, tango_asynch, pollingPeriod, keepTime, enablePolling """
+    def __init__(self, name, parent=None, **kw):
+        """ Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, enablePolling """
 
         self.simple_name = name.split('/')[-1]
         if not parent and '/' in name: 
             parent = name.rsplit('/',1)[0]
-            
+        
+        self.fake = kw.get('fake',False)
         if isString(parent):
             self.device = parent # just to keep it alive
-            self.proxy = PyTango.DeviceProxy(parent)
+            try:
+              self.proxy = not self.fake and self.PROXIES[parent]
+            except:
+              self.proxy = not self.fake and PyTango.DeviceProxy(parent)
         else:
             try:
                 self.device = parent.name()
@@ -359,33 +369,32 @@ class EventSource(Logger,Object):
         self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
         self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
         self.call__init__(Logger,self.full_name)
-        self.setLogLevel(kwargs.get('loglevel','WARNING'))
+        self.setLogLevel(kw.get('loglevel',kw.get('log_level',self.DEFAULT_LOG)))
         self.info('Init()')
-        assert self.proxy,'A valid device name is needed'
+        assert self.fake or self.proxy,'A valid device name is needed'
         
-        self.attr_value = None
-        self.attr_time = 0
         self.listeners = defaultdict(set) #[]       
         self.event_ids = dict() # An {EventType:ID} dict      
 
         self.state = self.STATES.UNSUBSCRIBED
-        self.tango_asynch = kwargs.get('tango_asynch',False)
+        self.tango_asynch = kw.get('tango_asynch',False)
         
         # Indicates if the attribute is being polled periodically
         # stores if polling has been forced by user API
-        self.forced = kwargs.get('enablePolling', False)
+        self.forced = kw.get('enablePolling',kw.get('enable_polling',False))
         self.polled = self.forced #Forced is permanent, polled may change
         # current polling period
-        self.polling_period = kwargs.get("pollingPeriod", self.DefaultPolling)
-        self.keep_time = kwargs.get("keepTime", 1/50.)
+        self.polling_period = kw.get("pollingPeriod",kw.get('polling_period',self.DefaultPolling))
+        self.keep_time = kw.get("keeptime",kw.get('keep_time',500))
         # force tango events usage
-        self.use_events = kwargs.get("use_events",[])
+        self.use_events = kw.get("use_events",[])
         if self.use_events is True: self.use_events = self.DEFAULT_EVENTS
 
+        self.attr_value = None
         self.last_event = dict()
         self.last_event_time = 0
         self.last_error = None
-        self.last_read_hw = 0
+        self.last_read_time = 0
         self.pending_request = None
         self.counters = defaultdict(int)
         EventSource.INSTANCES.append(weakref.ref(self))
@@ -393,7 +402,7 @@ class EventSource(Logger,Object):
         if self.forced:
             self.activatePolling()
 
-        listeners = toList(kwargs.get('listeners',[]))
+        listeners = toList(kw.get('listeners',[]))
         map(self.addListener,listeners)
             
     def __del__(self): 
@@ -506,24 +515,20 @@ class EventSource(Logger,Object):
         except Exception, e:
             pass
 
-    def addListener(self, listener,
-                    use_events=True,
-                    use_polling=False):
+    def addListener(self, listener,use_events=True,use_polling=False):
         """
         Adds a Listener to this EventSource object.
         use_events can be a boolean or a list of event types (change,attr_conf,periodic,archive)
         """
-        self.debug('addListener(%s,use_events=%s,polled=%s)'%(listener,use_events,use_polling))
-
         if not isCallable(listener) \
           and not hasattr(listener,'eventReceived') \
             and not hasattr(listener,'event_received'):
-              raise Exception('NotAValidListener!')
+              raise Exception('NotAValidListener!: %s'%listener)
         
         if not use_events: use_events = []
         elif use_events is True: use_events = self.DEFAULT_EVENTS
         use_events = toList(use_events or self.use_events)
-        
+        self.debug('addListener(%s,use_events=%s,polled=%s)'%(listener,use_events,use_polling))
         self.forced = self.forced or use_polling
         self.thread().register(self)
         if use_events:
@@ -534,9 +539,7 @@ class EventSource(Logger,Object):
         #if weak not in self.listeners:
         for e in use_events:
             self.listeners[weak].add(e)
-            return True
-        else:
-            return False
+        return True
 
     def removeListener(self, listener):
         if not isinstance(listener,weakref.ReferenceType):
@@ -568,10 +571,12 @@ class EventSource(Logger,Object):
             try:
                 #event filter will allow poll() events to pass through
                 if event_type!='periodic' and l in self.listeners and event_type not in self.listeners[l]:
-                    continue                
+                    self.debug('event discarded')
+                    continue
                 if isinstance(l, weakref.ref):
                     l = l()
                 if hasattr(l,'eventReceived'):
+                    self.debug('fireEvent(%s) => %s?' % (event_type,l))
                     l.eventReceived(self, event_type, event_value)
                 elif isCallable(l):
                     l(self, event_type, event_value)
@@ -688,6 +693,15 @@ class EventSource(Logger,Object):
     def decodeAttrInfoEx(self,attr_conf):
         pass
       
+    def set_cache(self,value,t=None):
+        """
+        set_cache and fake are used by PyAlarm.update_locals
+        It's used to emulate alarm state reading from other devices
+        """
+        self.last_read_time = t or time.time()
+        self.attr_value = hasattr(value,'value') and value or fakeAttributeValue(self.full_name,value,error=False)
+        self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
+      
     def write(self, value, with_read=True):
         self.debug('write(...)')
         self.counters['write']+=1
@@ -711,8 +725,8 @@ class EventSource(Logger,Object):
         if not any((self.isPollingEnabled(),self.isUsingEvents())):
             cache = False
         # If it was just updated, return cache
-        elif hasattr(self.attr_value,'time') and \
-          self.keep_time>(time.time()-ctime2time(self.attr_value.time)):
+        elif self.fake or (hasattr(self.attr_value,'time') and \
+          1e-3*self.keep_time>(time.time()-ctime2time(self.attr_value.time))):
             cache = True
 
         if cache:
@@ -720,7 +734,7 @@ class EventSource(Logger,Object):
             if self.attr_value is not None:
                 return self.attr_value
             elif not self.checkState('UNSUBSCRIBED'):
-                self.info('Attribute first reading (no events received yet)')
+                self.info('Attribute first reading (subscribed but no events received yet)')
         
         self.counters['read']+=1
         self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.tango_asynch,self.pending_request))
@@ -739,7 +753,8 @@ class EventSource(Logger,Object):
             # fakeAttributeValue initialized with full_name
             traceback.print_exc()
             self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
-        self.last_read_hw = now
+            
+        self.last_read_time = now
         self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
             
         return self.attr_value
@@ -774,11 +789,11 @@ class EventSource(Logger,Object):
 
     def poll(self):
         now = time.time()
-        self.debug('poll(+%s): %s'%(now-self.last_read_hw,self.counters['poll']))
+        self.debug('poll(+%s): %s'%(now-self.last_read_time,self.counters['poll']))
         self.counters['poll']+=1
         if self.checkState('SUBSCRIBING'):
             ## While subscribing, polling is ignored and resumed on SUBSCRIBED/PENDING state
-            self.thread().lasts[self.full_name] = self.last_read_hw = now
+            self.thread().lasts[self.full_name] = self.last_read_time = now
             return
         try:
             prev = self.attr_value and self.attr_value.value
@@ -791,7 +806,7 @@ class EventSource(Logger,Object):
             # fakeAttributeValue initialized with full_name
             traceback.print_exc()
             #self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
-        #self.last_read_hw = now
+        #self.last_read_time = now
         #self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
     
     def push_event(self,event):
@@ -812,7 +827,7 @@ class EventSource(Logger,Object):
                 value = event.errors[0]
                 reason = event.errors[0].reason
                 
-                if reason == 'API_EventPropertiesNotSet' and self.gotEvents():
+                if reason == 'API_EventPropertiesNotSet' and self.isUsingEvents():
                   #Nothing to do, other event types are already subscribed
                   return
                 elif reason in EVENT_TO_POLLING_EXCEPTIONS:
@@ -862,20 +877,26 @@ class EventSource(Logger,Object):
 class TangoListener(EventListener):
     pass
 
-class TangoValue(EventSource):
+class TangoAttribute(EventSource):
     pass
   
-def get_test_objects(model='controls02:10000/test/sim/tonto/Pressure'):
+#For backwards compatibility
+import fandango.tango
+class CachedAttributeProxy(EventSource):
+    pass
+setattr(fandango.tango,'CachedAttributeProxy',CachedAttributeProxy)
+  
+def get_test_objects(model='controls02:10000/test/sim/tonto/Pressure',period=1.):
     """
     v,tl = fandango.callbacks.get_test_objects()
     """
-    tv = TangoValue(model)
+    tv = TangoAttribute(model)
     tl = TangoListener('test')
-    tv.setLogLevel('INFO')
-    tl.setLogLevel('INFO')
-    #tv.thread().set_period(1.)
-    tv.thread().setLogLevel('INFO')
-    tv.addListener(tl,use_events=False)
+    tv.setLogLevel('DEBUG')
+    tl.setLogLevel('DEBUG')
+    tv.thread().set_period(period)
+    tv.thread().setLogLevel('DEBUG')
+    #tv.addListener(tl,use_events=False)
     return tv,tl
     
 
