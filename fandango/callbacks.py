@@ -167,7 +167,6 @@ class EventThread(Logger,ThreadedObject):
     
     def __init__(self,period=None):
         self.queue = Queue.Queue()
-        #self.listeners = CaselessDefaultDict(lambda k:CaselessList())
         self.sources = CaselessDict()
         self.event = threading.Event()
         self.counters = CaselessDefaultDict(int)
@@ -273,7 +272,7 @@ class EventThread(Logger,ThreadedObject):
         """
         try:
             if hasattr(source,'fireEvent'):
-                source.fireEvent(*args)
+                source.fireEvent(*args)  ## Event types are filtered at EventSource.fireEvent
             elif hasattr(source,'listeners'):
                 for l in source.listeners:
                     try: getattr(l,'eventReceived',l)(*([source]+list(args))) 
@@ -366,7 +365,7 @@ class EventSource(Logger,Object):
         
         self.attr_value = None
         self.attr_time = 0
-        self.listeners = []       
+        self.listeners = defaultdict(set) #[]       
         self.event_ids = dict() # An {EventType:ID} dict      
 
         self.state = self.STATES.UNSUBSCRIBED
@@ -407,7 +406,7 @@ class EventSource(Logger,Object):
     def cleanUp(self):
         self.debug("cleanUp")
         while self.listeners:
-          self.removeListener(self.listeners.pop(0))
+          self.removeListener(self.listeners.popitem())
         if self.isPollingEnabled():
           self.deactivatePolling()
         if self.checkState('SUBSCRIBED','PENDING'):
@@ -503,7 +502,7 @@ class EventSource(Logger,Object):
 
     def _listenerDied(self, weak_listener):
         try:
-            self.listeners.remove(weak_listener)
+            self.listeners.pop(weak_listener)
         except Exception, e:
             pass
 
@@ -523,7 +522,7 @@ class EventSource(Logger,Object):
         
         if not use_events: use_events = []
         elif use_events is True: use_events = self.DEFAULT_EVENTS
-        self.use_events = toList(use_events or self.use_events)
+        use_events = toList(use_events or self.use_events)
         
         self.forced = self.forced or use_polling
         self.thread().register(self)
@@ -532,8 +531,9 @@ class EventSource(Logger,Object):
         if self.forced and not self.polled:
             self.activatePolling()
         weak = weakref.ref(listener,self._listenerDied)
-        if weak not in self.listeners:
-            self.listeners.append(weak)
+        #if weak not in self.listeners:
+        for e in use_events:
+            self.listeners[weak].add(e)
             return True
         else:
             return False
@@ -542,7 +542,7 @@ class EventSource(Logger,Object):
         if not isinstance(listener,weakref.ReferenceType):
             listener = weakref.ref(listener,self._listenerDied)
         try:
-            self.listeners.remove(listener)
+            self.listeners.pop(listener)
         except Exception, e:
             return False
         if not self.listeners:
@@ -551,17 +551,24 @@ class EventSource(Logger,Object):
 
     def hasListeners(self):
         """ returns True if anybody is listening to events from this attribute """
-        if self.listeners is None:
+        if not self.listeners:
             return False
         return len(self.listeners) > 0
       
     def fireEvent(self, event_type, event_value, listeners=None):
-        """sends an event to all listeners or a specific one"""
+        """
+        sends an event to all listeners or a specific one
+        event type filtering is done here
+        poll() events will be allowed to pass through
+        """
         self.debug('fireEvent(%s)'%event_type)
         listeners = listeners or self.listeners
 
         for l in listeners:
             try:
+                #event filter will allow poll() events to pass through
+                if event_type!='periodic' and l in self.listeners and event_type not in self.listeners[l]:
+                    continue                
                 if isinstance(l, weakref.ref):
                     l = l()
                 if hasattr(l,'eventReceived'):
