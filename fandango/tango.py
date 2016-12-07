@@ -589,10 +589,12 @@ def get_extension_arg(x):
     return x.split(':',1)[-1].split('#')[0]
 
 def _copy_extension(prop,row,db=None): 
+    #This extension will copy property contents from argument
     db = db or get_database()
     return db.get_device_property(get_extension_arg(row),[prop])[prop]
 
 def _file_extension(prop,row,db=None):
+    #This extension will copy property contents from filename
     try:
         f = open(get_extension_arg(row))
         r = f.readlines()
@@ -601,8 +603,32 @@ def _file_extension(prop,row,db=None):
     except:
         traceback.print_exc()
         return []
+      
+def _attr_extension(prop,row,db=None):
+    """
+    This extension will replace the line by an attribute forwarding formula ($Arg = Type(ATTR('arg'))
+    
+    Syntax is @ATTR:[alias=]model [+formula]
+    """
+    try:
+      db = db or get_database()
+      args = row.split(':',1)[-1].split('#')[0].split('=')
+      s = args[-1] #formula
+      model = (searchCl(retango,s).group())
+      ai = get_attribute_config(model) #config
+      t = cast_tango_type(ai.data_type).__name__ #pytype
+      f = str(ai.data_format) #format
+      a = args[0] if len(args)>1 else model.split('/')[-1]
+      s = s.replace(model,"ATTR('%s')"%model)
+      r = "%s=%s(%s,%s)"%(a,f,t,s)
+      return [r]
+    except:
+      print('fandango.tango._attr_extension(%s,%s) failed!'%(prop,row))
+      traceback.print_exc()
+      return []
+      
 
-EXTENSIONS = {'@COPY:':_copy_extension,'@FILE:':_file_extension}
+EXTENSIONS = {'@COPY:':_copy_extension,'@FILE:':_file_extension,'@ATTR:':_attr_extension}
 
 def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS,filters=[]):
     db = db or get_database()
