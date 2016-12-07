@@ -401,8 +401,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 except Exception,e:
                     self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
-                if prop=='polled_attr': self._polled_attr_ = tango.get_polled_attrs(value)
-                else: setattr(self,prop,self.check_property_extensions(prop,value))
+                    
+                if prop=='polled_attr': 
+                  self._polled_attr_ = tango.get_polled_attrs(value)
+                
+                else: 
+                  #APPLYING @COPY/@FILE property extensions
+                  setattr(self,prop,self.check_property_extensions(prop,value))
+                  
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
             [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
         if self.UseTaurus:
