@@ -235,6 +235,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._locals['MATCH'] = lambda expr,cad: fun.matchCl(expr,cad)
         self._locals['DELAY'] = lambda secs: fandango.wait(secs)
         self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
+        self._locals['FORMULA'] = self.get_attr_formula
+        self._locals['MODELS'] = self.get_attr_models
         self._locals['time2str'] = fandango.time2str
         self._locals['ctime2time'] = fandango.ctime2time
         self._locals['now'] = fandango.now
@@ -820,7 +822,33 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def get_dyn_attr_list(self):
         """Gets all dynamic attribute names."""
         return self.dyn_attrs.keys()
-
+      
+    def get_attr_formula(self,aname,full=False):
+        """
+        Returns the formula for the given attribute
+        The as_tuple flag will return an attr,formula,compiled tuple
+        """
+        if aname in self.dyn_values:
+            formula = self.dyn_values[aname].formula
+            compiled = self.dyn_values[aname].compiled
+            
+        else:
+            #Getting a caseless attribute that match
+            try:
+                aname,formula,compiled = ((k,self.dyn_values[k].formula,
+                                           self.dyn_values[k].compiled) for 
+                                          k in self.dyn_values if 
+                                          k.lower()==aname.lower()).next()
+            except: 
+                self.warning('DynamicDS.evalAttr: %s doesnt match any Attribute name,'
+                             ' trying to evaluate ...'%aname)
+                formula,compiled=aname,None
+        if full:
+          return aname,formula,compiled
+        else:
+          #If no attribute is matching, attribute name is returned
+          return formula
+        
     def is_dyn_allowed(self,req_type,attr_name=''):
         return (time.time()-self.time0) > 1e-3*self.StartupDelay
 
@@ -925,14 +953,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         '''
         self.debug("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"%shortstr(getattr(self.dyn_values.get(aname,None),'value',None)))
         tstart = time.time()
-        if aname in self.dyn_values:
-            formula,compiled = self.dyn_values[aname].formula,self.dyn_values[aname].compiled#self.dyn_attrs[aname]       
-        else:#Getting a caseless attribute that match
-            try:
-                aname,formula,compiled = ((k,self.dyn_values[k].formula,self.dyn_values[k].compiled) for k in self.dyn_values if k.lower()==aname.lower()).next()
-            except: 
-                self.warning('DynamicDS.evalAttr: %s doesnt match any Attribute name, trying to evaluate ...'%aname)
-                formula,compiled=aname,None
+
+        aname,formula,compiled = self.get_attr_formula(aname,full=True)
+        
         try:
             #Checking attribute dependencies
             if self.CheckDependencies and aname in self.dyn_values:
@@ -1149,6 +1172,16 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             except:
                 print traceback.format_exc()
         return
+      
+    def get_attr_models(self,attribute):
+        """
+        Given a dynamic attribute name or formula, it will return a 
+        list of tango models appearing on it
+        """
+        formula = self.get_attr_formula(attribute)
+        matches = re.findall(tango.retango,formula)
+        #Matches are models split in parts, need to be joined
+        return ['/'.join(filter(bool,s)) for s in matches]
         
     def getXDevice(self,dname):
         """
