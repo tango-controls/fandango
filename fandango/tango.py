@@ -1381,43 +1381,43 @@ def get_polled_attrs(device,others=None):
 
 ########################################################################################
 
-class CachedAttributeProxy(PyTango.AttributeProxy):
-    #""" 
-    #This subclass of AttributeProxy keeps the last read value for a fixed keeptime (in milliseconds).
-    #DEPRECATED: Use callbacks.EventSource instead, AttributeProxy is not as well supported as DeviceProxy
+#class CachedAttributeProxy(PyTango.AttributeProxy):
+    ##""" 
+    ##This subclass of AttributeProxy keeps the last read value for a fixed keeptime (in milliseconds).
+    ##DEPRECATED: Use callbacks.EventSource instead, AttributeProxy is not as well supported as DeviceProxy
     
-    #It is used to avoid abusive attribute access from composers (fandango.dynamic) or alarm servers (fandango.tango)
-    #In comparison to AttributeValue, it can be used for attribute configuration setup (including polling/events)
-    #And it is WRITABLE!!
+    ##It is used to avoid abusive attribute access from composers (fandango.dynamic) or alarm servers (fandango.tango)
+    ##In comparison to AttributeValue, it can be used for attribute configuration setup (including polling/events)
+    ##And it is WRITABLE!!
     
-    #This class does not implement any kind of Event management, this will be done by EventSource subclass instead.
-    #"""
-    def __init__(self,name,keeptime=1000.,fake=False):
-        self.keeptime = keeptime
-        self.last_read_value = None
-        self.last_read_time = 0
-        self.fake = fake
-        if not fake: PyTango.AttributeProxy.__init__(self,name)
-        else: self.name = name
+    ##This class does not implement any kind of Event management, this will be done by EventSource subclass instead.
+    ##"""
+    #def __init__(self,name,keeptime=1000.,fake=False):
+        #self.keeptime = keeptime
+        #self.last_read_value = None
+        #self.last_read_time = 0
+        #self.fake = fake
+        #if not fake: PyTango.AttributeProxy.__init__(self,name)
+        #else: self.name = name
         
-    def set_cache(self,value,t=None):
-        #"""
-        #set_cache and fake are used by PyAlarm.update_locals
-        #used to emulate alarm state reading from other devices
-        #"""
-        self.last_read_time = t or time.time()
-        self.last_read_value = hasattr(value,'value') and value or fakeAttributeValue('',value)
+    #def set_cache(self,value,t=None):
+        ##"""
+        ##set_cache and fake are used by PyAlarm.update_locals
+        ##used to emulate alarm state reading from other devices
+        ##"""
+        #self.last_read_time = t or time.time()
+        #self.last_read_value = hasattr(value,'value') and value or fakeAttributeValue('',value)
     
-    def read(self,cache=True):
-        now = time.time()
-        if not cache or (now-self.last_read_time)>(self.keeptime/1e3):
-            self.last_read_time = now
-            try:
-                self.last_read_value = None if self.fake else PyTango.AttributeProxy.read(self)
-            except Exception,e:
-                self.last_read_value = e
-        if isinstance(self.last_read_value,Exception): raise self.last_read_value
-        else: return self.last_read_value
+    #def read(self,cache=True):
+        #now = time.time()
+        #if not cache or (now-self.last_read_time)>(self.keeptime/1e3):
+            #self.last_read_time = now
+            #try:
+                #self.last_read_value = None if self.fake else PyTango.AttributeProxy.read(self)
+            #except Exception,e:
+                #self.last_read_value = e
+        #if isinstance(self.last_read_value,Exception): raise self.last_read_value
+        #else: return self.last_read_value
 
 
 ########################################################################################

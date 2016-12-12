@@ -345,7 +345,7 @@ class EventSource(Logger,SingletonMap,Object):
       'FAILED': -1, #Not working at all
       })
     
-    def __init__(self, name, parent=None, **kw):
+    def __init__(self, name, keeptime=1000., fake=False, parent=None, **kw):
         """ Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, enablePolling """
 
         self.simple_name = name.split('/')[-1]
@@ -364,7 +364,7 @@ class EventSource(Logger,SingletonMap,Object):
                 self.device = parent.name()
                 self.proxy = parent
             except:
-                raise Exception('A valid device name is needed')
+                raise Exception('A valid device name is needed: %s'%([name,self.simple_name,parent]))
               
         self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
         self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
@@ -385,7 +385,7 @@ class EventSource(Logger,SingletonMap,Object):
         self.polled = self.forced #Forced is permanent, polled may change
         # current polling period
         self.polling_period = kw.get("pollingPeriod",kw.get('polling_period',self.DefaultPolling))
-        self.keep_time = kw.get("keeptime",kw.get('keep_time',500))
+        self.keep_time = kw.get('keep_time',keeptime)
         # force tango events usage
         self.use_events = kw.get("use_events",[])
         if self.use_events is True: self.use_events = self.DEFAULT_EVENTS
