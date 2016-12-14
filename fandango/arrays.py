@@ -1108,7 +1108,7 @@ class CSVArray(object):
         for c in range(self.ncols): self.fill(y=c)
         return self
         
-    def getAsTree(self,root=0,xsubset=[],lastbranch=None):
+    def getAsTree(self,root=0,xsubset=[],lastbranch=None,expand=False):
         """
         This method returns the content of the array as recursive dicts
         It will produce the right output only if the array has been filled before!
@@ -1122,9 +1122,10 @@ class CSVArray(object):
         """
         if lastbranch is None: lastbranch=self.ncols
         elif type(lastbranch) is str: lastbranch=self.colByHead(lastbranch)
-            
+        if expand: self.expandAll()
+        
         klines=self.get(y=root,distinct=True,xsubset=xsubset)
-        if len(klines)==1 and root>lastbranch: #Return resting columns in a single line
+        if len(klines)==1 and root>=lastbranch: #Return resting columns in a single line
             return self.get(x=klines.values()[0][0],ysubset=range(root,self.ncols))
         elif root+1>=self.ncols: #Last column
             return dict.fromkeys(klines.keys(),{})
@@ -1136,7 +1137,7 @@ class CSVArray(object):
                     #continue
                 tree[k]=self.getAsTree(root=root+1,xsubset=klines[k],lastbranch=lastbranch)
             return tree
-            
+        
     def updateFromTree(self,tree):
         """
         This method takes a dictionary of type {level0:{level1:{level2:{}}}}
