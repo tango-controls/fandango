@@ -643,6 +643,22 @@ def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
     if filename:
         json.dump(result,open(filename,'w'),encoding=encoding)
     return result if not filename else filename
+  
+def unicode2str(obj):
+    """
+    Converts an unpacked unicode object (json) to 
+    nested python primitives (map,list,str)
+    """
+    if isMapping(obj):
+        n = dict(unicode2python(t) for t in obj.items())
+    elif isSequence(obj):
+        n = list(unicode2python(t) for t in obj)
+    elif isString(obj):
+        n = str(obj)
+    else:
+        n = obj
+    return n    
+    
     
 def toList(val,default=[],check=isSequence):
     if val is None: 
