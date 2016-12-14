@@ -8,6 +8,7 @@ ALBA Synchrotron Controls Group
 
 import sys,os, traceback
 from PyTango import *
+from fandango.arrays import *
 
 def main():
 
