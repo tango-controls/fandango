@@ -943,7 +943,7 @@ def reduce_distinct(group1,group2):
 ########################################################################################
 ## Methods to export device/attributes/properties to dictionaries
 
-def export_attribute_to_dict(model,attribute=None,value=None,keep=False):
+def export_attribute_to_dict(model,attribute=None,value=None,keep=False,as_struct=False):
     """
     get attribute config, format and value from Tango and return it as a dictionary:
     
@@ -1029,7 +1029,7 @@ def export_attribute_to_dict(model,attribute=None,value=None,keep=False):
     except Exception,e:
         print(str((attr,traceback.format_exc())))
         raise(e)
-    return dict(attr)
+    return dict(attr) if not as_struct else Struct(dict(attr))
             
 def export_commands_to_dict(device,target='*'):
     """ export all device commands config to a dictionary """
