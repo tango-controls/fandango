@@ -3,4 +3,4 @@
 Introducing Fandango
 --------------------
 
-.. include:: README
+.. include:: ../README.rst
