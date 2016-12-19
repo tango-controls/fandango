@@ -529,7 +529,7 @@ def isSequence(seq,INCLUDE_GENERATORS = True):
     elif hasattr(seq,'__len__'): 
         return True
     return False
-    
+  
 def isDictionary(seq):
     """ It includes dicts and also nested lists """
     if isinstance(seq,dict): return True
@@ -551,6 +551,18 @@ def isNested(seq,strict=False):
     if not strict and isIterable(child): return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
+  
+def shape(seq):
+    """
+    Returns the N dimensions of a python sequence
+    """
+    if not isSequence(seq):
+      return []
+    else:
+      d = [len(seq)]
+    if isNested(seq):
+      d.extend(shape(seq[0]))
+    return d
     
 def isBool(seq,is_zero=True):
     codes = ['true','yes','false','no']
@@ -815,7 +827,7 @@ def time2date(epoch=None):
 
 def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
     if epoch is None: epoch = now() 
-    elif epoch<0: epoch = now()-epoch
+    elif epoch<0: epoch = now()+epoch
     return time.strftime(cad,time2tuple(epoch))
 epoch2str = time2str
     
