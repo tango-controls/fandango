@@ -39,7 +39,7 @@ Some extensions to python dictionary
 ThreadDict: Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.
 defaultdict_fromkey: Creates a dictionary with a default_factory function that creates new elements using key as argument.
 CaselessDict: caseless dictionary
-CaselessDefaultDict: a join venture between caseless and default dict
+CaselessDefaultDict: a join venture between caseless and default dict from key
 
 @deprecated
 @note see in tau.core.utils.containers
@@ -365,7 +365,7 @@ class CaselessDict(dict):
         dict.__delitem__(self, k.lower() if hasattr(k,'lower') else k)
         
 class CaselessDefaultDict(defaultdict_fromkey,CaselessDict):
-    """ a join venture between caseless and default dict
+    """ a join venture between caseless and defaultdict_fromkey
     This class merges the two previous ones.
     This declaration equals to:
         CaselessDefaultDict = type('CaselessDefaultType',(CaselessDict,defaultdict_fromkey),{})
