@@ -128,6 +128,10 @@ try:
     try: 
         from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute,DynamicDSTypes,CreateDynamicCommands,DynamicServer
     except Exception,e: raise Exception('fandango.dynamic: %s'%e)
+    try:
+        from callbacks import EventSource,EventThread,EventListener
+        from callbacks import CachedAttributeProxy,TangoListener,TangoAttribute
+    except Exception,e: raise Exception('fandango.callbacks: %s'%e)
 except Exception,e: 
     print 'Unable to import fandango.*tango modules: %s'%e
     #print traceback.format_exc()
