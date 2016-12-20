@@ -50,7 +50,7 @@ from dicts import *
 from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
 from tango import get_full_name,get_attribute_events
 from threads import ThreadedObject,Queue,timed_range,wait
-from log import Logger
+from log import Logger,printf
 
 """
 @package callbacks
@@ -161,19 +161,24 @@ class EventThread(Logger,ThreadedObject):
     This class processes both Events and Polling.
     All listeners should implement eventReceived method
     All sources must have a listeners list
-    Filters are not implemented
+    The filtered argument will just 
     """
-    MinWait = 1e-4 #Event processing limited to 10KHz maximum (rest are queued)
+    MinWait = 0.1 #Event processing limited to 10KHz maximum (rest are queued)
     EVENT_POLLING_RATIO = 100 #How many events to process before checking polled attributes
     
-    def __init__(self,period=None):
+    def __init__(self,period_ms=None,filtered=False,loglevel='WARNING'):
         self.queue = Queue.Queue()
         self.sources = CaselessDict()
         self.event = threading.Event()
         self.counters = CaselessDefaultDict(int)
-        
-        ThreadedObject.__init__(self,target=self.process,period=(period or self.MinWait))
+        period = 1e-3*(period_ms or 0) or self.MinWait
+        self.filtered = filtered
+        ThreadedObject.__init__(self,target=self.process,period=period)
         Logger.__init__(self,type(self).__name__)
+        self.setLogLevel(loglevel)
+        
+    def set_period_ms(self,period):
+        self.set_period(period*1e-3)
         
     def put(self,*args): 
         self.queue.put(*args)
@@ -203,25 +208,26 @@ class EventThread(Logger,ThreadedObject):
 
     def process(self):
         """ 
-        Currently, this implementation will process 1 event and one polling
+        Currently, this implementation will process 100 events for each polling
         each time as max.
         """
         #self.debug('Processing Events')
         WAS_EMPTY = False
+        queue = CaselessSortedDict()
+        evs,polls = 0,0
+        #First, extract events from the queue
         for i in range(self.EVENT_POLLING_RATIO):
             try:
-                #@TODO: Event Filters should be implemented here 
-                #including removal of PERIODIC events if a change event is already in queue
                 data = self.get(block=False)
+                evs+=1
                 if isSequence(data):
                     source,args = data[0],data[1:]
                 else: 
                     source,args = data,[]
                 name = self.get_source(source)
                 source = self.get_object(source)
-                source.last_read_time = time.time()
-                self.fireEvent(source,*args)
-                self.wait(0)
+                if source not in queue: queue[source] = []
+                queue[source].append((source,args))
             except Queue.Empty,e:
                 WAS_EMPTY = True
                 break
@@ -229,8 +235,26 @@ class EventThread(Logger,ThreadedObject):
                 #The queue is empty, long period attributes can be processed
                 if 'empty' not in str(e).lower():
                     self.error(traceback.format_exc())
-                #WAS_EMPTY = True
                 break
+        
+        #Execute the events for each source
+        #Sequential execution of events received is relatively guaranteed
+        for s,events in sorted(queue.items()):
+            #@TODO: Event Filters should be implemented here 
+            #including removal of PERIODIC events if a change event is already in queue
+            if self.filtered:
+                events = events[-1:]
+            while events:
+                try:
+                    e = events.pop(0)
+                    source,args = e
+                    source.last_read_time = time.time()
+                    self.fireEvent(source,*args)
+                    self.wait(0)                
+                except:
+                    self.error('%s:%s\n%s'%(s,e,traceback.format_exc()))
+
+        self.wait(0) #breathing
        
         ## print('Executing pollings')
         now = time.time()
@@ -247,6 +271,7 @@ class EventThread(Logger,ThreadedObject):
                 try:
                   t0 = time.time()
                   source.poll()
+                  polls+=1
                 except:
                   traceback.print_exc()
                   if WAS_EMPTY: break
@@ -263,7 +288,7 @@ class EventThread(Logger,ThreadedObject):
             break
           
         self.wait(0)
-        #self.debug('Done')
+        if evs or polls: self.debug('Processed %d events, %d pollings'%(evs,polls))
         return
                 
     def fireEvent(self,source,*args):
@@ -326,9 +351,9 @@ class EventSource(Logger,SingletonMap,Object):
     
     EVENT_TIMEOUT = 1800  # 10s
     DEFAULT_LOG = 'WARNING'
-    DEFAULT_EVENTS = [ 'user_event', 'periodic', 'change', 'archive', 'quality' ]
+    DEFAULT_EVENTS = [ 'user_event',  'change', 'archive', 'quality' ]
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
-    TAURUS_EVENTS = ['periodic','change','attr_conf']
+    TAURUS_EVENTS = ['change','attr_conf']
     QUEUE = None
     DefaultPolling = 3000.
     KeepAlive = 15000.
@@ -1209,11 +1234,20 @@ def subscribeDeviceAttributes(self,dev_name,attrs):
 
 def __test__(args):
     import fandango.callbacks as fb
-    es = fb.EventSource('test/events/1/currenttime')
-    es.setLogLevel('DEBUG')
-    es.KeepAlive = 5000.
-    el = fb.EventListener('tester')
+    a = args and args[0] or 'test/events/1/currentime'
+    es = fb.EventSource(a)
+    es.thread().set_period_ms(1000.)
+    es.thread().setLogLevel('DEBUG')
+    es.thread().filtered = True
+    #es.setLogLevel('DEBUG')
+    es.KeepAlive = 10000.
+    el = fb.EventListener('listener')
+    el.setLogLevel('DEBUG')
     es.addListener(el)
+    el.set_value_hook(
+        lambda s,t,v:
+            printf('Current: %s'%s.read().value)
+        )
     if 'ipython' not in str(sys.argv):
       while (1):
         try: threading.Event().wait(1.)
