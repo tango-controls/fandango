@@ -685,7 +685,8 @@ def toList(val,default=[],check=isSequence):
         return val
 toSequence = toList
 
-def toString(val):
+def toString(*val):
+    if len(val)==1: val = val[0]
     if hasattr(val,'text'):
         try: return val.text()
         except: return val.text(0)
