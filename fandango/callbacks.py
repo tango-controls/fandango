@@ -206,7 +206,7 @@ class EventThread(Logger,ThreadedObject):
         Currently, this implementation will process 1 event and one polling
         each time as max.
         """
-        self.debug('Processing Events')
+        #self.debug('Processing Events')
         WAS_EMPTY = False
         for i in range(self.EVENT_POLLING_RATIO):
             try:
@@ -263,7 +263,7 @@ class EventThread(Logger,ThreadedObject):
             break
           
         self.wait(0)
-        self.debug('Done')
+        #self.debug('Done')
         return
                 
     def fireEvent(self,source,*args):
@@ -325,7 +325,7 @@ class EventSource(Logger,SingletonMap,Object):
     """
     
     EVENT_TIMEOUT = 1800  # 10s
-    DEFAULT_LOG = 'INFO'
+    DEFAULT_LOG = 'WARNING'
     DEFAULT_EVENTS = [ 'user_event', 'periodic', 'change', 'archive', 'quality' ]
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
     TAURUS_EVENTS = ['periodic','change','attr_conf']
@@ -347,7 +347,8 @@ class EventSource(Logger,SingletonMap,Object):
     
     def __init__(self, name, keeptime=1000., fake=False, parent=None, **kw):
         """ Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, enablePolling """
-
+        if 0 < name.replace('//','/').count('/') < name.count(':')+3:
+            name += '/state'
         self.simple_name = name.split('/')[-1]
         if not parent and '/' in name: 
             parent = name.rsplit('/',1)[0]
@@ -570,8 +571,9 @@ class EventSource(Logger,SingletonMap,Object):
         for l in listeners:
             try:
                 #event filter will allow poll() events to pass through
-                if event_type!='periodic' and l in self.listeners and event_type not in self.listeners[l]:
-                    self.debug('event discarded')
+                if (event_type not in ('periodic',PyTango.EventType.PERIODIC_EVENT) 
+                    and l in self.listeners and event_type not in self.listeners[l]):
+                    self.debug('%s event discarded'%event_type)
                     continue
                 if isinstance(l, weakref.ref):
                     l = l()
