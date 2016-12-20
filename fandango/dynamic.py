@@ -1900,7 +1900,7 @@ def CreateDynamicCommands(ds,ds_class):
     print 'class = %s; classes = %s' % (ds.__name__,classes)
     devs = [classes[i] for i in range(len(classes)-1) if classes[i+1]==ds.__name__]    
     print 'devs = %s'%devs
-    if not hasattr(ds,'dyn_comms'): ds.dyn_comms = {}
+    if not hasattr(ds,'dyn_comms'): ds.dyn_comms = CaselessDict()
     
     for dev in devs:
         prop = db.get_device_property(dev,['DynamicCommands'])['DynamicCommands']
