@@ -9,6 +9,7 @@ ALBA Synchrotron Controls Group
 import sys,os, traceback
 from PyTango import *
 from fandango.arrays import *
+from fandango.tango import *
 
 def main():
 
@@ -113,7 +114,7 @@ def main():
           db.add_device(di)
       
   overwrite = False
-  answer = raw_input('do you want to effectively add this devices and properties to the database %s? (Yes/No/Overwrite)'%os.environ['TANGO_HOST'])
+  answer = raw_input('do you want to effectively add this devices and properties to the database %s? (Yes/No/Overwrite)'%get_tango_host())
 
   if answer.lower() in ['o','overwrite']:
       overwrite,answer = True,'yes'
