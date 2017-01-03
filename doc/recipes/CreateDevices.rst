@@ -8,6 +8,11 @@ Import fandango
 
 .. code-block:: python
 
+  # git clone https://github.com/tango-controls/fandango
+  # cd fandango
+  # python setup.py install     
+  #or export PYTHONPATH=$(pwd):$PYTHONPATH 
+  
   import fandango.tango as tango
   import fandango as fn
 
@@ -44,10 +49,10 @@ Move devices between servers
 
 .. code-block:: python
 
+  import fandango as fn
   oldserver = 'Pool/1'
   newserver = 'Pool/2'
-  sd = fandango.ServersDict(oldserver)
   for c in sd.get_all_classes():
     devs = sd.get_class_devices(c)
     for d in devices:
-      fandango.tango.add_new_device(newserver,c,d) 
+      fn.tango.add_new_device(newserver,c,d) 
