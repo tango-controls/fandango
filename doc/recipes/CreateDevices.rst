@@ -52,6 +52,7 @@ Move devices between servers
   import fandango as fn
   oldserver = 'Pool/1'
   newserver = 'Pool/2'
+  sd = fn.ServersDict(oldserver)
   for c in sd.get_all_classes():
     devs = sd.get_class_devices(c)
     for d in devices:
