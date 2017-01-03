@@ -55,5 +55,5 @@ Move devices between servers
   sd = fn.ServersDict(oldserver)
   for c in sd.get_all_classes():
     devs = sd.get_class_devs(c)
-    for d in devices:
+    for d in devs:
       fn.tango.add_new_device(newserver,c,d) 
