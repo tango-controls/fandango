@@ -37,4 +37,15 @@ Crosscheck devices
     ('pyattributeprocessor/sr_ct_calc', PyTango._PyTango.DevState.ON)
 
 
+Move devices between servers
+----------------------------
 
+.. code-block:: python
+
+  oldserver = 'Pool/1'
+  newserver = 'Pool/2'
+  sd = fandango.ServersDict(oldserver)
+  for c in sd.get_all_classes():
+    devs = sd.get_class_devices(c)
+    for d in devices:
+      fandango.tango.add_new_device(newserver,c,d) 
