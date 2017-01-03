@@ -1,6 +1,8 @@
 Create and launch new devices
 =============================
 
+.. contents::
+
 Import fandango
 ---------------
 
