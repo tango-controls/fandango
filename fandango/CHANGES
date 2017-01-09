@@ -15,6 +15,14 @@ PENDING:
     StructDict with sort/get/filter methods like Panic api
     preparing next PyAlarm release with None not allowed in comparisons
 
+-------------------
+12.4 - January 2017
+-------------------
+
+    Solve MRO exception in device.Dev4Tango
+    Solve bug in get_device_info/get_database_device 
+      caused by domains in tango hostname
+
 --------------------
 12.3 - November 2016
 --------------------
