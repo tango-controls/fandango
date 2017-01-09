@@ -128,9 +128,9 @@ def get_tango_host(dev_name='',use_db=False):
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
-            if matchCl('.*[a-z].*',host.lower()):
-              #Remove domain name
-              host = host.strip().split('.')[0]
+            # if matchCl('.*[a-z].*',host.lower()):
+            #   #Remove domain name
+            #   host = host.strip().split('.')[0]
             return "%s:%d"%(host,port)
         else:
             host = os.getenv('TANGO_HOST') 
