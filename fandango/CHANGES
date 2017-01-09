@@ -1,4 +1,4 @@
-RELEASE = (12,2,1)
+RELEASE = (12,3,0)
 RELEASE_NOTE = "Added FolderDS and FolderGUI, moved to GitHub, many bugs fixed"
 
 """
@@ -14,6 +14,31 @@ PENDING:
     dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
     StructDict with sort/get/filter methods like Panic api
     preparing next PyAlarm release with None not allowed in comparisons
+
+--------------------
+12.3 - November 2016
+--------------------
+
+Improve documentation
+
+functional:
+- Add timed_range
+- Improve export_device_to_dict()
+- Solve regexp bug in str2py
+- Add tango2json script
+- add clsplit method
+
+Dynamic:
+- Improve ATTR/XATTR syntax
+- Solve compatibility with Unsigned types, 12.2.3
+- allow READ(full_attr) on eval
+
+New-cache-proxy:
+- Solve Bugs in EventListener and ThreadedObject
+
+FolderDS:
+- Adapt FolderAPI to multi-tango-host environment
+- Add launchers
 
 -------------------------------------------------------------------
 12.2.1 - October 2016, Bugfix release, required by latest PyPLC/Panic

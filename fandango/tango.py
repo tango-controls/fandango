@@ -128,9 +128,10 @@ def get_tango_host(dev_name='',use_db=False):
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
-            if matchCl('.*[a-z].*',host.lower()):
-              #Remove domain name
-              host = host.strip().split('.')[0]
+            if (matchCl('.*[a-z].*',host.lower())
+              and PyTango.__version_number__ < 800):
+                #Remove domain name
+                host = host.strip().split('.')[0]
             return "%s:%d"%(host,port)
         else:
             host = os.getenv('TANGO_HOST') 
@@ -208,8 +209,9 @@ def get_device(dev,use_tau=False,keep=False):
 
 def get_database_device(use_tau=False,db=None): 
     global TangoDevice
-    if db is None and TangoDevice is not None:
-      td = TangoDevice
+    td = TangoDevice
+    if db is None and td is not None:
+      return td
     else:
         try:
            dev_name = (db or get_database(use_tau=use_tau)).dev_name()
