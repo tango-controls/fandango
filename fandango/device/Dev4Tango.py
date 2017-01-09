@@ -60,7 +60,7 @@ from fandango.dynamic import DynamicDS,USE_STATIC_METHODS
 ########################################################################################
 ## Device servers template
 
-class Dev4Tango(log.Logger,PyTango.Device_4Impl):
+class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     """
     See documentation at doc/devices/Dev4Tango.rst
     
