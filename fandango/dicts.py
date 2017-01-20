@@ -146,7 +146,6 @@ class ThreadDict(dict):
         else: return self._Thread.isAlive()
     def __del__(self):
         self.stop()
-        #dict.__del__(self)
         
     def run(self):
         self.tracer('In ThreadDict.run()')
@@ -160,11 +159,9 @@ class ThreadDict(dict):
                     if (time.time()-self._updates.get(k,0))>self._periods.get(k,0):
                         #if period=0 or if not updated the condition applies
                         self.__getitem__(k,hw=True)
-                        self._updates[k] = time.time()
                 except Exception,e:
                     if self.trace:
-                        print '!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:1000] #+': %s'%str(e)
-                    #raise e
+                        print('!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:1000])
                     self.__setitem__(k,e,hw=False)
                 finally:
                     self._last_read = k
@@ -213,10 +210,12 @@ class ThreadDict(dict):
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
         if self.trace: print 'In ThreadDict.__getitem__(%s,%s)'%(key,hw)
-        if (hw or not self.threaded) and self.read_method: # or (self.threaded and key not in self._threadkeys) #HW ACCESS MUST NOT BE DONE WITHOUT ASKING EXPLICITLY! (Use __setitem__(k,None) instead)
-            value = self.read_method(key)
-            self.__locked_setitem__(key,value)
-            self.set_last_update(time.time())
+        if (hw or not self.threaded): #HW ACCESS MUST NOT BE DONE WITHOUT ASKING EXPLICITLY! (Use __setitem__(k,None) instead)
+            self._updates[key] = time.time()
+            if self.read_method: 
+              value = self.read_method(key)
+              self.__locked_setitem__(key,value)
+              self.set_last_update(self._updates[key])
         return self.__locked_getitem__(key)
 
     def __setitem__(self,key,value,hw=True):
