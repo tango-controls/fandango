@@ -1120,21 +1120,18 @@ class CSVArray(object):
             for each key, get the distinct keys in the next column matching lines
                 for each key, get the distinct keys in the next column matching lines       
         """
-        if lastbranch is None: lastbranch=self.ncols
+        if lastbranch is None: lastbranch=self.ncols-1
         elif type(lastbranch) is str: lastbranch=self.colByHead(lastbranch)
         if expand: self.expandAll()
         
         klines=self.get(y=root,distinct=True,xsubset=xsubset)
-        if len(klines)==1 and root>=lastbranch: #Return resting columns in a single line
+        if len(klines)==1 and root>lastbranch: #Return last columns as a list
             return self.get(x=klines.values()[0][0],ysubset=range(root,self.ncols))
-        elif root+1>=self.ncols: #Last column
+        elif root+1>=self.ncols: #Last columns as a dictionary
             return dict.fromkeys(klines.keys(),{})
         else:
             tree={}
             for k in klines.keys():
-                #if not k:  #!DEPRECATED AS WE WERE LOOSING INFORMATION IF A CELL IS EMPTY!
-                    #print 'WARNING! %s has not been properly filled' % k
-                    #continue
                 tree[k]=self.getAsTree(root=root+1,xsubset=klines[k],lastbranch=lastbranch)
             return tree
         
