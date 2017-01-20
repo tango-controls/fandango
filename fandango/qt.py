@@ -594,7 +594,7 @@ class QSignalHook(Qt.QObject):
     Class initialized with a transformation function.
     For every setModel(model) it will emit a modelChanged(function(model))
     """
-    __pyqtSignals__ = ("modelChanged",)
+    #__pyqtSignals__ = ("modelChanged",)
     def __init__(self,function):
         Qt.QObject.__init__(self)
         self._model = None
@@ -602,9 +602,17 @@ class QSignalHook(Qt.QObject):
         self.function = function
         
     def setModel(self,model):
-        self._model = model
-        self._new_model = self.function(model) if self.function is not None else model
-        self.emit(Qt.SIGNAL("modelChanged"), self._new_model)
+        model = str(model) #Do a copy or die!
+        from fandango import FakeLogger as FL
+        fl = FL('QSignalHook',True)
+        try:
+          #fl.warning('QSignalHook(%s)'%(self._model,))
+          self._model = model
+          self._new_model = self.function(model) if self.function is not None else model
+          #fl.warning('QSignalHook.modelChanged(%s => %s)'%(self._model,self._new_model))
+          self.emit(Qt.SIGNAL("modelChanged"), self._new_model)
+        except:
+          fl.warning('QSignalHook: %s'%(traceback.format_exc()))
 
 class NullWidget(TaurusWidget):
     def __init__(self,*args):
