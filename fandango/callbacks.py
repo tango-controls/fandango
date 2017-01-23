@@ -311,7 +311,7 @@ class EventThread(Logger,ThreadedObject):
             self.warning(traceback.format_exc())
 
 
-class EventSource(Logger,SingletonMap,Object):
+class EventSource(SingletonMap,Logger):
     """ 
     Simplified implementation of Taurus Attribute/Model and fandango.CachedAttributeProxy classes 
     
@@ -394,14 +394,14 @@ class EventSource(Logger,SingletonMap,Object):
               
         self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
         self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
-        self.call__init__(Logger,self.full_name)
+        #self.call__init__(Logger,self.full_name)
+        Logger.__init__(self,self.full_name)
         self.setLogLevel(kw.get('loglevel',kw.get('log_level',self.DEFAULT_LOG)))
         self.info('Init()')
         assert self.fake or self.proxy,'A valid device name is needed'
         
         self.listeners = defaultdict(set) #[]       
         self.event_ids = dict() # An {EventType:ID} dict      
-
         self.state = self.STATES.UNSUBSCRIBED
         self.tango_asynch = kw.get('tango_asynch',False)
         
