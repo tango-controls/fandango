@@ -336,7 +336,10 @@ class Object(object):
 
         if klass not in self.inited_class_list:
             self.inited_class_list.append(klass)
-            #print '%s.call__init__(%s,%s)' % (klass.__name__,args,kw)
+            #print('#'*80)
+            #print('%s(%s).call__init__(%s,%s)' % (
+              #type(self).__name__,klass.__name__,args,kw))
+            #print('#'*80)
             klass.__init__(self, *args, **kw)
             
     def call_all__init__(self, klass, *_args, **_kw):
