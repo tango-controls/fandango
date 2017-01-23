@@ -135,6 +135,17 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     
     ##@name Attribute hacking methods
     #@{
+    
+    attr_list = {
+       'MemUsage':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
+       'LastUpdate':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
+        }
 
     def getAttributeTime(self,attr_value):
         """ AttributeValue.time is of Type TimeVal={tv_sec,tv_usec,...}, not accepted by set_attribute_value_date_quality method of DeviceImpl """
@@ -152,6 +163,17 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         props.set_format(frmt),props.set_unit(unit)
         attrib.set_default_properties(props)
         return attrib
+      
+    def getMemUsage(self):
+        return fandango.linos.get_memory()/1e3
+    
+    def read_MemUsage(self, attr):
+        self.debug("In read_MemUsage()")
+        attr.set_value(self.getMemUsage())
+        
+    def read_LastUpdate(self, attr):
+        self.debug("In read_LastUpdate()")
+        attr.set_value(self.last_update)
         
     ##@}
     
