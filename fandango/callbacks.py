@@ -77,8 +77,13 @@ EVENT_TO_POLLING_EXCEPTIONS = (
     'API_NotificationServiceFailed',
     'API_EventChannelNotExported',
     'API_EventTimeout',
-    #'API_EventPropertiesNotSet', #Typical for archive and data ready event
+    'API_EventPropertiesNotSet', #Typical for archive and data ready event
     'API_CommandNotFound')
+
+EVENT_CONF_EXCEPTIONS = (
+    'API_AttributePollingNotStarted',
+    'API_EventPropertiesNotSet', #Typical for archive and data ready event
+    )
 
 EVENT_TYPES = [ 'attr_conf', 'data_ready', 'user_event', 'periodic', 'change', 'archive','quality']
 
@@ -164,7 +169,7 @@ class EventThread(Logger,ThreadedObject):
     The filtered argument will just 
     """
     MinWait = 0.1 #Event processing limited to 10KHz maximum (rest are queued)
-    EVENT_POLLING_RATIO = 100 #How many events to process before checking polled attributes
+    EVENT_POLLING_RATIO = 1000 #How many events to process before checking polled attributes
     
     def __init__(self,period_ms=None,filtered=False,loglevel='WARNING'):
         self.queue = Queue.Queue()
@@ -351,7 +356,7 @@ class EventSource(SingletonMap,Logger):
     
     EVENT_TIMEOUT = 1800  # 10s
     DEFAULT_LOG = 'WARNING'
-    DEFAULT_EVENTS = [ 'user_event',  'change', 'archive', 'quality' ]
+    DEFAULT_EVENTS = [ 'periodic', 'change', 'archive', 'quality' ] #'user_event',
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
     TAURUS_EVENTS = ['change','attr_conf']
     QUEUE = None
@@ -371,7 +376,7 @@ class EventSource(SingletonMap,Logger):
       })
     
     def __init__(self, name, keeptime=1000., fake=False, parent=None, **kw):
-        """ Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, enablePolling """
+        """ Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, enablePolling, use_events """
         if 0 < name.replace('//','/').count('/') < name.count(':')+3:
             name += '/state'
         self.simple_name = name.split('/')[-1]
@@ -409,11 +414,11 @@ class EventSource(SingletonMap,Logger):
         # stores if polling has been forced by user API
         self.forced = kw.get('enablePolling',kw.get('enable_polling',False))
         self.polled = self.forced #Forced is permanent, polled may change
-        # current polling period
+        # current polling period in milliseconds
         self.polling_period = kw.get("pollingPeriod",kw.get('polling_period',self.DefaultPolling))
         self.keep_time = kw.get('keep_time',keeptime)
         # force tango events usage
-        self.use_events = kw.get("use_events",[])
+        self.use_events = kw.get("use_events",[]) or []
         if self.use_events is True: self.use_events = self.DEFAULT_EVENTS
 
         self.attr_value = None
@@ -562,7 +567,9 @@ class EventSource(SingletonMap,Logger):
         if self.forced and not self.polled:
             self.activatePolling()
         weak = weakref.ref(listener,self._listenerDied)
-        #if weak not in self.listeners:
+        if weak not in self.listeners:
+          #This line is needed, as listeners may be polling only
+          self.listeners[weak] = []
         for e in use_events:
             self.listeners[weak].add(e)
         return True
@@ -590,7 +597,7 @@ class EventSource(SingletonMap,Logger):
         event type filtering is done here
         poll() events will be allowed to pass through
         """
-        self.debug('fireEvent(%s)'%event_type)
+        self.debug('fireEvent(%s), %d events in queue'%(event_type,self.thread().queue.qsize()))
         listeners = listeners or self.listeners
 
         for l in listeners:
@@ -624,7 +631,7 @@ class EventSource(SingletonMap,Logger):
     def subscribeEvents(self,types=None,asynchronous=True):
         t0 = now()
         types = toList(types) if types else []
-        if not isSequence(self.use_events): self.use_events = []
+        if not isIterable(self.use_events): self.use_events = []
         self.use_events = sorted(set((self.use_events+types) or self.DEFAULT_EVENTS))
 
         if self.isUsingEvents() and self.checkEventsReceived(self.use_events):
@@ -833,11 +840,16 @@ class EventSource(SingletonMap,Logger):
             # fakeAttributeValue initialized with full_name
             traceback.print_exc()
             #self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
+            
+        ##FIRE EVENT IS ALREADY DONE IN read() METHOD!
         #self.last_read_time = now
         #self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
     
     def push_event(self,event):
         try:           
+            REG_FAILED = 'API_DSFailedRegisteringEvent'
+            NOT_READY = 'API_AttributeNotDataReadyEnabled'
+            NOT_PROPS = 'API_EventPropertiesNotSet'
             self.counters['total_events']+=1
             now = time.time()
             type_ = event.event
@@ -848,23 +860,30 @@ class EventSource(SingletonMap,Logger):
               if not event.err: 
                 self.warning('%s event time is 0!'%type_)
               et = now
-            self.debug('push_event(%s,err=%s)'%(type_,event.err))
+            self.debug('push_event(%s,err=%s,has_events=%s)'%(type_,event.err,self.isUsingEvents()))
             if event.err:
                 self.last_error = event
+                has_evs,is_polled = self.isUsingEvents(),self.isPollingEnabled()
                 value = event.errors[0]
                 reason = event.errors[0].reason
+                self.info('push_event(%s,err=%s,has_events=%s,polled=%s)'%(type_,reason,has_evs,is_polled))
                 
                 if reason == 'API_EventPropertiesNotSet' and self.isUsingEvents():
                   #Nothing to do, other event types are already subscribed
                   return
+                
                 elif reason in EVENT_TO_POLLING_EXCEPTIONS:
-                  if self.use_events and not self.isPollingEnabled():
-                    self.warning('EVENTS_FAILED! (%s,%s): reactivating Polling'%(type_,reason))
+                  if reason in EVENT_CONF_EXCEPTIONS and any(self.last_event.values()):
+                    #Discard config exceptions if some other event is already working well
+                    return
+                  elif self.use_events and not is_polled:
+                    self.warning('EVENTS_FAILED! (%s,%s,%s,%s): reactivating Polling'%(type_,reason,has_evs,is_polled))
                     self.setState('PENDING')
                     self.activatePolling()
                   return
+                
                 else:
-                  if reason not in ('API_AttributeNotDataReadyEnabled',):
+                  if reason not in (NOT_PROPS,NOT_READY,REG_FAILED):
                     # If push_event is executed, attributes are being received
                     self.warning('ERROR in %s(%s): %s(%s)'%(self.full_name,type_,type(value),reason))
                     self.last_event_time = et or time.time() #A valid error is a valid event
