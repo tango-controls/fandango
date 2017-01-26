@@ -151,6 +151,7 @@ class ThreadedObject(Object):
     self._loop_hook = self.loop_hook
     self._stop_hook = self.stop_hook
     self._wait_hook = None
+    self._last_exc = ''
     
     self._threads = []
     if nthreads>1:
@@ -211,6 +212,11 @@ class ThreadedObject(Object):
   def set_loop_hook(self,target): self._loop_hook = target
   def set_stop_hook(self,target): self._stop_hook = target
   def set_wait_hook(self,target): self._wait_hook = target
+  
+  def print_exc(self,e=''):
+    if not e: e = traceback.format_exc()
+    self._last_exc = str(e)
+    print(self._last_exc)
   
   def set_queue(self,queue): 
     """
@@ -298,7 +304,7 @@ class ThreadedObject(Object):
                 args,kwargs = self._start_hook(ts)
             except:
                 if self._errors < 10:
-                    traceback.print_exc()
+                    self.print_exc()
                 self._errors += 1
                 args,kwargs = [],{}
 
@@ -315,7 +321,7 @@ class ThreadedObject(Object):
                           self._target(*args,**kwargs)
                   except:
                       if self._errors < 10:
-                          traceback.print_exc()          
+                          self.print_exc()
                       self._errors += 1
 
                 ## Obtain next scheduled execution
@@ -342,7 +348,7 @@ class ThreadedObject(Object):
                       args,kwargs = self._loop_hook(ts)
                     except:
                       if self._errors < 10:
-                          traceback.print_exc()
+                          self.print_exc()
                       self._errors += 1
                       args,kwargs = [],{}
                 
@@ -356,7 +362,7 @@ class ThreadedObject(Object):
         print('ThreadedObject.Kill() ...')
         return #<< Will never get to this point
     except:
-        traceback.print_exc()
+        self.print_exc()
 
 ###############################################################################
 
