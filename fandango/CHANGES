@@ -16,8 +16,14 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
 
 -------------------
-12.4 - January 2017
+12.6 - January 2017
 -------------------
+
+    EventSource: solve issues with poll-only  attributes, tune for >1000 events/second
+    Dev4Tango: add LastUpdate and MemUsage attributes
+    FolderDS: add SaveFolder attribute
+    ThreadDict: add _updates refresh on write hardware 
+    Solve problems on DynamicDS evalAttr() and tuples
 
     Solve MRO exception in device.Dev4Tango
     Solve bug in get_device_info/get_database_device 
