@@ -2,7 +2,16 @@
 
 MOD="$1"
 
-if [ ! "$MOD" ] ; then MOD="../fandango" ; fi
+if [ ! "$MOD" ] ; then 
+  echo "This script will search for .rst files and sources"
+  echo "and will generate sphinx documentation in an autodoc/ folder"
+  echo ""
+  echo "Usage: "
+  echo "      # git clone https://github.com/.../PROJECT PROJECT.git"
+  echo "      # cd PROJECT.git/doc "
+  echo "      # generate-sphinx-docs.sh ../PROJECT "
+  exit 1
+fi
 
 TARGET=$(pwd)/autodoc
 

@@ -219,10 +219,10 @@ class Logger(Object):
         return '%s.%d'%(s,ms)
         
     def logPrint(self,prio,msg):
-        name = self.log_name+'.' if self.log_name else ''
+        name = self.log_name or ''
         l = self.__levelAliases.get(prio,prio)
         if l<self.log_obj.level: return
-        print ('%s%s\t%s\t%s'%(name,prio,self.getTimeString(),str(msg).replace('\r','')))
+        print ('%s %7s %s: %s'%(name,prio,self.getTimeString(),str(msg).replace('\r','')))
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
@@ -248,8 +248,10 @@ class Logger(Object):
     def getLogLevel(self,alias=None):
         if alias is None:
             l = self.log_obj.level
-            try: l = (k for k,v in self.__levelAliases.iteritems() if v==l).next()
-            except: return l
+            for k,v in self.__levelAliases.items():
+              if v==l:
+                l = k
+            return l
         else:
             if not isinstance(alias,basestring):
                 try: return (k for k,v in self.__levelAliases.iteritems() if v==alias).next()

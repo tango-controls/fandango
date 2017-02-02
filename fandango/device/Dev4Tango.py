@@ -74,7 +74,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     
     def __init__(self,cl,name):
         self.call__init__(PyTango.Device_4Impl,cl,name)
-        self.init_my_Logger()
+        self.init_logger()
 
     def trace(self,prio,s):
         printf( '4T.%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s))
@@ -82,10 +82,12 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     ##@name State Machine methods
     #@{
     
-    def is_Attr_allowed(self, req_type): 
+    def is_attr_allowed(self, req_type): 
         """ This method is a template for any Attribute allowed control. """
         self.info( 'In is_Attr_allowed ...' )
         return bool( self.get_state() not in [PyTango.DevState.UNKNOWN,PyTango.DevState.INIT] )
+    
+    is_Attr_allowed = is_attr_allowed #For backwards compatibility
     
     def set_state(self,state):
         self._state = state
@@ -133,19 +135,52 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     
     ##@name Attribute hacking methods
     #@{
+    
+    attr_list = {
+       'MemUsage':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
+       'LastUpdate':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
+        }
 
     def getAttributeTime(self,attr_value):
         """ AttributeValue.time is of Type TimeVal={tv_sec,tv_usec,...}, not accepted by set_attribute_value_date_quality method of DeviceImpl """
         if type(attr_value) is float: return attr_value
         elif type(attr_value.time) is float: return attr_value.time  
         else: return float(attr_value.time.tv_sec)+1e-6*float(attr_value.time.tv_usec)
+      
+    def getAttributeTemplate(self,name,type_=PyTango.DevDouble,
+                        rw=PyTango.AttrWriteType.READ,unit='',frmt=''):
+        """ 
+        Returns an Attr object ready to be inserted with self.add_attribute(&Attr,&reader,&writer,&allowed)
+        """
+        attrib = PyTango.Attr(name,type_,rw)
+        props = PyTango.UserDefaultAttrProp()
+        props.set_format(frmt),props.set_unit(unit)
+        attrib.set_default_properties(props)
+        return attrib
+      
+    def getMemUsage(self):
+        return fandango.linos.get_memory()/1e3
+    
+    def read_MemUsage(self, attr):
+        self.debug("In read_MemUsage()")
+        attr.set_value(self.getMemUsage())
+        
+    def read_LastUpdate(self, attr):
+        self.debug("In read_LastUpdate()")
+        attr.set_value(self.last_update)
         
     ##@}
     
     ##@name Device management methods
     #@{
     
-    def init_my_Logger(self,name = None, use_tango = False):
+    def init_logger(self,name = None, use_tango = False):
         """ 
         A default initialization for the Logger class 
         
@@ -178,10 +213,14 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
             self.debug= lambda s: sys.stdout.write('DEBUG:\t%s\n'%s)            
             pass
         #if init_fun is not None: self.init_fun()
+        
+    init_my_Logger = init_logger #For backwards compatibility
     
-    def check_Properties(self,props_list):
+    def check_properties(self,props_list):
         """ It verifies that all properties has been initialized """
-        return all([getattr(self,p,None) for p in props_list])        
+        return all([getattr(self,p,None) for p in props_list])
+      
+    check_Properties = check_properties #For backwards compatibility
     
     def get_device_properties(self,myclass):
         self.info('In Dev4Tango.get_device_properties(%s) ...' % str(myclass))

@@ -529,7 +529,7 @@ def isSequence(seq,INCLUDE_GENERATORS = True):
     elif hasattr(seq,'__len__'): 
         return True
     return False
-    
+  
 def isDictionary(seq):
     """ It includes dicts and also nested lists """
     if isinstance(seq,dict): return True
@@ -551,6 +551,18 @@ def isNested(seq,strict=False):
     if not strict and isIterable(child): return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
+  
+def shape(seq):
+    """
+    Returns the N dimensions of a python sequence
+    """
+    if not isSequence(seq):
+      return []
+    else:
+      d = [len(seq)]
+    if isNested(seq):
+      d.extend(shape(seq[0]))
+    return d
     
 def isBool(seq,is_zero=True):
     codes = ['true','yes','false','no']
@@ -643,6 +655,22 @@ def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
     if filename:
         json.dump(result,open(filename,'w'),encoding=encoding)
     return result if not filename else filename
+  
+def unicode2str(obj):
+    """
+    Converts an unpacked unicode object (json) to 
+    nested python primitives (map,list,str)
+    """
+    if isMapping(obj):
+        n = dict(unicode2python(t) for t in obj.items())
+    elif isSequence(obj):
+        n = list(unicode2python(t) for t in obj)
+    elif isString(obj):
+        n = str(obj)
+    else:
+        n = obj
+    return n    
+    
     
 def toList(val,default=[],check=isSequence):
     if val is None: 
@@ -657,7 +685,8 @@ def toList(val,default=[],check=isSequence):
         return val
 toSequence = toList
 
-def toString(val):
+def toString(*val):
+    if len(val)==1: val = val[0]
     if hasattr(val,'text'):
         try: return val.text()
         except: return val.text(0)
@@ -799,7 +828,7 @@ def time2date(epoch=None):
 
 def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
     if epoch is None: epoch = now() 
-    elif epoch<0: epoch = now()-epoch
+    elif epoch<0: epoch = now()+epoch
     return time.strftime(cad,time2tuple(epoch))
 epoch2str = time2str
     

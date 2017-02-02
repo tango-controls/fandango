@@ -78,28 +78,33 @@ def get_filtered_devs(filters):
     return
 
 def add_properties_to_csv(out_csv,counter,server,klass,device,properties):        
-    all_values = sum(len(v) for v in properties.values())
-    if out_csv.size()[0]<(counter+all_values): 
-        out_csv.resize(1+counter+all_values,out_csv.ncols)            
-    out_csv.set(counter,0,server)
-    out_csv.set(counter,1,klass)
-    out_csv.set(counter,2,device)
-    for prop,values in properties.items():
-        if prop in (
-          '__SubDevices','polled_attr','polled_cmd',
-          'doc_url','ProjectTitle','cvs_location','Description','InheritedFrom'): continue
-        print '%s.%s = %s' % (device,prop,values)
-        out_csv.set(counter,3,prop)
-        for value in values:
-            out_csv.set(counter,4,value)
-            print 'Added at %d: %s,%s,%s,%s' % (counter,server,device,prop,value)
-            counter += 1         
-    return counter
+    try:
+        all_values = sum(len(v) for v in properties.values())
+        if out_csv.size()[0]<(counter+all_values): 
+            out_csv.resize(1+counter+all_values,out_csv.ncols)            
+        out_csv.set(counter,0,server)
+        out_csv.set(counter,1,klass)
+        out_csv.set(counter,2,device)
+        for prop,values in properties.items():
+            if prop in (
+            '__SubDevices','polled_attr','polled_cmd',
+            'doc_url','ProjectTitle','cvs_location','Description','InheritedFrom'): continue
+            print '%s.%s = %s' % (device,prop,values)
+            out_csv.set(counter,3,prop)
+            for value in values:
+                out_csv.set(counter,4,value)
+                print 'Added at %d: %s,%s,%s,%s' % (counter,server,device,prop,value)
+                counter += 1         
+        return counter
+    except Exception,e:
+        print('add_properties_to_csv(%s,%s,%s,%s): failed!: %s'%(
+            counter,server,klass,device,traceback.format_exc))
     
 if __name__ == '__main__':
     try:
         print sys.argv
         filters = sys.argv[1:-1]
+        print filters
         if not filters:
             print __usage__ #'Syntax is ./tango2csv filter1 [more filters] destination.csv'
             exit()

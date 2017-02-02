@@ -887,7 +887,7 @@ class CSVArray(object):
                     if i<self.xoffset: 
                         self.xoffset-=1
                 i=i+1
-            if self.trace: print 'Header line is %d: %s' % (len(rows[self.header]),rows[self.header])
+            if self.trace: print 'Header line is %d: %s' % (len(rows[header]),rows[header])
             ncols = max(len(row) for row in rows) if rows else 0
             for i in range(len(rows)):
                 while len(rows[i])<ncols:
@@ -1036,25 +1036,29 @@ class CSVArray(object):
         """
         def set(self,x,y,val):
         """
-        if self.trace: print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
-        val = val if type(val) in [int,long,float] else (val or '')
-        if x is None or x<0:
-           #Setting a column
-           if len(val)>self.nrows or len(val)<0: 
-               raise Exception('CSVArray.set(column) ... wrong size of column')
-           for i,v in enumerate(val):
-               self.cols[y][i]=v
-               self.rows[i][y]=v;
-        elif y is None or y<0:
-            #Setting an entire row
-            if len(val)>self.ncols or len(val)<0: 
-                raise Exception('CSVArray.set(row) ... wrong size of row')           
+        try:
+          if self.trace: print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
+          val = val if type(val) in [int,long,float] else (val or '')
+          if x is None or x<0:
+            #Setting a column
+            if len(val)>self.nrows or len(val)<0: 
+                raise Exception('CSVArray.set(column) ... wrong size of column')
             for i,v in enumerate(val):
-               self.rows[x][i]=v
-               self.cols[i][x]=v;             
-        else:
-            self.rows[self.xoffset+int(x)][self.yoffset+int(y)]=val
-            self.cols[self.yoffset+int(y)][self.xoffset+int(x)]=val
+                self.cols[y][i]=v
+                self.rows[i][y]=v;
+          elif y is None or y<0:
+              #Setting an entire row
+              if len(val)>self.ncols or len(val)<0: 
+                  raise Exception('CSVArray.set(row) ... wrong size of row')           
+              for i,v in enumerate(val):
+                self.rows[x][i]=v
+                self.cols[i][x]=v;             
+          else:
+              self.rows[self.xoffset+int(x)][self.yoffset+int(y)]=val
+              self.cols[self.yoffset+int(y)][self.xoffset+int(x)]=val
+        except Exception,e:
+          print('CSVArray.set(%s,%s,%s) failed!'%(x,y,type(val)))
+          raise e
     
     def setRow(self,x,val):
         self.set(x,None,val)
@@ -1105,10 +1109,12 @@ class CSVArray(object):
 
     #@Catched
     def expandAll(self):
-        for c in range(self.ncols): self.fill(y=c)
+        for c in range(self.ncols): 
+          if self.trace: print('CSVArray.expandAll(c=%s)'%c)
+          self.fill(y=c)
         return self
         
-    def getAsTree(self,root=0,xsubset=[],lastbranch=None):
+    def getAsTree(self,root=0,xsubset=[],lastbranch=None,expand=False):
         """
         This method returns the content of the array as recursive dicts
         It will produce the right output only if the array has been filled before!
@@ -1120,23 +1126,21 @@ class CSVArray(object):
             for each key, get the distinct keys in the next column matching lines
                 for each key, get the distinct keys in the next column matching lines       
         """
-        if lastbranch is None: lastbranch=self.ncols
+        if lastbranch is None: lastbranch=self.ncols-1
         elif type(lastbranch) is str: lastbranch=self.colByHead(lastbranch)
-            
+        if expand: self.expandAll()
+        
         klines=self.get(y=root,distinct=True,xsubset=xsubset)
-        if len(klines)==1 and root>lastbranch: #Return resting columns in a single line
+        if len(klines)==1 and root>lastbranch: #Return last columns as a list
             return self.get(x=klines.values()[0][0],ysubset=range(root,self.ncols))
-        elif root+1>=self.ncols: #Last column
+        elif root+1>=self.ncols: #Last columns as a dictionary
             return dict.fromkeys(klines.keys(),{})
         else:
             tree={}
             for k in klines.keys():
-                #if not k:  #!DEPRECATED AS WE WERE LOOSING INFORMATION IF A CELL IS EMPTY!
-                    #print 'WARNING! %s has not been properly filled' % k
-                    #continue
                 tree[k]=self.getAsTree(root=root+1,xsubset=klines[k],lastbranch=lastbranch)
             return tree
-            
+        
     def updateFromTree(self,tree):
         """
         This method takes a dictionary of type {level0:{level1:{level2:{}}}}

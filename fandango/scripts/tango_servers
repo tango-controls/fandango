@@ -9,8 +9,8 @@ tango_servers
 
 This script uses fandango.servers.ServersDict class to start/stop devices on any point of the control system using Tango Starters.
 
-  tango_servers.py [host] start|stop|restart|status [server_name_expression_list]
-
+  tango_servers [host] start|stop|kill|restart|status [server_name_expression_list]
+  
 Examples:
 
   tango_servers.py status              # Will display status of devices in localhost
@@ -22,7 +22,7 @@ NOTE: ctds and tango_admin scripts provide similar functionality
 """
 
 def main():
-  actions = 'start stop restart status'.split()
+  actions = 'start stop kill restart status'.split()
 
   try:
       assert 'help' not in sys.argv[1]
@@ -63,6 +63,9 @@ def main():
       matched = [s for s in astor] # if not targets or fandango.clmatch(targets[0],s)]
       running = [s for s,st in sts.items() if st is not None]
       
+      if action in ('kill',):
+          print('Killing : %s'%matched)
+          astor.kill_servers(matched)
       if action in ('stop','restart'):
           print('Stopping : %s'%running)
           astor.stop_servers(running)
