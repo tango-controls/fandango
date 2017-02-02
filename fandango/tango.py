@@ -582,7 +582,12 @@ def property_undo(dev,prop,epoch):
 def get_property_history(dev,prop):
     db = get_database()
     his = db.get_device_property_history(dev,prop)
-    return [(str2time(h.get_date()),h.get_value()) for h in his]    
+    return [(str2time(h.get_date()),h.get_value()) for h in his]
+  
+def get_server_property(name,instance,prop):
+    name = clsub("(dserver/|.py)","",name)
+    return get_device_property('dserver/'+name+'/'+instance,prop)
+    
 
 ###############################################################################
 # Property extensions
