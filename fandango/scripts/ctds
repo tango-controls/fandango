@@ -5,6 +5,10 @@ import sys
 import time
 import traceback
 
+print """
+DEPRECATED: This script has been replaced by tango_servers
+"""
+
 COMMANDS = 'list search status start stop restart create export put'.split()
 __doc__ = USAGE = 'USAGE: ctds <list|search|status|start|stop|restart|create|export|put> [servers....]'
 
