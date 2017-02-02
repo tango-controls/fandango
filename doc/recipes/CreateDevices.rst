@@ -1,11 +1,18 @@
 Create and launch new devices
 =============================
 
+.. contents::
+
 Import fandango
 ---------------
 
 .. code-block:: python
 
+  # git clone https://github.com/tango-controls/fandango
+  # cd fandango
+  # python setup.py install     
+  #or export PYTHONPATH=$(pwd):$PYTHONPATH 
+  
   import fandango.tango as tango
   import fandango as fn
 
@@ -37,4 +44,16 @@ Crosscheck devices
     ('pyattributeprocessor/sr_ct_calc', PyTango._PyTango.DevState.ON)
 
 
+Move devices between servers
+----------------------------
 
+.. code-block:: python
+
+  import fandango as fn
+  oldserver = 'Pool/1'
+  newserver = 'Pool/2'
+  sd = fn.ServersDict(oldserver)
+  for c in sd.get_all_classes():
+    devs = sd.get_class_devs(c)
+    for d in devs:
+      fn.tango.add_new_device(newserver,c,d) 

@@ -11,6 +11,13 @@ Introduction
 
 The fandango library provides Dynamic Tango Device Classes through the fandango.dynamic module and the DynamicDS class.
 
+DynamicDS device formulas are declared using four properties:
+
+ - DynamicAttributes
+ - DynamicCommands
+ - DynamicStates
+ - DynamicQualities
+
 What DynamicAttributes / DynamicDS allow
 ----------------------------------------
 
@@ -224,6 +231,79 @@ Where $ will be equivalent to the expression returned by (*)
 
 ----
 
+Directives and Keywords
+=======================
+ 
+All DynamicDS formulas accept special directives, functions and keywords
+
+Special directives
+------------------
+
+**@COPY:a/dev/name** : It COPIES! your DynamicAttributes from another dynamic device (e.g., for all power supplies you just have one as template and all the rest pointing to the first one, update one and you update all).
+        
+**@FILE:filename.txt** : It reads the attributes/states/commands from a file instead of properties; for templating hundreds of devices w/out having to go one by one in Jive.
+
+Functions in Dynamic Properties
+-------------------------------
+
+**DYN/SCALAR/SPECTRUM/IMAGE** : for creating typed attributes ( Attr=SPECTRUM(float,...) instead of Attr=DevVarDoubleArray(...) ) ; the main advantage is that it allows compact syntax and having Images as DynamicAttributes.
+
+**ATTR('attribute')** : Read tango attribute (internal)
+
+**XATTR('a/tango/dev/attribute')** : Read tango attribute (external)
+
+**WATTR('a/tango/dev/attribute',$VALUE)** : Write tango attribute
+
+**COMM('a/tango/dev/command',$ARGS?)** : Execute Tango command
+
+**XDEV('a/tango/dev')** : Create a DeviceProxy
+
+**VAR('name',v?,default?,WRITE=bool?)** : instantiate a new variable. If WRITE is True it will 
+convert the whole formula into a writable attribute.
+
+**VARS** : Access to variables dict.
+
+**GET/SET** : helpers to VAR(name) or VAR(name,value)
+
+**PROPERTY/WPROPERTY** : helpers to read/write properties.
+
+**EVAL** : evaluate a DynamicDS formula
+
+**MATCH(regexp,str)** : careless regexp matching
+
+**FILE** : open a file
+
+**time2str/ctime2time** : Time conversions
+
+Keywords updated at every call
+------------------------------
+
+**now()/t** : get current timestamp / get seconds since device start
+
+**WRITE/READ** : True if doing a WRITE attribute access, False when reading
+
+**LOCALS** : local python namespace dictionary
+
+**XATTRS** : all instantiated attributes
+
+**ATTRIBUTES** : all dynamic attributes
+
+**STATE** : current state
+
+**NAME** : current device name
+
+**ATTRIBUTE** : current attribute being evaluated
+
+**VALUE** : Value passed to write_attribute as argument 
+
+**ARGS** : Array passed to command as argument
+
+**POLLING(pending)** : Actual Polling period of the Attribute (POLLING=new_value is NOT allowed) 
+
+
+
+----
+
 Examples
 ========
 
@@ -245,6 +325,33 @@ DynamicStates::
 DynamicCommands::
 
   test_command=str(VAR('C',int(ARGS[0])) or VAR('C'))
+
+DynamicCommands
+---------------
+
+Remember that DynamicCommands need a full restart of the server to be created/updated.
+
+Write a command that writes an attribute::
+
+  OpenFrontEnd=   WATTR( 'PLC_CONFIG_STATUS','0000000000100000')
+
+The syntax for typed arguments now replaces ARGS by {SCALAR/SPECTRUM}({int/str/float/bool},ARGS), thus specifying type in Command and Arguments is::
+  
+  SumSomeNumbers = DevDouble(sum(SPECTRUM(float,ARGS))) 
+  #Instead of sum(map(float,ARGS)) which is still available
+
+The old syntax still works (DevVarStringArray always for argin, anything you declare for argout).
+
+DynamicCommands become functions in your attribute calls!!::
+
+  SumAttr = SumSomeNumbers([Attr1,Attr2,Attr3])
+
+DynamicQualities
+----------------
+
+Change quality of an attribute depending on another one::
+
+  (*)_VAL=ATTR_ALARM if ATTR('$_ALRM') else ATTR_VALID
 
 
 Creating a Ramp with a SimulatorDS
@@ -279,35 +386,15 @@ DynamicStates::
   ON=VAR('Init',default=0)
   INIT=[SET(x,v) for x,v in [('Init',1),('SP',0),('R',0),('T1',1),('V0',0),('V1',1),('T0',0)]]
 
+Simulations
+-----------
+
+More examples available in the SimulatorDS documentation: https://github.com/tango-controls/simulatords
+
 ----
 
 Advanced features / Syntax
 ==========================
-
-Meta Variables
---------------
-
-Several variables are available by default in DynamicAttributes and DynamicStates declaration::
-
-    t : seconds passed since device startup 
-
-    READ : Boolean set to True when read_attribute is being executed 
-
-    WRITE : Boolean set to True when write_attribute is being executed 
-
-    VALUE : Value passed to write_attribute as argument 
-
-    STATE : Actual state of the device (although STATE=new_value equals to a set_state() execution) 
-
-    STATUS : Last generated status 
-
-    ATTRIBUTE : Name of the attribute being evaluated 
-
- 
-
-    NAME : The device name 
-
-    POLLING(pending) : Actual Polling period of the Attribute (POLLING=new_value is NOT allowed) 
 
 Variables, Tango Properties and EVAL
 ------------------------------------
