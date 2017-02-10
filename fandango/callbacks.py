@@ -141,9 +141,9 @@ class EventListener(Logger,Object): #Logger,
         Method to implement the event notification
         Source will be an object, type a PyTango EventType, evt_value an AttrValue
         """
-        now = time.time()
-        inc = now - self.last_event_time
-        delay = int(1e3*(now-(ctime2time(value.time) if hasattr(value,'time') else now)))
+        t0 = time.time()
+        inc = t0 - self.last_event_time
+        delay = int(1e3*(t0 - (ctime2time(value.time) if hasattr(value,'time') else t0)))
         
         if getattr(value,'error',False):
             self.warning('%s: eventReceived(%s,ERROR,%s): +%s(+%s ms)'%(self.name,src,value,inc,delay))
@@ -159,28 +159,52 @@ class EventListener(Logger,Object): #Logger,
         if self.event_hook:
             try: self.event_hook(src,type_,value)
             except: self.error(traceback.format_exc())
-        self.last_event_time = now
+        self.last_event_time = t0
     
 class EventThread(Logger,ThreadedObject):
     """
     This class processes both Events and Polling.
     All listeners should implement eventReceived method
     All sources must have a listeners list
-    The filtered argument will just 
+    On Current EventSource implementation this is a SINGLETONE!!!, its configuration
+    will apply for the whole running process!
+    
+
+    The filtered argument will just forward last event received 
+    on each loop iteration for each source. It can be set to False, True or a factor
+    of latency.
+    
+    The latency (ms) specifies a time condition to abort event checking
+    and proceed to callback execution.
+    
+    The real latency of the system is provided by inherited get_delay 
+    and get_avg_delay methods
+    
     """
     MinWait = 0.0001 #Event processing limited to 10KHz maximum (rest are queued)
     EVENT_POLLING_RATIO = 1000 #How many events to process before checking polled attributes
     
-    def __init__(self,period_ms=None,filtered=False,loglevel='WARNING'):
+    def __init__(self,period_ms=None,filtered=False,latency=10.,loglevel='WARNING'):
         self.queue = Queue.Queue()
         self.sources = CaselessDict()
         self.event = threading.Event()
-        self.counters = CaselessDefaultDict(int)
         period = 1e-3*(period_ms or 0) or self.MinWait
-        self.filtered = filtered
         ThreadedObject.__init__(self,target=self.process,period=period)
         Logger.__init__(self,type(self).__name__)
+        self.filtered,self.latency = filtered,latency
         self.setLogLevel(loglevel)
+        
+    def setup(self,period_ms=None,filtered=None,latency=None,loglevel=None):
+        """ 
+        This method allows to reconfigure an already running EventThread 
+        """
+        self.filtered = notNone(filtered,self.filtered)
+        self.latency = notNone(latency,self.latency)
+        if period_ms is not None:
+          period = 1e-3*(period_ms or 0) or self.MinWait
+          self.set_period(period)
+        if loglevel is not None:
+          self.setLogLevel(loglevel)
         
     def set_period_ms(self,period):
         self.set_period(period*1e-3)
@@ -210,6 +234,9 @@ class EventThread(Logger,ThreadedObject):
     
     def get_object(self,source):
         return self.sources.get(source,None) if isString(source) else source
+      
+    def get_pending(self):
+        return queue.qsize()
 
     def process(self):
         """ 
@@ -219,7 +246,9 @@ class EventThread(Logger,ThreadedObject):
         #self.debug('Processing Events')
         WAS_EMPTY = False
         queue = CaselessSortedDict()
-        evs,polls = 0,0
+        t0,evs,polls = now(),0,0
+        filtered = self.filtered >= True
+        
         #First, extract events from the queue
         for i in range(self.EVENT_POLLING_RATIO):
             try:
@@ -233,27 +262,38 @@ class EventThread(Logger,ThreadedObject):
                 source = self.get_object(source)
                 if source not in queue: queue[source] = []
                 queue[source].append((source,args))
+
             except Queue.Empty,e:
                 WAS_EMPTY = True
                 break
+
             except Exception,e:
                 #The queue is empty, long period attributes can be processed
                 if 'empty' not in str(e).lower():
                     self.error(traceback.format_exc())
                 break
+              
+            # Enable filtering if the performance is compromisesd
+            if (False < self.filtered < True) and (
+                  (time.time()-t0)>(self.filtered * 1e-3*self.latency) or 
+                  self.queue.qsize() < self.EVENT_TO_POLLING_RATIO):
+                filtered = True
+
+            if now()>(t0+1e-3*self.latency):
+                break 
         
         #Execute the events for each source
         #Sequential execution of events received is relatively guaranteed
         for s,events in sorted(queue.items()):
             #@TODO: Event Filters should be implemented here 
             #including removal of PERIODIC events if a change event is already in queue
-            if self.filtered:
+            if filtered:
                 events = events[-1:]
             while events:
                 try:
                     e = events.pop(0)
                     source,args = e
-                    source.last_read_time = time.time()
+                    source.last_read_time = now()
                     self.fireEvent(source,*args)
                     self.wait(0)                
                 except:
@@ -262,7 +302,7 @@ class EventThread(Logger,ThreadedObject):
         self.wait(0) #breathing
        
         ## print('Executing pollings')
-        now = time.time()
+        t0 = now()
         pollings = []
         for s in self.sources.values():
             s.checkEvents(tdiff=2e-3*s.polling_period)
@@ -272,15 +312,14 @@ class EventThread(Logger,ThreadedObject):
                     pollings.append((nxt,s))
             
         for nxt,source in reversed(sorted(pollings)):
-            if now > nxt and (s.isPollingEnabled() or WAS_EMPTY):
+            if t0 > nxt and (s.isPollingEnabled() or WAS_EMPTY):
                 try:
-                  t0 = time.time()
                   source.poll()
                   polls+=1
                 except:
                   traceback.print_exc()
                   if WAS_EMPTY: break
-                source.last_read_time = now
+                source.last_read_time = now()
                 
         ## print('Check pending HW asynch requests')
         asynch_hw = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
@@ -289,7 +328,7 @@ class EventThread(Logger,ThreadedObject):
               source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
             except Exception,e:
               traceback.print_exc()
-            source.last_read_time = now #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
+            source.last_read_time = now() #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
             break
           
         self.wait(0)
@@ -427,8 +466,8 @@ class EventSource(SingletonMap,Logger):
         self.last_error = None
         self.last_read_time = 0
         self.pending_request = None
-        self.counters = defaultdict(int)
-        self.counters['start'] = now()
+        self.stats = defaultdict(int)
+        self.stats['start'] = now()
         EventSource.INSTANCES.append(weakref.ref(self))
                           
         if self.forced:
@@ -452,12 +491,22 @@ class EventSource(SingletonMap,Logger):
           self.deactivatePolling()
         if self.checkState('SUBSCRIBED','PENDING'):
           self.unsubscribeEvents()
+          
+    def resetStats(self):
+        t0 = now()
+        self.stats = defaultdict(int)
+        self.stats['start'] = t0
+        return t0
         
     @staticmethod
     def thread():
+        """
+        It returns the current EventThread INSTANCE
+        Use EventSource.thread().setup(...) to configure it
+        """
         if EventSource.QUEUE is None:
             EventSource.QUEUE = EventThread()
-        return EventSource.QUEUE         
+        return EventSource.QUEUE
     
     @staticmethod
     def start_thread():
@@ -499,7 +548,7 @@ class EventSource(SingletonMap,Logger):
         return self.checkState('SUBSCRIBED')
          
     def enablePolling(self,force=False):
-        if force: self.activatePolling(force)
+        if force: self.activatePolling(force = force)
         
     def forcePolling(self, period = None):
         self.activatePolling(period,force=True)
@@ -510,12 +559,14 @@ class EventSource(SingletonMap,Logger):
     def isPollingEnabled(self):
         return self.isPollingActive()
 
-    def activatePolling(self,period = None, force = False):
+    def activatePolling(self,period = None, force = None):
         #self.factory().addAttributeToPolling(self, self.getPollingPeriod())      
-        self.polling_period = period or self.polling_period
+        self.polling_period = notNone(period,self.polling_period)
         self.polled = True
         self.info('activatePolling(%s,%s)'%(self.full_name,self.polling_period))
-        self.forced = force
+        self.resetStats()
+        self.forced = notNone(force,self.forced)
+        self.thread().register(self)
         self.start_thread()
 
     def deactivatePolling(self):
@@ -612,7 +663,7 @@ class EventSource(SingletonMap,Logger):
         poll() events will be allowed to pass through
         """
         self.debug('fireEvent(%s), %d events in queue'%(event_type,self.thread().queue.qsize()))
-        self.counters['fired']+=1
+        self.stats['fired']+=1
         listeners = listeners or self.listeners
 
         for l in listeners:
@@ -631,6 +682,12 @@ class EventSource(SingletonMap,Logger):
                     l(self, event_type, event_value)
             except:
                 traceback.print_exc()
+        try:
+            vtime = ctime2time(getattr(event_value,'time',None))
+            self.stats['acc_latency'] += now()-vtime
+            self.stats['latency'] = self.stats['acc_latency']/self.stats['fired']
+        except: pass
+            
                 
     # TANGO RELATED METHODS
     
@@ -644,9 +701,8 @@ class EventSource(SingletonMap,Logger):
         return True                
     
     def subscribeEvents(self,types=None,asynchronous=True):
-        t0 = now()
-        self.counters = defaultdict(int)
-        self.counters['start'] = t0
+
+        t0 = self.resetStats()
         
         types = toList(types) if types else []
         if not isIterable(self.use_events): self.use_events = []
@@ -689,6 +745,9 @@ class EventSource(SingletonMap,Logger):
           self.error('subscribeEvents(): \n'+traceback.format_exc())
         finally:
           pass #self.start_thread() #DONT DO THIS WITHIN THE LOOP HOOK!
+        
+        self.thread().register(self)
+        self.start_thread()
         return True
 
     def checkEvents(self,tdiff=None,vdiff=None):
@@ -756,12 +815,12 @@ class EventSource(SingletonMap,Logger):
       
     def write(self, value, with_read=True):
         self.debug('write(...)')
-        self.counters['write']+=1
+        self.stats['write']+=1
         self.proxy.write_attribute(self.simple_name,value)
         if with_read:
             return self.read(cache=False)
 
-    def read(self, cache=True,asynch=None):
+    def read(self, cache=None,asynch=None):
         """ 
         Read last value acquired, 
         if cache = False or not polled it will trigger
@@ -771,15 +830,18 @@ class EventSource(SingletonMap,Logger):
         """
         self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
         asynch = notNone(asynch,self.tango_asynch)
-        now = time.time()
+        t0 = now()
         
         # If it was just updated, return cache
-        vtime = ctime2time(getattr(self.attr_value,'time',None))
-        if self.fake or (now > (1e-3*self.keep_time + vtime)):
-            cache = True
-        # If not polled, force HW reading
-        elif not any((self.isPollingEnabled(),self.isUsingEvents())):
-            cache = False
+        if cache is None:
+          vtime = ctime2time(getattr(self.attr_value,'time',None))
+          if self.fake or (t0 < (vtime + self.keep_time*1e-3)):
+              cache = True
+          # If not polled, force HW reading
+          elif not any((self.isPollingEnabled(),self.isUsingEvents())):
+              cache = False
+          else:
+              cache = True
 
         if cache:
             self.asynch_hook() # Check for pending asynchronous results
@@ -788,7 +850,7 @@ class EventSource(SingletonMap,Logger):
             elif not self.checkState('UNSUBSCRIBED'):
                 self.info('Attribute first reading (subscribed but no events received yet)')
         
-        self.counters['read']+=1
+        self.stats['read']+=1
         self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.tango_asynch,self.pending_request))
 
         try:
@@ -797,7 +859,7 @@ class EventSource(SingletonMap,Logger):
                 if self.pending_request is not None:
                     self.attr_value = notNone(self.asynch_hook(),self.attr_value)
                 else:
-                    self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),time.time()
+                    self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),now()
                     self.attr_value = notNone(self.asynch_hook(),self.attr_value)
             else:
                 self.attr_value = self.proxy.read_attribute(self.simple_name)
@@ -806,7 +868,7 @@ class EventSource(SingletonMap,Logger):
             traceback.print_exc()
             self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
             
-        self.last_read_time = now
+        self.last_read_time = t0
         self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
             
         return self.attr_value
@@ -840,12 +902,12 @@ class EventSource(SingletonMap,Logger):
         except: return v
 
     def poll(self):
-        now = time.time()
-        self.debug('poll(+%s): %s'%(now-self.last_read_time,self.counters['poll']))
-        self.counters['poll']+=1
+        t0 = now()
+        self.debug('poll(+%s): %s'%(t0-self.last_read_time,self.stats['poll']))
+        self.stats['poll']+=1
         if self.checkState('SUBSCRIBING'):
             ## While subscribing, polling is ignored and resumed on SUBSCRIBED/PENDING state
-            self.thread().lasts[self.full_name] = self.last_read_time = now
+            self.thread().lasts[self.full_name] = self.last_read_time = t0
             return
         try:
             prev = self.attr_value and self.attr_value.value
@@ -860,7 +922,7 @@ class EventSource(SingletonMap,Logger):
             #self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
             
         ##FIRE EVENT IS ALREADY DONE IN read() METHOD!
-        #self.last_read_time = now
+        #self.last_read_time = t0
         #self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
     
     def push_event(self,event):
@@ -868,16 +930,16 @@ class EventSource(SingletonMap,Logger):
             REG_FAILED = 'API_DSFailedRegisteringEvent'
             NOT_READY = 'API_AttributeNotDataReadyEnabled'
             NOT_PROPS = 'API_EventPropertiesNotSet'
-            self.counters['total_events']+=1
-            now = time.time()
+            self.stats['total_events']+=1
+            t0 = now()
             type_ = event.event
-            self.counters[type_]+=1
+            self.stats[type_]+=1
             
             et = ctime2time(event.reception_date)
             if et<1e9: 
               if not event.err: 
                 self.warning('%s event time is 0!'%type_)
-              et = now
+              et = t0
             self.debug('push_event(%s,err=%s,has_events=%s)'%(type_,event.err,self.isUsingEvents()))
             if event.err:
                 self.last_error = event
@@ -927,7 +989,7 @@ class EventSource(SingletonMap,Logger):
                 self.info('push_event(): Event received, deactivating polling')
                 self.deactivatePolling()
 
-            delay = now-self.last_event_time
+            delay = t0-self.last_event_time
             if delay > 1e3 : self.warning('push_event was %f seconds late'%delay)
             self.last_event[type_] = event
             #Instead of firingEvent, I return and pass the value to the queue
