@@ -49,7 +49,7 @@ from functional import *
 from dicts import *
 from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
 from tango import get_full_name,get_attribute_events
-from threads import ThreadedObject,Queue,timed_range,wait
+from threads import ThreadedObject,Queue,timed_range,wait,threading
 from log import Logger,printf
 
 """
@@ -312,7 +312,7 @@ class EventThread(Logger,ThreadedObject):
                     pollings.append((nxt,s))
             
         for nxt,source in reversed(sorted(pollings)):
-            if t0 > nxt and (s.isPollingEnabled() or WAS_EMPTY):
+            if t0 > nxt and (s.isPollingActive() or WAS_EMPTY):
                 try:
                   source.poll()
                   polls+=1
@@ -366,6 +366,9 @@ class EventSource(SingletonMap,Logger):
     
     Slow Polling will be always enabled, as a KeepAlive is always kept reading
     the attribute values at an slow rate.
+    
+    Well, will be always enabled as long there are Listeners or Forced is True. If not polling
+    will not be activated and it will be simply a CachedAttributeProxy.
     
     In this implementation, just a faster polling will be enabled if the 
     attribute provides no events. But the slow polling will never be fully disabled.
@@ -461,6 +464,7 @@ class EventSource(SingletonMap,Logger):
         if self.use_events is True: self.use_events = self.DEFAULT_EVENTS
 
         self.attr_value = None
+        self.event_lock = threading.Lock()
         self.last_event = dict()
         self.last_event_time = 0
         self.last_error = None
@@ -557,7 +561,8 @@ class EventSource(SingletonMap,Logger):
         self.deactivatePolling() # DON'T STOP THREADS HERE!
 
     def isPollingEnabled(self):
-        return self.isPollingActive()
+        """ It should be called isPollingAllowed instead """
+        return self.polled
 
     def activatePolling(self,period = None, force = None):
         #self.factory().addAttributeToPolling(self, self.getPollingPeriod())      
@@ -567,7 +572,6 @@ class EventSource(SingletonMap,Logger):
         self.resetStats()
         self.forced = notNone(force,self.forced)
         self.thread().register(self)
-        self.start_thread()
 
     def deactivatePolling(self):
         #self.factory().removeAttributeFromPolling(self)
@@ -576,7 +580,7 @@ class EventSource(SingletonMap,Logger):
         self.forced = False
 
     def isPollingActive(self):
-        return self.polled
+        return self.polled or self.forced
 
     def isPollingForced(self):
         return self.forced
@@ -701,53 +705,60 @@ class EventSource(SingletonMap,Logger):
         return True                
     
     def subscribeEvents(self,types=None,asynchronous=True):
-
-        t0 = self.resetStats()
-        
-        types = toList(types) if types else []
-        if not isIterable(self.use_events): self.use_events = []
-        self.use_events = sorted(set((self.use_events+types) or self.DEFAULT_EVENTS))
-
-        if self.isUsingEvents() and self.checkEventsReceived(self.use_events):
-            self.warning('AlreadySubscribed!')
-            return False
-          
-        self.info('subscribeEvents(%s,asynch=%s)'%(self.use_events,asynchronous))
-
-        if asynchronous:
-            # Subscription to be done by checkEvents()
-            #if self.checkState('SUBSCRIBING','PENDING'):
-            self.setState('UNSUBSCRIBED')
-            return True
-        
-        self.last_event_time = now()
-        ##self.thread().stop() #DONT DO THIS WITHIN THE LOOP HOOK!
-
         try:
-          for k,type_ in EventType.names.items():
-            if any(clmatch(e,k) for e in self.use_events):
-              try:
-                  if self.event_ids.get(type_) is not None:
-                      self.debug('event %s already subscribed'%type_)
-                  else:
-                    self.info('SUBSCRIBING to %s events'%type_)                      
-                    self.event_ids[type_] = self.proxy.subscribe_event(
-                        self.simple_name,type_,self,[],True)
-                    if not self.isUsingEvents():
-                        self.setState('SUBSCRIBING')
-              except:
-                  self.debug('event %s not subscribed'%type_)
+          self.event_lock.acquire()
+          t0 = self.resetStats()
+          
+          types = toList(types) if types else []
+          if not isIterable(self.use_events): self.use_events = []
+          self.use_events = sorted(set((self.use_events+types) or self.DEFAULT_EVENTS))
 
-          ## State will be kept in SUBSCRIBING until an event is received
-          ## If nothing arrives after N seconds, polling will be activated
-          self.info('subscribeEvents() took %.2f seconds'%(now()-t0))
+          if self.isUsingEvents() and self.checkEventsReceived(self.use_events):
+              self.warning('AlreadySubscribed!')
+              return False
+            
+          self.info('subscribeEvents(%s,asynch=%s)'%(self.use_events,asynchronous))
+
+          if asynchronous:
+              # Subscription to be done by checkEvents()
+              #if self.checkState('SUBSCRIBING','PENDING'):
+              self.setState('UNSUBSCRIBED')
+
+          else:
+              self.last_event_time = now()
+              ##self.thread().stop() #DONT DO THIS WITHIN THE LOOP HOOK!
+
+              try:
+                for k,type_ in EventType.names.items():
+                  if any(clmatch(e,k) for e in self.use_events):
+                    try:
+                        if self.event_ids.get(type_) is not None:
+                            self.debug('event %s already subscribed'%type_)
+                        else:
+                          self.info('SUBSCRIBING to %s events'%type_)                      
+                          self.event_ids[type_] = self.proxy.subscribe_event(
+                              self.simple_name,type_,self,[],True)
+                          if not self.isUsingEvents():
+                              self.setState('SUBSCRIBING')
+                    except:
+                        self.debug('event %s not subscribed'%type_)
+
+                ## State will be kept in SUBSCRIBING until an event is received
+                ## If nothing arrives after N seconds, polling will be activated
+                self.info('subscribeEvents() took %.2f seconds'%(now()-t0))
+              except:
+                self.error('subscribeEvents(): \n'+traceback.format_exc())
+              finally:
+                pass 
+          
+          #self.start_thread() #DONT DO THIS WITHIN THE LOOP HOOK!
+          self.thread().register(self)
+
         except:
           self.error('subscribeEvents(): \n'+traceback.format_exc())
         finally:
-          pass #self.start_thread() #DONT DO THIS WITHIN THE LOOP HOOK!
-        
-        self.thread().register(self)
-        self.start_thread()
+          self.event_lock.release()
+
         return True
 
     def checkEvents(self,tdiff=None,vdiff=None):
@@ -782,9 +793,11 @@ class EventSource(SingletonMap,Logger):
             if self.polled and not self.forced:
                 self.info('checkEvents(): no clients, stop polling')
                 self.deactivatePolling()
-            if self.isUsingEvents():
-                self.info('checkEvents(): no clients, disabling events')
-                self.unsubscribeEvents()
+            
+            # Do not unsubscribe events if not called explicitly
+            #if self.isUsingEvents():
+                #self.info('checkEvents(): no clients, disabling events')
+                #self.unsubscribeEvents()
 
         return r
                 
@@ -838,7 +851,7 @@ class EventSource(SingletonMap,Logger):
           if self.fake or (t0 < (vtime + self.keep_time*1e-3)):
               cache = True
           # If not polled, force HW reading
-          elif not any((self.isPollingEnabled(),self.isUsingEvents())):
+          elif not self.getMode():
               cache = False
           else:
               cache = True
@@ -943,7 +956,7 @@ class EventSource(SingletonMap,Logger):
             self.debug('push_event(%s,err=%s,has_events=%s)'%(type_,event.err,self.isUsingEvents()))
             if event.err:
                 self.last_error = event
-                has_evs,is_polled = self.isUsingEvents(),self.isPollingEnabled()
+                has_evs,is_polled = self.isUsingEvents(),self.isPollingActive()
                 value = event.errors[0]
                 reason = event.errors[0].reason
                 self.info('push_event(%s,err=%s,has_events=%s,polled=%s)'%(type_,reason,has_evs,is_polled))
@@ -1286,7 +1299,9 @@ def addReceiver(attribute,receiver):
     return
 
 def subscribeDeviceAttributes(self,dev_name,attrs):
-    """ This is how attributes were registered in the old PyStateComposer """
+    """ 
+    This is how attributes were registered in the old PyStateComposer 
+    """
     dev = PyTango.DeviceProxy(dev_name)
     dev.ping()                                
     # Initializing lists
