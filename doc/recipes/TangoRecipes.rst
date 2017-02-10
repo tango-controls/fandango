@@ -13,7 +13,7 @@ The fandango api provides helper commands to create devices and assign propertie
 
 .. code:: python
 
-import fandango as fn
+  import fandango as fn
   fn.tango.add_new_device('Server/Instance','Class','your/device/name')
   fn.tango.put_device_property('your/device/name','Property','Value')
 
@@ -60,8 +60,8 @@ Obtain all information from a device
 
 .. code:: python
 
-In [59]:fandango.tango.get_device_info('sr/vc/gll')
-Out[59]:fandango.Struct({
+  In [59]:fandango.tango.get_device_info('sr/vc/gll')
+  Out[59]:fandango.Struct({
         'name': sr/vc/gll,
         'level': 4,
         'started': 11th February 2013 at 13:07:37,
@@ -93,7 +93,7 @@ Use TangoEval to evaluate strings containing Tango Attributes
 TangoEval class provides PyAlarm-like evaluation of strings containing attribute names (replacing them by its values). It is part of fandango.device module.
 The result of each evaluation is stored in te.result.
 
-.. code::python
+.. code:: python
 
   from fandango import TangoEval
   te = TangoEval('(s01/vc/gauge-01/pressure + s01/vc/gauge-01/pressure) / 2.')
@@ -253,7 +253,7 @@ Available interfaces are:
     
 Available operators are:
 
-::
+.. code:: python
 
   pgrep = lambda exp: iPiped(lambda input: (x for x in input if inCl(exp,x)))
   pmatch = lambda exp: iPiped(lambda input: (x for x in input if matchCl(exp,str(x))))
