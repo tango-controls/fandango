@@ -576,13 +576,21 @@ class EventSource(SingletonMap,Logger):
         return True
 
     def removeListener(self, listener):
+        """
+        Remove a listener object or callback.
+        :listener: can be object, weakref, sequence or '*'
+        """
         if listener == '*':
             self.warning('Removing all listeners')
-            while self.listeners:
-              self.removeListener(self.listeners.keys()[0])
+            listener = self.listeners.keys()
+
+        if isSequence(listener):
+            while listener:
+              self.removeListener(listener.pop())
             return
-        if not isinstance(listener,weakref.ReferenceType):
+        elif not isinstance(listener,weakref.ReferenceType):
             listener = weakref.ref(listener,self._listenerDied)
+            
         try:
             self.listeners.pop(listener)
         except Exception, e:
