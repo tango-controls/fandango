@@ -194,6 +194,7 @@ class ThreadedObject(Object):
   def get_errors(self): return self._errors
   def get_delay(self): return self._delay
   def get_acc_delay(self): return self._acc_delay
+  def get_avg_delay(self): return self._acc_delay/(self._count or 1)
   def get_usage(self): return self._usage
   def get_next(self): return self._next
   def get_last(self): return self._last
