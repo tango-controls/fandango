@@ -122,7 +122,7 @@ class EventListener(Logger,Object): #Logger,
         If source is True or an object, this listener will subscribe for source or parent events.
         If False, then subscription will have to be done using EventSource.addListener(EventListener)
         """
-        self.name, self.parent,self.source = name,parent,source
+        self.name,self.parent,self.source = name,parent,source
         Logger.__init__(self,type(self).__name__+'(%s)'%self.name)
         self.last_event_time = 0
         #self.call__init__(Logger,name=name, parent=parent)
@@ -168,7 +168,7 @@ class EventThread(Logger,ThreadedObject):
     All sources must have a listeners list
     The filtered argument will just 
     """
-    MinWait = 0.1 #Event processing limited to 10KHz maximum (rest are queued)
+    MinWait = 0.0001 #Event processing limited to 10KHz maximum (rest are queued)
     EVENT_POLLING_RATIO = 1000 #How many events to process before checking polled attributes
     
     def __init__(self,period_ms=None,filtered=False,loglevel='WARNING'):
@@ -428,6 +428,7 @@ class EventSource(SingletonMap,Logger):
         self.last_read_time = 0
         self.pending_request = None
         self.counters = defaultdict(int)
+        self.counters['start'] = now()
         EventSource.INSTANCES.append(weakref.ref(self))
                           
         if self.forced:
@@ -569,12 +570,17 @@ class EventSource(SingletonMap,Logger):
         weak = weakref.ref(listener,self._listenerDied)
         if weak not in self.listeners:
           #This line is needed, as listeners may be polling only
-          self.listeners[weak] = []
+          self.listeners[weak] = set()
         for e in use_events:
             self.listeners[weak].add(e)
         return True
 
     def removeListener(self, listener):
+        if listener == '*':
+            self.warning('Removing all listeners')
+            while self.listeners:
+              self.removeListener(self.listeners.keys()[0])
+            return
         if not isinstance(listener,weakref.ReferenceType):
             listener = weakref.ref(listener,self._listenerDied)
         try:
@@ -598,6 +604,7 @@ class EventSource(SingletonMap,Logger):
         poll() events will be allowed to pass through
         """
         self.debug('fireEvent(%s), %d events in queue'%(event_type,self.thread().queue.qsize()))
+        self.counters['fired']+=1
         listeners = listeners or self.listeners
 
         for l in listeners:
@@ -630,6 +637,9 @@ class EventSource(SingletonMap,Logger):
     
     def subscribeEvents(self,types=None,asynchronous=True):
         t0 = now()
+        self.counters = defaultdict(int)
+        self.counters['start'] = t0
+        
         types = toList(types) if types else []
         if not isIterable(self.use_events): self.use_events = []
         self.use_events = sorted(set((self.use_events+types) or self.DEFAULT_EVENTS))
@@ -755,13 +765,13 @@ class EventSource(SingletonMap,Logger):
         asynch = notNone(asynch,self.tango_asynch)
         now = time.time()
         
-        # If not polled, force HW reading
-        if not any((self.isPollingEnabled(),self.isUsingEvents())):
-            cache = False
         # If it was just updated, return cache
-        elif self.fake or (hasattr(self.attr_value,'time') and \
-          1e-3*self.keep_time>(time.time()-ctime2time(self.attr_value.time))):
+        vtime = ctime2time(getattr(self.attr_value,'time',None))
+        if self.fake or (now > (1e-3*self.keep_time + vtime)):
             cache = True
+        # If not polled, force HW reading
+        elif not any((self.isPollingEnabled(),self.isUsingEvents())):
+            cache = False
 
         if cache:
             self.asynch_hook() # Check for pending asynchronous results
