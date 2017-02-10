@@ -882,10 +882,16 @@ def timezone():
 
 #Auxiliary methods:
 def ctime2time(time_struct):
-    return (float(time_struct.tv_sec)+1e-6*float(time_struct.tv_usec))
+    try:
+      return (float(time_struct.tv_sec)+1e-6*float(time_struct.tv_usec))
+    except:
+      return -1
     
 def mysql2time(mysql_time):
-    return time.mktime(mysql_time.timetuple())
+    try:
+      return time.mktime(mysql_time.timetuple())
+    except:
+      return -1
     
 
 ########################################################################
