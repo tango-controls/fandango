@@ -242,7 +242,7 @@ def get_device_info(dev,db=None):
     if ':' in dev:
       model = fandango.Struct(parse_tango_model(dev))
       db = get_database(model.host,model.port)
-      dev = model.device
+      dev = '/'.join(model.device.split('/')[-3:])
     try:
       dd = get_database_device(db=db)
       vals = dd.DbGetDeviceInfo(dev)
