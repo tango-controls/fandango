@@ -1178,11 +1178,15 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
     :param brief: return just .value instead of AttrValue object
     """
     try:
-        #PyTango.AttributeProxy(attr).read()
-        dev,att = attr.lower().rsplit('/',1)
-        assert att in [str(s).lower() for s in PyTango.DeviceProxy(dev).get_attribute_list()]
+        if hasattr(attr,'read'):
+          proxy = attr
+        else:
+          dev,att = attr.lower().rsplit('/',1)
+          assert att in [str(s).lower() for s in PyTango.DeviceProxy(dev).get_attribute_list()]
+          proxy = PyTango.AttributeProxy(attr)
+          
         try: 
-            attvalue = PyTango.AttributeProxy(attr).read()
+            attvalue = proxy.read()
             if readable and attvalue.quality == PyTango.AttrQuality.ATTR_INVALID:
                 return None
             elif timeout and attvalue.time.totime()<(time.time()-timeout):
@@ -1191,7 +1195,7 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 if not brief:
                   return attvalue
                 else:
-                  return getattr(attvalue,'value',None)
+                  return getattr(attvalue,'value',getattr(attvalue,'rvalue',None))
         except Exception,e: 
             if trace: traceback.print_exc()
             return None if readable or brief else e
