@@ -575,9 +575,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     def check_attribute_events(self,aname,poll=False):
         self.UseEvents = [u.lower().strip() for u in self.UseEvents]
-        self.info('check_attribute_events(%s,%s,%s)'%(aname,poll,self.UseEvents))
+        self.debug('check_attribute_events(%s,%s,%s)'%(aname,poll,self.UseEvents))
         if not len(self.UseEvents): return False
-        elif self.UseEvents[0] in ('','no','false'): return False
+        elif self.UseEvents[0].lower().strip() in ('','no','false'): return False
         elif aname.lower().strip() == 'state': 
             return True
         elif any(fun.matchCl(s,aname) for s in self.UseEvents): return True #Attrs explicitly set doesn't need event config
@@ -896,8 +896,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.debug('DynamicDS('+self.get_name()+").read_dyn_attr("+aname+")="+text_result+
                     ", ellapsed %1.2e"%(self._eval_times[aname])+" seconds.\n")
                     #", finished at "+time.ctime(now)+"="+str(now)+", timestamp is %s"%str(date)+", difference is "+str(now-date))
+
             if 'debug' in str(self.getLogLevel()) and (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==sorted(self.dyn_values.keys())[-1]):
                 self.attribute_polling_report()
+                
         except Exception, e:           
             now=time.time()
             self.dyn_values[aname].update(e,now,PyTango.AttrQuality.ATTR_INVALID) #Exceptions always kept!
@@ -906,13 +908,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self._read_times[aname]=now-self._hook_epoch #Internal debugging
             self._eval_times[aname]=now-tstart #Internal debugging
             if aname==self.dyn_values.keys()[-1]: self._cycle_start = now
-            #last_exc = getLastException()
-            #last_exc = '\n'.join([str(e)]*4)
             last_exc = str(e)
             self.error('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
             if not isinstance(e,RethrownException): print(traceback.format_exc())
             raise Exception('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
-            #PyTango.Except.throw_exception('DynamicDS_read_dyn_attr_Exception',str(e),last_exc)
     
     ##This hook has been used to force self to be passed always as argument and avoid dynattr missmatching
     if USE_STATIC_METHODS: read_dyn_attr=staticmethod(read_dyn_attr)
