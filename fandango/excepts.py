@@ -218,7 +218,8 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
                   logger.warning(elog)
                 return default
         finally:
-            if verbose: logger.warning('<'*80)
+            #if verbose: logger.warning('<'*80)
+            pass
     
     ##ExceptionWrapper behaves like a decorator
     functools.update_wrapper(wrapper,fun) #it copies all function information to the wrapper
