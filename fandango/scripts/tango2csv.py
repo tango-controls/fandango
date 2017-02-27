@@ -77,28 +77,31 @@ def get_filtered_devs(filters):
         #TODO: unfinished
     return
 
-def add_properties_to_csv(out_csv,counter,server,klass,device,properties):        
+def add_properties_to_csv(out_csv,counter,server,klass,device,properties,exclude=[]):
+    exclude = exclude or ['__SubDevices']
     try:
-        all_values = sum(len(v) for v in properties.values())
+        [properties.pop(e) for e in exclude if e in properties]
+        all_values = sum(len(v) for v in properties.values()) or 1
+        print('add_properties_to_csv(...,%s,%s,[%d],...)'%(counter,device,all_values))
         if out_csv.size()[0]<(counter+all_values): 
-            out_csv.resize(1+counter+all_values,out_csv.ncols)            
+            out_csv.resize(counter+all_values,out_csv.ncols)            
         out_csv.set(counter,0,server)
         out_csv.set(counter,1,klass)
         out_csv.set(counter,2,device)
         for prop,values in properties.items():
-            if prop in (
-            '__SubDevices','polled_attr','polled_cmd',
-            'doc_url','ProjectTitle','cvs_location','Description','InheritedFrom'): continue
+            #if prop in (
+            #'__SubDevices','polled_attr','polled_cmd',
+            #'doc_url','ProjectTitle','cvs_location','Description','InheritedFrom'): continue
             print '%s.%s = %s' % (device,prop,values)
             out_csv.set(counter,3,prop)
             for value in values:
                 out_csv.set(counter,4,value)
                 print 'Added at %d: %s,%s,%s,%s' % (counter,server,device,prop,value)
                 counter += 1         
-        return counter
+        return counter if properties else counter+1
     except Exception,e:
         print('add_properties_to_csv(%s,%s,%s,%s): failed!: %s'%(
-            counter,server,klass,device,traceback.format_exc))
+            counter,server,klass,device,traceback.format_exc()))
     
 if __name__ == '__main__':
     try:
@@ -136,7 +139,8 @@ if __name__ == '__main__':
         out_csv.save() #It is really needed!
         out_csv.resize(len(devices),5)
         [out_csv.set(0,i,['server','class','device','property','value'][i]) for i in range(5)]
-        counter = 1
+        out_csv.setOffset(1)
+        counter = 0
         
         print ('Creating a dict with servers/classes/devices from the database ...')
         servers = ServersDict()
