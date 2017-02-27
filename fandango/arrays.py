@@ -36,6 +36,7 @@
 
 import csv,sys,re,operator,traceback
 import functional as fun
+from fandango.log import printf
 from fandango.dicts import SortedDict
 try: import numpy as np
 except: np = None
@@ -919,9 +920,10 @@ class CSVArray(object):
         
     #@Catched
     def resize(self, x, y):
-        """def resize(self, x(rows), y(columns)):
+        """
         TODO: This method seems quite buggy, a refactoring should be done
         """
+        x,y = x+self.xoffset,y+self.yoffset
         if self.trace: print 'CSVArray.resize(',x,',',y,'), actual size is (%d,%d)' % (self.nrows,self.ncols)
         if len(self.rows)!=self.nrows: print 'The Size of the Array has been corrupted!'
         if len(self.cols)!=self.ncols: print 'The Size of the Array has been corrupted!'
@@ -955,8 +957,10 @@ class CSVArray(object):
         self.ncols = y
         if len(self.cols)!=self.ncols: print 'The Size of the Array Columns has been corrupted!'
         
-        if self.trace: print 'CSVArray.rows dimension is now ',len(self.rows),'x',max([len(r) for r in self.rows])
-        if self.trace: print 'CSVArray.cols dimension is now ',len(self.cols),'x',max([len(c) for c in self.cols])
+        if 1: #self.trace: 
+            print 'CSVArray.rows dimension is now ',len(self.rows),'x',max([len(r) for r in self.rows])
+        if self.trace: 
+            print 'CSVArray.cols dimension is now ',len(self.cols),'x',max([len(c) for c in self.cols])
         return x,y
         
     ###########################################################################
@@ -1037,28 +1041,29 @@ class CSVArray(object):
         def set(self,x,y,val):
         """
         try:
-          if self.trace: print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
-          val = val if type(val) in [int,long,float] else (val or '')
-          if x is None or x<0:
-            #Setting a column
-            if len(val)>self.nrows or len(val)<0: 
-                raise Exception('CSVArray.set(column) ... wrong size of column')
-            for i,v in enumerate(val):
-                self.cols[y][i]=v
-                self.rows[i][y]=v;
-          elif y is None or y<0:
-              #Setting an entire row
-              if len(val)>self.ncols or len(val)<0: 
-                  raise Exception('CSVArray.set(row) ... wrong size of row')           
-              for i,v in enumerate(val):
-                self.rows[x][i]=v
-                self.cols[i][x]=v;             
-          else:
-              self.rows[self.xoffset+int(x)][self.yoffset+int(y)]=val
-              self.cols[self.yoffset+int(y)][self.xoffset+int(x)]=val
+            if self.trace: print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
+            val = val if type(val) in [int,long,float] else (val or '')
+            if x is None or x<0:
+                #Setting a column
+                if len(val)>self.nrows or len(val)<0: 
+                    raise Exception('CSVArray.set(column) ... wrong size of column')
+                for i,v in enumerate(val):
+                    self.cols[y][i]=v
+                    self.rows[i][y]=v;
+            elif y is None or y<0:
+                #Setting an entire row
+                if len(val)>self.ncols or len(val)<0: 
+                    raise Exception('CSVArray.set(row) ... wrong size of row')           
+                for i,v in enumerate(val):
+                    self.rows[x][i]=v
+                    self.cols[i][x]=v;             
+            else:
+                self.rows[self.xoffset+int(x)][self.yoffset+int(y)]=val
+                self.cols[self.yoffset+int(y)][self.xoffset+int(x)]=val
         except Exception,e:
-          print('CSVArray.set(%s,%s,%s) failed!'%(x,y,type(val)))
-          raise e
+            print('CSVArray[%d,%d].set(%s,%s,%s) failed!\n%s' 
+                  % (len(self.rows),len(self.cols),x,y,val,traceback.format_exc()))
+            raise e
     
     def setRow(self,x,val):
         self.set(x,None,val)
