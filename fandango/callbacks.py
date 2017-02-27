@@ -451,6 +451,7 @@ class EventSource(SingletonMap,Logger):
         self.event_ids = dict() # An {EventType:ID} dict      
         self.state = self.STATES.UNSUBSCRIBED
         self.tango_asynch = kw.get('tango_asynch',False)
+        self.write_with_read = kw.get('write_with_read',False)        
         
         # Indicates if the attribute is being polled periodically
         # stores if polling has been forced by user API
@@ -826,8 +827,12 @@ class EventSource(SingletonMap,Logger):
         self.attr_value = hasattr(value,'value') and value or fakeAttributeValue(self.full_name,value,error=False)
         self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
       
-    def write(self, value, with_read=True):
-        self.debug('write(...)')
+    def write(self, value, with_read=None):
+        """
+        The with_read argument will trigger a read() call and an update in all listeners
+        """
+        with_read = with_read if with_read is not None else self.write_with_read
+        self.debug('write(...,with_read=%s)'%with_read)
         self.stats['write']+=1
         self.proxy.write_attribute(self.simple_name,value)
         if with_read:
