@@ -150,6 +150,10 @@ fandango.dynamic.CreateDynamicCommands method will modify both device and device
         fandango.dynamic.CreateDynamicCommands(PyStateComposer,PyStateComposerClass) #<=== It enables new Dynamic Commands
         U.server_init()
         U.server_run()
+        
+The method will parse the DynamicCommands property, store declarations in ds.dyn_comms dictionary, add the command definitions to the ds_class and add a new method executing ds.evalCommand.
+
+In principle it relies on using it with subclasses of DynamicDS; but you can implement your own evalCommand and it should work anyway.    
 
 It will create new commands parsable from the DynamicCommands property:
 
