@@ -155,7 +155,27 @@ The method will parse the DynamicCommands property, store declarations in ds.dyn
 
 In principle it relies on using it with subclasses of DynamicDS; but you can implement your own evalCommand and it should work anyway.    
 
-It will create new commands parsable from the DynamicCommands property:
+When used on DynamicDS devices, DynamicCommands will need a full restart of the server to be created, but just an updateDynamicAttributes() call to be updated.
+
+Specify Arguments and Types
+---------------------------
+
+It will use an ARGS variable to manage the input arguments of the command. If ARGS appear in the formula the Command created will use DevVarStringArray as argin. If not, then it will be a DevVoid command.
+
+The returning type can be explicitly specified:
+
+:DynamicCommands:
+  ReadHoldingRegisters=DevVarLongArray([ARGS[0]]*int(ARGS[1]))        
+  
+The syntax for typed arguments now replaces ARGS by {SCALAR/SPECTRUM}({int/str/float/bool},ARGS), thus specifying type in Command and Arguments is::
+
+  SumSomeNumbers = DevDouble(sum(SPECTRUM(float,ARGS)))
+  #Instead of sum(map(float,ARGS)) which is still available
+
+Example
+-------
+
+If KeepAttributes=True; attribute values are available in commands.
 
 DynamicAttributes::
 
@@ -165,13 +185,15 @@ DynamicCommands::
 
   TEST=str(COMM('test/test/test/State',[]))+'='+str(VALS)
   TEST2=str(float(VALS)+float(ARGS[0]))
+  
+For a DevVoid command writing an attribute:
 
-It will use an ARGS variable to manage the input arguments of the command. If ARGS appear in the formula the Command created will use DevVarStringArray as argin. If not, then it will be a DevVoid command.
+  OpenFrontEnd=   WATTR( 'PLC_CONFIG_STATUS','0000000000100000')
 
-The returning type can be explicitly specified:
+DynamicCommands become functions in your attribute calls!!:
 
-:DynamicCommands:
-  ReadHoldingRegisters=DevVarLongArray([ARGS[0]]*int(ARGS[1]))        
+  SumAttr = SumSomeNumbers([Attr1,Attr2,Attr3])
+
   
 ----
 
@@ -333,22 +355,30 @@ DynamicCommands::
 DynamicCommands
 ---------------
 
-Remember that DynamicCommands need a full restart of the server to be created/updated.
+If KeepAttributes=True; attribute values are available in commands.
 
-Write a command that writes an attribute::
+DynamicAttributes::
+
+  VALS=sum([XAttr('test/test/test/value%d'%i or 0.) for i in range(1,5)])
+
+DynamicCommands::
+
+  TEST=str(COMM('test/test/test/State',[]))+'='+str(VALS)
+  TEST2=str(float(VALS)+float(ARGS[0]))
+  
+For a DevVoid command writing an attribute:
 
   OpenFrontEnd=   WATTR( 'PLC_CONFIG_STATUS','0000000000100000')
 
-The syntax for typed arguments now replaces ARGS by {SCALAR/SPECTRUM}({int/str/float/bool},ARGS), thus specifying type in Command and Arguments is::
-  
-  SumSomeNumbers = DevDouble(sum(SPECTRUM(float,ARGS))) 
-  #Instead of sum(map(float,ARGS)) which is still available
-
-The old syntax still works (DevVarStringArray always for argin, anything you declare for argout).
-
-DynamicCommands become functions in your attribute calls!!::
+DynamicCommands become functions in your attribute calls!!:
 
   SumAttr = SumSomeNumbers([Attr1,Attr2,Attr3])
+  
+specifying type in Command and Arguments is::
+
+  SumSomeNumbers = DevDouble(sum(SPECTRUM(float,ARGS)))
+  #Instead of sum(map(float,ARGS)) which is still available
+
 
 DynamicQualities
 ----------------
