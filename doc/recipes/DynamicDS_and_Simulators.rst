@@ -190,8 +190,11 @@ For a DevVoid command writing an attribute:
 
   OpenFrontEnd=   WATTR( 'PLC_CONFIG_STATUS','0000000000100000')
 
-DynamicCommands become functions in your attribute calls!!:
+DynamicCommands become functions in your attribute calls:
 
+:DynamicCommands:
+  SumSomeNumbers = float(sum(SPECTRUM(float,ARGS)))
+:DynamicAttributes:
   SumAttr = SumSomeNumbers([Attr1,Attr2,Attr3])
 
   
