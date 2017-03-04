@@ -43,7 +43,7 @@ import sys,os,time,re
 import threading,weakref
 from copy import *
 
-from excepts import getLastException
+from excepts import getLastException,exc2str
 from objects import *
 from functional import *
 from dicts import *
@@ -838,7 +838,7 @@ class EventSource(SingletonMap,Logger):
         if with_read:
             return self.read(cache=False)
 
-    def read(self, cache=None,asynch=None):
+    def read(self, cache=None,asynch=None,_raise=True):
         """ 
         Read last value acquired, 
         if cache = False or not polled it will trigger
@@ -860,36 +860,38 @@ class EventSource(SingletonMap,Logger):
               cache = False
           else:
               cache = True
-
-        if cache:
-            self.asynch_hook() # Check for pending asynchronous results
-            if self.attr_value is not None:
-                return self.attr_value
-            elif not self.checkState('UNSUBSCRIBED'):
-                self.info('Attribute first reading (subscribed but no events received yet)')
+       
+        self.asynch_hook() # Check for pending asynchronous results
         
-        self.stats['read']+=1
-        self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.tango_asynch,self.pending_request))
+        if not cache or self.attr_value is None:          
+          if not self.checkState('UNSUBSCRIBED'):
+                self.info('Attribute first reading (subscribed but no events received yet)')          
+          self.stats['read']+=1
+          self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.tango_asynch,self.pending_request))
 
-        try:
-            ## Do not merge these IF's, order matters
-            if asynch:
-                if self.pending_request is not None:
-                    self.attr_value = notNone(self.asynch_hook(),self.attr_value)
-                else:
-                    self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),now()
-                    self.attr_value = notNone(self.asynch_hook(),self.attr_value)
-            else:
-                self.attr_value = self.proxy.read_attribute(self.simple_name)
-        except Exception,e:
-            # fakeAttributeValue initialized with full_name
-            traceback.print_exc()
-            self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
+          try:
+              ## Do not merge these IF's, order matters
+              if asynch:
+                  if self.pending_request is not None:
+                      self.attr_value = notNone(self.asynch_hook(),self.attr_value)
+                  else:
+                      self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),now()
+                      self.attr_value = notNone(self.asynch_hook(),self.attr_value)
+              else:
+                  self.attr_value = self.proxy.read_attribute(self.simple_name)
+          except Exception,e:
+              # fakeAttributeValue initialized with full_name
+              print('EventSource.read(%s) failed!:\n%s'%(self.full_name,exc2str(e)))#traceback.format_exc().split('desc')[-1][:80]))
+              self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
+              
+          self.last_read_time = t0
+          self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
             
-        self.last_read_time = t0
-        self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
-            
-        return self.attr_value
+        if _raise and getattr(self.attr_value,'error',False):
+          raise self.attr_value.value
+        else:
+          return self.attr_value
+        
     
     def asynch_hook(self):
         self.debug('asynch_hook()')
@@ -935,13 +937,8 @@ class EventSource(SingletonMap,Logger):
             diff = prev != av
             self.checkEvents(vdiff=diff)
         except Exception,e:
-            # fakeAttributeValue initialized with full_name
-            traceback.print_exc()
-            #self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
-            
+            self.debug('poll(%s): %s'%(self.full_name,exc2str(e)))            
         ##FIRE EVENT IS ALREADY DONE IN read() METHOD!
-        #self.last_read_time = t0
-        #self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
     
     def push_event(self,event):
         try:           

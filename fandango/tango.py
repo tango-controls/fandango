@@ -54,6 +54,7 @@ from fandango.functional import *
 from dicts import CaselessDefaultDict,CaselessDict
 from objects import Object,Struct
 from log import Logger,except2str,printf
+from excepts import exc2str
 
 __test__ = {}
 
@@ -1450,7 +1451,7 @@ class fakeAttributeValue(object):
         self.device=device or (self.name.rsplit('/',1)[0] if '/' in self.name else '')
         self.set_value(value,dim_x,dim_y)
         self.set_date(time_ or time.time())
-        self.write_value = None
+        self.write_value = self.wvalue = None
         self.quality=quality
         self.parent=parent
         self.error = error
@@ -1486,7 +1487,7 @@ class fakeAttributeValue(object):
         raise Exception(self.error)
     
     def set_value(self,value,dim_x=1,dim_y=1):
-        self.value = value
+        self.value = self.rvalue = value
         if (dim_x,dim_y) == (1,1):
             if isSequence(value): 
                 dim_x = len(value)
@@ -1512,7 +1513,7 @@ class fakeAttributeValue(object):
         self.set_quality(quality)
         
     def set_write_value(self,value):
-        self.write_value = value
+        self.write_value = self.wvalue = value
     def get_write_value(self,data = None):
         if data is None: data = []
         if isSequence(self.write_value):
@@ -1817,6 +1818,7 @@ class TangoEval(object):
         :param _raise: if attribute is empty or 'State' exceptions will be rethrown
         """
         timeout = timeout or self.timeout
+        self.trace('read_attribute(%s,%s,%s,%s,%s)'%(device,attribute,what,_raise,timeout))
         if not attribute:
           if device.split(':')[-1].count('/')>2:
             device,attribute = device.rsplit('/',1)
@@ -1853,8 +1855,8 @@ class TangoEval(object):
                 return e
             elif _raise and not isNaN(_raise):
                 raise e
-            self.trace('TangoEval: ERROR(%s.%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),_raise,what,device,attribute,e))
-            self.trace(traceback.format_exc())
+            self.trace('TangoEval: ERROR(%s.%s)! Unable to get %s for attribute %s/%s: %s' % (type(e),_raise,what,device,attribute,except2str(e)))
+            #self.trace(traceback.format_exc())
             value = _raise
         return value
                 
@@ -1928,7 +1930,7 @@ class TangoEval(object):
         self.formula = self.parse_formula(self.formula) #Replacement of FIND(...), env variables and comments.
         variables = self.parse_variables(self.formula,parsed=True) #Extract the list of tango variables
         self.trace('>'*80)
-        self.trace('eval(): variables in formula are %s' % variables)
+        self.trace('eval(_raise=%s): variables in formula are %s' % (_raise,variables))
         self.source = self.formula #It will be modified on each iteration
         targets = [(device + (attribute and '/%s'%attribute) + (what and '.%s'%what),device,attribute,what) for device,attribute,what in variables]
         self.last.clear()
@@ -1948,6 +1950,7 @@ class TangoEval(object):
                 #Used from alarm messages
                 self.last[target] = self.previous[var_name] 
             except Exception,e:
+                self.trace('eval(r=%s): Unable to obtain %s values'%(r,target))
                 self.last[target] = e
                 raise e
         self.trace('formula = %s' % (self.source))
