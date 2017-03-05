@@ -1755,7 +1755,10 @@ class QEvaluator(Qt.QWidget):
         return fandango.evalX(c,_locals=self._locals,modules=self._modules,instances=self._instances,_trace=True)
         
     def setup_ui(self):
-        from PyQt4.QtWebKit import QWebView
+        try:
+          from PyQt4.QtWebKit import QWebView
+        except:
+          QWebView = Qt.QTextBrowser
         self.combo = Qt.QComboBox(self)
         self.combo.setEditable(True) #self.model in (None,'fandango'))
         self.args = Qt.QComboBox(self) #Qt.QLineEdit(self)
@@ -1839,8 +1842,12 @@ class QEvaluator(Qt.QWidget):
     def printf(self,txt,append=True,highlight=False,curr=''):
         if append: 
             try: 
-                curr = self.result.page().currentFrame().toHtml().replace('</body></html>','')
-                plain = self.result.page().currentFrame().toPlainText()
+                if hasattr(self.result,'page'):
+                    curr = self.result.page().currentFrame().toHtml().replace('</body></html>','')
+                    plain = self.result.page().currentFrame().toPlainText()
+                else:
+                    curr = self.result.toHtml().replace('</body></html>','')
+                    plain = self.result.toPlainText()
             except: 
                 traceback.print_exc()
                 curr = ''
