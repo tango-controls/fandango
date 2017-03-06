@@ -42,12 +42,58 @@ Synchronous / Asynchronous modes and glossary
 Behaviour
 =========
 
-Main differences with TaurusAttribute:
+See the class definition to see argument definition at creation:
+
+https://github.com/tango-controls/fandango/blob/develop/fandango/callbacks.py#L319
+
+The Class __doc__ is::
+
+    Simplified implementation of Taurus Attribute/Model and fandango.CachedAttributeProxy classes 
+    
+    It implements CachedAttributeProxy methods but doesnt inherit from it; 
+    this regression is due to the lack of reliability of AttributeProxy in PyTango 9.
+    
+    Documentation at doc/recipes/EventsAndCallbacks.rst
+    
+    Slow Polling will be always enabled, as a KeepAlive is always kept reading
+    the attribute values at an slow rate.
+    
+    Well, will be always enabled as long there are Listeners or Forced is True. If not polling
+    will not be activated and it will be simply a CachedAttributeProxy.
+    
+    In this implementation, just a faster polling will be enabled if the 
+    attribute provides no events. But the slow polling will never be fully disabled.
+    
+    If no events are received after EVENT_TIMEOUT, polling wil be also enabled.
+    
+    It will also subscribe to all attribute events, not only CHANGE and CONFIG
+    
+    All types are: 'CHANGE_EVENT,PERIODIC_EVENT,QUALITY_EVENT,ARCHIVE_EVENT,ATTR_CONF_EVENT,DATA_READY_EVENT,USER_EVENT'
+    
+    Arguments to EventSource(...) are:
+    
+    - name : attribute name (simple or full)
+    - parent : device name or proxy
+    - enablePolling (force polling by default)
+    - pollingPeriod (3000)
+    - keeptime (500 ms) min. time (in ms!) between HW reads
+    - tango_asynch = True/False ; to use asynchronous Tango reading
+    - listeners = a list of listeners to be added at startup
+    
+    Keep in mind that if tango_asynch=True; you will not get the latest value 
+    when doing  read(cache=False). You must use read(cache=False,asynch=False) instead.
+    
+
+Differences with TaurusAttribute
+--------------------------------
 
 - simplified API:: enablePolling and activatePolling become synonymous.
 - polling works always:: but adapting frequency to received events.
 - event-fail tolerant:: uses slow polling to verify if events are working properly.
 - polling-late tolerant:: if polling is late triggers warning but still returning a value.
+
+
+
 
 use_events and polling_period properties
 ----------------------------------------
@@ -84,4 +130,28 @@ except those with period < keepTime ; thus returning a Cached value.
 Recipes
 -------
 
-...
+Attribute used for the test:
+
+  dev = 'sys/tg_devtest/1'
+  attr = 'double_scalar'
+  model = dev+'/'+attr
+
+Create a proxy without listeners (just a Cached proxy)
+......................................................
+
+No polling should be visible. Values should not be updated if read() is called faster than keeptime.
+
+Persistent proxy with client polling
+....................................
+
+This test will show events only at client polling period
+
+Persistent proxy with events
+............................
+
+This test will show events only at device polling period.
+
+If this period is longer than keep_alive; polled values should appear.
+
+
+
