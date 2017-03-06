@@ -16,14 +16,57 @@ PENDING:
     preparing next PyAlarm release with None not allowed in comparisons
 
 -------------------
-12.6 - January 2017
+12.6 - March 2017
 -------------------
 
-    EventSource: solve issues with poll-only  attributes, tune for >1000 events/second
-    Dev4Tango: add LastUpdate and MemUsage attributes
-    FolderDS: add SaveFolder attribute
-    ThreadDict: add _updates refresh on write hardware 
-    Solve problems on DynamicDS evalAttr() and tuples
+    Arrays: 
+      Solve bug in CSVArray.getAsTree when lastbranch is a column name
+      Apply x/y offsets on calls to CSVArray.resize()
+      Add try/except to CSVArray.set()
+    Callbacks/EventSource:
+      Rethrow exceptions on EventSource/CachedProxy.read(_raise=True) (default)
+      Solve EventSource filtering and polling bugs, cleanup now() references
+      solve issues with poll-only  attributes, tune for >1000 events/second
+      Add write_with_read argument to EventSource.init()
+      Enable EventSource subscribe without listeners
+      Enable EventSource.removeListener(sequence)
+      Add extra counters to EventSource, solve bug in Cached values
+    Dev4Tango:
+      add LastUpdate and MemUsage attributes to all devices
+    Dicts:
+      ThreadDict: add _updates refresh on write hardware 
+    FolderDS/GUI:
+      add SaveFolder attribute
+      Solve bug in FolderGUI.ListFiles
+    Qt: 
+      Adapt fadango.QEvaluator to latest PyQt4
+      patch for taurus 4
+      Solve problems with non-string models in QSignalHook
+    Scripts:
+      Add offset to tango2csv.add_properties_to_csv()
+      Enable host argument to tango_servers start/status/stop
+      Use tango_property to export DynamicDS properties
+    Tango:
+      Remove domain info in get_tango_host() (pytango bug)
+      Adapt get_device_info to multihost
+      Adapt fakeAttributeValue to taurus4
+      Solve bug in TangoEval formula starting with 'not '
+      add get_server_property method
+      check_attribute to allow proxy or taurusattribute as argument
+    Tests/simulation: 
+      Set SimulatorDS as default simulation class
+    Threading:
+      Add ThreadedObject.get_avg_delay method
+
+-------------------
+12.5 - January 2017
+-------------------
+
+    Solve problems on DynamicDS evalAttr() and tuples as sequences
+
+-------------------
+12.4 - January 2017
+-------------------
 
     Solve MRO exception in device.Dev4Tango
     Solve bug in get_device_info/get_database_device 
