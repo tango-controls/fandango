@@ -236,7 +236,7 @@ class EventThread(Logger,ThreadedObject):
         return self.sources.get(source,None) if isString(source) else source
       
     def get_pending(self):
-        return queue.qsize()
+        return self.queue.qsize()
 
     def process(self):
         """ 
@@ -355,7 +355,7 @@ class EventThread(Logger,ThreadedObject):
             self.warning(traceback.format_exc())
 
 
-class EventSource(SingletonMap,Logger):
+class EventSource(Logger,SingletonMap):
     """ 
     Simplified implementation of Taurus Attribute/Model and fandango.CachedAttributeProxy classes 
     
@@ -441,7 +441,7 @@ class EventSource(SingletonMap,Logger):
               
         self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
         self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
-        #self.call__init__(Logger,self.full_name)
+        #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
         Logger.__init__(self,self.full_name)
         self.setLogLevel(kw.get('loglevel',kw.get('log_level',self.DEFAULT_LOG)))
         self.info('Init()')
@@ -1016,9 +1016,11 @@ class EventSource(SingletonMap,Logger):
 ###############################################################################
 
 class TangoListener(EventListener):
+    __doc__ = EventListener.__doc__
     pass
 
 class TangoAttribute(EventSource):
+    __doc__ = EventSource.__doc__
     pass
   
 #For backwards compatibility
