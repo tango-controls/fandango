@@ -92,6 +92,13 @@ Differences with TaurusAttribute
 - event-fail tolerant:: uses slow polling to verify if events are working properly.
 - polling-late tolerant:: if polling is late triggers warning but still returning a value.
 
+Event flow
+----------
+
+PyTango Events are received by EventSource.push_event method. There, event.err, event(type), attr_conf and attr_value are extracted.  A tuple with (EventSource,type_,value) is inserted in the EventThread.queue
+
+The EventThread.process loop will manage the events in queue; grouping received events by its source full name. 
+
 
 
 
@@ -125,12 +132,23 @@ occasional clients (Panic GUI, ipython).
 Events are not subscribed, polling is not active, all reads go directly to HW
 except those with period < keepTime ; thus returning a Cached value.
 
+Conditions for Client Polling
+-----------------------------
+
+Polling will be triggered from the client side if:
+
+- Event source is registered in EventThread.sources (at least a listener has been added).
+- source.getMode() is True ()
+- last_read_time is older than (polling_period if isPollingEnabled() else KeepAlive).
+- source.isPollingActive() is True or the EventThread.queue is EMPTY.
+
+Thus, the KeepAlive polling (trigger a HW read() for attributes not receiving events) may not be ever executed if there are still many events in the queue to process.
 
 
 Recipes
 -------
 
-Attribute used for the test:
+Attribute used for the test::
 
   dev = 'sys/tg_devtest/1'
   attr = 'double_scalar'
@@ -139,19 +157,91 @@ Attribute used for the test:
 Create a proxy without listeners (just a Cached proxy)
 ......................................................
 
-No polling should be visible. Values should not be updated if read() is called faster than keeptime.
+No polling should be active. Values should not be updated if read() is called faster than keeptime.
+
+.. code:: python
+
+  cached = fn.callbacks.TangoAttribute(model,keeptime=6000)
+  t0,v0 = fn.now(),cached.read().value
+
+  while fn.now() < t0+30.:
+    fn.wait(1.)
+    v = cached.read().value
+    if v!=v0:
+        print(fn.time2str(),v)
+        v0 = v
+
+  ('2017-03-06 12:41:26', -111.83805760016259)
+  ('2017-03-06 12:41:32', -120.36249365482121)
+  ('2017-03-06 12:41:38', -128.55702503785676)
+  ('2017-03-06 12:41:44', -136.39919114627801)
+  ('2017-03-06 12:41:50', -143.86749718418756)
+  
+Each read will try to fire client events, but it will have no effect unless a listener is added to the proxy.
+
+If this is the only instantiated object the EventThread will not be active. If it is already active polling will not be enabled unless EventSource.getMode() returns True.
+
+Proxy with listeners
+....................
+
+It has no secret::
+
+ listened = fn.callbacks.TangoAttribute(model)
+ el =  fn.callbackes.EventListener('test')
+ el.setLogLevel('DEBUG')
+ listened.addListener(el)
+ 
+Automatically it will try to subscribe to Change,Archiving,Periodic events. You can avoid that using::
+
+ #polled by client
+ listened.addListener(el,use_events=False,use_polling=True) 
+ 
+ #not polled nor subscribed, proxy updated only on explicit read() calls
+ listened.addListener(el,use_events=False,use_polling=False) 
 
 Persistent proxy with client polling
 ....................................
 
-This test will show events only at client polling period
+This test will show events only at client polling period::
+
+  
 
 Persistent proxy with events
 ............................
 
-This test will show events only at device polling period.
+This test will show events only when pushed by device::
 
-If this period is longer than keep_alive; polled values should appear.
+  listened = fn.callbacks.TangoAttribute(model)
+  listened.subscribe()
+  listened.use_events
+  Out[98]:['archive', 'change', 'periodic', 'quality']
+  
+From now on the device will start receiving events. If no listener is added there will be no callback, but the attribute cache will be always updated by the last event::
 
+  In [133]:listened.read().value
+  Out[133]:123.13220677602663
+  In [134]:listened.read().value
+  Out[134]:125.86398884679437
+  In [147]:fn.now()-fn.ctime2time(listened.read().time)
+  Out[147]:0.20083999633789062
+  In [148]:fn.now()-fn.ctime2time(listened.read().time)
+  Out[148]:0.82412290573120117
+  In [149]:fn.now()-fn.ctime2time(listened.read().time)
+  Out[149]:0.3119041919708252
+  In [150]:fn.now()-fn.ctime2time(listened.read().time)
+  Out[150]:0.039993047714233398
 
+If this period is longer than keep_alive; and slow polling starts::
 
+  EventThread    INFO 2017-03-06 16:29:50.668: KeepAlive(tango://controls02:10000/sys/tg_test/1/double_scalar) after   15000.0 ms
+EventThread    INFO 2017-03-06 16:30:20.681: KeepAlive(tango://controls02:10000/sys/tg_test/1/double_scalar) after 15000.0 ms
+EventThread    INFO 2017-03-06 16:30:50.680: KeepAlive(tango://controls02:10000/sys/tg_test/1/double_scalar) after 15000.0 ms
+EventThread    INFO 2017-03-06 16:31:20.676: KeepAlive(tango://controls02:10000/sys/tg_test/1/double_scalar) after 15000.0 ms
+
+This subscription will be persistent if you don't use listeners. But!, this may break if you add a listener and then remove all of them. This will disable events completely.
+
+To ensure that an attribute is always subscribed, add the persistent flag at creation. This will add a permanent listener to ensure that events are never disabled::
+
+  # This proxy is automatically subscribed to events if available.
+  listened = fn.callbacks.TangoAttribute(model,persistent=True)
+  
