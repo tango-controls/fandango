@@ -27,10 +27,10 @@ def export(devices,suffix='.json',preffix=''):
       traceback.print_exc()
   return files 
 
-def load(tango_host,instance,devices,replace={},overwrite=False):
+def load(tango_host,instance,devices,replace={},overwrite=False,def_class='SimulatorDS'):
   """ 
   the tango_host variable must match with the current tango_host; it is used to avoid accidental loading
-  load .json files into simulated devices 
+  load .json files into simulated devices; one .json file per device
   devices may be a list of devices, a list of files or a dictionary {device:filename}
   """
   assert tango_host == fn.get_tango_host()
@@ -74,7 +74,7 @@ def load(tango_host,instance,devices,replace={},overwrite=False):
       ft.put_device_property(dd,props)
       
     else:
-      if not exists: ft.add_new_device('PyAttributeProcessor/'+instance,'PyAttributeProcessor',dd)
+      if not exists: ft.add_new_device(def_class+'/'+instance,def_class,dd)
         
       ft.put_device_property(dd,props)
       
