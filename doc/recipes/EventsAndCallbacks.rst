@@ -209,15 +209,22 @@ This test will show events only at client polling period::
 Persistent proxy with events
 ............................
 
-This test will show events only when pushed by device::
+.. code::
 
   listened = fn.callbacks.TangoAttribute(model)
   listened.subscribe()
   listened.use_events
   Out[98]:['archive', 'change', 'periodic', 'quality']
   
-From now on the device will start receiving events. If no listener is added there will be no callback, but the attribute cache will be always updated by the last event::
+This subscription will be persistent if you don't use listeners. But!, this may break if you add a listener and then remove all of them. This will disable events completely.
 
+To ensure that an attribute is always subscribed, add the persistent flag at creation. This will add a permanent listener to ensure that events are never disabled::
+
+  # This proxy is automatically subscribed to events if available.
+  listened = fn.callbacks.TangoAttribute(model,persistent=True)
+
+This test will show events only when pushed by device. From now on the device will start receiving events. If no listener is added there will be no callback, but the attribute cache will be always updated by the last event::
+  
   In [133]:listened.read().value
   Out[133]:123.13220677602663
   In [134]:listened.read().value
@@ -238,10 +245,5 @@ EventThread    INFO 2017-03-06 16:30:20.681: KeepAlive(tango://controls02:10000/
 EventThread    INFO 2017-03-06 16:30:50.680: KeepAlive(tango://controls02:10000/sys/tg_test/1/double_scalar) after 15000.0 ms
 EventThread    INFO 2017-03-06 16:31:20.676: KeepAlive(tango://controls02:10000/sys/tg_test/1/double_scalar) after 15000.0 ms
 
-This subscription will be persistent if you don't use listeners. But!, this may break if you add a listener and then remove all of them. This will disable events completely.
 
-To ensure that an attribute is always subscribed, add the persistent flag at creation. This will add a permanent listener to ensure that events are never disabled::
-
-  # This proxy is automatically subscribed to events if available.
-  listened = fn.callbacks.TangoAttribute(model,persistent=True)
   
