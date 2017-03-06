@@ -204,6 +204,7 @@ Persistent proxy with client polling
 
 This test will show events only at client polling period::
 
+  forced = fn.callbacks.TangoAttribute(model,enable_polling=True,polling_period=1000,use_events=False,loglevel='DEBUG')
   
 
 Persistent proxy with events
@@ -222,6 +223,8 @@ To ensure that an attribute is always subscribed, add the persistent flag at cre
 
   # This proxy is automatically subscribed to events if available.
   listened = fn.callbacks.TangoAttribute(model,persistent=True)
+  
+  listened = fn.callbacks.TangoAttribute(model,persistent=True,loglevel='DEBUG',use_events=['change'])
 
 This test will show events only when pushed by device. From now on the device will start receiving events. If no listener is added there will be no callback, but the attribute cache will be always updated by the last event::
   
