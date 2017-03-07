@@ -24,6 +24,7 @@ PENDING:
       Apply x/y offsets on calls to CSVArray.resize()
       Add try/except to CSVArray.set()
     Callbacks/EventSource:
+      Adapted to multiple sources, add dummy for persistence
       Rethrow exceptions on EventSource/CachedProxy.read(_raise=True) (default)
       Solve EventSource filtering and polling bugs, cleanup now() references
       solve issues with poll-only  attributes, tune for >1000 events/second
@@ -35,6 +36,8 @@ PENDING:
       add LastUpdate and MemUsage attributes to all devices
     Dicts:
       ThreadDict: add _updates refresh on write hardware 
+    Functional
+      Add iif(condition,truepart,falsepart,foward)
     FolderDS/GUI:
       add SaveFolder attribute
       Solve bug in FolderGUI.ListFiles
