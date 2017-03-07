@@ -6,6 +6,30 @@ Some recipes on using fandango and Tango
 
 .. contents::
 
+Create Tango devices from shell
+===============================
+
+The fandango api provides helper commands to create devices and assign properties:
+
+.. code:: python
+
+  import fandango as fn
+  fn.tango.add_new_device('Server/Instance','Class','your/device/name')
+  fn.tango.put_device_property('your/device/name','Property','Value')
+
+
+You can also call them from shell::
+
+  > fandango.sh add_new_device Server/Instance Class your/device/name
+  > fandango.sh put_device_property your/device/name Property Value
+
+
+To start it on any host managed by Starter::
+
+  > tango_servers yourhost start Server/Instance
+
+
+
 Get devices or attributes matching a regular expression
 =======================================================
 
@@ -36,8 +60,8 @@ Obtain all information from a device
 
 .. code:: python
 
-In [59]:fandango.tango.get_device_info('sr/vc/gll')
-Out[59]:fandango.Struct({
+  In [59]:fandango.tango.get_device_info('sr/vc/gll')
+  Out[59]:fandango.Struct({
         'name': sr/vc/gll,
         'level': 4,
         'started': 11th February 2013 at 13:07:37,
@@ -69,7 +93,7 @@ Use TangoEval to evaluate strings containing Tango Attributes
 TangoEval class provides PyAlarm-like evaluation of strings containing attribute names (replacing them by its values). It is part of fandango.device module.
 The result of each evaluation is stored in te.result.
 
-.. code::python
+.. code:: python
 
   from fandango import TangoEval
   te = TangoEval('(s01/vc/gauge-01/pressure + s01/vc/gauge-01/pressure) / 2.')
@@ -86,7 +110,7 @@ Use CSVArray to turn a .csv into a dictionary
   A       B       2
           C       3
 
-::
+.. code:: python
 
   csv = fandango.arrays.CSVArray('tmp/tree_test.csv')
   csv.expandAll()
@@ -96,7 +120,7 @@ Use CSVArray to turn a .csv into a dictionary
 Fast property update
 ====================
 
-::
+.. code:: python
 
   import fandango.functional as fun
   servers = fandango.Astor('PyAlarm/*')
@@ -109,7 +133,7 @@ Fast property update
 ReversibleDict
 ==============
 
-::
+.. code:: python
 
   ----In [133]: ch = fandango.dicts.ReversibleDict()
 
@@ -138,7 +162,9 @@ ReversibleDict
 ThreadDict
 ==========
 
-from PyPLC::
+from PyPLC:
+
+.. code:: python
 
     def initThreadDict(self):
         def read_method(args,comm=self.Regs,log=self.debug): #It takes a key with commas and splits it to have a list of arguments
@@ -173,7 +199,9 @@ from PyPLC::
         self.threadDict.start()
         self.info('out of PyPLC.initThreadDict()')
 
-Reading::
+Reading:
+
+.. code:: python
 
                 for reg in regs:
                     key = ','.join(str(r) for r in reg)
@@ -187,7 +215,9 @@ Fandango has a set of operators to use regular-or operator ('|') like a linux pi
 ::
     cat('filename') | grep('myname') | printlines
     
-Using fandango::
+Using fandango:
+
+.. code:: python
 
   from fandango.functional import *
 
@@ -199,7 +229,7 @@ Using fandango::
 
 Available interfaces are:
 
-::
+.. code:: python
 
   class Piped:
       """This class gives a "Pipeable" interface to a python method:
@@ -223,7 +253,7 @@ Available interfaces are:
     
 Available operators are:
 
-::
+.. code:: python
 
   pgrep = lambda exp: iPiped(lambda input: (x for x in input if inCl(exp,x)))
   pmatch = lambda exp: iPiped(lambda input: (x for x in input if matchCl(exp,str(x))))
