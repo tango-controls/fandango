@@ -412,6 +412,9 @@ class EventSource(Logger,SingletonMap):
     - listeners = a list of listeners to be added at startup
     - persistent = if True, a dummy listener is added to enforce subscription
     
+    Arguments are supported in CamelCase and lowercase to keep compatibility 
+    with previous apis (CachedProxy and TaurusAttribute).
+    
     Keep in mind that if tango_asynch=True; you will not get the latest value 
     when doing  read(cache=False). You must use read(cache=False,asynch=False) instead.
     
@@ -461,15 +464,19 @@ class EventSource(Logger,SingletonMap):
                 self.device = parent.name()
                 self.proxy = parent
             except:
-                raise Exception('A valid device name is needed: %s'%([name,self.simple_name,parent]))
+                raise Exception('A valid device name is needed: %s'%
+                                ([name,self.simple_name,parent]))
               
         self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
         self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
+        assert self.fake or self.proxy,'A valid device name is needed'
+        
+        ##Set logging
         #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
         Logger.__init__(self,self.full_name)
-        self.setLogLevel(kw.get('loglevel',kw.get('log_level',self.DEFAULT_LOG)))
+        self.setLogLevel(kw.get('loglevel',kw.get('log_level',
+            kw.get('logLevel',self.DEFAULT_LOG))))
         self.info('Init()')
-        assert self.fake or self.proxy,'A valid device name is needed'
         
         self.listeners = defaultdict(set) #[]       
         self.event_ids = dict() # An {EventType:ID} dict      
@@ -477,16 +484,21 @@ class EventSource(Logger,SingletonMap):
         self.tango_asynch = kw.get('tango_asynch',False)
         self.write_with_read = kw.get('write_with_read',False)        
         
+        ## Set polling configuration
         # Indicates if the attribute is being polled periodically
         # stores if polling has been forced by user API
-        self.forced = kw.get('enablePolling',kw.get('enable_polling',False))
+        self.forced = kw.get('enablePolling',kw.get('enable_polling',
+            kw.get('forcePolling',kw.get('force_polling',False))))
         self.polled = self.forced #Forced is permanent, polled may change
         # current polling period in milliseconds
-        self.polling_period = kw.get("pollingPeriod",kw.get('polling_period',self.DefaultPolling))
+        self.polling_period = kw.get("pollingPeriod",kw.get('polling_period',
+            iif(isNumber,self.forced,self.DefaultPolling,float)))
+
         self.keep_time = kw.get('keep_time',keeptime)
         # force tango events usage
         self.use_events = kw.get("use_events",[]) or []
-        if self.use_events is True: self.use_events = self.DEFAULT_EVENTS
+        if self.use_events is True: 
+            self.use_events = self.DEFAULT_EVENTS
 
         self.attr_value = None
         self.event_lock = threading.Lock()
@@ -504,7 +516,7 @@ class EventSource(Logger,SingletonMap):
 
         listeners = toList(kw.get('listeners',[]))
         if kw.get('persistent',False):
-          listeners.append(EventSource.DUMMY)
+            listeners.append(EventSource.DUMMY)
         map(self.addListener,listeners)
             
     def __del__(self): 
@@ -513,6 +525,12 @@ class EventSource(Logger,SingletonMap):
         return 'EventSource(%s)'%(self.full_name)
     def __repr__(self):  
         return str(self)
+      
+    def getParent(self):
+        return self.device
+      
+    def getParentObj(self):
+        return self.proxy
         
     def cleanUp(self):
         self.debug("cleanUp")
@@ -582,7 +600,8 @@ class EventSource(Logger,SingletonMap):
         if force: self.activatePolling(force = force)
         
     def forcePolling(self, period = None):
-        self.activatePolling(period,force=True)
+        if period: self.activatePolling(period,force=True)
+        else: self.deactivatePolling()
 
     def disablePolling(self):
         self.deactivatePolling() # DON'T STOP THREADS HERE!
