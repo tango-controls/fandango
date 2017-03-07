@@ -898,6 +898,27 @@ def mysql2time(mysql_time):
 ## Extended eval
 ########################################################################
 
+def iif(condition,truepart,falsepart=None,forward=False):
+    """
+    if condition is boolean return (falsepart,truepart)[condition]
+    if condition is callable returns truepart if condition(tp) else falsepart
+    if forward is True condition(truepart) is returned instead of truepart
+    if forward is callable, forward(truepart) is returned instead
+    """
+    if isCallable(condition):
+      v = condition(truepart)
+      if not v: 
+        return falsepart
+    elif not condition: 
+      return falsepart
+    
+    if isCallable(forward):
+      return forward(truepart)
+    elif forward:
+      return v
+    else:
+      return truepart
+
 def ifThen(condition,callback,falsables=tuple()):
     """
     This function allows to execute a callable on an object only if it has a valid value.
@@ -948,10 +969,13 @@ def evalF(formula):
     c = compile(formula,formula,'eval') #returning a lambda that evals a compiled code makes the method 500% faster
     return (lambda *args: eval(c,{'args':args,'x':args and args[0],'y':len(args)>1 and args[1],'z':len(args)>2 and args[2]}))
 
-def testF(f,args=[],t=1.):
+def testF(f,args=[],t=5.):
+    """
+    it returns how many times f(*args) can be executed in t seconds
+    """
     args = toSequence(args)
     ct,t0 = 0,time.time()
-    while time.time()<t0+5:
+    while time.time()<t0+t:
         f(*args)
         ct+=1
     return ct
