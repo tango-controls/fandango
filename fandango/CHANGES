@@ -1,4 +1,4 @@
-RELEASE = (12,3,0)
+RELEASE = (12,6,0)
 RELEASE_NOTE = "Added FolderDS and FolderGUI, moved to GitHub, many bugs fixed"
 
 """
