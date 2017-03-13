@@ -291,7 +291,7 @@ class EventThread(Logger,ThreadedObject):
             # Enable filtering if the performance is compromisesd
             if (False < self.filtered < True) and (
                   (time.time()-t0)>(self.filtered * 1e-3*self.latency) or 
-                  self.queue.qsize() < self.EVENT_TO_POLLING_RATIO):
+                  self.queue.qsize() < self.EVENT_POLLING_RATIO):
                 filtered = True
 
             if now()>(t0+1e-3*self.latency):
