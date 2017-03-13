@@ -62,7 +62,7 @@ else
   cd ${DSPATH}
 
   HASSCREEN=$(which screen 2>/dev/null)
-  if [ ! $(echo $2 | grep "\?") && "$HASSCREEN" ] ; then
+  if [ ! "$( echo $1 | grep '\?' )" ] && [ "$HASSCREEN" ] ; then
     if [ ! "$(echo $* | grep 'attach')" ] ; then
       echo "run detached"
       CMD="screen -dm -S $DS-$INSTANCE "

@@ -2140,7 +2140,7 @@ class DynamicServer(object):
             self.name,server,instance,logs = name,name.split('/')[0],name.split('/')[-1],log
         self.args = [server,instance,logs]+orb
         print('In DynamicServer(%s)'%(self.args,))
-        self.util = PyTango.Util(self.args)
+        self.util = PyTango.Util(filter(bool,self.args))
         self.instance = self.util.instance()
         self.db = self.instance.get_database()
         class_list = self.db.get_device_class_list(self.instance.get_ds_name()) #Device,Class object list
@@ -2167,7 +2167,7 @@ class DynamicServer(object):
         print(args)
         server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
         instance = args[1]
-        logs,orb = '-v2',[]
+        logs,orb = '-v2' if instance!='-?' else '',[]
         for i in (2,3):
             if args[i:]:
                 if args[i].startswith('-v'):
@@ -2205,6 +2205,7 @@ class DynamicServer(object):
             sys.exit(-1)
         
     def main(self,args=None):
+        #Args argument has no effect! @TODO
         print('DynamicDS.main(%s)'%(args or sys.argv,))
         U = self.util.instance()
         U.server_init()
