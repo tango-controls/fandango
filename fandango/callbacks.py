@@ -324,7 +324,7 @@ class EventThread(Logger,ThreadedObject):
         ## print('Executing pollings')
         t0 = now()
         pollings = []
-        for s in self.sources:
+        for s in self.sources.copy():
             s.checkEvents(tdiff=2e-3*s.polling_period)
             if s.getMode():
                     nxt = s.last_read_time+(s.polling_period if s.isPollingEnabled() 
@@ -366,7 +366,8 @@ class EventThread(Logger,ThreadedObject):
             if hasattr(source,'fireEvent'):
                 source.fireEvent(*args)  ## Event types are filtered at EventSource.fireEvent
             elif hasattr(source,'listeners'):
-                for l in source.listeners:
+                listeners = source.listeners.keys()
+                for l in listeners:
                     try: getattr(l,'eventReceived',l)(*([source]+list(args))) 
                     except: traceback.print_exc()
                     finally: self.event.wait(self.MinWait/len(source.listeners))
@@ -721,8 +722,8 @@ class EventSource(Logger,SingletonMap):
         if pending:
           self.debug('fireEvent(%s), %d events still in queue'%(event_type,pending))
         self.stats['fired']+=1
-        listeners = listeners or self.listeners
 
+        listeners = listeners or self.listeners.keys()
         for l in listeners:
             try:
                 #event filter will allow poll() events to pass through
