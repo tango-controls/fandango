@@ -423,7 +423,7 @@ class EventSource(Logger,SingletonMap):
     @TODO: read(cache=False) should trigger fireEvent if not called from poll()
     """
     
-    EVENT_TIMEOUT = 1800  # 10s
+    EVENT_TIMEOUT = 900  # 10s
     DEFAULT_LOG = 'WARNING'
     DEFAULT_EVENTS = [ 'periodic', 'change', 'archive', 'quality' ] #'user_event',
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
@@ -835,7 +835,7 @@ class EventSource(Logger,SingletonMap):
                     self.warning('Event subscribing failed (tdiff=%s,vdiff=%s) switching to polling'%(tdiff,vdiff))
                     self.setState('PENDING')
                 else:
-                    self.warning('Values differ and no event received! (tdiff=%s,vdiff=%s)'%(tdiff,vdiff))
+                    self.warning('Values differ and no event received (check sardana/attr_conf)! (tdiff=%s,vdiff=%s)'%(tdiff,vdiff))
                 r = False
 
         if self.listeners:
@@ -988,7 +988,9 @@ class EventSource(Logger,SingletonMap):
             self.attr_value = self.read(cache=False) #(self.attr_value is not None))
             av = getattr(self.attr_value,'value',self.attr_value)
             diff = prev != av
-            self.checkEvents(vdiff=diff)
+            r = self.checkEvents(vdiff=diff)
+            if diff and self.isUsingEvents(): 
+              self.info('Polled a subscribed attribute; diff: %s!=%s'%(prev,av))
         except Exception,e:
             self.debug('poll(%s): %s'%(self.full_name,exc2str(e)))            
         ##FIRE EVENT IS ALREADY DONE IN read() METHOD!
@@ -1027,6 +1029,7 @@ class EventSource(Logger,SingletonMap):
                     return
                   elif self.use_events and not is_polled:
                     self.warning('EVENTS_FAILED! (%s,%s,%s,%s): reactivating Polling'%(type_,reason,has_evs,is_polled))
+                    self.warning(str([et,type_,event.err,]))
                     self.setState('PENDING')
                     self.activatePolling()
                   return
@@ -1067,6 +1070,7 @@ class EventSource(Logger,SingletonMap):
                 
                 if self.isPollingActive() and not self.isPollingForced():
                     self.info('push_event(): Event received, deactivating polling')
+                    self.warning(str([et,type_,event.attr_value]))
                     self.deactivatePolling()
 
             delay = t0-self.last_event_time
