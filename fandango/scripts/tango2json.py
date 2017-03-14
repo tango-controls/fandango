@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import fandango as fn
 import sys,json,gzip
 
