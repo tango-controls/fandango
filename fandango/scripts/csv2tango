@@ -185,7 +185,7 @@ def main():
       answer = raw_input('% devices already exist, '
         'do you want to delete its previous data from the database?'%len(already))
       if answer.lower() in ['y','yes']:
-          remove_devices(already)
+          remove_tango_devices(already)
       
       for k,props in kprops.items():
           oldprops = db.get_class_property(k,props.keys())
