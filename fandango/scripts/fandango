@@ -34,9 +34,13 @@ __doc__ = """
 
 Usage:
 
-  fandango [qt] [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1] [...]
+  fandango [qt] [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1/argument_0] [...]
+  
+  Execute python and fandango methods from shell
 
   Objects and Generators will not be allowed as arguments, only python primitives, lists and tuples
+  
+  The --extra option will load PyTangoArchiving and Panic methods
   
 Examples:
 
