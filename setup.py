@@ -30,13 +30,12 @@ release = open('fandango/VERSION').read()
 
 scripts = [
 './fandango/scripts/ctds',
-'./fandango/scripts/csv2tango.py',
-'./fandango/scripts/tango2csv.py',
-'./fandango/scripts/tango2json.py',
+'./fandango/scripts/csv2tango',
+'./fandango/scripts/tango2csv',
+'./fandango/scripts/tango2json',
 './fandango/scripts/sardanact',
 './fandango/scripts/tango_cleanup',
 './fandango/scripts/folder-gui',
-'./fandango/scripts/generate-sphinx-docs.sh',
 './fandango/scripts/fandango',
 './fandango/scripts/DynamicDS',
 './fandango/scripts/WorkerDS',

@@ -12,6 +12,27 @@ import fandango as fn
 from fandango.arrays import *
 from fandango.tango import *
 
+def remove_tango_devices(devices):
+    """
+    Remove Tango devices and its properties from Database
+    """
+    for d in devices:
+      try:
+        print('Removing %s from Tango database'%d)
+        props = db.get_device_property_list(d,'*')
+        for p in list(props):
+          db.delete_device_property(d,p)
+        server = db.get_device_info('test/panic/delay').ds_full_name
+        db.delete_device(d)
+        devs = list(db.get_device_class_list(server))
+        if not devs or all(fn.clmatch('^deserver*',d) for d in devs):
+          print('Removing %s from Tango database'%server)
+          db.delete_server(server)
+      except:
+        traceback.print_exc()
+        print('Unable to delete %s device'%d)
+    return len(devices)
+
 def main():
 
   if len(sys.argv)<1:
@@ -160,6 +181,11 @@ def main():
     
       alldevs = fn.tango.get_all_devices()
       db = fn.tango.get_database()
+      already = [d for d in dprops if d in alldevs] 
+      answer = raw_input('% devices already exist, '
+        'do you want to delete its previous data from the database?'%len(already))
+      if answer.lower() in ['y','yes']:
+          remove_devices(already)
       
       for k,props in kprops.items():
           oldprops = db.get_class_property(k,props.keys())
