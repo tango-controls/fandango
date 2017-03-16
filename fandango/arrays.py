@@ -970,7 +970,7 @@ class CSVArray(object):
     #@Catched
     def get(self,x=None,y=None,head=None,row=None,column=None,distinct=False,xsubset=[],ysubset=[]):
         """
-        def get(self,x=None,y=None,head=None,distinct=False):
+        get(x=None,y=None,head=None,distinct=False):
         """
         result = []
         if x is None: x = row
@@ -1106,7 +1106,10 @@ class CSVArray(object):
         c = y if y in range(self.ncols+1) else self.colByHead(head)
         column = self.get(y=c)
         last = ''
-        previous = (type(previous) is list and previous) or (previous and len(column)*[previous]) or (c and self.get(y=c-1)) or []
+        previous = (type(previous) is list and previous) \
+          or (previous and len(column)*[previous]) \
+          or (c and self.get(y=c-1)) or []
+        
         for r in range(len(column)):
             if r and column[r]=='' and (not previous or previous[r-1]==previous[r]):
                 self.set(r,c,last)
