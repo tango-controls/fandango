@@ -8,6 +8,7 @@ ALBA Synchrotron Controls Group
 
 import sys,os, traceback
 from PyTango import *
+import fandango as fn
 from fandango.arrays import *
 from fandango.tango import *
 
@@ -16,35 +17,44 @@ def main():
   if len(sys.argv)<1:
       exit()
 
-  print 'Loading file ...'
-  array = CSVArray()
-  array.load(sys.argv[1],prune_empty_lines=True)
-  array.setOffset(x=1)
-  for s in ['server','class','device','property']: array.fill(head=s)
+  filename = sys.argv[1]
+  print('Loading %s ...'%filename)
+  array = CSVArray(filename,header=0,offset=1)
+  [array.fill(head=s) for s in array.getHeaders()]
 
-  #print array.get(x=0)
-  print 'Getting device column ...'
-  answer = raw_input('Do you want to force all device names to be uppercase? (Yes/No)')
-  if answer.lower().startswith('y'):
-      listofdevs = {}
-      [listofdevs.__setitem__(s.upper(),i) for s,i in array.get(head='device',distinct=True).iteritems()]
-  else:
-      listofdevs = array.get(head='device',distinct=True)
-  print '%s devices read from file.' % len(listofdevs)
-  lkeys = listofdevs.keys()
-  lkeys.sort()
+  #print('Getting device columns ...')
+  classes = array.get(head='class',distinct=True)
+  devices = array.get(head='device',distinct=True)
+  
+  if '' in classes: 
+    print(classes)
+    print('-'*80)
+    print('\n'.join('%03d:%s'%(i,'\t'.join(r)) for i,r in enumerate(array.rows)))
+    print('-'*80)
+  else:  
+    print('%d classes: %s'%(len(classes),classes.keys()))
+  print('%d devices read from file.' % (len(devices)))
+  
+  upper = raw_input('Do you want to force all device names '
+                      'to be uppercase? (Yes/No)')
+  upper = upper.startswith('y')
+  devices = dict((k.upper() if k else k,v)
+      for k,v in devices.items() if k and not fn.isRegexp(k))
 
   #######################################################################
 
   def getProperties(device):
       props={}
-      for l in listofdevs[device]:
+      lines= device if fn.isSequence(device) else devices[device]
+      #Iterate through each line of device declaration
+      for l in lines:
           pr = array.get(x=l,head='property')
           try: 
-              if pr not in props:
-                  props[pr]=[array.get(x=l,head='value')]
-              else:
-                  props[pr].append(array.get(x=l,head='value'))
+              if pr:
+                  if pr not in props:
+                      props[pr]=[array.get(x=l,head='value')]
+                  else:
+                      props[pr].append(array.get(x=l,head='value'))
           except Exception,e:
               print traceback.format_exc()
               print 'Failed to get %s property' % pr
@@ -56,7 +66,7 @@ def main():
           
   def getField(line,field):
       server=array.get(x=line,head=field)
-      _class=array.get(x=listofdevs[device][0],head='class')
+      _class=array.get(x=devices[device][0],head='class')
       return server,_class,name
 
   def createStarter(hostnames,folders=[]):
@@ -101,17 +111,44 @@ def main():
       
   print createStarter.__doc__
   #######################################################################
-      
-  print 'Get device properties ...'
-  for device in listofdevs.keys():
-      print 'Device ',device,' properties are:'
-      props=getProperties(device)
-      for p,v in props.items(): print '\t',p,':',str(v)
+  
+  kprops,dprops,wildcards = {},{},fn.dicts.defaultdict(dict)
+  for lines,klass in sorted((v,k) for k,v in classes.items()):
+      kdevs = array.get(head='device',distinct=True,xsubset=lines)
+      print('%s has %d devices'%(klass,len(kdevs)))
+      for lines,device in sorted((v,k) for k,v in kdevs.items()):
+        props = {}
+        if not device:
+          print('Get Class Properties (%s,%s):'%(klass,lines))
+          kprops[klass] = props = getProperties(lines)
+        elif klass and fn.isRegexp(device):
+          print('Get Wildcard Properties (%s,%s):'%(klass,device))
+          wildcards[klass][device] = props = getProperties(lines)
+        else:
+          if upper: device = device.upper()
+          print('Get Device Properties (%s,%s,%s)'%(klass,device,lines))
+          props = fn.matchMap(wildcards,klass,default={})
+          props = fn.matchMap(props,device,default={}).copy() #Copy it!!
+          if props: print('wildcard: %s'%props)
+          props.update(getProperties(device))
+          dprops[device] = props
+        if props:
+          for p,v in props.items(): print('\t%s:%s'%(p,v))
+          print('\n')
+  
+  #for device,lines in devices.items():
+      #print('getDeviceProperties(%s,%s)'%(device,lines))
+      #dprops[device] = props = getProperties(device)
+      #for p,v in props.items(): print('\t%s:%s'%(p,v))
       
   def addTangoDev(server,_class,device):
           di = DbDevInfo()
           di.name,di._class,di.server = device,_class,server
           db.add_device(di)
+          
+  if len(devices)!=len(dprops):
+    print('!?: %s'%[d for d in devices if d not in dprops])
+    print('!?: %s'%[d for d in dprops if d not in devices])
       
   overwrite = False
   answer = raw_input('do you want to effectively add this devices and properties to the database %s? (Yes/No/Overwrite)'%get_tango_host())
@@ -120,38 +157,55 @@ def main():
       overwrite,answer = True,'yes'
       
   if answer.lower() in ['y','yes']:
-      db = Database()
-      for device,lines in listofdevs.items():
+    
+      alldevs = fn.tango.get_all_devices()
+      db = fn.tango.get_database()
+      
+      for k,props in kprops.items():
+          oldprops = db.get_class_property(k,props.keys())
+          
+          # Set properties in the Database (overwriting iff specified)
+          #----------------------------------------------------------------------------------------
+          for prop,value in props.items():
+              if not prop: continue
+              if overwrite or not oldprops[prop]:
+                  value = type(value) in (list,set) and value or [value]
+                  while not value[-1] and len(value)>1: value.pop(-1)
+                  print('Class Property ',k,'.',prop,', creating: ',value)
+                  db.put_class_property(k,{prop:value})
+              else:
+                  print('Class Property ',k,'.',prop,' already exists: ',oldprops[property])
+      
+      for device,lines in devices.items():
           server=array.get(x=lines[0],head='server').strip()
-          _class=array.get(x=lines[0],head='class').strip()
+          klass=array.get(x=lines[0],head='class').strip()
           
           # Create the Device if it doesn't exists
           #----------------------------------------------------------------------------------------
-          if not db.get_device_member(device) or overwrite:
-              print 'Creating ',device,' device ...'
-              addTangoDev(server,_class,device)
+          if overwrite or device.lower() not in alldevs:
+              print('Creating %s.%s(%s) '%(server,klass,device))
+              addTangoDev(server,klass,device)
           else:
-              print device,' device already exists ...'
-          
-          props=getProperties(device)
-          oldprops=db.get_device_property(device,props.keys())
+              print('%s device already exists ...'%(device))
           
           ##@todo loading default properties
           # A way to define easily if some default properties must be defined and implemented here!
+          props = dprops[device]
 
           # oldprops values must be updated with new values
-          oldprops=db.get_device_property(device,props.keys())
+          oldprops = db.get_device_property(device,props.keys())
 
           # Set properties in the Database (overwriting iff specified)
           #----------------------------------------------------------------------------------------
-          for property,value in props.items():
-              if overwrite or not oldprops[property]:
+          for prop,value in props.items():
+              if not prop: continue
+              if overwrite or not oldprops[prop]:
                   value = type(value) in (list,set) and value or [value]
                   while not value[-1] and len(value)>1: value.pop(-1)
-                  print 'Device Property ',device,'.',property,', creating: ',value
-                  db.put_device_property(device,{property:value})
+                  print('Device Property ',device,'.',prop,', creating: ',value)
+                  db.put_device_property(device,{prop:value})
               else:
-                  print 'Device Property ',device,'.',property,' already exists: ',oldprops[property]
+                  print('Device Property ',device,'.',prop,' already exists: ',oldprops[property])
 
 if __name__ == '__main__':
   main()    
