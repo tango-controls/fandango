@@ -37,7 +37,7 @@
 import Queue,traceback,time,sys,os
 from functools import partial
 import fandango
-from fandango.functional import isString,isSequence,isDictionary,isCallable
+from fandango.functional import *
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton,Decorated,Decorator,ClassDecorator,BoundDecorator
@@ -1864,10 +1864,10 @@ class QEvaluator(Qt.QWidget):
             traceback.print_exc()
     
     @staticmethod
-    def main(args=[]):
+    def main(args=None):
         qapp = getApplication()
         print(len(args),args)
-        args = args or sys.argv[1:]
+        args = notNone(args,sys.argv[1:])
         if args and os.path.isfile(args[0]):
           args = filter(bool,map(str.strip,open(args[0]).readlines()))
         kw = args and {'model':';'.join(args)} or {}
