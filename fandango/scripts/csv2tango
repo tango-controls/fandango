@@ -9,43 +9,59 @@ ALBA Synchrotron Controls Group
 import sys,os, traceback
 from PyTango import *
 import fandango as fn
-from fandango.arrays import *
+from fandango import SortedDict,CSVArray
+from fandango.functional import *
 from fandango.tango import *
+#from fandango.arrays import *
 
-def remove_tango_devices(devices):
+def remove_tango_devices(devices,db=None):
     """
     Remove Tango devices and its properties from Database
     """
+    db = db or fn.get_database()
+    servers = set()
     for d in devices:
       try:
         print('Removing %s from Tango database'%d)
         props = db.get_device_property_list(d,'*')
         for p in list(props):
           db.delete_device_property(d,p)
-        server = db.get_device_info('test/panic/delay').ds_full_name
+        servers.add(db.get_device_info(d).ds_full_name)
         db.delete_device(d)
+      except:
+        traceback.print_exc()
+        print('Unable to delete %s device'%d)
+    for server in servers:
+      try:
         devs = list(db.get_device_class_list(server))
         if not devs or all(fn.clmatch('^deserver*',d) for d in devs):
           print('Removing %s from Tango database'%server)
           db.delete_server(server)
       except:
         traceback.print_exc()
-        print('Unable to delete %s device'%d)
+        print('Unable to delete %s server'%server)
     return len(devices)
 
 def main():
 
-  if len(sys.argv)<1:
+  if len(sys.argv)<=1:
+      print('Insert devices and properties into Tango Database')
+      print('Usage: csv2tango ["--filter=*/*/*"] filename.csv')
       exit()
 
-  filename = sys.argv[1]
+  filename = sys.argv[-1]
+  options = [o for o in sys.argv[1:-1] if o.startswith('-')]
   print('Loading %s ...'%filename)
+  print('options = %s'%(options))
+  filters = ([o.replace('--filter=','') for o in options if '--filter' in o] or ['*'])[0]
+  
   array = CSVArray(filename,header=0,offset=1)
   [array.fill(head=s) for s in array.getHeaders()]
 
   #print('Getting device columns ...')
   classes = array.get(head='class',distinct=True)
   devices = array.get(head='device',distinct=True)
+  devices = dict((k,v) for k,v in devices.items() if k and clmatch(filters,k))
   
   if '' in classes: 
     print(classes)
@@ -133,7 +149,7 @@ def main():
   print createStarter.__doc__
   #######################################################################
   
-  kprops,dprops,wildcards = {},{},fn.dicts.defaultdict(dict)
+  kprops,dprops,wildcards = {},{},fn.dicts.SortedDict()
   for lines,klass in sorted((v,k) for k,v in classes.items()):
       kdevs = array.get(head='device',distinct=True,xsubset=lines)
       print('%s has %d devices'%(klass,len(kdevs)))
@@ -144,12 +160,17 @@ def main():
           kprops[klass] = props = getProperties(lines)
         elif klass and fn.isRegexp(device):
           print('Get Wildcard Properties (%s,%s):'%(klass,device))
+          if klass not in wildcards: wildcards[klass] = SortedDict()
           wildcards[klass][device] = props = getProperties(lines)
         else:
+          if not clmatch(filters,device): continue
           if upper: device = device.upper()
           print('Get Device Properties (%s,%s,%s)'%(klass,device,lines))
-          props = fn.matchMap(wildcards,klass,default={})
-          props = fn.matchMap(props,device,default={}).copy() #Copy it!!
+          ## Parse wildcards
+          for k,ds in wildcards.items():
+            for d,ps in ds.items():
+              if clmatch(k,klass) and clmatch(d,device):
+                props.update(ps)
           if props: print('wildcard: %s'%props)
           props.update(getProperties(device))
           dprops[device] = props
@@ -170,7 +191,16 @@ def main():
   if len(devices)!=len(dprops):
     print('!?: %s'%[d for d in devices if d not in dprops])
     print('!?: %s'%[d for d in dprops if d not in devices])
-      
+    
+  alldevs = fn.tango.get_all_devices()
+  db = fn.tango.get_database()
+  already = [d for d in dprops if d.lower() in alldevs] 
+  if already:
+    answer = raw_input('%d devices already exist, '
+      'do you want to DELETE its previous data from the database?'%len(already))
+    if answer.lower() in ['y','yes']:
+        remove_tango_devices(already,db)
+        
   overwrite = False
   answer = raw_input('do you want to effectively add this devices and properties to the database %s? (Yes/No/Overwrite)'%get_tango_host())
 
@@ -178,14 +208,6 @@ def main():
       overwrite,answer = True,'yes'
       
   if answer.lower() in ['y','yes']:
-    
-      alldevs = fn.tango.get_all_devices()
-      db = fn.tango.get_database()
-      already = [d for d in dprops if d in alldevs] 
-      answer = raw_input('% devices already exist, '
-        'do you want to delete its previous data from the database?'%len(already))
-      if answer.lower() in ['y','yes']:
-          remove_tango_devices(already)
       
       for k,props in kprops.items():
           oldprops = db.get_class_property(k,props.keys())
@@ -200,7 +222,7 @@ def main():
                   print('Class Property ',k,'.',prop,', creating: ',value)
                   db.put_class_property(k,{prop:value})
               else:
-                  print('Class Property ',k,'.',prop,' already exists: ',oldprops[property])
+                  print('Class Property ',k,'.',prop,' already exists: ',oldprops[prop])
       
       for device,lines in devices.items():
           server=array.get(x=lines[0],head='server').strip()
@@ -208,7 +230,8 @@ def main():
           
           # Create the Device if it doesn't exists
           #----------------------------------------------------------------------------------------
-          if overwrite or device.lower() not in alldevs:
+          if device.lower() not in alldevs:
+              #DO NOT RECREATE EVEN ON OVERWRITE
               print('Creating %s.%s(%s) '%(server,klass,device))
               addTangoDev(server,klass,device)
           else:
@@ -231,7 +254,7 @@ def main():
                   print('Device Property ',device,'.',prop,', creating: ',value)
                   db.put_device_property(device,{prop:value})
               else:
-                  print('Device Property ',device,'.',prop,' already exists: ',oldprops[property])
+                  print('Device Property ',device,'.',prop,' already exists: ',oldprops[prop])
 
 if __name__ == '__main__':
   main()    
