@@ -401,9 +401,12 @@ def filtersmart(seq,filters):
         '+' : complementary, it must match all complementaries and at least a 'normal filter' to be valid
         '^' : matches string since the beginning (startswith instead of contains)
         '$' : matches the end of strings
+        ',' : will be used as filter separator if a single string is provided
+        
     """
     seq = seq if isSequence(seq) else (seq,)
-    filters = filters if isSequence(filters) else (filters,)
+    if isString(filters):
+      filters = filters.split(',')
     raw,comp,neg = [],[],[]
     def parse(s):
         s = toRegexp(s)
