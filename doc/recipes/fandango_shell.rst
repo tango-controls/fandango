@@ -36,6 +36,10 @@ You can also start devices on an specific host::
 
 Most fandango methods can be launched from Unix shell (the launcher was called fandango.sh in previous versions)::
 
+  > fandango --help # will return the list of commands available
+  
+  > fandango --help [command] # will return the command help
+
   > fandango get_tango_host
   
     localhost:10000
