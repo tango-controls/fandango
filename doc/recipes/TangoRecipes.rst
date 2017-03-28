@@ -113,38 +113,9 @@ if you just want to see if things are effectively running or not::
 
   astor.states()
   
-Use TangoEval to evaluate strings containing Tango Attributes
-=============================================================
 
-TangoEval class provides PyAlarm-like evaluation of strings containing attribute names (replacing them by its values). It is part of fandango.device module.
-The result of each evaluation is stored in te.result.
-
-.. code:: python
-
-  from fandango import TangoEval
-  te = TangoEval('(s01/vc/gauge-01/pressure + s01/vc/gauge-01/pressure) / 2.')
-
-  [Out]: TangoEval: result = 7.2e-10
-  
-  
-Use CSVArray to turn a .csv into a dictionary
-=============================================
-
-::
-
-  cat tmp/tree_test.csv
-  A       B       2
-          C       3
-
-.. code:: python
-
-  csv = fandango.arrays.CSVArray('tmp/tree_test.csv')
-  csv.expandAll()
-  csv.getAsTree(lastbranch=1)
-  Out[18]: {'A': {'B': ['2'], 'C': ['3']}}
-
-Fast property update
-====================
+Example: Fast property update
+=============================
 
 This example will collect all running instances of PyAlarm and will replace its properties
 
@@ -167,9 +138,42 @@ This example will collect all running instances of PyAlarm and will replace its 
   # Reload the devices properties
   for d in devs: 
     servers.proxies[d].Init()
+  
+Use TangoEval to evaluate strings containing Tango Attributes
+=============================================================
+
+TangoEval class provides PyAlarm-like evaluation of strings containing attribute names (replacing them by its values). It is part of fandango.device module.
+The result of each evaluation is stored in te.result.
+
+.. code:: python
+
+  from fandango import TangoEval
+  te = TangoEval('(s01/vc/gauge-01/pressure + s01/vc/gauge-01/pressure) / 2.')
+
+  [Out]: TangoEval: result = 7.2e-10
+  
+Other tools/classes
+===================
+  
+  
+Use CSVArray to turn a .csv into a dictionary
+---------------------------------------------
+
+::
+
+  cat tmp/tree_test.csv
+  A       B       2
+          C       3
+
+.. code:: python
+
+  csv = fandango.arrays.CSVArray('tmp/tree_test.csv')
+  csv.expandAll()
+  csv.getAsTree(lastbranch=1)
+  Out[18]: {'A': {'B': ['2'], 'C': ['3']}}
 
 ReversibleDict
-==============
+--------------
 
 .. code:: python
 
@@ -198,7 +202,7 @@ ReversibleDict
   Out[139]: set([0])
 
 ThreadDict
-==========
+----------
 
 from PyPLC:
 
@@ -246,7 +250,7 @@ Reading:
                     val = self.threadDict[key]
                     
 Piped, iPiped, zPiped interfaces
-================================
+--------------------------------
 
 Fandango has a set of operators to use regular-or operator ('|') like a linux pipe between operators (inspired by Maxim Krikun [ http://code.activestate.com/recipes/276960-shell-like-data-processing/?in=user-1085177]).
 
