@@ -50,7 +50,26 @@ Using fandango.tango.get_matching_devices or get_matching_attributes:
    'SR01/VC/VGCT-01A08-01',
    'SR01/VC/VGCT-02A01-01',
    'SR02/VC/IPCT-02A02-01',
-
+   
+   tango.get_matching_attributes('bo01*corv*/current')
+   ['bo01/pc/corv-01/Current',
+    'bo01/pc/corv-03/Current',
+    'bo01/pc/corv-05/Current',
+    'bo01/pc/corv-06/Current',
+    'bo01/pc/corv-07/Current',
+    'bo01/pc/corv-09/Current',
+    'bo01/pc/corv-11/Current']
+     
+   import fandango as fn
+   fn.kmap(tango.read_attribute,tango.get_matching_attributes('bo01*corv*/current'))
+   [('bo01/pc/corv-01/Current', 0.090130000000000002),
+    ('bo01/pc/corv-03/Current', 0.084650000000000003),
+    ('bo01/pc/corv-05/Current', 0.099900000000000003),
+    ('bo01/pc/corv-06/Current', -0.054309999999999997),
+    ('bo01/pc/corv-07/Current', 0.0099299999999999996),
+    ('bo01/pc/corv-09/Current', 0.052699999999999997),
+    ('bo01/pc/corv-11/Current', 0.081900000000000001)]  
+   
 Search for device attribute/properties matching a regular expression:
 
 .. code:: python
@@ -59,6 +78,8 @@ Search for device attribute/properties matching a regular expression:
   {'S01/VC/IPCT-01': {'SerialLine': 'S01/VC/SERIAL-01'},
    'S01/VC/IPCT-02': {'SerialLine': 'S01/VC/SERIAL-02'},
    'S01/VC/VGCT-01': {'SerialLine': 'S01/VC/SERIAL-10'}}
+   
+
 
 Obtain all information from a device
 ====================================
