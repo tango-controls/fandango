@@ -18,16 +18,21 @@ The fandango api provides helper commands to create devices and assign propertie
   fn.tango.put_device_property('your/device/name','Property','Value')
 
 
-You can also call them from shell::
+You can also call them from shell (use fandango.sh in <12.6 releases)::
 
-  > fandango.sh add_new_device Server/Instance Class your/device/name
-  > fandango.sh put_device_property your/device/name Property Value
+  > fandango add_new_device Server/Instance Class your/device/name
+  > fandango put_device_property your/device/name Property Value
 
 
 To start it on any host managed by Starter::
 
-  > tango_servers yourhost start Server/Instance
+  > tango_servers "yourhostname" start "YourServer/YourInstance"
+  
+Visualize its state::
 
+  > tango_servers state "YourServer/YourInstance"
+  
+  > fandango check_device your/device/name
 
 
 Get devices or attributes matching a regular expression
