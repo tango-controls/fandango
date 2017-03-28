@@ -146,15 +146,27 @@ Use CSVArray to turn a .csv into a dictionary
 Fast property update
 ====================
 
+This example will collect all running instances of PyAlarm and will replace its properties
+
 .. code:: python
 
-  import fandango.functional as fun
+  import fandango as fn
   servers = fandango.Astor('PyAlarm/*')
-  8 : devs = [d for d in fun.chain(*[servers[s].get_device_list() for s,v in servers.states().items() if v is not None]) if not d.startswith('dserver')]
+  # Get running servers
+  running = [s for for s,v in servers.states().items() if v is not None]
+  # Get the list of devices
+  devs = fn.chain(*[servers[s].get_device_list() for s in running])
+  
   for d in devs:
+    if not d.startswith('dserver'):
       prop = servers.proxies[d].get_property(['AlarmReceivers'])['AlarmReceivers']
-      servers.proxies[d].put_property({'AlarmReceivers':[s.replace('%SRUBIO','%DFERNANDEZ') for s in prop]})
-  for d in devs: servers.proxies[d].ReloadFromDB()
+      # Modify property values
+      prop = [s.replace('%SRUBIO','%DFERNANDEZ') for s in prop]
+      servers.proxies[d].put_property({'AlarmReceivers':prop})
+      
+  # Reload the devices properties
+  for d in devs: 
+    servers.proxies[d].Init()
 
 ReversibleDict
 ==============
