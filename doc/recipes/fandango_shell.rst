@@ -34,7 +34,7 @@ You can also start devices on an specific host::
   > tango_servers ctlabserver start PyPLC/plctest12
   
 
-Most fandango methods can be launched from Unix shell::
+Most fandango methods can be launched from Unix shell (the launcher was called fandango.sh in previous versions)::
 
   > fandango get_tango_host
   
