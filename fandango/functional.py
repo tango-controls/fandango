@@ -750,8 +750,18 @@ def list2str(s,separator='\t',MAX_LENGTH=255):
 def text2tuples(s,separator='\t'):
     return [str2list(t,separator) for t in text2list(s)]
 
-def tuples2text(s,separator='\t'):
-    return list2str([list2str(t,separator) for t in s],'\n')
+def tuples2text(s,separator='\t',lineseparator='\n'):
+    return list2str([list2str(t,separator) for t in s],lineseparator)
+  
+def dict2str(s,sep=':\t',linesep='\n',listsep='\n\t'):
+    return linesep.join(sorted(
+      sep.join((str(k),list2str(toList(v),listsep,0))) 
+      for k,v in s.items()))
+  
+def obj2str(obj,sep=',',linesep='\n'):
+    if isMapping(obj): return dict2str(obj,sep,linesep)
+    elif isSequence(obj): return list2str(obj,sep)
+    else: return toString(obj)
 
 ########################################################################
 ## Number conversion

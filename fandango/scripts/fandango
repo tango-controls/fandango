@@ -100,6 +100,7 @@ if __name__ == '__main__':
       except: pass
     
     if opts.get('-h',opts.get('help',0)):
+      ## Executing HELP
       import inspect
       
       _locals=locals()
@@ -129,24 +130,28 @@ if __name__ == '__main__':
       assert comms
       
       if 'qt' in comms[:1] or opts.get('-qt'):
+        # LAUNCHING QT SHELL
         args = comms['qt' in comms:]
         print('Launching the interactive Qt console ... %s'%args)
         import fandango.qt
         fandango.qt.QEvaluator.main(args)
         
       elif '(' in comms[0]:
+        ## SINGLE STRING COMMAND
         _locals = locals()
         for c in comms:
           cmd = c
           r = evalX(c,_locals=_locals)
           
       else:
+        ## MULTIPLE ARGS COMMAND
         args = ','.join((str(c) if isNumber(c) else "'%s'"%c) for c in comms[1:])
         cmd = '%s(*[%s])'%(comms[0],args)
         r = evalX(cmd,_locals=locals())
         
     if opts.get('-l'): print(cmd)
-    print(r if not isSequence(r) else list2str(r,'\n'))
+    #print(r if not isSequence(r) else list2str(r,'\n'))
+    print(obj2str(r,sep=' '))
     
   except AssertionError,e:
     print(__doc__)

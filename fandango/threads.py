@@ -63,14 +63,25 @@ def wait(seconds,event=True,hook=None):
     :param seconds: seconds to wait for
     :param event: if True (default) it uses a dummy Event, if False it uses time.sleep, if Event is passed then it calls event.wait(seconds)
     """
-    if hook and isCallable(hook):
-        Catched(hook)()
-    if not event:
-        time.sleep(seconds)
-    elif hasattr(event,'wait'):
-        event.wait(seconds)
-    else:
-        _EVENT.wait(seconds)
+    r = 0
+    try:
+      if hook and isCallable(hook):
+          Catched(hook)()
+      r+=1
+      if not event:
+          time.sleep(seconds)
+      elif hasattr(event,'wait'):
+        try:
+          event.wait(seconds)
+        except Exception,e:
+          raise e
+      else:
+          _EVENT and _EVENT.wait(seconds)
+      r+=2
+    except Exception,e:
+      ## This method triggers unexpected exceptions on ipython exit
+      print('wait.hook failed!: %s,%s,%s,%s'%(event,event.wait,r,e))
+      if time: time.sleep(seconds)
         
 def timed_range(seconds,period,event=None):
     """
@@ -214,10 +225,11 @@ class ThreadedObject(Object):
   def set_stop_hook(self,target): self._stop_hook = target
   def set_wait_hook(self,target): self._wait_hook = target
   
-  def print_exc(self,e=''):
-    if not e: e = traceback.format_exc()
+  def print_exc(self,e='',msg=''):
+    if not e and traceback: 
+      e = traceback.format_exc()
     self._last_exc = str(e)
-    print(self._last_exc)
+    print(msg+':'+self._last_exc)
   
   def set_queue(self,queue): 
     """
@@ -295,10 +307,10 @@ class ThreadedObject(Object):
 
             while self._stop.isSet():
                 wait(self._timewait,self._event,self._wait_hook)
-
+                
             self._done.clear()
             self.clean_stats()
-            
+
             ts = time.time()
             ## Evaluate target() arguments
             try:
@@ -308,11 +320,12 @@ class ThreadedObject(Object):
                     self.print_exc()
                 self._errors += 1
                 args,kwargs = [],{}
-
+            
             print('ThreadedObject.Start() ...')
             self._started = time.time()
             self._next = self._started + self._timewait
             while not self._stop.isSet():
+              try:
                 self._event.clear()
                 
                 ## Task Execution
@@ -355,15 +368,20 @@ class ThreadedObject(Object):
                 
                 self._count += 1
                 
+              except Exception,e:
+                self.print_exc(e if not traceback else traceback.format_exc(),
+                               'ThreadObject stop!')
+                raise e
+                
             print('ThreadedObject.Stop(...)')
             self._started = 0
             self._done.set() #Will not be cleared until stop/start() are called
             Catched(self._stop_hook)()
     
         print('ThreadedObject.Kill() ...')
-        return #<< Will never get to this point
-    except:
-        self.print_exc()
+        return #<< Should never get to this point
+    except Exception,e:
+        self.print_exc(e,'ThreadObject exit!')
 
 ###############################################################################
 
