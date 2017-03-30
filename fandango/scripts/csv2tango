@@ -82,7 +82,7 @@ def main():
 
   def getProperties(device):
       props={}
-      lines= device if fn.isSequence(device) else devices[device]
+      lines= device if fn.isSequence(device) else devices[device.upper()]
       #Iterate through each line of device declaration
       for l in lines:
           pr = array.get(x=l,head='property')
