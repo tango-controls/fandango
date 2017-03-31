@@ -17,6 +17,13 @@ DynamicDS device formulas are declared using four properties:
  - DynamicCommands
  - DynamicStates
  - DynamicQualities
+ 
+Devices implementing DynamicAttributes
+--------------------------------------
+
+The best example of DynamicAttributes is SimulatorDS: https://github.com/tango-controls/SimulatorDS
+
+Other devices implementing this API are PyStateComposer, PyAttributeProcessor, PyPLC, CopyCatDS, CSVReader, RFFacade, ...
 
 What DynamicAttributes / DynamicDS allow
 ----------------------------------------
@@ -33,45 +40,6 @@ It's also possible to write READ/WRITE attributes::
 
   SETPOINT = DevDouble(READ and SerialCommand('SP?') or WRITE and SerialCommand('SP=%s'%VALUE))
 
-Add DynamicAttributes to a Tango Device Class
----------------------------------------------
-
-Modify the following lines of your device::
-
-Declaration of your device, replace DevImpl by DynamicDS::
-
-  from fandango.dynamic import *
-  class GaugeController(fandango.DynamicDS):
-
-Class creator, initialize DynamicDS instead of DevImpl; methods added to _locals dictionary will be available in attributes formulas::
-
-  def __init__(self,cl, name):
-        ...
-        fandango.DynamicDS.__init__(self,cl,name,_locals={'SerialCommand':self.SerialCommand})
-        GaugeController.init_device(self)
-
-Init() method of device, replace get_device_properties()::
-
-  def init_device(self):
-        ...
-        self.get_DynDS_properties() 
-        ...
-
-Add always executed hook for evaluating states::
-
-  def always_executed_hook(self):
-        print "In ", self.get_name(), "::always_excuted_hook()"
-        fandango.DynamicDS.always_executed_hook(self)
-
-In the Tango class declaration, replace PyTango.DeviceClass::
-
-  class GaugeControllerClass(fandango.DynamicDSClass): #<--- Declaration of Class
-        ...
-
-Finally, go to Jive and create the DynamicAttributes property and put there your attributes formulas.::
-
-  SETPOINT=type(READ and SerialComm('SP?') or WRITE and SerialComm('SP=%s'%VALUE))
-  
 ----
 
 Usage of Dynamic Attributes
@@ -490,6 +458,46 @@ ChekDependencies (True by default)
 ..................................
 
 will force a check of which attributes are accessed in other's formulas, creating an index for each attribute with its pre-requisites for evaluation (which will be automatically assigned to be kept). At each read_dyn_attr execution the dependency values will be added to _locals, and a read_dyn_attr(dependency) may be forced if its values are older than KeepTime.
+
+Add DynamicAttributes to a Tango Device Class
+---------------------------------------------
+
+Modify the following lines of your device::
+
+Declaration of your device, replace DevImpl by DynamicDS::
+
+  from fandango.dynamic import *
+  class GaugeController(fandango.DynamicDS):
+
+Class creator, initialize DynamicDS instead of DevImpl; methods added to _locals dictionary will be available in attributes formulas::
+
+  def __init__(self,cl, name):
+        ...
+        fandango.DynamicDS.__init__(self,cl,name,_locals={'SerialCommand':self.SerialCommand})
+        GaugeController.init_device(self)
+
+Init() method of device, replace get_device_properties()::
+
+  def init_device(self):
+        ...
+        self.get_DynDS_properties() 
+        ...
+
+Add always executed hook for evaluating states::
+
+  def always_executed_hook(self):
+        print "In ", self.get_name(), "::always_excuted_hook()"
+        fandango.DynamicDS.always_executed_hook(self)
+
+In the Tango class declaration, replace PyTango.DeviceClass::
+
+  class GaugeControllerClass(fandango.DynamicDSClass): #<--- Declaration of Class
+        ...
+
+Finally, go to Jive and create the DynamicAttributes property and put there your attributes formulas.::
+
+  SETPOINT=type(READ and SerialComm('SP?') or WRITE and SerialComm('SP=%s'%VALUE))
+  
 
 ----
 
