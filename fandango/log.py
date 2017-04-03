@@ -145,9 +145,12 @@ class Logger(Object):
     This class provides logging methods (debug,info,error,warning) to all classes inheriting it.
     To use it you must inherit from it and add it within your __init__ method:
     
-    def __init__(self,cl, name):
+    class MyTangoDevice(Device_4Impl,Logger):
+    
+      def __init__(self,cl, name):
+      
         PyTango.Device_4Impl.__init__(self,cl,name)
-        self.call__init__(fandango.log.Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
     
     Constructor arguments allow to customize the output format:
      * name='fandango.Logger' #object name to appear at the beginning
