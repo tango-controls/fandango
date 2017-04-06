@@ -5,4 +5,4 @@ Introducing Fandango
 
 See README.rst file
 
-.. include:: ../README.rst
+.. include:: README.rst

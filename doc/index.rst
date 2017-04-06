@@ -5,7 +5,7 @@
 
 .. Later edited by srubio
 
-Welcome to fandango 11+ documentation!
+Welcome to fandango 12+ documentation!
 ======================================
 
 See an Introduction to fandango: :ref:`description`
@@ -16,11 +16,12 @@ Contents:
 =========
 
 .. toctree::
-   :maxdepth: 4
+   :maxdepth: 2
 
    description
-   changes
    recipes
+   devices
+   changes
    fandango.arrays
    fandango.callbacks
    fandango.db

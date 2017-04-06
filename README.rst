@@ -32,14 +32,14 @@ Features
 
 This library provides submodules with utilities for PyTango device servers and applications written in python:
 
- * functional: functional programming, data format conversions, caseless regular expressions
- * tango: tango api helper methods, search/modify using regular expressions
- * dynamic: dynamic attributes, online python code evaluation
- * server: Astor-like python API
- * device: some templates for Tango device servers, TangoEval for fast "tango code" evaluation.
+ * :doc:`functional: functional programming, data format conversions, caseless regular expressions <fandango.functional>`
+ * :doc:`tango : tango api helper methods, search/modify using regular expressions <fandango.tango>`
+ * :doc:`dynamic : dynamic attributes, online python code evaluation <fandango.dynamic>`
+ * server : Astor-like python API
+ * device : some templates for Tango device servers.
  * interface: device server inheritance
  * db: MySQL access
- * dicts,arrays: advanced containers, sorted/caseless list/dictionaries, .csv parsing
+ * :doc:`dicts,arrays: advanced containers, sorted/caseless list/dictionaries, .csv parsing <fandango.arrays>`
  * log: logging
  * objects: object templates, singletones, structs
  * threads: serialized hardware access, multiprocessing

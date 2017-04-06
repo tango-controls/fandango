@@ -1,13 +1,21 @@
+
 ================
 Fandango Recipes
 ================
 
-.. contents::
+.. toctree::
+   :maxdepth: 2
 
-.. include:: ../recipes/fandango_shell.rst
 
-.. include:: ../recipes/CheckDevices.rst
+   recipes/CheckDevices
+   recipes/CreateDevices
+   recipes/fandango_shell
+   recipes/script_ctds
+   recipes/EventsAndCallbacks
+   recipes/CreateNewTangoHost
+   recipes/ExportDeviceData
+   recipes/DynamicDS_and_Simulators
+   recipes/Exceptions
+   recipes/TangoRecipes
+   recipes/Threading
 
-.. include:: ../recipes/CreateDevices.rst
-
-.. include:: ../recipes/script_ctds.rst
