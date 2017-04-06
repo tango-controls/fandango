@@ -1,10 +1,22 @@
-RELEASE = (12,6,0)
-RELEASE_NOTE = "Added FolderDS and FolderGUI, moved to GitHub, many bugs fixed"
+RELEASE = (12,6,1)
+RELEASE_NOTE = "Event Callbacks, Shell scripts and FolderDS for remote logging"
 
 """
 IMPORTANT:
 
   Due to fandango.device module refactoring you may need to remove previous package before installing this one
+
+-------------------
+12.6.1 - April 2017
+-------------------
+
+  Solve bugs in csv2tango and fandango launcher
+  Remove extensions from scripts
+
+  Add functional.obj2str, better string return from fandango launcher
+  filtersmart: accept strings as filter sequence
+  Solve exceptions on ThreadedObject exit
+  Solve bug on EventsThread.EVENT_POLLING_RATIO
 
 PENDING:
 
@@ -13,8 +25,9 @@ PENDING:
   ONGOING: 
     dicts: implement DictFile regexp alternative to CSVArray (to be used to import/export web reports)
     StructDict with sort/get/filter methods like Panic api
-    preparing next PyAlarm release with None not allowed in comparisons
+    preparing next PyAlarm release with None not allowed in comparisons      
 
+   
 -------------------
 12.6 - March 2017
 -------------------
@@ -60,7 +73,7 @@ PENDING:
       Set SimulatorDS as default simulation class
     Threading:
       Add ThreadedObject.get_avg_delay method
-
+      
 -------------------
 12.5 - January 2017
 -------------------
