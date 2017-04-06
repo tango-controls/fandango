@@ -18,16 +18,21 @@ The fandango api provides helper commands to create devices and assign propertie
   fn.tango.put_device_property('your/device/name','Property','Value')
 
 
-You can also call them from shell::
+You can also call them from shell (use fandango.sh in <12.6 releases)::
 
-  > fandango.sh add_new_device Server/Instance Class your/device/name
-  > fandango.sh put_device_property your/device/name Property Value
+  > fandango add_new_device Server/Instance Class your/device/name
+  > fandango put_device_property your/device/name Property Value
 
 
 To start it on any host managed by Starter::
 
-  > tango_servers yourhost start Server/Instance
+  > tango_servers "yourhostname" start "YourServer/YourInstance"
+  
+Visualize its state::
 
+  > tango_servers state "YourServer/YourInstance"
+  
+  > fandango check_device your/device/name
 
 
 Get devices or attributes matching a regular expression
@@ -45,7 +50,26 @@ Using fandango.tango.get_matching_devices or get_matching_attributes:
    'SR01/VC/VGCT-01A08-01',
    'SR01/VC/VGCT-02A01-01',
    'SR02/VC/IPCT-02A02-01',
-
+   
+   tango.get_matching_attributes('bo01*corv*/current')
+   ['bo01/pc/corv-01/Current',
+    'bo01/pc/corv-03/Current',
+    'bo01/pc/corv-05/Current',
+    'bo01/pc/corv-06/Current',
+    'bo01/pc/corv-07/Current',
+    'bo01/pc/corv-09/Current',
+    'bo01/pc/corv-11/Current']
+     
+   import fandango as fn
+   fn.kmap(tango.read_attribute,tango.get_matching_attributes('bo01*corv*/current'))
+   [('bo01/pc/corv-01/Current', 0.090130000000000002),
+    ('bo01/pc/corv-03/Current', 0.084650000000000003),
+    ('bo01/pc/corv-05/Current', 0.099900000000000003),
+    ('bo01/pc/corv-06/Current', -0.054309999999999997),
+    ('bo01/pc/corv-07/Current', 0.0099299999999999996),
+    ('bo01/pc/corv-09/Current', 0.052699999999999997),
+    ('bo01/pc/corv-11/Current', 0.081900000000000001)]  
+   
 Search for device attribute/properties matching a regular expression:
 
 .. code:: python
@@ -54,6 +78,8 @@ Search for device attribute/properties matching a regular expression:
   {'S01/VC/IPCT-01': {'SerialLine': 'S01/VC/SERIAL-01'},
    'S01/VC/IPCT-02': {'SerialLine': 'S01/VC/SERIAL-02'},
    'S01/VC/VGCT-01': {'SerialLine': 'S01/VC/SERIAL-10'}}
+   
+
 
 Obtain all information from a device
 ====================================
@@ -87,6 +113,32 @@ if you just want to see if things are effectively running or not::
 
   astor.states()
   
+
+Example: Fast property update
+=============================
+
+This example will collect all running instances of PyAlarm and will replace its properties
+
+.. code:: python
+
+  import fandango as fn
+  servers = fandango.Astor('PyAlarm/*')
+  # Get running servers
+  running = [s for for s,v in servers.states().items() if v is not None]
+  # Get the list of devices
+  devs = fn.chain(*[servers[s].get_device_list() for s in running])
+  
+  for d in devs:
+    if not d.startswith('dserver'):
+      prop = servers.proxies[d].get_property(['AlarmReceivers'])['AlarmReceivers']
+      # Modify property values
+      prop = [s.replace('%SRUBIO','%DFERNANDEZ') for s in prop]
+      servers.proxies[d].put_property({'AlarmReceivers':prop})
+      
+  # Reload the devices properties
+  for d in devs: 
+    servers.proxies[d].Init()
+  
 Use TangoEval to evaluate strings containing Tango Attributes
 =============================================================
 
@@ -100,9 +152,12 @@ The result of each evaluation is stored in te.result.
 
   [Out]: TangoEval: result = 7.2e-10
   
+Other tools/classes
+===================
+  
   
 Use CSVArray to turn a .csv into a dictionary
-=============================================
+---------------------------------------------
 
 ::
 
@@ -117,21 +172,8 @@ Use CSVArray to turn a .csv into a dictionary
   csv.getAsTree(lastbranch=1)
   Out[18]: {'A': {'B': ['2'], 'C': ['3']}}
 
-Fast property update
-====================
-
-.. code:: python
-
-  import fandango.functional as fun
-  servers = fandango.Astor('PyAlarm/*')
-  8 : devs = [d for d in fun.chain(*[servers[s].get_device_list() for s,v in servers.states().items() if v is not None]) if not d.startswith('dserver')]
-  for d in devs:
-      prop = servers.proxies[d].get_property(['AlarmReceivers'])['AlarmReceivers']
-      servers.proxies[d].put_property({'AlarmReceivers':[s.replace('%SRUBIO','%DFERNANDEZ') for s in prop]})
-  for d in devs: servers.proxies[d].ReloadFromDB()
-
 ReversibleDict
-==============
+--------------
 
 .. code:: python
 
@@ -160,7 +202,7 @@ ReversibleDict
   Out[139]: set([0])
 
 ThreadDict
-==========
+----------
 
 from PyPLC:
 
@@ -208,7 +250,7 @@ Reading:
                     val = self.threadDict[key]
                     
 Piped, iPiped, zPiped interfaces
-================================
+--------------------------------
 
 Fandango has a set of operators to use regular-or operator ('|') like a linux pipe between operators (inspired by Maxim Krikun [ http://code.activestate.com/recipes/276960-shell-like-data-processing/?in=user-1085177]).
 
