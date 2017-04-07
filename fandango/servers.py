@@ -961,4 +961,7 @@ class ComposersDict(ServersDict):
         except Exception,e:
             print e
             return e
-    
+   
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+ 

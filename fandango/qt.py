@@ -1881,3 +1881,7 @@ class ApiBrowser(QEvaluator): pass #For backwards compatibility
         
 if __name__ == '__main__':
     QEvaluator.main(sys.argv[1:])
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

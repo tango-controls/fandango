@@ -1102,8 +1102,5 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
 
-try:
-  from doc import get_autodoc
-  __doc__ = get_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])
-except:
-  print('Unable to generate doc toctree')
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])

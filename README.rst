@@ -2,6 +2,11 @@
 Fandango, functional tools for Tango Control System
 ---------------------------------------------------
 
+Fandango ("functional" programming for Tango) is a Python library for 
+developing functional and multithreaded control applications and scripts.
+It is mostly (but not only) used in the scope of Tango Control System and 
+PANIC Alarm System projects.
+
 Fandango is available at:
 
 * github: https://github.com/tango-controls/fandango/
@@ -14,25 +19,28 @@ Fandango is available at:
 Description
 ===========
 
-Fandango is a Python module created to simplify the configuration of big control systems; implementing the behavior of Jive (configuration) and/or Astor (deployment) tools in methods that could be called from scripts using regexp and wildcards.
+Fandango was developed to simplify the configuration of big control systems; implementing the behavior of Jive (configuration) and/or Astor (deployment) tools in methods that could be called from scripts using regexp and wildcards.
 
 It has been later extended with methods commonly used in some of our python API's (archiving, CCDB, alarms, vacca) or generic devices (composers, simulators, facades).
 
 Fandango python modules provides functional methods, classes and utilities to develop high-level device servers and APIs for Tango control system.
 
-Fandango is published using the same licenses than other TANGO projects; the license will be kept up to date in the LICENSE file.
+Fandango is published using the same licenses than other TANGO projects; the license will be kept up to date in the `LICENSE file <https://github.com/tango-controls/fandango/blob/documentation/LICENSE>`_
 
 FANDANGO IS TESTED ON LINUX ONLY, WINDOWS/MAC MAY NOT BE FULLY SUPPORTED IN MASTER BRANCH
 
 For more comprehensive documentation:
 
 * http://pythonhosted.org/fandango/
-* https://github.com/tango-controls/fandango/blob/master/doc/recipes
+
+Checkout for more updated recipes at:
+
+* https://github.com/tango-controls/fandango/blob/documentation/doc/recipes
 
 Authors
 =======
 
-Fandango library was originally written by Sergi Rubio Manrique for the ALBA Synchrotron. Later authors will be acknowledged in the AUTHORS file
+Fandango library was originally written by Sergi Rubio Manrique for the ALBA Synchrotron. Later authors will be acknowledged in the `AUTHORS file <https://github.com/tango-controls/fandango/blob/documentation/AUTHORS>`_
 
 Features
 ========
@@ -83,8 +91,8 @@ Several PyTango APIs and device servers use Fandango modules:
 Requirements
 ============
 
- * It requires PyTango to access Tango
- * It requires Taurus to use Tango Events.
+ * The functional, object submodules doesn't have any dependency
+ * It requires PyTango to use tango, device, dynamic and callback submodules
  * Some submodules have its own dependencies (Qt,MySQL), so they are always imported within try,except clauses. 
 
 Downloading
@@ -99,7 +107,7 @@ Fandango module is available from github (>=T9) and sourceforge (<=T9):
 Warranty
 ========
 
-see WARRANTY file
+see `WARRANTY file <https://github.com/tango-controls/fandango/blob/documentation/WARRANTY>`_
 
 
 

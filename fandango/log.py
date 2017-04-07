@@ -437,3 +437,7 @@ class InOutLogged(Decorator):
     r = self.f(*args,**kwargs)
     debug('Out of '+self.f.__name__)
     return r
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

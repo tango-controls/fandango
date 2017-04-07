@@ -11,7 +11,8 @@ Just do that at the end of your modules:
 
 """
 
-import inspect,fandango,os
+## KEEP THIS MODULE CLEAN OF DEPENDENCIES!!
+import inspect,os
 
 __all__ = ['get_autodoc','get_class_docs','get_function_docs','get_vars_docs']
 
@@ -56,6 +57,7 @@ TM3 = '~',False
 TM4 = '.',False
 
 def generate_rest_files(module,path='source'):
+  import fandango
   print '\n'*5
   print 'Writing documentation settings to %s/*rst' % (path)
   if fandango.isString(module): module = fandango.loadModule(module)
@@ -126,6 +128,18 @@ def get_autodoc(module_name,module_scope,module_vars=[],module_doc='',module_pos
     module_doc += get_class_docs(module_name,module_scope)
     module_doc += get_function_docs(module_name,module_scope)
     return module_doc+module_postdoc
+
+def get_fn_autodoc(module_name,module_scope,module_vars=[],module_doc='',module_postdoc='\n----\n'):
+    try:
+      post = '\n----\n\n\n'+get_rest_title('raw autodoc',*TM2)+'\n'
+      module_doc = module_doc or module_scope.get('__doc__','') or ''
+      if not any(c in module_doc for c in (3*TM1[0],3*TM2[0],3*TM3[0])):
+          module_doc = get_rest_title('Description',*TM2) + module_doc
+      if not any(c in module_doc for c in ('contents::','toctree::')):
+          module_doc = '.. contents::\n\n' + module_doc
+      module_doc = get_autodoc(module_name,module_scope,module_vars,module_doc ,module_postdoc=post)
+    except: print('failed to update %s.__doc__'%module_name)
+    return module_doc
 
 if __name__ == '__main__':
   import sys

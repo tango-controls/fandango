@@ -1228,3 +1228,7 @@ class AsynchronousFunction(threading.Thread):
             self.result = None            
             self.exception = e
         self.finished.set() #Not really needed, simply call AsynchronousFunction.isAlive() to know if it has finished
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

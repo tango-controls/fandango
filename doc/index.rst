@@ -8,9 +8,14 @@
 Welcome to fandango 12+ documentation!
 ======================================
 
+Fandango ("functional" programming for Tango) is a Python library for 
+developing functional and multithreaded control applications and scripts, 
+mostly used in the scope of Tango Control System and PANIC Alarm System 
+projects.
+
 See an Introduction to fandango: :ref:`description`
 
-Or try it directly from console: :ref:`fandango_scripts`
+And have a look to some common recipes: :doc:`recipes`
 
 Contents:
 =========

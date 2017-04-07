@@ -502,3 +502,7 @@ if __name__ == '__main__':
     #print sysargs_to_dict(defaults=['params'],cast=False,split=True)
     print sysargs_to_dict.__name__,'\n',sysargs_to_dict.__doc__
     print sysargs_to_dict(cast=False,split=True)
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

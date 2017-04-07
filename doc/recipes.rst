@@ -10,7 +10,6 @@ Fandango Recipes
    recipes/CheckDevices
    recipes/CreateDevices
    recipes/fandango_shell
-   recipes/script_ctds
    recipes/EventsAndCallbacks
    recipes/CreateNewTangoHost
    recipes/ExportDeviceData

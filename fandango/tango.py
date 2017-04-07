@@ -36,6 +36,11 @@ provides tango utilities for fandango, like database search methods and emulated
 This module is a light-weight set of utilities for PyTango.
 Classes dedicated for device management will go to fandango.device
 Methods for Astor-like management will go to fandango.servers
+
+.. contents::
+
+.
+
 """
 
 #python imports
@@ -2143,4 +2148,5 @@ if __name__ == '__main__':
     import sys
     __test_method__(sys.argv[1:])
 
-__doc__ = fandango.get_autodoc(__name__,vars())
+from fandango.doc import get_fn_autodoc
+__doc__ = get_fn_autodoc(__name__,vars())

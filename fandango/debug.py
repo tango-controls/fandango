@@ -29,4 +29,7 @@ def test_xtreme(device,attribute,value):
         print traceback.format_exc()
         PyTango.DeviceProxy(dp.adm_name()).command_inout('kill')
     return
-        
+       
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+ 

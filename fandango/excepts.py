@@ -318,3 +318,7 @@ def __test__(args=[]):
 if __name__ == '__main__':
   import sys
   __test__(sys.argv[1:])
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

@@ -1179,3 +1179,7 @@ class CSVArray(object):
             #print r,':','\t'.join([self.cols[c][r] for c in range(len(self.cols))])
     
     pass #END OF CSVARRAY
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

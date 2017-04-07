@@ -1,6 +1,6 @@
-==================
-Functional Recipes
-==================
+==============================
+Functional Programming Recipes
+==============================
 
 fandango.functional Module
 ==========================

@@ -249,3 +249,7 @@ def jqplot(title,ats):
         list([fandango.time2str(t[0]),t[1]] for t in vals[k]) for k in ats]
         )
     return jqp_template.replace('$DATA',data).replace('$SERIES',series).replace('$TITLE',title)
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+

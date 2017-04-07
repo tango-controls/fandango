@@ -924,3 +924,6 @@ class Enumeration:
     
     def whatis(self, value):
         return self.reverseLookup[value]
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())

@@ -1,5 +1,5 @@
 #!/usr/bin/env python2.5
-""" @if gnuheader
+
 #############################################################################
 ##
 ## file :       objects.py
@@ -8,7 +8,7 @@
 ##
 ## project :     Tango Control System
 ##
-## $Author: tcoutinho@cells.es, homs@esrf.fr $
+## $Author: srubio@cells.es, tcoutinho@cells.es, homs@esrf.fr $
 ##
 ##
 ## $Revision: 2008 $
@@ -34,10 +34,15 @@
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
-@endif
-@package object
-@description It includes 2 wonderful classes: Object (by ahoms) and Singleton (by MarcSantiago)
-@attention THIS MODULE IS DEPRECATED, Use @b tau.core.utils.Singleton and @b tau.core.utils.Object instead!
+
+"""
+fandango.objects contains method for loading python modules and objects "on the run",
+as well as several advanced types used within the fandango library
+
+It includes 2 wonderful classes: Object (by Alejandro Homs) and Singleton (by Marc Santiago)
+
+Other classes are borrowed from taurus.core.utils (by Tiago Coutinho)
+
 """
 import __builtin__
 from __builtin__ import object
@@ -620,3 +625,6 @@ class BoundDecorator(Decorator):#object):
                 setattr(instance, self.f.__name__, wrapper)
                 return wrapper
         return _Descriptor(f)
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())

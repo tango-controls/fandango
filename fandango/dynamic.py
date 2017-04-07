@@ -2211,7 +2211,7 @@ class DynamicServer(object):
         U.server_init()
         U.server_run()
 
-__doc__ = fandango.get_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
+__doc__ = fandango.doc.get_fn_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
         
 if __name__ == '__main__':
     print('.'*80)

@@ -236,3 +236,8 @@ class FriendlyDB(log.Logger):
             if not self.tables[t]: 
                 self.getTableCols(t)
         return
+
+from . import doc
+__doc__ = doc.get_fn_autodoc(__name__,vars())
+
+
