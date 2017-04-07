@@ -67,7 +67,8 @@ class FolderGUI(Qt.QSplitter):
       device = str(self.devices.currentText())
       mask = str(self.mask.text())
       if '*' not in mask: mask = '*%s*'%mask
-      self.files.addItems(sorted(self.api.find(device,mask)))
+      files = sorted(fn.clsplit('[:/]',f)[-1] for f in self.api.find(device,mask))
+      self.files.addItems(files)
       
     def loadFile(self):
       device = str(self.devices.currentText())

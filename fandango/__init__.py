@@ -57,7 +57,7 @@ try:
     import pkg_resources
     __version__ = pkg_resources.get_distribution(__name__).version
 except Exception, e:
-    __version__ = None
+    __version__ = RELEASE
     #print ('Unable to get distribution version number, fandango has '
     #       'probably not been installed as a package')
     
@@ -128,6 +128,10 @@ try:
     try: 
         from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute,DynamicDSTypes,CreateDynamicCommands,DynamicServer
     except Exception,e: raise Exception('fandango.dynamic: %s'%e)
+    try:
+        from callbacks import EventSource,EventThread,EventListener
+        from callbacks import CachedAttributeProxy,TangoListener,TangoAttribute
+    except Exception,e: raise Exception('fandango.callbacks: %s'%e)
 except Exception,e: 
     print 'Unable to import fandango.*tango modules: %s'%e
     #print traceback.format_exc()

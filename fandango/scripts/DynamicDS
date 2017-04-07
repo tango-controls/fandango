@@ -5,6 +5,7 @@
 
 DS=$(basename $0)
 
+## The instance argument can be used to override the server name
 if [ $(echo $1 | grep "/" ) ] ; then
  IFS='/' read -r DS INSTANCE <<< "$1"
 else
@@ -12,40 +13,69 @@ else
  INSTANCE=$1
 fi
 
-DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property('ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
-if [ "$DSORB" ] ; then
- DSORB="-ORBendPoint $DSORB"
-fi
+## @TODO:all these database calls should be done in a single rc.py file
+
+DSPROPS=$(tango_property -e \
+          DSORB=ORBEndPoint.$DS/$INSTANCE \
+          LcPATH=Starter/$HOST.StartDSPath \
+          DfPATH=PYTHON_CLASSPATH.DeviceClasses \
+          PyPATH=PYTHON_CLASSPATH.$DS)
+
+echo "Tango properties for $DS/$INSTANCE: $DSPROPS"
+for p in $DSPROPS; do 
+#   echo $p;
+  export $p;
+done
+
+# DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property('ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
+# if [ "$DSORB" ] ; then
+#  DSORB="-ORBendPoint $DSORB"
+# fi
+
+export PYTHONPATH=$PYTHONPATH:$LcPATH:$DfPATH:$PyPATH:$(pwd)/python/
+# echo $PYTHONPATH
 
 DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
 
 if [ ! "$DSPATH" ] ; then
- DSPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")
- if [ -e "$DSPATH/device/$DS.py" ] ; then
-  DSPATH=$DSPATH/device
- elif [ -e "$DSPATH/interface/$DS.py" ] ; then
-  DSPATH=$DSPATH/interface
+ FnPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")
+ if [ -e "$FnPATH/device/$DS.py" ] ; then
+  DSPATH=$FnPATH/device
+ elif [ -e "$FnPATH/interface/$DS.py" ] ; then
+  DSPATH=$FnPATH/interface
  fi
 fi
 
-DSPATH=$(readlink -f $DSPATH)
+if [ "$DSPATH" ] ; then
+  DSPATH=$(readlink -f $DSPATH)
+fi
 
-echo "Launching $DSPATH/$DS $INSTANCE at $DSORB"
+if [ ! -e "${DSPATH}/$DS.py" ] ; then
+  echo "############## ERROR ###############"
+  echo "Module $DS not found in PYTHONPATH!?"
 
-# TODO: if it is mandatory to be in the module path 
-cd ${DSPATH}
-
-if [ $(which screen 2>/dev/null) ] ; then
- if [ ! "$(echo $* | grep attach)" ] ; then
-  echo "run detached"
-  CMD="screen -dm -S $DS-$INSTANCE "
- else
-  CMD="screen -S $DS-$INSTANCE "
- fi
 else
-  CMD=""
+  echo "-------------------------------------------"
+  echo "Launching ${DSPATH}/$DS $INSTANCE at $DSORB"
+
+  # TODO: if it is mandatory to be in the module path 
+  cd ${DSPATH}
+
+  HASSCREEN=$(which screen 2>/dev/null)
+  if [ ! "$( echo $1 | grep '\?' )" ] && [ "$HASSCREEN" ] ; then
+    if [ ! "$(echo $* | grep 'attach')" ] ; then
+      echo "run detached"
+      CMD="screen -dm -S $DS-$INSTANCE "
+    else
+      CMD="screen -S $DS-$INSTANCE "
+    fi
+  else
+    CMD=""
+  fi
+
+  CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $2 $DSORB"
+  echo $CMD
+  $CMD
+
 fi
 
-CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $2 $DSORB"
-echo $CMD
-$CMD

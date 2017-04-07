@@ -1,16 +1,16 @@
 #!/usr/bin/env python
 
 import sys,time,traceback
-import fandango
+import fandango as fn
 
 __doc__ = """
 tango_servers
 -------------
 
-This script uses fandango.servers.ServersDict class to start/stop devices on any point of the control system using Tango Starters.
+This script uses fn.servers.ServersDict class to start/stop devices on any point of the control system using Tango Starters.
 
-  tango_servers.py [host] start|stop|restart|status [server_name_expression_list]
-
+  tango_servers [host] start|stop|kill|restart|status [server_name_expression_list]
+  
 Examples:
 
   tango_servers.py status              # Will display status of devices in localhost
@@ -21,35 +21,44 @@ NOTE: ctds and tango_admin scripts provide similar functionality
 
 """
 
-def main():
-  actions = 'start stop restart status'.split()
-
+def main(args = []):
+  actions = 'start stop kill restart status'.split()
+  args = [] or sys.argv[1:]
+  opts = [a for a in args if a.startswith('-')]
+  args = [a for a in args if a not in opts]
+  
   try:
-      assert 'help' not in sys.argv[1]
-      host = sys.argv[1] if not sys.argv[1] in actions else ''      
-      action = fandango.first([a for a in sys.argv if a in actions] or 'status')
-      targets = sys.argv[(2 if sys.argv[1] in actions else 3):]
+      assert 'help' not in str(opts+args)
+      host = args[0] if args[0] not in actions else ''
+      action = fn.first([a for a in args if a in actions] or [''])
+      targets = args[bool(host)+bool(action):]
+      action = action or 'status' #order matters
   except:
       print __doc__
       sys.exit(1)
-      
-  action,targets = sys.argv[1],sys.argv[2:]
+  
   try:
-      astor = fandango.Astor()
+      astor = fn.Astor()
       if targets:
           for exp in targets:
-              print 'Loading %s devices'%exp
+              print('Loading %s devices\n'%exp)
               astor.load_by_name(exp)
       else:
-          h = host or fandango.MyMachine().host
-          print 'Loading %s devices'%h
+          h = host or fn.MyMachine().host
+          print('Loading %s devices\n'%h)
           astor.load_by_host(h)
           
       sts = astor.states()
-
       if action in ('status','states','info','list'):
           if targets:
-              print '\n'.join(sorted('%s:\t%s'%(k,str(v)) for k,v in sts.items()))
+              for k,v in sorted(astor.items()):
+                print('%s:\t%s'%(k,str(sts[k])))
+                try:
+                  for d,s in sorted(v.get_all_states().items()):
+                    print('\t%s:\t%s'%(d,str(s)))
+                except: pass
+                print('')
+
           else:
             for h,ls in sorted(astor.get_host_overview().items()):
                 print('Note: Devices not controlled by Astor will not appear in this report\n\n')
@@ -59,10 +68,14 @@ def main():
                         print '\t'+s
                         for d,st in sorted(devs.items()):
                             print '\t\t%s:\t%s'%(d,st)
+                print('')
 
-      matched = [s for s in astor] # if not targets or fandango.clmatch(targets[0],s)]
+      matched = [s for s in astor] # if not targets or fn.clmatch(targets[0],s)]
       running = [s for s,st in sts.items() if st is not None]
       
+      if action in ('kill',):
+          print('Killing : %s'%matched)
+          astor.kill_servers(matched)
       if action in ('stop','restart'):
           print('Stopping : %s'%running)
           astor.stop_servers(running)
@@ -72,11 +85,11 @@ def main():
           print('Starting : %s'%matched)
           astor.start_servers(matched,**(host and {'host':host} or {}))
       
-      print '-'*80
+      print('-'*80)
       print(' '.join(sys.argv)+': Done')  
   except:
       print traceback.format_exc()
-      print '-'*80
+      print('-'*80)
       print(' '.join(sys.argv)+': Failed!')   
       
 if __name__ == '__main__':

@@ -47,7 +47,7 @@ except: import queue as Queue
 
 from log import except2str,shortstr
 from functional import *
-from excepts import trial
+from excepts import trial,Catched,CatchedArgs
 from operator import isCallable
 from objects import Singleton,Object,SingletonMap
 
@@ -58,17 +58,30 @@ except: pass
 
 _EVENT = threading.Event()
 
-def wait(seconds,event=True):
+def wait(seconds,event=True,hook=None):
     """
     :param seconds: seconds to wait for
     :param event: if True (default) it uses a dummy Event, if False it uses time.sleep, if Event is passed then it calls event.wait(seconds)
     """
-    if not event:
-        time.sleep(seconds)
-    elif isinstance(event,type(_EVENT)):
-        event.wait(seconds)
-    else:
-        _EVENT.wait(seconds)
+    r = 0
+    try:
+      if hook and isCallable(hook):
+          Catched(hook)()
+      r+=1
+      if not event:
+          time.sleep(seconds)
+      elif hasattr(event,'wait'):
+        try:
+          event.wait(seconds)
+        except Exception,e:
+          raise e
+      else:
+          _EVENT and _EVENT.wait(seconds)
+      r+=2
+    except Exception,e:
+      ## This method triggers unexpected exceptions on ipython exit
+      print('wait.hook failed!: %s,%s,%s,%s'%(event,event.wait,r,e))
+      if time: time.sleep(seconds)
         
 def timed_range(seconds,period,event=None):
     """
@@ -99,16 +112,36 @@ class FakeLock(object):
 
 class ThreadedObject(Object):
   """
-  An Object with a thread pool that provides safe stop on exit
+  An Object with a thread pool that provides safe stop on exit.
+  
+  It has a permanent thread running, that it's just paused 
   
   Created to allow safe thread usage in Tango Device Servers
   
-  Statistics and execution hooks are provided
+  WARNING DO NOT CALL start()/stop() methods inside target or any hook,
+  it may provoke unexpected behaviors.
+  
+  Some arguments:
+  
+  :target: function to be called
+  :period=1: iteration frequency
+  :nthreads=1: size of thread pool
+  :min_wait=1e-5:  max frequency allowed
+  :first=0: first iteration to start execution
+  :start=False: start processing at object creation
+  
+  Statistics and execution hooks are provided:
+  
+  :start_hook: launched after an start() command, 
+   may return args,kwargs for the target() method
+  :loop_hook: like start_hook, but called at each iteration
+  :stop_hook: called after an stop() call
+  :wait_hook: called before each wait()
   """
   
   INSTANCES = []
   
-  def __init__(self,target=None,period=1.,nthreads=1,min_wait=1e-5,start=False):
+  def __init__(self,target=None,period=1.,nthreads=1,start=False,min_wait=1e-5,first=0):
 
     self._event = threading.Event()
     self._stop = threading.Event()
@@ -116,6 +149,7 @@ class ThreadedObject(Object):
     self._kill = threading.Event()
     self._started = 0
     self._min_wait = 1e-5
+    self._first = first
     self._count = -1
     self._errors = 0
     self._delay = 0
@@ -126,8 +160,13 @@ class ThreadedObject(Object):
     self._queue = []
     self._start_hook = self.start_hook
     self._loop_hook = self.loop_hook
+    self._stop_hook = self.stop_hook
+    self._wait_hook = None
+    self._last_exc = ''
     
     self._threads = []
+    if nthreads>1:
+      print('Warning: ThreadedObject.nthreads>1 Not Implemented Yet!')
     for i in range(nthreads):
       self._threads.append(threading.Thread(target=self.loop))
       self._threads[i].daemon = True
@@ -136,7 +175,8 @@ class ThreadedObject(Object):
     self.set_target(target)
     self.stop(wait=False)
     if start:
-        self.start()
+      #Not starting threads, just reset flags
+      self.start()
     
     for t in self._threads: 
       t.start()
@@ -165,6 +205,7 @@ class ThreadedObject(Object):
   def get_errors(self): return self._errors
   def get_delay(self): return self._delay
   def get_acc_delay(self): return self._acc_delay
+  def get_avg_delay(self): return self._acc_delay/(self._count or 1)
   def get_usage(self): return self._usage
   def get_next(self): return self._next
   def get_last(self): return self._last
@@ -172,22 +213,40 @@ class ThreadedObject(Object):
       
   def get_thread(self,i=0): return self._threads[i]
   def get_nthreads(self): return len(self._threads)
-  def is_alive(self,i=0): return self.get_thread().is_alive()
+  def is_alive(self,i=0): return self.get_thread(i).is_alive()
     
   def set_period(self,period): self._timewait = period
   def get_period(self): return self._timewait  
-  def set_queue(self,queue): self._queue = queue
   def set_target(self,target): self._target = target
   def get_target(self): return self._target
+
   def set_start_hook(self,target): self._start_hook = target
   def set_loop_hook(self,target): self._loop_hook = target
+  def set_stop_hook(self,target): self._stop_hook = target
+  def set_wait_hook(self,target): self._wait_hook = target
+  
+  def print_exc(self,e='',msg=''):
+    if not e and traceback: 
+      e = traceback.format_exc()
+    self._last_exc = str(e)
+    print(msg+':'+self._last_exc)
+  
+  def set_queue(self,queue): 
+    """
+    A list of timestamps can be passed to the main loop to force
+    a faster or slower processing.
+    This list will override the current periodic execution,
+    target() will be executed at each queued time instead.
+    """
+    self._queue = queue
   
   ## MAIN METHODS
     
   def start(self):
-    #self._event.clear()
     if self._started: 
       self.stop()
+    else: #abort stop wait
+      self._event.clear()
     self._done.clear()
     self._stop.clear()
     
@@ -197,7 +256,7 @@ class ThreadedObject(Object):
     if not wait: wait = .1e-5
     self._done.wait(wait)
     self._done.clear()
-    self._event.clear
+    self._event.clear()
     
   @staticmethod
   def stop_all():
@@ -232,6 +291,13 @@ class ThreadedObject(Object):
   def stop_hook(self,*args,**kwargs):
     """ redefine at convenience """
     pass  
+  
+  def clean_stats(self):
+    self._count = 0
+    self._errors = 0
+    self._delay = 0
+    self._acc_delay = 0
+    self._last  = 0
     
   def loop(self):
     try:
@@ -240,37 +306,39 @@ class ThreadedObject(Object):
         while not self._kill.isSet():
 
             while self._stop.isSet():
-                self._event.wait(.01)
-
+                wait(self._timewait,self._event,self._wait_hook)
+                
             self._done.clear()
-            self._count = 0
-            self._errors = 0
-            self._delay = 0
-            self._acc_delay = 0
-            self._last  = 0
-            
+            self.clean_stats()
+
             ts = time.time()
+            ## Evaluate target() arguments
             try:
                 args,kwargs = self._start_hook(ts)
             except:
                 if self._errors < 10:
-                    traceback.print_exc()        
+                    self.print_exc()
                 self._errors += 1
                 args,kwargs = [],{}
-
+            
             print('ThreadedObject.Start() ...')
             self._started = time.time()
             self._next = self._started + self._timewait
             while not self._stop.isSet():
+              try:
                 self._event.clear()
-                try:
-                    if self._target:
-                        self._target(*args,**kwargs)
-                except:
-                    if self._errors < 10:
-                        traceback.print_exc()          
-                    self._errors += 1
+                
+                ## Task Execution
+                if count>=self._first:
+                  try:
+                      if self._target:
+                          self._target(*args,**kwargs)
+                  except:
+                      if self._errors < 10:
+                          self.print_exc()
+                      self._errors += 1
 
+                ## Obtain next scheduled execution
                 t1,tn = time.time(),ts+self._timewait
                 if self._queue:
                     while self._queue and self._queue[0]<self._next:
@@ -278,33 +346,42 @@ class ThreadedObject(Object):
                     if self._queue:
                         tn = self._queue[0]
                 
+                ## Wait and Calcullate statistics
                 self._next = tn
                 tw = self._next-t1
                 self._usage = (t1-ts)/self._timewait
-                #print('waiting %s'%tw)
-                self._event.wait(max((tw,self._min_wait)))
-                
+                #self.debug('waiting %s'%tw)
+                wait(max((tw,self._min_wait)),self._event,self._wait_hook)
                 ts = self._last = time.time()
                 self._delay = ts>self._next and ts-self._next or 0
                 self._acc_delay = self._acc_delay + self._delay
-                try:
-                    args,kwargs = self._loop_hook(ts)
-                except:
-                    if self._errors < 10:
-                        traceback.print_exc()
-                    self._errors += 1
-                    args,kwargs = [],{}
+                
+                ## Execute Loop Hook to reevaluate target Arguments
+                if count>=self._first:
+                    try:
+                      args,kwargs = self._loop_hook(ts)
+                    except:
+                      if self._errors < 10:
+                          self.print_exc()
+                      self._errors += 1
+                      args,kwargs = [],{}
                 
                 self._count += 1
+                
+              except Exception,e:
+                self.print_exc(e if not traceback else traceback.format_exc(),
+                               'ThreadObject stop!')
+                raise e
                 
             print('ThreadedObject.Stop(...)')
             self._started = 0
             self._done.set() #Will not be cleared until stop/start() are called
+            Catched(self._stop_hook)()
     
         print('ThreadedObject.Kill() ...')
-        return #<< Will never get to this point
-    except:
-        traceback.print_exc()
+        return #<< Should never get to this point
+    except Exception,e:
+        self.print_exc(e,'ThreadObject exit!')
 
 ###############################################################################
 
@@ -677,49 +754,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     """
     Class that provides a multiprocessing interface to process tasks in a background process and throw callbacks when finished.
     
-    The queries are sent between sender/receiver thread and worker process using tuples.
-    Queries may be: (key,) ; (key,target) ; (key,target,args)
-     - key is just an identifier to internally store data results and callbacks
-     - if target is a callable it will be thrown with args as argument (use [] if target is a void function)
-     - if it isn't, then executor(target) will be called
-     - executor can be fandango.evalX or other object/method assigned using WorkerProcess.bind(class,args)
-    
-    By default fandango.evalX is used to perform tasks, a different executor can be defined as WorkerProcess argument or calling:
-      CP = WorkerProcess(targetClass(initArgs))
-      CP.bind(targetClass,initArgs)
-    
-    Sending tasks to the process:
-      CP.send(key='A1',target) 
-      # Returns immediately and executes target() or executor(*target) in a background process
-      CP.send('A1',target,args,callback=callback) 
-      # Returns immediately, executes x=target(args) in background and launches callback(x) when ready
-      
-    When a (key,target,args) tuple is received the procedure is:
-     * obtain the exec_ method (executor if args is None, 
-     * obtain arguments (target if args is None, if args is map/sequence it is pre-parsed):
-     * if args is None and there's a valid executor: return executor(target)
-     
-    How the executable method is obtained:
-     - if args is None it tries to get a valid executor and target will be args.
-     - if target is string first it tries to get executor.target
-     - if failed, then it evals target (that may return an executable)
-     - if args is not none and target is not string, target is used as executable if callable
-    Return value:
-     - if a valid executable method is found it returns exec_([*/**]args)
-     - if not, it returns what has been found instead (evalX(target), executor.target or target)
-    
-    To use it like a threadDict, allowing a fixed list of keys to be permanently updated:
-      CP.add(key,target,args,period,expire,callback)
-      #This call will add a key to dictionary, which target(args) method will be executed every period, value obtained will expire after X seconds.
-      #Optional Callback will be executed every time value is updated.
-    
-    Throwing commands in a sequential way (it will return when everything already in the queue is done):
-      CP.command('comm') # Execute comm() and returns result
-      CP.command('comm',args=(,)) # Execute comm(*args) and returns result
-    
-    Two different dictionaries will keep track of process results:
-     - data : will store named data with and update period associated
-     - callbacks : will store associated callbacks to throw-1 calls
+    See full description and usage in doc/recipes/Threading.rst
     """
     
     ALIVE_PERIOD = 15

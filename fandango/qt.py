@@ -37,7 +37,7 @@
 import Queue,traceback,time,sys,os
 from functools import partial
 import fandango
-from fandango.functional import isString,isSequence,isDictionary,isCallable
+from fandango.functional import *
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton,Decorated,Decorator,ClassDecorator,BoundDecorator
@@ -594,7 +594,7 @@ class QSignalHook(Qt.QObject):
     Class initialized with a transformation function.
     For every setModel(model) it will emit a modelChanged(function(model))
     """
-    __pyqtSignals__ = ("modelChanged",)
+    #__pyqtSignals__ = ("modelChanged",)
     def __init__(self,function):
         Qt.QObject.__init__(self)
         self._model = None
@@ -602,9 +602,17 @@ class QSignalHook(Qt.QObject):
         self.function = function
         
     def setModel(self,model):
-        self._model = model
-        self._new_model = self.function(model) if self.function is not None else model
-        self.emit(Qt.SIGNAL("modelChanged"), self._new_model)
+        model = str(model) #Do a copy or die!
+        from fandango import FakeLogger as FL
+        fl = FL('QSignalHook',True)
+        try:
+          #fl.warning('QSignalHook(%s)'%(self._model,))
+          self._model = model
+          self._new_model = self.function(model) if self.function is not None else model
+          #fl.warning('QSignalHook.modelChanged(%s => %s)'%(self._model,self._new_model))
+          self.emit(Qt.SIGNAL("modelChanged"), self._new_model)
+        except:
+          fl.warning('QSignalHook: %s'%(traceback.format_exc()))
 
 class NullWidget(TaurusWidget):
     def __init__(self,*args):
@@ -1747,7 +1755,10 @@ class QEvaluator(Qt.QWidget):
         return fandango.evalX(c,_locals=self._locals,modules=self._modules,instances=self._instances,_trace=True)
         
     def setup_ui(self):
-        from PyQt4.QtWebKit import QWebView
+        try:
+          from PyQt4.QtWebKit import QWebView
+        except:
+          QWebView = Qt.QTextBrowser
         self.combo = Qt.QComboBox(self)
         self.combo.setEditable(True) #self.model in (None,'fandango'))
         self.args = Qt.QComboBox(self) #Qt.QLineEdit(self)
@@ -1831,8 +1842,12 @@ class QEvaluator(Qt.QWidget):
     def printf(self,txt,append=True,highlight=False,curr=''):
         if append: 
             try: 
-                curr = self.result.page().currentFrame().toHtml().replace('</body></html>','')
-                plain = self.result.page().currentFrame().toPlainText()
+                if hasattr(self.result,'page'):
+                    curr = self.result.page().currentFrame().toHtml().replace('</body></html>','')
+                    plain = self.result.page().currentFrame().toPlainText()
+                else:
+                    curr = self.result.toHtml().replace('</body></html>','')
+                    plain = self.result.toPlainText()
             except: 
                 traceback.print_exc()
                 curr = ''
@@ -1849,10 +1864,10 @@ class QEvaluator(Qt.QWidget):
             traceback.print_exc()
     
     @staticmethod
-    def main(args=[]):
+    def main(args=None):
         qapp = getApplication()
         print(len(args),args)
-        args = args or sys.argv[1:]
+        args = notNone(args,sys.argv[1:])
         if args and os.path.isfile(args[0]):
           args = filter(bool,map(str.strip,open(args[0]).readlines()))
         kw = args and {'model':';'.join(args)} or {}

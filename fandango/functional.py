@@ -401,9 +401,12 @@ def filtersmart(seq,filters):
         '+' : complementary, it must match all complementaries and at least a 'normal filter' to be valid
         '^' : matches string since the beginning (startswith instead of contains)
         '$' : matches the end of strings
+        ',' : will be used as filter separator if a single string is provided
+        
     """
     seq = seq if isSequence(seq) else (seq,)
-    filters = filters if isSequence(filters) else (filters,)
+    if isString(filters):
+      filters = filters.split(',')
     raw,comp,neg = [],[],[]
     def parse(s):
         s = toRegexp(s)
@@ -529,7 +532,7 @@ def isSequence(seq,INCLUDE_GENERATORS = True):
     elif hasattr(seq,'__len__'): 
         return True
     return False
-    
+  
 def isDictionary(seq):
     """ It includes dicts and also nested lists """
     if isinstance(seq,dict): return True
@@ -551,6 +554,18 @@ def isNested(seq,strict=False):
     if not strict and isIterable(child): return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
     return False
+  
+def shape(seq):
+    """
+    Returns the N dimensions of a python sequence
+    """
+    if not isSequence(seq):
+      return []
+    else:
+      d = [len(seq)]
+    if isNested(seq):
+      d.extend(shape(seq[0]))
+    return d
     
 def isBool(seq,is_zero=True):
     codes = ['true','yes','false','no']
@@ -643,6 +658,22 @@ def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
     if filename:
         json.dump(result,open(filename,'w'),encoding=encoding)
     return result if not filename else filename
+  
+def unicode2str(obj):
+    """
+    Converts an unpacked unicode object (json) to 
+    nested python primitives (map,list,str)
+    """
+    if isMapping(obj):
+        n = dict(unicode2python(t) for t in obj.items())
+    elif isSequence(obj):
+        n = list(unicode2python(t) for t in obj)
+    elif isString(obj):
+        n = str(obj)
+    else:
+        n = obj
+    return n    
+    
     
 def toList(val,default=[],check=isSequence):
     if val is None: 
@@ -657,7 +688,8 @@ def toList(val,default=[],check=isSequence):
         return val
 toSequence = toList
 
-def toString(val):
+def toString(*val):
+    if len(val)==1: val = val[0]
     if hasattr(val,'text'):
         try: return val.text()
         except: return val.text(0)
@@ -718,8 +750,18 @@ def list2str(s,separator='\t',MAX_LENGTH=255):
 def text2tuples(s,separator='\t'):
     return [str2list(t,separator) for t in text2list(s)]
 
-def tuples2text(s,separator='\t'):
-    return list2str([list2str(t,separator) for t in s],'\n')
+def tuples2text(s,separator='\t',lineseparator='\n'):
+    return list2str([list2str(t,separator) for t in s],lineseparator)
+  
+def dict2str(s,sep=':\t',linesep='\n',listsep='\n\t'):
+    return linesep.join(sorted(
+      sep.join((str(k),list2str(toList(v),listsep,0))) 
+      for k,v in s.items()))
+  
+def obj2str(obj,sep=',',linesep='\n'):
+    if isMapping(obj): return dict2str(obj,sep,linesep)
+    elif isSequence(obj): return list2str(obj,sep)
+    else: return toString(obj)
 
 ########################################################################
 ## Number conversion
@@ -799,7 +841,7 @@ def time2date(epoch=None):
 
 def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
     if epoch is None: epoch = now() 
-    elif epoch<0: epoch = now()-epoch
+    elif epoch<0: epoch = now()+epoch
     return time.strftime(cad,time2tuple(epoch))
 epoch2str = time2str
     
@@ -853,15 +895,42 @@ def timezone():
 
 #Auxiliary methods:
 def ctime2time(time_struct):
-    return (float(time_struct.tv_sec)+1e-6*float(time_struct.tv_usec))
+    try:
+      return (float(time_struct.tv_sec)+1e-6*float(time_struct.tv_usec))
+    except:
+      return -1
     
 def mysql2time(mysql_time):
-    return time.mktime(mysql_time.timetuple())
+    try:
+      return time.mktime(mysql_time.timetuple())
+    except:
+      return -1
     
 
 ########################################################################
 ## Extended eval
 ########################################################################
+
+def iif(condition,truepart,falsepart=None,forward=False):
+    """
+    if condition is boolean return (falsepart,truepart)[condition]
+    if condition is callable returns truepart if condition(tp) else falsepart
+    if forward is True condition(truepart) is returned instead of truepart
+    if forward is callable, forward(truepart) is returned instead
+    """
+    if isCallable(condition):
+      v = condition(truepart)
+      if not v: 
+        return falsepart
+    elif not condition: 
+      return falsepart
+    
+    if isCallable(forward):
+      return forward(truepart)
+    elif forward:
+      return v
+    else:
+      return truepart
 
 def ifThen(condition,callback,falsables=tuple()):
     """
@@ -913,10 +982,13 @@ def evalF(formula):
     c = compile(formula,formula,'eval') #returning a lambda that evals a compiled code makes the method 500% faster
     return (lambda *args: eval(c,{'args':args,'x':args and args[0],'y':len(args)>1 and args[1],'z':len(args)>2 and args[2]}))
 
-def testF(f,args=[],t=1.):
+def testF(f,args=[],t=5.):
+    """
+    it returns how many times f(*args) can be executed in t seconds
+    """
     args = toSequence(args)
     ct,t0 = 0,time.time()
-    while time.time()<t0+5:
+    while time.time()<t0+t:
         f(*args)
         ct+=1
     return ct

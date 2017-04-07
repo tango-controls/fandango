@@ -131,15 +131,33 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
           uri,filename = uri.rsplit('/',1)
         return self.get_device(uri).GetFile(filename)
     
-    def find(self,device,mask,N=0):
+    def find(self,device,mask='',N=0,strict=False):
+        """ Method for finding devices or files
+        find(device): will return devices or folders matching the given string
+        find(device,file): will return files matching the given argument for the given devices
+        """
+        if not strict and '*' not in device:
+          device = '*'+device+'*'
         m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]
+        if not m:
+            for d in self.values():
+              try:
+                if fn.clmatch(device,d.SaveFolder):
+                  m.append(d.name())
+                  if N and N>=len(m): 
+                    return m
+              except:pass
+        if m and not mask:
+            return m
+        if not strict and '*' not in mask:
+            mask = '*'+mask+'*'
         r = []
         for d in m:
             l = fn.get_device(d).ListFiles(mask)
             for f in l:
-                r.append((d+':' if len(m)>1 else '')+f)
-                if N and N>=len(r):
-                  return r
+              r.append(d+':'+f)
+              if N and N>=len(r):
+                return r
         return r
       
     @staticmethod
@@ -186,10 +204,10 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
                 folder,mask = '',mask
             #if self.SaveFolder and not folder.startswith('/'):
             folder = self.SaveFolder + '/' + folder  #SAFER TO FORCE  ALWAYS PATH
-            return fandango.listdir(folder,mask)
+            return fn.listdir(folder,mask)
         else:
             #using cache
-            return [f for f in files if fandango.clmatch(mask,f)]        
+            return [f for f in files if fn.clmatch(mask,f)]        
         
 #------------------------------------------------------------------
 #    Device constructor
@@ -200,7 +218,7 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
         _locals = {}        
         DynamicDS.__init__(self,cl,name,_locals=_locals,useDynStates=True)
         FolderDS.init_device(self)
-        self.worker = fandango.threads.WorkerThread()
+        self.worker = fn.threads.WorkerThread()
         self.worker.start()
         self.worker.put('1')
 
@@ -224,7 +242,7 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #    Always excuted hook method
 #------------------------------------------------------------------
     def always_executed_hook(self):
-        print "In ", self.get_name(), "::always_excuted_hook()"
+        print "In "+self.get_name()+ "::always_excuted_hook()"
         DynamicDS.always_executed_hook(self)
 
 #==================================================================
@@ -236,8 +254,11 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #    Read Attribute Hardware
 #------------------------------------------------------------------
     def read_attr_hardware(self,data):
-        print "In ", self.get_name(), "::read_attr_hardware()"
+        print("In "+self.get_name()+"::read_attr_hardware()")
 
+
+    def read_SaveFolder(self,attr):
+        attr.set_value(self.SaveFolder)
 
 #==================================================================
 #
@@ -333,11 +354,13 @@ class FolderDSClass(DynamicDSClass):
         'Help':DynamicDSClass.cmd_list['Help'],
         }
 
-
     #    Attribute definitions
     attr_list = {
+       'SaveFolder':
+           [[PyTango.DevString,
+           PyTango.SCALAR,
+           PyTango.READ]],
         }
-
 
 #------------------------------------------------------------------
 #    FolderDSClass Constructor

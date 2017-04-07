@@ -29,8 +29,14 @@ print(__doc__)
 release = open('fandango/VERSION').read()
 
 scripts = [
-'./fandango/scripts/fandango.sh',
-'./fandango/scripts/fandango.qt',
+'./fandango/scripts/ctds',
+'./fandango/scripts/csv2tango',
+'./fandango/scripts/tango2csv',
+'./fandango/scripts/tango2json',
+'./fandango/scripts/sardanact',
+'./fandango/scripts/tango_cleanup',
+'./fandango/scripts/folder-gui',
+'./fandango/scripts/fandango',
 './fandango/scripts/DynamicDS',
 './fandango/scripts/WorkerDS',
 './fandango/scripts/CopyCatDS',

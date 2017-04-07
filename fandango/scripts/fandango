@@ -34,31 +34,37 @@ __doc__ = """
 
 Usage:
 
-  fandango.sh [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1] [...]
+  fandango [qt] [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1/argument_0] [...]
+  
+  Execute python and fandango methods from shell
 
   Objects and Generators will not be allowed as arguments, only python primitives, lists and tuples
   
+  The --extra option will load PyTangoArchiving and Panic methods
+  
 Examples:
 
-  fandango.sh findModule fandango
+  fandango findModule fandango
 
-  python $(fandango.sh findModule fandango)/interface/CopyCatDS.py 1
+  python $(fandango findModule fandango)/interface/CopyCatDS.py 1
   
-  fandango.sh get_tango_host
+  fandango get_tango_host
   
-  fandango.sh --help get_matching_devices | less
+  fandango qt #Launch interactive Qt console
   
-  fandango.sh get_matching_devices "tango/admin/*"
+  fandango --help get_matching_devices | less
   
-  fandango.sh get_matching_attributes "lab/ct/plctest16/*_af"
+  fandango get_matching_devices "tango/admin/*"
   
-  fandango.sh -h | grep propert
+  fandango get_matching_attributes "lab/ct/plctest16/*_af"
   
-  fandango.sh get_matching_device_properties "lab/ct/plctest16" "*modbus*"
+  fandango -h | grep propert
   
-  fandango.sh read_attribute "tango/admin/pctest/status"
+  fandango get_matching_device_properties "lab/ct/plctest16" "*modbus*"
   
-  for attr in $(fandango.sh get_matching_attributes "tango/admin/pctest/*"); do echo "$attr : $(fandango.sh read_attribute ${attr})" ; done
+  fandango read_attribute "tango/admin/pctest/status"
+  
+  for attr in $(fandango get_matching_attributes "tango/admin/pctest/*"); do echo "$attr : $(fandango read_attribute ${attr})" ; done
   
 """
 
@@ -94,6 +100,7 @@ if __name__ == '__main__':
       except: pass
     
     if opts.get('-h',opts.get('help',0)):
+      ## Executing HELP
       import inspect
       
       _locals=locals()
@@ -103,8 +110,10 @@ if __name__ == '__main__':
       _locals['get_module_name'] = get_module_name
       
       target = comms[0] if comms else (opts.get('help') or '')
+
       if target and isString(target):
         cmd = 'inspect.getsource(%s)'%target
+        
       else:
         cmd = "sorted([('%s.%s'%(get_module_name(o),k)).strip('.') for k,o in locals().items() if not k.startswith('_')])"
         
@@ -119,23 +128,38 @@ if __name__ == '__main__':
       
     else:
       assert comms
-      if '(' in comms[0]:
+      
+      if 'qt' in comms[:1] or opts.get('-qt'):
+        # LAUNCHING QT SHELL
+        args = comms['qt' in comms:]
+        print('Launching the interactive Qt console ... %s'%args)
+        import fandango.qt
+        fandango.qt.QEvaluator.main(args)
+        
+      elif '(' in comms[0]:
+        ## SINGLE STRING COMMAND
         _locals = locals()
         for c in comms:
           cmd = c
           r = evalX(c,_locals=_locals)
+          
       else:
+        ## MULTIPLE ARGS COMMAND
         args = ','.join((str(c) if isNumber(c) else "'%s'"%c) for c in comms[1:])
         cmd = '%s(*[%s])'%(comms[0],args)
         r = evalX(cmd,_locals=locals())
         
     if opts.get('-l'): print(cmd)
-    print(r if not isSequence(r) else list2str(r,'\n'))
+    #print(r if not isSequence(r) else list2str(r,'\n'))
+    print(obj2str(r,sep=' '))
+    
   except AssertionError,e:
     print(__doc__)
+    
   except:
     print(cmd)
     import traceback
     traceback.print_exc()
     sys.exit(1)
+    
   sys.exit(0)

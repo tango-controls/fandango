@@ -62,6 +62,8 @@ from fandango.dynamic import DynamicDS,USE_STATIC_METHODS
 
 class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     """
+    See documentation at doc/devices/Dev4Tango.rst
+    
     This class provides several new features to TangoDevice implementations.
     By including log.Logger it also includes objects.Object as parent class.
     It allows to use call__init__(self, klass, *args, **kw) to avoid multiple inheritance from same parent problems.
@@ -69,6 +71,10 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     
     It also allows to connect several devices within the same server or not usint taurus.core
     """
+    
+    def __init__(self,cl,name):
+        self.call__init__(PyTango.Device_4Impl,cl,name)
+        self.init_logger()
 
     def trace(self,prio,s):
         printf( '4T.%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s))
@@ -76,14 +82,17 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     ##@name State Machine methods
     #@{
     
-    def is_Attr_allowed(self, req_type): 
+    def is_attr_allowed(self, req_type): 
         """ This method is a template for any Attribute allowed control. """
         self.info( 'In is_Attr_allowed ...' )
         return bool( self.get_state() not in [PyTango.DevState.UNKNOWN,PyTango.DevState.INIT] )
     
+    is_Attr_allowed = is_attr_allowed #For backwards compatibility
+    
     def set_state(self,state):
         self._state = state
-        type(self).mro()[type(self).mro().index(Dev4Tango)+1].set_state(self,state)
+        #type(self).mro()[type(self).mro().index(Dev4Tango)+1].set_state(self,state)
+        PyTango.Device_4Impl.set_state(self,state)
         
     def get_state(self):
         #@Tango6
@@ -126,32 +135,72 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     
     ##@name Attribute hacking methods
     #@{
+    
+    attr_list = {
+       'MemUsage':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
+       'LastUpdate':
+           [[PyTango.DevDouble,
+           PyTango.SCALAR,
+           PyTango.READ]],
+        }
 
     def getAttributeTime(self,attr_value):
         """ AttributeValue.time is of Type TimeVal={tv_sec,tv_usec,...}, not accepted by set_attribute_value_date_quality method of DeviceImpl """
         if type(attr_value) is float: return attr_value
         elif type(attr_value.time) is float: return attr_value.time  
         else: return float(attr_value.time.tv_sec)+1e-6*float(attr_value.time.tv_usec)
+      
+    def getAttributeTemplate(self,name,type_=PyTango.DevDouble,
+                        rw=PyTango.AttrWriteType.READ,unit='',frmt=''):
+        """ 
+        Returns an Attr object ready to be inserted with self.add_attribute(&Attr,&reader,&writer,&allowed)
+        """
+        attrib = PyTango.Attr(name,type_,rw)
+        props = PyTango.UserDefaultAttrProp()
+        props.set_format(frmt),props.set_unit(unit)
+        attrib.set_default_properties(props)
+        return attrib
+      
+    def getMemUsage(self):
+        return fandango.linos.get_memory()/1e3
+    
+    def read_MemUsage(self, attr):
+        self.debug("In read_MemUsage()")
+        attr.set_value(self.getMemUsage())
+        
+    def read_LastUpdate(self, attr):
+        self.debug("In read_LastUpdate()")
+        attr.set_value(self.last_update)
         
     ##@}
     
     ##@name Device management methods
     #@{
     
-    def init_my_Logger(self):
-        """ A default initialization for the Logger class """ 
-        print 'In %s.init_my_Logger ...'%self.get_name()
+    def init_logger(self,name = None, use_tango = False):
+        """ 
+        A default initialization for the Logger class 
+        
+        :use_tango: Use internal tango streams (-v) or not.
+        """ 
+        name = name or self.get_name()
+        print 'In %s.init_my_Logger ...'%name
         try:
-            #First try to use Tango Streams
-            if False: #hasattr(self,'error_stream'):
-                self.error,self.warning,self.info,self.debug = self.error_stream,self.warn_stream,self.info_stream,self.debug_stream
-            #Then Check if this class inherits from Logger
-            elif isinstance(self,log.Logger): 
-                self.call__init__(log.Logger,self.get_name(),format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+            #Check if this class inherits from Logger
+            if isinstance(self,log.Logger): 
+                self.call__init__(log.Logger,name,use_tango=use_tango,
+                    format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
                 if hasattr(self,'LogLevel'): self.setLogLevel(self.LogLevel)
                 self.info('Logger streams initialized (error,warning,info,debug)')
             else:
-                raise Exception('LoggerNotInBaseClasses')
+                #try to use Tango Streams
+                try:
+                  self.error,self.warning,self.info,self.debug = self.error_stream,self.warn_stream,self.info_stream,self.debug_stream
+                except:
+                  raise Exception('LoggerNotInBaseClasses')
         except Exception,e:
             print '*'*80
             print 'Exception at init_my_Logger!!!!'
@@ -164,18 +213,25 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
             self.debug= lambda s: sys.stdout.write('DEBUG:\t%s\n'%s)            
             pass
         #if init_fun is not None: self.init_fun()
+        
+    init_my_Logger = init_logger #For backwards compatibility
     
-    def check_Properties(self,props_list):
+    def check_properties(self,props_list):
         """ It verifies that all properties has been initialized """
-        return all([getattr(self,p,None) for p in props_list])        
+        return all([getattr(self,p,None) for p in props_list])
+      
+    check_Properties = check_properties #For backwards compatibility
     
     def get_device_properties(self,myclass):
-        self.debug('In Dev4Tango.get_device_properties(%s) ...' % str(myclass))
+        self.info('In Dev4Tango.get_device_properties(%s) ...' % str(myclass))
+
         PyTango.Device_4Impl.get_device_properties(self,myclass)
-        #self.get_device_properties(self.get_device_class())
+        if hasattr(self,'LogLevel'):
+          self.setLogLevel(self.LogLevel)
+
         missing_properties = {}
         for k in myclass.device_property_list.keys():
-            default = myclass.device_property_list[k][2] #this value is always a list!
+            default = myclass.device_property_list[k][2]
             if k not in dir(self):
                 missing_properties[k]=default
             else:
@@ -186,6 +242,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                     value = list(value)
                 if value==default:
                     missing_properties[k]=value
+                    
         if missing_properties:
             try:
                 self.info('In Dev4Tango.get_device_properties(%s): initializing default property values: %s' % (self.get_name(),missing_properties))

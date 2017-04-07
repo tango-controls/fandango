@@ -154,28 +154,7 @@ class WorkerDS(PyTango.Device_4Impl):
             self.worker._locals.update([(k,v) for k,v in self._locals.items()
               if (k in _locals or k in self.extra_modules) 
                 and k not in self.tasks])
-            #if check:
-                #for k,v in self.Alarms.items():
-                    #val = v.active if not self.CheckDisabled(k) else False
-                    #if _locals.get(k,None)!=val: update = True
-                    #_locals[k] = val
-            #if update:
-                #self.debug('In PyAlarm.update_locals(...)')
-                #if self.worker:
-                    #try:
-                        #self.worker.send('update_locals',
-                            #target='update_locals',
-                            #args={'dct':dict((k,v) for k,v in _locals.items() if k in self.Panic)},
-                            #callback=None)
-                    #except: 
-                        #self.error('worker.send(update_locals) failed!: %s'%traceback.format_exc())
-                        #self.info(str(_locals))
-                #else: 
-                    #self.Eval.update_locals(_locals)
-                    #if self.get_name()+'/'+self.Alarms.keys()[0] not in self.Eval.attributes:
-                        #self.Eval.attributes.update(dict((str(n).lower(),fandango.tango.CachedAttributeProxy(n,fake=True))
-                            #for n in (self.get_name()+'/'+k for k in self.Alarms) ))
-                    #[self.Eval.attributes[self.get_name()+'/'+k].set_cache(_locals[k]) for k in self.Alarms]
+
         except:
             self.warning(traceback.format_exc())
         return self.locals()
