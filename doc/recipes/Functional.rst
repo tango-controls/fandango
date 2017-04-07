@@ -2,16 +2,26 @@
 Functional Recipes
 ==================
 
-For using all the useful functional programming methods of fandango see:
+fandango.functional Module
+==========================
 
-:doc:`fandango.functional`
+The methods available in the functional submodule doesn't have any dependency
+and can be used freely without Tango nor other library installed.
 
-These page just describes other functional tools from other submodules.
+All of them are loaded from start, so just import fandango and enjoy it::
+
+  import fandango as fn
+
+For a reference and all useful functional programming methods of fandango see:
+
+  :doc:`../fandango.functional`
+
 
 
 Other tools/classes
 ===================
-  
+
+These page just describes other functional tools from other submodules apart of functional.
   
 Use CSVArray to turn a .csv into a dictionary
 ---------------------------------------------

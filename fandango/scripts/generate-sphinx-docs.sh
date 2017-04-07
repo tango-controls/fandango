@@ -5,14 +5,14 @@
 
 MOD="$1"
 
-if [ ! "$MOD" ] ; then 
+if [ ! "$MOD" ] || [ "$(echo $MOD | grep '\-h' )" != "" ] ; then 
   echo "This script will search for .rst files and sources"
   echo "and will generate sphinx documentation in an autodoc/ folder"
   echo ""
   echo "Usage: "
   echo "      # git clone https://github.com/.../PROJECT PROJECT.git"
   echo "      # cd PROJECT.git/doc "
-  echo "      # generate-sphinx-docs.sh ../PROJECT "
+  echo "      # generate-sphinx-docs.sh ../PROJECT [--force] [--clean]"
   exit 1
 fi
 
@@ -20,12 +20,17 @@ TARGET=$(pwd)/autodoc
 
 echo "Generating $MOD documentation at $TARGET"
 
-if [ ! $( echo "$*" | grep "force" ) ]; then
+if [ "$(echo $* | grep '\-force')" == "" ]; then
  if [ -e $MOD/.svn ] || [ -e $MOD/.git ] ; then
   echo "Execute this method only on exports!, not checkouts!!!"
   echo "exiting ..."
   exit 1
  fi
+fi
+
+if [ "$(echo $* | grep '\-clean')" != "" ]; then
+ echo "Removing $TARGET ..."
+ rm -rf $TARGET
 fi
 
 if [ -e update.py ] ; then 

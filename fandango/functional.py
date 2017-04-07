@@ -34,6 +34,9 @@
 __doc__ = """
 fandango.functional::
     contains functional programming methods for python, it should use only python main library methods and not be dependent of any other module
+    
+.. contents::
+
 """
 
 import re
@@ -1098,4 +1101,9 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             raise _exception('targetMustBeCallable, not %s(%s)'%(type(target),target))
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
-  
+
+try:
+  from doc import get_autodoc
+  __doc__ = get_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])
+except:
+  print('Unable to generate doc toctree')

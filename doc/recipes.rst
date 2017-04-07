@@ -18,4 +18,5 @@ Fandango Recipes
    recipes/Exceptions
    recipes/TangoRecipes
    recipes/Threading
+   recipes/Functional
 
