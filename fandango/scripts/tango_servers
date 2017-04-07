@@ -36,6 +36,8 @@ def main(args = []):
   except:
       print __doc__
       sys.exit(1)
+      
+  print('%s of %s at %s'%(action,targets,host or '*'))
   
   try:
       astor = fn.Astor()
