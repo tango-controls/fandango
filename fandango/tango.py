@@ -240,7 +240,40 @@ def add_new_device(server,klass,device):
     dev_info.name = device
     dev_info.klass = klass
     dev_info.server = server
-    get_database().add_device(dev_info)    
+    get_database().add_device(dev_info)
+    
+def delete_device(device,server=True):
+    """
+    This method will delete a device and all of its properties
+    If the device was the last of its server, it will be also deleted 
+    """
+    #First, remove the attribue properties
+    server = server and get_device_info(device).server
+    db = get_database(get_tango_host(device))
+    if check_device(device):
+      dp = get_device(device)
+      if False: #QUARANTINED
+        ## As of Tango9 this code fails to delete attribute properties
+        attrs = dp.get_attribute_list()
+        for a in attrs:
+          props = db.get_device_attribute_property(device,a)
+          db.delete_device_attribute_property(device,props)
+      adm = dp.adm_name()
+      print('Kill %s'%adm)
+      get_device(adm).kill()
+    
+    props = get_matching_device_properties(d,'*')
+    print('Removing %d properties'%len(props))
+    db.delete_device_property(device,props)
+    print('Delete %s'%device)
+    db.delete_device(device)
+    if server:
+      others = list(db.get_server_class_list(server))
+      if all(d in ('DDebug','DServer') for d in others):
+        print('Delete %s'%server)
+        db.delete_server(server)
+    
+    return True
     
 def get_device_info(dev,db=None):
     """
