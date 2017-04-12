@@ -57,7 +57,7 @@ import objects
 import threading
 from fandango.functional import *
 from dicts import CaselessDefaultDict,CaselessDict
-from objects import Object,Struct
+from objects import Object,Struct,Cached
 from log import Logger,except2str,printf
 from excepts import exc2str
 
@@ -1212,6 +1212,11 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,bad_stat
         return True
     except:
         return None
+
+@Cached(depth=200,expire=10)
+def check_device_cached(*args,**kwargs):
+    """ Cached implementation of check_device method  """
+    return check_device(*args,**kwargs)
 
 def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
     """ checks if attribute is available.
