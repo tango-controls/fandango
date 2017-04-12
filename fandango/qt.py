@@ -861,11 +861,21 @@ def Dropable(QtKlass):
     This decorator enables any Qt class to accept drops
     """    
     class DropableQtKlass(QtKlass): #,Decorated):
+      
+        _dlog = lambda *msg: None #_dlog = fandango.log.printf
+      
+        def setDropLogger(self,logger):
+            self._dlog = logger
     
         def checkDropSupport(self): 
             ''' Initializes DropEvent support '''
+            #self._dlog = getattr(self,'error',self._dlog)
             try: 
                 self.setAcceptDrops(True)
+                # Needed to reapply drop support overriden by taurusgui.ini
+                try: self.setModifiableByUser(True)
+                except: self._dlog(traceback.format_exc())
+
                 if not hasattr(self,'TAURUS_DEV_MIME_TYPE'):
                     self.TAURUS_DEV_MIME_TYPE = TAURUS_DEV_MIME_TYPE
                     self.TAURUS_ATTR_MIME_TYPE = TAURUS_ATTR_MIME_TYPE
@@ -873,6 +883,7 @@ def Dropable(QtKlass):
                     self.TAURUS_MODEL_LIST_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE
             except: traceback.print_exc()
             self.TEXT_MIME_TYPE = 'text/plain'
+            self._dlog('checkDropSupport(True')
             return True
 
         def getSupportedMimeTypes(self): 
@@ -884,15 +895,16 @@ def Dropable(QtKlass):
                 try: 
                     self.setSupportedMimeTypes([self.TAURUS_DEV_MIME_TYPE, self.TAURUS_ATTR_MIME_TYPE,self.TAURUS_MODEL_MIME_TYPE, self.TAURUS_MODEL_LIST_MIME_TYPE, self.TEXT_MIME_TYPE])
                 except:
-                    print 'Unable to import TAURUS MIME TYPES: %s'%traceback.format_exc()
+                    self._dlog('Unable to import TAURUS MIME TYPES: %s'%traceback.format_exc())
                     self.setSupportedMimeTypes([self.TEXT_MIME_TYPE])
+            self._dlog('getSupportedMimeTypes(%s)'%str(self._supportedMimeTypes))
             return self._supportedMimeTypes
         
         def setSupportedMimeTypes(self, mimetypes):
             ''' sets the mimeTypes that this widget support 
             :param mimetypes: (list<str>) list (ordered by priority) of MIME type names or a {mimeType: callback} dictionary (w/out priority if not using SortedDict)
             '''
-            print 'In setSupportedMimeTypes()'
+            self._dlog('In setSupportedMimeTypes(%s)'%str(mimetypes))
             self.checkDropSupport()
             self._supportedMimeTypes = mimetypes
 
@@ -906,24 +918,38 @@ def Dropable(QtKlass):
                 if mimetype and fandango.isMapping(mimes):
                     return mimes.get(mimetype)
             except: traceback.print_exc()
-            return getattr(self,'_dropeventcallback',None) or getattr(self,'setText',None)
+            
+            return (getattr(self,'_dropeventcallback',None) 
+                    or getattr(self,'setText',None))
         
         # ENABLING DROP OF DEVICE NAMES :
         def checkSupportedMimeType(self,event,accept=False): 
+            self._dlog('checkSupportedMimeType(%s)'%str(event))
             for t in self.getSupportedMimeTypes():
                 if t in event.mimeData().formats():
                     if accept: event.acceptProposedAction()
                     return self.getDropEventCallback(t) or True
+            self._dlog('checkSupportedMimeType(%s)'%False)
             return False
         
-        def dragEnterEvent(self,event): self.checkSupportedMimeType(event,accept=True)
-        def dragMoveEvent(self,event): event.acceptProposedAction()
+        #def mouseMoveEvent(self,event):
+            #self._dlog('In mouseMoveEvent(...)')
+            #self.checkDropSupport()
+            #event.accept()
+            #QtKlass.mouseMoveEvent(self,event)
+        def dragEnterEvent(self,event): 
+            self._dlog('dragEnterEvent')
+            self.checkSupportedMimeType(event,accept=True)
+        def dragMoveEvent(self,event): 
+            self._dlog('dragMoveEvent')
+            event.acceptProposedAction()
                 
         def dropEvent(self, event):
             '''reimplemented to support drag&drop of models. See :class:`QWidget`'''
-            print('dropEvent(%s): %s,%s'%(event,event.mimeData(),event.mimeData().formats()))
+            self._dlog('dropEvent(%s): %s,%s'%(
+              event,event.mimeData(),event.mimeData().formats()))
             if event.source() is self:
-                print('Internal drag/drop not allowed')
+                self._dlog('Internal drag/drop not allowed')
             mtype = self.handleMimeData(event.mimeData())
             event.acceptProposedAction()
             
@@ -933,6 +959,7 @@ def Dropable(QtKlass):
             :param method: (callable<str>) a method that accepts a string as argument. This method will be called with the data from the mimeData object
             :return: (str or None) returns the MimeType used if the model was successfully set, or None if the model could not be set
             '''
+            self._dlog('handleMimeData(%s)'%str(mimeData))
             for mtype in self.getSupportedMimeTypes():
                 try:
                     data = str(mimeData.data(mtype) or '')
@@ -942,7 +969,7 @@ def Dropable(QtKlass):
                                 (method or self.getDropEventCallback(mtype))(data)
                                 return mtype
                             except:
-                                print('Invalid data (%s,%s) for MIMETYPE=%s'%(repr(mimeData),repr(data), repr(mtype)))
+                                self._dlog('Invalid data (%s,%s) for MIMETYPE=%s'%(repr(mimeData),repr(data), repr(mtype)))
                                 traceback.print_exc()
                                 return None
                     except: self.info(traceback.warning_exc())
