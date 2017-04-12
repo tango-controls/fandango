@@ -489,7 +489,6 @@ class SingletonMap(object):
 
 
 ###############################################################################
-from functools import wraps
 
 class nullDecorator(object):
     """
@@ -549,7 +548,8 @@ class Decorator(object):
     """
     def __init__(self,f):
         self.f = f
-        self.call = wraps(f,self.__call__)
+         #self.call = wraps(self.f)(self.__call__) #Not for methods!!
+        functools.update_wrapper(self,self.f)
         
     def __call__(self,*args,**kwargs):
         return self.f(*args,**kwargs)
@@ -592,15 +592,18 @@ class Cached(Decorator):
   
     def __init__(self,target=None,depth=10,expire=3.,log=False,catched=False):
 
-        self.decorate(target)
+        self.log = log
+        self._im = None
         self.cache = {}
         self.depth = depth
         self.expire = expire
         self.catched = catched
-        self.log = log
-        self._im = None
+        self.decorate(target)
           
     def __call__(self,*args,**kwargs):
+        """
+        This method will either decorate a method (with args) or execute it
+        """
         if self.f is None:
             # Deferred decorator
             self.decorate(args[0])
@@ -616,7 +619,7 @@ class Cached(Decorator):
           print(msg)
       
     @staticmethod
-    def CachedObject(obj,methods=[],depth=10.,expire=3.,catched=False):
+    def getCachedObject(obj,methods=[],depth=10.,expire=3.,catched=False):
         """ @RISKY
         This method will try to apply Cached decorator to all methods 
         of an object. USE IT AT YOUR OWN RISK!!
@@ -635,9 +638,10 @@ class Cached(Decorator):
         if isCallable(target):
             self._log('decorate(%s)'%str(target))
             self.f = target
-            self.call = wraps(self.f,self.__call__)
+            #self.call = wraps(self.f)(self.__call__) #Not for methods!!
+            functools.update_wrapper(self,self.f)
         else:
-            self.f,self.call = None,None
+            self.f = None
         
     def execute(self,*args,**kwargs):
         self._log('__call__(%s,%s)'%(args,kwargs))
