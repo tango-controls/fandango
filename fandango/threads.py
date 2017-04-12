@@ -678,7 +678,7 @@ class SingletonWorker(WorkerThread,objects.Singleton):
     """
     def put(self,target):
         if not hasattr(self,'_queued'): self._queued = []
-        self._queued.append(target)
+        self._queued.append(target) #<< saving a timestamp would be useful here
         WorkerThread.put(self,target)
     def get(self,target):
         """
@@ -687,13 +687,16 @@ class SingletonWorker(WorkerThread,objects.Singleton):
         """
         if not hasattr(self,'_values'): self._values = {}
         self._values.update(self.flush())
+        ## @OJO: If update values fails, all received values will be lost!?!
+        ## it seems that this should be done here instead of using flush(): self._queued.pop(target)
         return self._values.pop(target)
     def flush(self):
-        #It just flushes received values
+        #It just flushes all received values
         l = []
         l.extend(getattr(self,'_values',{}).items())
         l.extend(WorkerThread.flush(self))
-        [self._queued.remove(v) for v in l if v in self._queued]
+        # Removing already finished commands from entry queue
+        [self._queued.remove(v[0]) for v in l if v[0] in self._queued]
         return l
     def values(self):
         return self._values
