@@ -1,10 +1,19 @@
-RELEASE = (12,6,1)
+RELEASE = (13,0,1)
 RELEASE_NOTE = "Event Callbacks, Shell scripts and FolderDS for remote logging"
 
 """
 IMPORTANT:
 
   Due to fandango.device module refactoring you may need to remove previous package before installing this one
+  
+ONGOING 13.0.1
+
+Decorators capable for bound methods
+New Cached decorator for replacing all previous caches
+New check_device_cached method
+
+Solving bugs on WorkerDS "lost" results
+
 
 -------------------
 12.6.1 - April 2017

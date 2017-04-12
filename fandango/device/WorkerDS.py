@@ -113,7 +113,7 @@ class WorkerDS(PyTango.Device_4Impl):
           for task,commands in sorted(self.tasks.items()):
             if not commands[-1].startswith(task) and ' = ' not in commands[-1]:
               commands[-1] = commands[-1].replace('return ','')
-              commands[-1] = task+'_result = '+commands[-1]            
+              commands[-1] = task+'_result = '+commands[-1]
             try:
               self.worker.get(commands[-1])
               self.dones[task] = time.time()

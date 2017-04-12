@@ -47,7 +47,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'fandango'
-copyright = u'2015, Author'
+copyright = u'2015, S.Rubio Manrique'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -244,7 +244,7 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
   ('index', 'fandango', u'fandango Documentation',
-   u'Author', 'fandango', 'One line description of project.',
+   u'Sergi Rubio-Manrique', 'fandango', 'One line description of project.',
    'Miscellaneous'),
 ]
 
@@ -265,9 +265,9 @@ texinfo_documents = [
 
 # Bibliographic Dublin Core info.
 epub_title = u'fandango'
-epub_author = u'Author'
-epub_publisher = u'Author'
-epub_copyright = u'2015, Author'
+epub_author = u'Sergi Rubio-Manrique'
+epub_publisher = u'Sergi Rubio-Manrique'
+epub_copyright = u'2015, Sergi Rubio-Manrique'
 
 # The basename for the epub file. It defaults to the project name.
 #epub_basename = u'fandango'
