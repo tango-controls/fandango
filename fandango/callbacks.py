@@ -934,7 +934,7 @@ class EventSource(Logger,SingletonMap):
                   self.attr_value = self.proxy.read_attribute(self.simple_name)
           except Exception,e:
               # fakeAttributeValue initialized with full_name
-              print('EventSource.read(%s) failed!:\n%s'%(self.full_name,exc2str(e)))#traceback.format_exc().split('desc')[-1][:80]))
+              self.warning('EventSource.read(%s) failed!:\n%s'%(self.full_name,exc2str(e)))#traceback.format_exc().split('desc')[-1][:80]))
               self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
               
           self.last_read_time = t0
