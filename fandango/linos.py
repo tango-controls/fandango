@@ -396,80 +396,91 @@ def timefun(f):
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
 
-def sysargs_to_dict(args=None,defaults=[],trace=False,split=False,cast=True,lazy=True):
-    ''' 
+def sysargs_to_dict(args=None,defaults=[],alias={},
+                    trace=False,split=False,cast=True,lazy=True,multiflag=True,
+                    multiarg=[],splitter='='):
+    '''  DEPRECATED IN FANDANGO > 13
+    
     It parses the command line arguments into an understandable dict
-    defaults is the list of anonymous arguments to accept (would be False if not specified)
+    @defaults is the list [and values] of anonymous arguments 
+    to accept (would be [] if not specified)
     
     @param split: if True: args,kwargs are returned; if False then {None:[defaults],'option':value} is returned instead
-    
     @param cast: will try to cast all strings to python types
-    
     @param lazy: will accept any A=B as an alternative to -A B
     
-    > command H=1 --option=value --parameter VALUE -test default_arg1 default_arg2
+    @splitter: override it when '=' must be passed within values
     
-    will returns
+    > cmd H=1 --option=value --parameter VALUE1 VALUE2 -test def1 def2
     
-    {H:1,option:value,parameter:VALUE,test:True,params:[default_arg1,default_arg2]}
+    will return
     
-    getopt and argparse modules in python provide similar functionality, but are not available in all of our distributions
+    {H:1,option:value,parameter:[V1,V2],test:True,params:[default_arg1,default_arg2]}
+    
+    getopt, optpase and argparse modules in python provide similar 
+    functionality, but are not available in all of our distributions. 
+    After Fandango 13 argparse will replace the usage of sysargs_to_dict
+    
     '''
     if args is None: args = sys.argv[1:]
     if trace: print 'sysargs_to_dict(%s,%s)'%(args,defaults)
     result,defargs,vargs = {},[],[]
     cast_arg = lambda x: fun.str2type(x,use_eval=True) if cast else x
+    is_opt = lambda x: x.startswith('-') or splitter in x
     
-    ##Separate parameter/options and default arguments
-    [(vargs if (lazy and '=' in a 
-        or a.startswith('-') 
-        or (i and args[i-1].startswith('--') and '=' not in args[i-i])) else defargs
-        ).append(a) 
-      for i,a in enumerate(args)]
-
-    #Parsing multiflag like -xHaB
-    extend = [a for a in vargs if fun.re.match('[-][a-zA-Z]+',a)]
-    for e in extend:
-      vargs.remove(e)
-      [vargs.append('-'+a) for a in e[1:]]
+    ##Separate parameter/options and unnamed arguments
+    if multiarg: defaults.extend(multiarg)
+    [args.insert(0,d) for d in defaults if is_opt(d)]
+    defaults = [d for d in defaults if not is_opt(d)]
+    i,e = 0,len(args)
+    while i < e:
+        a,l = args[i],vargs
+        if lazy and splitter in a:
+            # par=2
+            pass #by default, added to vargs
+          
+        elif a.startswith('--'): 
+            # --par=2 or --par 2 3 4
+            if lazy and i+1<e:
+                while lazy and i+1<e and not is_opt(args[i+1]):
+                    i+=1
+                    a = a+splitter+args[i]
+                    
+        elif a.startswith('-'):
+            # -o or -oXcV
+            if multiflag and splitter not in a: a = list(a.strip('-'))
+            
+        else: 
+            l = defargs
+        l.extend(a.lstrip('-') for a in fun.toList(a))
+        i+=1
+        
+    for n,a in enumerate(vargs):
+        a = a.split(splitter)
+        if a: 
+            if len(a) == 1: v = True
+            elif len(a) == 2: v = cast_arg(a[1])
+            else: v = cast_arg(a[1:])
+            result[a[0]] = v
       
     defargs = map(cast_arg,defargs)
     if trace: print('defargs: %s'%defargs)
-    for n,a in enumerate(vargs):
-        if '=' in a: #argument like [-]ARG=VALUE
-            while a.startswith('-'): a = a[1:]
-            if a: result[a.split('=',1)[0]] = cast_arg(a.split('=',1)[1])
-        elif a.startswith('--'): #argument with - prefix
-            while a.startswith('-'): a = a[1:] 
-            if not a: continue
-            #If it is not the last value it is considered an assigment
-            if (n+1)<len(args) and not args[n+1].startswith('-'): # --OPTION VALUE
-                result[a],n = cast_arg(args[n+1]),n+1 
-            else: result[a]=True # --OPTION for option=True
-        else: #if a.startswith('-'):
-            #A single dash is a plain boolean option
-            result[a]=True
     if trace: print('defaults: %s'%defaults)
-    if not defaults:
-        result[None] = defargs
-        #if not vargs:
-            #return defargs
-        #else:
-        #if not vargs and defargs: #Arguments do not parse
-            #return sysargs_to_dict(None,args) #Defaulting to sys.argv
-    else: #Assigning arguments using defaults as keys
-        defaults = [d for d in defaults if d not in result]
-        if len(defaults)==1: 
-            result[defaults[0]] = defargs[0] if len(defargs)==1 else (defargs or None)
-        else:
-            if len(defargs)>len(defaults): result[None] = defargs[len(defaults):]
-            result.update(zip(defaults,defargs))
-            result.update((d,False) for d in defaults if d not in result)
+    
+    defaults = [d.strip('-') for d in defaults if d.strip('-') not in result]
+    if len(defaults)==1 and len(defargs)>1:
+        result[defaults[0]] = defargs
+    else:
+        result[None] = defargs[len(defaults):]
+        result.update(zip(defaults,defargs))
+        result.update((d,False) for d in defaults if d not in result)
     
     if trace: print result
     if len(result)==1 and None in result: split = True
+    
     if not split:
         return result
+      
     else:
         args = result.pop(None,[])
         kwargs = result
