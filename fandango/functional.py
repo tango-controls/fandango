@@ -599,6 +599,10 @@ def str2float(seq):
 def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
     return seq.lower().strip() not in ('false','0','none','no')
+  
+def str2bytes(seq):
+    """ Converts an string to a list of integers """
+    return map(ord,str(seq))
 
 def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     """ 
@@ -737,6 +741,11 @@ def code2atoms(code):
     #l2 = [a for l in l1 for a in str2list(l,ops,1,-1)]
     return l1
     
+def shortstr(s,max_len=144):
+    s = str(s)
+    if max_len>0 and len(s) > max_len:
+        s = s[:max_len-4]+' ...'
+    return s
 
 def text2list(s,separator='\n'):
     return filter(bool,str2list(s,separator))
@@ -744,10 +753,10 @@ def text2list(s,separator='\n'):
 def str2lines(s,length=80,separator='\n'):
     return separator.join(s[i:i+length] for i in range(0,len(s),length))
 
-def list2str(s,separator='\t',MAX_LENGTH=255):
+def list2str(s,separator='\t',MAX_LENGTH=0):
     s = str(separator).join(str(t) for t in s)
-    if MAX_LENGTH>0 and separator not in ('\n','\r') and len(s)>MAX_LENGTH: 
-        s = s[:MAX_LENGTH-4]+'... '
+    if MAX_LENGTH>0 and separator not in ('\n','\r'):
+      s = shortstr(s,MAX_LENGTH)
     return s
 
 def text2tuples(s,separator='\t'):
@@ -761,10 +770,12 @@ def dict2str(s,sep=':\t',linesep='\n',listsep='\n\t'):
       sep.join((str(k),list2str(toList(v),listsep,0))) 
       for k,v in s.items()))
   
-def obj2str(obj,sep=',',linesep='\n'):
-    if isMapping(obj): return dict2str(obj,sep,linesep)
-    elif isSequence(obj): return list2str(obj,sep)
-    else: return toString(obj)
+def obj2str(obj,sep=',',linesep='\n',MAX_LENGTH=0):
+    if isMapping(obj): s = dict2str(obj,sep,linesep)
+    elif isSequence(obj): s = list2str(obj,sep)
+    else: s = toString(obj)
+    s = shortstr(s,MAX_LENGTH)
+    return s
 
 ########################################################################
 ## Number conversion
@@ -830,22 +841,38 @@ def time2tuple(epoch=None):
 def tuple2time(tup):
     return time.mktime(tup)
 
-def date2time(date):
-    return tuple2time(date.timetuple())
+def date2time(date,us=True):
+    try:
+      t = tuple2time(date.timetuple())
+      us = us and getattr(date,'microsecond',0)
+      if us: t+=us*1e-6
+      return t
+    except Exception,e:
+      try:
+        return date.total_seconds()
+      except:
+        raise e
 
-def date2str(date):
+def date2str(date,us=False):
     #return time.ctime(date2time(date))
-    return time.strftime('%Y-%m-%d %H:%M:%S',time2tuple(date2time(date)))
+    t = time.strftime('%Y-%m-%d %H:%M:%S',time2tuple(date2time(date)))
+    us = us and getattr(date,'microsecond',0)
+    if us: t+='.%06d'%us
+    return t
 
 def time2date(epoch=None):
     if epoch is None: epoch = now()
     elif epoch<0: epoch = now()-epoch
     return datetime.datetime.fromtimestamp(epoch)
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
+def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False):
     if epoch is None: epoch = now() 
     elif epoch<0: epoch = now()+epoch
-    return time.strftime(cad,time2tuple(epoch))
+    t = time.strftime(cad,time2tuple(epoch))
+    us = us and epoch%1
+    if us: t+='.%06d'%(1e6*us)
+    return t
+  
 epoch2str = time2str
     
 def str2time(seq='',cad=''):
@@ -903,9 +930,10 @@ def ctime2time(time_struct):
     except:
       return -1
     
-def mysql2time(mysql_time):
+def mysql2time(mysql_time,us=True):
     try:
-      return time.mktime(mysql_time.timetuple())
+      return date2time(mysql_time,us=us)
+      #t = time.mktime(mysql_time.timetuple())
     except:
       return -1
     
