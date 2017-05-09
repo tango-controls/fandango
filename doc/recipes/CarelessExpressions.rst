@@ -8,9 +8,13 @@ The methods matchCl, searchCl, splitCl, replaceCl, inCl replace re.match, re.sea
 The differences with standard regular expressions are:
 
 - regexp and target strings are converted to lower case prior to matching
+
 - "*" and " " are equivalent to ".*"
+
 - if extend=True: 
--- "!" at the beginning of expression implies negative matching
--- "exp1 & exp2" will require both expressions to be matched
+
+ - "!" at the beginning of expression implies negative matching
+
+ -  "exp1 & exp2" will require both expressions to be matched
  
 This changes in syntax are implemented in functional.toCl and functional.matchCl methods
