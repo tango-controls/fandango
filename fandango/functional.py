@@ -713,9 +713,11 @@ def str2list(s,separator='',regexp=False,sep_offset=0):
     sep_offset = 1 : keep with precedent
     """
     if not regexp:
-      return map(str.strip,s.split(separator) if separator else s.split())
+      return map(str.strip,
+          s.split(separator) if separator else s.split())
     elif not sep_offset:
-      return map(str.strip,re.split(separator,s) if separator else re.split('[\ \\n]',s))
+      return map(str.strip,
+          re.split(separator,s) if separator else re.split('[\ \\n]',s))
     else:
       r,seps,m = [],[],1
       while m:
@@ -769,6 +771,26 @@ def dict2str(s,sep=':\t',linesep='\n',listsep='\n\t'):
     return linesep.join(sorted(
       sep.join((str(k),list2str(toList(v),listsep,0))) 
       for k,v in s.items()))
+  
+def str2dict(s,ksep='',vsep=''):
+    """ 
+    convert "name'ksep'value'vsep',..." to {name:value,...} 
+    argument may be string or sequence of strings
+    if s is a mapping type it will be returned
+    """
+    if isMapping(s): return s
+  
+    if isString(s):
+      vsep = vsep or (
+          '\n' if '\n' in s 
+              else (',' if s.count(',')>=s.count(';') 
+                  else ';'))
+      s = str2list(s,vsep)
+    
+    if s:
+      ksep = ksep or (':' if s[0].count(':')>=s[0].count('=') else '=')
+      
+    return dict(str2list(t,ksep) for t in s)
   
 def obj2str(obj,sep=',',linesep='\n',MAX_LENGTH=0):
     if isMapping(obj): s = dict2str(obj,sep,linesep)
