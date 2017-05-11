@@ -14,7 +14,14 @@ def timeit(target,args=[],kwargs={},setup='pass',number=1):
     except:
       traceback.print_exc()
     return time.time()-t0
-    
+  
+def Timed(target):
+    def wrapped(*args,**kwargs):
+        t0 = time.time()
+        r = target(*args,**kwargs)
+        print('%s needed %3.1f ms'%(target,(time.time()-t0)*1e3))
+        return r
+    return wrapped
 
 def test_xtreme(device,attribute,value):
     import PyTango
