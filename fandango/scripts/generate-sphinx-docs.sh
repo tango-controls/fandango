@@ -2,6 +2,7 @@
 
 ## THIS SCRIPT WILL COPY ALL DOCUMENTATION TO A SEPARATE
 # autodoc FOLDER TO AVOID MODIFYING ORIGINAL GIT CHECKOUT
+# used in fandango and panic projects
 
 MOD="$1"
 

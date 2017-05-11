@@ -1,7 +1,9 @@
 WARNING!
 
-Tango Device Servers contained in this folder are very powerful, but experimental.
+Tango Device Servers contained in this folder are 
+very powerful, but experimental.
 
-In some cases may use non-standard features of Tango that may not work in all versions.
+In some cases may use non-standard features of Tango that 
+may not work in all Tango versions nor OS
 
 Use them with care.
