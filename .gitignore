@@ -1,0 +1,7 @@
+.gitignore
+*.pyc
+*.py~
+*deb_dist*
+*egg*
+*dist*
+*tar.gz*
