@@ -1706,6 +1706,11 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevString,
             "If not empty, a file where additional attribute formulas can be declared. It will be parsed BEFORE DynamicAttributes",
             ['no'] ],
+        'InitDevice':
+            [PyTango.DevVarStringArray,
+            "False/True/Attributes/Code, formulas to evaluate at init()"
+            "(True to load all attributes)",
+            ['False'] ],
         'KeepAttributes':
             [PyTango.DevVarStringArray,
             "This property can be used to store the values of only needed attributes; values are 'yes', 'no' or a list of attribute names",
