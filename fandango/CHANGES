@@ -14,6 +14,7 @@ New check_device_cached method
 
 Solving bugs on WorkerDS "lost" results
 
+launchers simplified : fandango , fandango -qt
 
 -------------------
 12.6.1 - April 2017
