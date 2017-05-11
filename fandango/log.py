@@ -56,7 +56,7 @@ import time, logging, weakref, traceback, sys
 from objects import Object,Decorator
 from pprint import pprint
 from functional import \
-  time2str,first,matchCl,isSequence,isMapping,isCallable,isString
+  time2str,first,matchCl,isSequence,isMapping,isCallable,isString,shortstr
 import warnings
 
 
@@ -66,12 +66,6 @@ def printf(*args):
     
 def printerr(*args):
     sys.stderr.write(*args)
-    
-def shortstr(s,max_len=144):
-    s = str(s)
-    if max_len>0 and len(s) > max_len:
-        s = s[:max_len-3]+'...'
-    return s
     
 def except2str(e=None,max_len=int(7.5*80)):
     if e is None: e = traceback.format_exc()
