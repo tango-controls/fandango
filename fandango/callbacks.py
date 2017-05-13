@@ -134,9 +134,12 @@ class EventListener(Logger,Object): #Logger,
         hooks = [o for o in (parent,source) if source and hasattr(o,'addListener')]
         if hooks: hooks[0].addListener(self)
 
-    def set_event_hook(self,callable=None): self.event_hook = callable
-    def set_error_hook(self,callable=None): self.error_hook = callable      
-    def set_value_hook(self,callable=None): self.value_hook = callable
+    def set_event_hook(self,callable=None): 
+        self.event_hook = callable or getattr(self,'event_hook',None)
+    def set_error_hook(self,callable=None): 
+        self.error_hook = callable or getattr(self,'error_hook',None)
+    def set_value_hook(self,callable=None): 
+        self.value_hook = callable or getattr(self,'value_hook',None)
 
     def eventReceived(self, src, type_, value):
         """ 
@@ -148,19 +151,21 @@ class EventListener(Logger,Object): #Logger,
         delay = int(1e3*(t0 - (ctime2time(value.time) if hasattr(value,'time') else t0)))
         
         if getattr(value,'error',False):
-            self.warning('%s: eventReceived(%s,ERROR,%s): +%2.1f ms (%2.1f delay)'%(self.name,src,value,1e3*inc,delay))
+            self.warning('%s: eventReceived(%s,ERROR,%s): +%2.1f ms'
+                ' (%2.1f delay)'%(self.name,src,value,1e3*inc,delay))
             if self.error_hook is not None:
                 try: self.error_hook(src,type_,value)
-                except: self.warning(traceback.format_exc())
+                except: self.warning(' %s:%s'%(src,traceback.format_exc()))
         else:
-            value = getattr(value,'value',getattr(value,'rvalue',type(value)))
-            self.debug('%s: eventReceived(%s,%s,%s): +%2.1f ms (%2.1f delay)'%(self.name,src,type_,value,1e3*inc,delay))
-            if value is not None and self.value_hook is not None:
-              try:self.value_hook(src,type_,value)
-              except: self.error(traceback.format_exc())
+            rvalue = getattr(value,'value',getattr(value,'rvalue',type(value)))
+            self.debug('%s: eventReceived(%s,%s,%s): +%2.1f ms (%2.1f delay)'%(
+                self.name,src,type_,rvalue,1e3*inc,delay))
+            if rvalue is not None and self.value_hook is not None:
+                try:self.value_hook(src,type_,rvalue)
+                except: self.error(' %s:%s'%(src,traceback.format_exc()))
         if self.event_hook:
             try: self.event_hook(src,type_,value)
-            except: self.error(traceback.format_exc())
+            except: self.error(' %s:%s'%(src,traceback.format_exc()))
         self.last_event_time = t0
     
 class EventThread(Logger,ThreadedObject):
