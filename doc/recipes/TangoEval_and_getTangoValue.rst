@@ -2,6 +2,8 @@
 TangoEval objects for Panic
 ===========================
 
+.. contents::
+
 TangoedValue class
 ==================
 
