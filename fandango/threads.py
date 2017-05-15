@@ -522,7 +522,7 @@ WorkerException = type('WorkerException',(Exception,),{})
 
 class WorkerThread(object):
     """
-    This class allows to schedule tasks in a background thread or process
+    Allows to schedule tasks in a background thread or process
     
     If no process() method is overriden, the tasks introduced in the internal queue using put(Task) method may be:
          
