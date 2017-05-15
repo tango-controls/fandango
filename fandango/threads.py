@@ -321,7 +321,7 @@ class ThreadedObject(Object):
                 self._errors += 1
                 args,kwargs = [],{}
             
-            print('ThreadedObject.Start() ...')
+            print('ThreadedObject(%s).Start() ...'%type(self))
             self._started = time.time()
             self._next = self._started + self._timewait
             while not self._stop.isSet():
