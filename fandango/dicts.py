@@ -427,6 +427,12 @@ class SortedDict(dict):
     @staticmethod
     def fromkeys(S,v=None):
         return SortedDict((s,v) for s in S)
+      
+    def insert(self,index,key,value):
+        """Insert key,value at given position"""
+        if key in self: self.pop(key)
+        self._keys.insert(index,key)
+        dict.__setitem__(self,key,value)
             
     def pop(self,k,d=None):
         """Removes key and returns its (self[key] or d or None)"""
