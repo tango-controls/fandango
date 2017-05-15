@@ -48,7 +48,9 @@ import time,re,os,traceback
 
 #pytango imports
 import PyTango
-from PyTango import AttrQuality,EventType,DevState,AttrDataFormat,AttrWriteType,CmdArgType
+from PyTango import AttrQuality,EventType,DevState,AttrDataFormat,\
+  AttrWriteType,CmdArgType,AttributeProxy,DeviceProxy
+
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
@@ -110,6 +112,11 @@ TANGO_COLORS = \
   'Lime White White Lime White Lime LightBlue Yellow Red Brown LightBlue Orange Magenta Grey'.split()
 
 TANGO_STATE_COLORS = dict(zip(TANGO_STATES,TANGO_COLORS))
+
+ATTR_ALARM = AttrQuality.ATTR_ALARM
+ATTR_WARNING = AttrQuality.ATTR_WARNING
+ATTR_VALID = AttrQuality.ATTR_VALID
+ATTR_INVALID = AttrQuality.ATTR_INVALID
 
 ####################################################################################################################
 ##@name Access Tango Devices and Database
@@ -1637,7 +1644,23 @@ def get_attribute_time(value):
     return getattr(value.time,'tv_sec',value.time)
 
 class TangoedValue(object):
-    pass
+  
+    def init_values(self,*args,**kwargs):
+        self.value = self.type = None
+        self.time = 0
+        self.name = self.device = self.host = ''
+        self.domain = self.family = self.member = ''
+        self.quality = ATTR_INVALID
+        self.set_quality_flags()
+        return self
+        
+    def set_quality_flags(self,quality=None):
+        quality = quality or self.quality
+        self.ALARM = quality==ATTR_ALARM
+        self.WARNING = quality in (ATTR_ALARM,ATTR_WARNING)
+        self.INVALID = quality==ATTR_INVALID
+        self.VALID = quality!=ATTR_INVALID
+        self.OK = quality==ATTR_VALID
 
 def getTangoValue(obj,device=None):
     """
@@ -1649,26 +1672,35 @@ def getTangoValue(obj,device=None):
         if p: device,host = p['device'],p['host']+':'+p['port']
         else: host = get_tango_host()
         if type(obj) is str:
-            obj = PyTango.AttributeProxy(obj).read()
+            obj = AttributeProxy(obj).read()
         
         if hasattr(obj,'quality'):
-            value,quality,t,name,ty = obj.value,obj.quality,get_attribute_time(obj),obj.name,obj.type
+            value = obj.value
+            quality = obj.quality
+            t = get_attribute_time(obj)
+            name = obj.name
+            ty = obj.type
+            
             if isSequence(value): 
-                value = value.tolist() if hasattr(value,'tolist') else list(value)
+                value = (value.tolist() if hasattr(value,'tolist') 
+                         else list(value))
         else:
-            value,quality,t,name,ty = obj,PyTango.AttrQuality.ATTR_VALID,time.time(),'',type(obj)
+            value,quality = obj,AttrQuality.ATTR_VALID
+            t,name,ty = time.time(),'',type(obj)
             
         try: domain,family,member = device.split('/')[-3:]
         except: domain,family,member = '','',''
             
         Type = type(value)
-        Type = Type if (Type not in (bool,None,type(None)) and ty!=PyTango.CmdArgType.DevState) else int
+        Type = Type if (Type not in (bool,None,type(None)) and ty!=CmdArgType.DevState) else int
         nt = type('tangoed_'+Type.__name__,(Type,TangoedValue),{})
         o = nt(value or 0)
-        [setattr(o,k,v) for k,v in (
-            ('value',value),('quality',quality),('time',t),('name',name),('type',ty),
-            ('device',device),('domain',domain),('family',family),('member',member),('host',host),
+        [setattr(o,k,v) for k,v in (('name',name),('type',ty),
+            ('value',value),('quality',quality),('time',t),
+            ('device',device),('host',host),
+            ('domain',domain),('family',family),('member',member),
             )]
+        o.set_quality_flags()
         return o
     except:
         print traceback.format_exc()
@@ -1726,10 +1758,15 @@ class TangoEval(object):
     no_alnum = '[^a-zA-Z0-9-_]'
     no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
     #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; IT IS TAKEN AS PART OF THE DEVICE NAME!!
-    redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-    reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|hist))?)?' #Matches attribute and extension
+    #It matches a device name
+    redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
+    #Matches attribute and extension
+    rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|'\
+              'hist|ALARM|WARNING|VALID|INVALID|OK))?'
+    reattr = '(?:/(?P<attribute>'+alnum+')'+rewhat+')?' 
     retango = redev+reattr#+'(?!/)'
-    regexp = no_quotes + retango + no_quotes.replace('\.','').replace(':','=') #Excludes attr_names between quotes, accepts value type methods    
+    #Excludes attr_names between quotes, accepts value type methods    
+    regexp = no_quotes + retango + no_quotes.replace('\.','').replace(':','=') 
     
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,
               trace=False, proxies=None, attributes=None, cache=0, use_events = False, 
@@ -1764,7 +1801,10 @@ class TangoEval(object):
         self.macros = [('FIND(%s)',self.FIND_EXP,self.find_macro)]
         
         self._trace = trace
-        self._defaults = dict([(str(v),v) for v in PyTango.DevState.values.values()]+[(str(q),q) for q in PyTango.AttrQuality.values.values()])
+        self._defaults = dict(
+            [(str(v),v) for v in DevState.values.values()]+
+            [(str(q),q) for q in AttrQuality.values.values()]
+            )
         self._defaults['T'] = str2time
         self._defaults['str2time'] = str2time
         self._defaults['time'] = time
