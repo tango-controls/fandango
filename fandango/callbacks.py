@@ -837,7 +837,7 @@ class EventSource(Logger,SingletonMap):
           
             if tdiff and (self.checkState('SUBSCRIBING') or (vdiff and self.isUsingEvents())):
                 if not self.isUsingEvents():
-                    self.warning('Event subscribing failed (tdiff=%s,vdiff=%s) switching to polling'%(tdiff,vdiff))
+                    self.info('Event subscribing failed (tdiff=%s,vdiff=%s) switching to polling'%(tdiff,vdiff))
                     self.setState('PENDING')
                 else:
                     self.warning('Values differ and no event received (check sardana/attr_conf)! (tdiff=%s,vdiff=%s)'%(tdiff,vdiff))
@@ -1033,8 +1033,8 @@ class EventSource(Logger,SingletonMap):
                     #Discard config exceptions if some other event is already working well
                     return
                   elif self.use_events and not is_polled:
-                    self.warning('EVENTS_FAILED! (%s,%s,%s,%s): reactivating Polling'%(type_,reason,has_evs,is_polled))
-                    self.warning(str([et,type_,event.err,]))
+                    self.info('EVENTS_FAILED! (%s,%s,%s,%s): reactivating Polling'%(type_,reason,has_evs,is_polled))
+                    self.info(str([et,type_,event.err,]))
                     self.setState('PENDING')
                     self.activatePolling()
                   return
@@ -1075,7 +1075,7 @@ class EventSource(Logger,SingletonMap):
                 
                 if self.isPollingActive() and not self.isPollingForced():
                     self.info('push_event(): Event received, deactivating polling')
-                    self.warning(str([et,type_,event.attr_value]))
+                    self.info(str([et,type_,event.attr_value]))
                     self.deactivatePolling()
 
             delay = t0-self.last_event_time
