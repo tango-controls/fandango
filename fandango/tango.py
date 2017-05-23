@@ -1222,7 +1222,10 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,bad_stat
 
 @Cached(depth=200,expire=10)
 def check_device_cached(*args,**kwargs):
-    """ Cached implementation of check_device method  """
+    """ 
+    Cached implementation of check_device method
+    @Cached(depth=200,expire=10)
+    """
     return check_device(*args,**kwargs)
 
 def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
@@ -1496,7 +1499,10 @@ class fakeAttributeValue(object):
     The cache is controlled by keeptime variable (milliseconds)
     :param parent: Apart of common Attribute arguments, parent will be used to keep a proxy to the parent object (a DeviceProxy or DeviceImpl) 
     """
-    def __init__(self,name,value=None,time_=0.,quality=PyTango.AttrQuality.ATTR_VALID,dim_x=1,dim_y=1,parent=None,device='',error=False,keeptime=0):
+    def __init__(self,name,value=None,time_=0.,
+                 quality=PyTango.AttrQuality.ATTR_VALID,
+                 dim_x=1,dim_y=1,parent=None,device='',
+                 error=False,keeptime=0):
         self.name=name
         self.device=device or (self.name.rsplit('/',1)[0] if '/' in self.name else '')
         self.set_value(value,dim_x,dim_y)
@@ -1504,7 +1510,7 @@ class fakeAttributeValue(object):
         self.write_value = self.wvalue = None
         self.quality=quality
         self.parent=parent
-        self.error = error
+        self.error = self.err = error
         self.keeptime = keeptime*1e3 if keeptime<10. else keeptime
         self.lastread = 0
         self.type = type(value)
@@ -1529,20 +1535,24 @@ class fakeAttributeValue(object):
         return self 
     
     def throw_exception(self,msg=''):
-        self.error = msg or traceback.format_exc()
+        self.err = self.error = msg or traceback.format_exc()
         print 'fakeAttributeValue(%s).throw_exception(%s)'%(self.name,self.error)
         #event_type = fakeEventType.lookup['Error']
         self.set_value(None)
         self.set_quality(PyTango.AttrQuality.ATTR_INVALID)
         raise Exception(self.error)
     
-    def set_value(self,value,dim_x=1,dim_y=1):
+    def set_value(self,value,dim_x=1,dim_y=1,err=False):
         self.value = self.rvalue = value
+        self.err = (err or 
+              isinstance(self.value,(PyTango.DevFailed,PyTango.DevError)))
+        
         if (dim_x,dim_y) == (1,1):
             if isSequence(value): 
                 dim_x = len(value)
                 if len(value)>1 and isSequence(value[0]):
                     dim_y = len(value[0])
+                    
         self.dim_x = dim_x
         self.dim_y = dim_y
         self.set_date(time.time())
