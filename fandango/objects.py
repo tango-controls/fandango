@@ -171,7 +171,7 @@ class Struct(object):
       for k,v in self.items():
         if v == value:
           return k
-      raise Exception('NotFound!')
+      raise Exception('%s_NotFound!'%value)
       
     def set(self,k,v): return setattr(self,k,v)
     def setdefault(self,v): self.dict().setdefault(v)
