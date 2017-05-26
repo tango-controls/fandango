@@ -40,7 +40,7 @@ srubio@cells.es,
 """
 import time,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
-from threading import Event,RLock,Thread
+from threading import Event,Lock,RLock,Thread
 
 try: import Queue
 except: import queue as Queue
@@ -369,7 +369,7 @@ class ThreadedObject(Object):
                 self._count += 1
                 
               except Exception,e:
-                self.print_exc(e if not traceback else traceback.format_exc(),
+                self.print_exc(traceback and traceback.format_exc(),
                                'ThreadObject stop!')
                 raise e
                 
@@ -381,7 +381,7 @@ class ThreadedObject(Object):
         print('ThreadedObject.Kill() ...')
         return #<< Should never get to this point
     except Exception,e:
-        self.print_exc(e,'ThreadObject exit!')
+        self.print_exc(time and e,'ThreadObject exit!')
 
 ###############################################################################
 
