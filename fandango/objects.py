@@ -760,7 +760,7 @@ class BoundDecorator(Decorator):
                 return self.make_bound(instance)
             def make_unbound(self, klass):
                 BoundDecorator.tracer('make_unbound(%s)'%klass)
-                @wraps(self.f)
+                @functools.wraps(self.f)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)
                     This method may work well only without arguments
@@ -773,7 +773,7 @@ class BoundDecorator(Decorator):
                 return wrapper
             def make_bound(self, instance):
                 BoundDecorator.tracer('make_bound(%s)'%instance)
-                @wraps(self.f)
+                @functools.wraps(self.f)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)'''
                     BoundDecorator.tracer("Called the decorated method %s of %s"%(self.f.__name__, instance))
