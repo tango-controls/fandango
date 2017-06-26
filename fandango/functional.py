@@ -536,10 +536,13 @@ def isSequence(seq,INCLUDE_GENERATORS = True):
         return True
     return False
   
-def isDictionary(seq):
-    """ It includes dicts and also nested lists """
+def isDictionary(seq,strict=False):
+    """ 
+    It includes dict-like and also nested lists if strict is False
+    """
     if isinstance(seq,dict): return True
     if hasattr(seq,'items') or hasattr(seq,'iteritems'): return True
+    if strict: return False
     try:
         if seq and isSequence(seq) and isSequence(seq[0]):
             if seq[0] and not isSequence(seq[0][0]): return True #First element of tuple must be hashable
@@ -660,7 +663,7 @@ def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
                     json.dumps(result[k])
                 except:
                     result[k] = []
-            elif isMapping(v) and recursive:
+            elif isMapping(v,strict=True) and recursive:
                 result[k] = dict2json(v,None,False,True,encoding=encoding)
     if filename:
         json.dump(result,open(filename,'w'),encoding=encoding)
@@ -671,7 +674,7 @@ def unicode2str(obj):
     Converts an unpacked unicode object (json) to 
     nested python primitives (map,list,str)
     """
-    if isMapping(obj):
+    if isMapping(obj,strict=True):
         n = dict(unicode2python(t) for t in obj.items())
     elif isSequence(obj):
         n = list(unicode2python(t) for t in obj)
@@ -778,7 +781,7 @@ def str2dict(s,ksep='',vsep=''):
     argument may be string or sequence of strings
     if s is a mapping type it will be returned
     """
-    if isMapping(s): return s
+    if isMapping(s,strict=True): return s
   
     if isString(s):
       vsep = vsep or (
@@ -793,7 +796,7 @@ def str2dict(s,ksep='',vsep=''):
     return dict(str2list(t,ksep) for t in s)
   
 def obj2str(obj,sep=',',linesep='\n',MAX_LENGTH=0):
-    if isMapping(obj): s = dict2str(obj,sep,linesep)
+    if isMapping(obj,strict=True): s = dict2str(obj,sep,linesep)
     elif isSequence(obj): s = list2str(obj,sep)
     else: s = toString(obj)
     s = shortstr(s,MAX_LENGTH)
