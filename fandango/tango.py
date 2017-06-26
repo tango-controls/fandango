@@ -1608,39 +1608,62 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
     An earlier version is used in PyTangoArchiving.utils module
     This class must be substituted by Tau.Core.TauManager().getFactory()()
     '''
-    def __init__(self,use_tau = False):
+    def __init__(self,use_tau = False, tango_host = ''):
         self.log = Logger('ProxiesDict')
         self.log.setLogLevel('INFO')
         self.use_tau = TAU and use_tau
+        self.tango_host = tango_host
         self.call__init__(CaselessDefaultDict,self.__default_factory__)
+
     def __default_factory__(self,dev_name):
         '''
         Called by defaultdict_fromkey.__missing__ method
-        If a key doesn't exists this method is called and returns a proxy for a given device.
-        If the proxy caused an exception (usually because device doesn't exists) a None value is returned
-        '''        
+        If a key doesn't exists this method is called and 
+        returns a proxy for a given device.
+        If the proxy caused an exception (usually because device 
+        doesn't exists) a None value is returned
+        '''
+        
+        if self.tango_host and ':' not in dev_name:
+            dev_name = self.tango_host + '/' + dev_name
+            
         if dev_name not in self.keys():
             self.log.debug( 'Getting a Proxy for %s'%dev_name)
+            
             try:
-                devklass,attrklass = (TAU.Device,TAU.Attribute) if self.use_tau else (PyTango.DeviceProxy,PyTango.AttributeProxy)
-                dev = (attrklass if str(dev_name).count('/')==(4 if ':' in dev_name else 3) else devklass)(dev_name)
+                devklass,attrklass = (TAU.Device,TAU.Attribute) \
+                    if self.use_tau else \
+                    (PyTango.DeviceProxy,PyTango.AttributeProxy)
+                dev = (attrklass if 
+                    str(dev_name).count('/')==(4 if ':' in dev_name else 3) 
+                    else devklass)(dev_name)
             except Exception,e:
                 print('ProxiesDict: %s doesnt exist!'%dev_name)
                 #print traceback.format_exc()
                 #raise e
                 dev = None
         return dev
+      
+    def __getitem__(self,key):
+        if self.tango_host and ':' not in key:
+            key = self.tango_host + '/' + key
+        return CaselessDefaultDict.__getitem__(self,key)
             
     def get(self,dev_name):
-        return self[dev_name]   
+        return self[dev_name]
+      
     def get_admin(self,dev_name):
-        '''Adds to the dictionary the admin device for a given device name and returns a proxy to it.'''
+        '''Adds to the dictionary the admin device for a given device name
+        and returns a proxy to it.'''
         dev = self[dev_name]
         class_ = dev.info().dev_class
         admin = dev.info().server_id
         return self['dserver/'+admin]
+      
     def pop(self,dev_name):
         '''Removes a device from the dict'''
+        if self.tango_host and ':' not in dev_name:
+            dev_name = self.tango_host + '/' + dev_name
         if dev_name not in self.keys(): return
         self.log.debug( 'Deleting the Proxy for %s'%dev_name)
         return CaselessDefaultDict.pop(self,dev_name)
