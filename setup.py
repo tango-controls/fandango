@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # Always prefer setuptools over distutils
-import os, imp
+import os, imp, sys
 from setuptools import setup, find_packages
 
 __doc__ = """
@@ -24,6 +24,7 @@ To tune some options:
 -------------------------------------------------------------------------------
 """
 
+#if 'help' in str(sys.argv): 
 print(__doc__)
 
 release = open('fandango/VERSION').read()

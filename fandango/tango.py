@@ -909,7 +909,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                     if limit and len(attrs)>limit: break
                 except: 
                     print 'Unable to get attributes for %s'%d
-                    print traceback.format_exc()
+                    #print traceback.format_exc()
                     
     result = sorted(set(attrs))
     return result[:limit] if limit else result
@@ -1980,7 +1980,7 @@ class TangoEval(object):
         if dct:
             if not hasattr(dct,'keys'): dct = dict(dct)
             self._locals.update(dct)
-            self.trace('update_locals(%s)'%dct.keys())
+            self.trace('update_locals(%s)'%shortstr(dct.keys()))
         self._locals['now'] = self._locals['t'] = time.time()
         self._locals['formula'] = self.formula
         return self._locals
