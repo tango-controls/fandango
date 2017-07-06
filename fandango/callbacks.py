@@ -947,7 +947,7 @@ class EventSource(Logger,SingletonMap):
         if with_read:
             return self.read(cache=False)
 
-    def read(self, cache=None,asynch=None,_raise=True,verbose=False):
+    def read(self, cache=None,asynch=None,_raise=True):
         """ 
         Read last value acquired, 
         if cache = False or not polled it will trigger
@@ -978,32 +978,7 @@ class EventSource(Logger,SingletonMap):
                 self.info('Attribute subscribed but no events received yet!!')
           
           self.stats['read']+=1
-          self.debug('%s.read_attribute(%s,%s,%s)'%(self.device,self.simple_name,self.tango_asynch,self.pending_request))
-
-          try:
-              #assert check_device_cached(self.device),'%s_DevFailed'%self.device
-              ## Do not merge these IF's, order matters
-              if verbose:print('cache : %s'%self.attr_value)
-              if asynch:
-                  if self.pending_request is not None:
-                      if verbose:print('pending_request ...')
-                      self.attr_value = notNone(self.asynch_hook(),self.attr_value)
-                  else:
-                      if verbose:print('new_request ...')
-                      self.pending_request = self.proxy.read_attribute_asynch(self.simple_name),now()
-                      self.attr_value = notNone(self.asynch_hook(),self.attr_value)
-              else:
-                  if verbose: print('not asynch')
-                  self.attr_value = self.proxy.read_attribute(self.simple_name)
-          except Exception,e:
-              # fakeAttributeValue initialized with full_name
-              self.info('EventSource.read(%s) failed!, polling will be deactivated:\n%s'%(
-                self.full_name,exc2str(e)))
-              #traceback.format_exc().split('desc')[-1][:80]))
-              self.attr_value = fakeAttributeValue(self.full_name,value=e,error=e)
-              if (not check_device_cached(self.device) 
-                  and self.polled and not self.forced):
-                  self.deactivatePolling()
+          self.read_hw(asynch=asynch)
               
           self.last_read_time = t0
           if self.attr_value is not None: 
@@ -1014,6 +989,45 @@ class EventSource(Logger,SingletonMap):
           raise self.attr_value.value
         else:
           return self.attr_value
+        
+    def read_hw(self,asynch=False):
+      
+        self.debug('%s.read_hw(%s,%s,%s)'%(
+          self.device,self.simple_name,self.tango_asynch,self.pending_request))
+
+        try:
+            #assert check_device_cached(self.device),\
+            #  '%s_DevFailed'%self.device
+            ## Do not merge these IF's, order matters
+            self.debug('read(): cache : %s'%self.attr_value)
+            if asynch:
+                if self.pending_request is not None:
+                    self.debug('read(): pending_request ...')
+                    self.attr_value = notNone(self.asynch_hook(),
+                                              self.attr_value)
+                else:
+                    self.debug('read(): new_request ...')
+                    self.pending_request = \
+                      self.proxy.read_attribute_asynch(self.simple_name),now()
+                    self.attr_value = \
+                      notNone(self.asynch_hook(),self.attr_value)
+            else:
+                self.debug('read(): not asynch')
+                self.attr_value = self.proxy.read_attribute(self.simple_name)
+                self.debug('read(%s(%s),%s): %s:%s'%(
+                    type(self.proxy),self.proxy,self.simple_name,
+                    getattr(self.attr_value,'value','null'),
+                    shortstr(self.attr_value)))
+        except Exception,e:
+            # fakeAttributeValue initialized with full_name
+            self.info('EventSource.read(%s) failed!,'
+              ' polling will be deactivated:\n%s'%(self.full_name,exc2str(e)))
+            #traceback.format_exc().split('desc')[-1][:80]))
+            self.attr_value = fakeAttributeValue(
+                                  self.full_name,value=e,error=e)
+            if (not check_device_cached(self.device) 
+                and self.polled and not self.forced):
+                self.deactivatePolling()      
         
     
     def asynch_hook(self):
