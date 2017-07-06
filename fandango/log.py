@@ -110,12 +110,14 @@ def printtest(obj,meth='',args=[],kwargs={}):
     print(r)
     return v
 
-ERROR,WARNING,INFO,DEBUG = logging.ERROR,logging.WARNING,logging.INFO,logging.DEBUG
+ERROR,WARNING,INFO,DEBUG = \
+  logging.ERROR,logging.WARNING,logging.INFO,logging.DEBUG
 LogLevels = {'ERROR':ERROR,'WARNING':WARNING,'INFO':INFO,'DEBUG':DEBUG,}
   
 class FakeLogger():
     """
-    This class just simulates a Logger using prints with date and header, it doesn't allow any customization
+    This class just simulates a Logger using prints with date and header, 
+    it doesn't allow any customization
     """
     _instances = []
     def __init__(self,header='',keep=False):
@@ -126,17 +128,18 @@ class FakeLogger():
         self.LogLevel = str(s).lower()!='DEBUG'
     def trace(self,s):
         if not self.LogLevel:
-          print time2str()+' '+'TRACE\t'+self.header+s
+          print(time2str()+' '+'TRACE\t'+self.header+s)
     def debug(self,s):
         if not self.LogLevel:
-          print time2str()+' '+'DEBUG\t'+self.header+s
-    def info(self,s):print time2str()+' '+'INFO\t'+self.header+s
-    def warning(self,s):print time2str()+' '+'WARNING\t'+self.header+s
-    def error(self,s):print time2str()+' '+'ERROR\t'+self.header+s
+          print(time2str()+' '+'DEBUG\t'+self.header+s)
+    def info(self,s):print(time2str()+' '+'INFO\t'+self.header+s)
+    def warning(self,s):print(time2str()+' '+'WARNING\t'+self.header+s)
+    def error(self,s):print(time2str()+' '+'ERROR\t'+self.header+s)
     
 class Logger(Object):
     """
-    This class provides logging methods (debug,info,error,warning) to all classes inheriting it.
+    This class provides logging methods (debug,info,error,warning) 
+    to all classes inheriting it.
     To use it you must inherit from it and add it within your __init__ method:
     
     class MyTangoDevice(Device_4Impl,Logger):
@@ -144,14 +147,16 @@ class Logger(Object):
       def __init__(self,cl, name):
       
         PyTango.Device_4Impl.__init__(self,cl,name)
-        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s'
+          ' %(name)s: %(message)s')
     
     Constructor arguments allow to customize the output format:
      * name='fandango.Logger' #object name to appear at the beginning
      * parent=None
      * format='%(levelname)-8s %(asctime)s %(name)s: %(message)s'\
      * use_tango=True #Use Tango Logger if available
-     * use_print=True #Use printouts instead of linux logger (use_tango will override this option)
+     * use_print=True #Use printouts instead of linux logger (use_tango 
+        will override this option)
      * level='INFO' #default log level
      * max_len=0 #max length of log strings
     """
@@ -190,7 +195,7 @@ class Logger(Object):
         self.setLogLevel(level)
         
         if not Logger.root_inited:
-            #print 'log format is ',format
+            #print('log format is ',format)
             self.initRoot(format)
             Logger.root_inited = True
             
@@ -199,13 +204,16 @@ class Logger(Object):
         if parent is not None:
             parent.delChild(self)
 
-    def initRoot(self,_format='%(threadName)-12s %(levelname)-8s %(asctime)s %(name)s: %(message)s'):
+    def initRoot(self,_format='%(threadName)-12s %(levelname)-8s '
+                 '%(asctime)s %(name)s: %(message)s'):
         logging.basicConfig(level=logging.INFO,format=_format)
         #logging.basicConfig(level=logging.DEBUG,                           
-#                            format='%(threadName)-12s %(levelname)-8s %(asctime)s %(name)s: %(message)s')        
+        #format='%(threadName)-12s %(levelname)-8s '
+        #'%(asctime)s %(name)s: %(message)s')        
 
     def setLogPrint(self,force):
-        ''' This method enables/disables a print to be executed for each log call '''
+        ''' This method enables/disables a print to be 
+        executed for each log call '''
         self._ForcePrint=force
         
     def getTimeString(self,t=None):
@@ -219,27 +227,32 @@ class Logger(Object):
         name = self.log_name or ''
         l = self.__levelAliases.get(prio,prio)
         if l<self.log_obj.level: return
-        print ('%s %7s %s: %s'%(name,prio,self.getTimeString(),str(msg).replace('\r','')))
+        print('%s %7s %s: %s'%(name,prio,
+                self.getTimeString(),str(msg).replace('\r','')))
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
         #if isinstance(level,basestring): level = level.upper() 
         if type(level)==type(logging.NOTSET):
             self.log_obj.setLevel(level)
-            self.debug('log.Logger: Logging  level set to %s'%str(level).upper())
+            self.debug('log.Logger: Logging  level set to %s'%
+                       str(level).upper())
         else:
             l = self.getLogLevel(level)
             if l is not None:
                 self.log_obj.setLevel(l)
-                self.debug('log.Logger: Logging  level set to "%s" = %s'%(level,l))
+                self.debug('log.Logger: Logging  level set to "%s" = %s'
+                  %(level,l))
             else:
-                self.warning('log.Logger: Logging level cannot be set to "%s"'%level)
+                self.warning('log.Logger: Logging level cannot be set to "%s"'
+                  %level)
         return level
         
     setLevel = setLogLevel
 
     def setLevelAlias(self,alias,level):
-        ''' setLevelAlias(alias,level), allows to setup predefined levels for different tags '''
+        ''' setLevelAlias(alias,level), allows to setup predefined 
+        levels for different tags '''
         self.__levelAliases[alias]=level
         
     def getLogLevel(self,alias=None):
@@ -251,12 +264,14 @@ class Logger(Object):
             return l
         else:
             if not isinstance(alias,basestring):
-                try: return (k for k,v in self.__levelAliases.iteritems() if v==alias).next()
+                try: return (k for k,v in self.__levelAliases.iteritems() 
+                             if v==alias).next()
                 except: return None
             elif alias.lower() in ('debug','info','warning','error'):
                 return logging.__dict__.get(alias.upper())
             else:
-                try: return (v for k,v in self.__levelAliases.iteritems() if k.lower()==alias.lower()).next()
+                try: return (v for k,v in self.__levelAliases.iteritems() 
+                             if k.lower()==alias.lower()).next()
                 except: return None
         return
 
@@ -269,7 +284,8 @@ class Logger(Object):
         try:
             #import PyTango
             #if PyTango.Util.instance().is_svr_starting(): return None
-            self.get_name() #Will trigger exception if Tango object is not ready
+            self.get_name() 
+            #Will trigger exception if Tango object is not ready
             self.__tango_log = self
         except:
             print(traceback.format_exc())
@@ -337,21 +353,25 @@ class Logger(Object):
             msg = str(msg).replace('\r','').replace('%','%%')
             obj = self.getTangoLog()
             if obj: 
-                stream = (obj.error_stream,obj.warn_stream,obj.info_stream,obj.debug_stream)[prio]
+                stream = (obj.error_stream,obj.warn_stream,
+                          obj.info_stream,obj.debug_stream)[prio]
                 stream(msg, *args, **kw)
             elif self._ForcePrint: 
                 self.logPrint(level.upper(),msg)
             else: 
-                stream = (self.log_obj.error,self.log_obj.warning,self.log_obj.info,self.log_obj.debug)[prio]
+                stream = (self.log_obj.error,self.log_obj.warning,
+                          self.log_obj.info,self.log_obj.debug)[prio]
                 stream(msg, *args, **kw)
         except Exception,e:
-            print 'Exception in Logger.%s! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'%(level,msg,e,str(args),str(kw))
-            print traceback.format_exc()
+            print('Exception in Logger.%s! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'
+              %(level,msg,e,str(args),str(kw)))
+            print(traceback.format_exc())
         
 
     def deprecated(self, msg, *args, **kw):
         filename, lineno, func = self.log_obj.findCaller()
-        depr_msg = warnings.formatwarning(msg, DeprecationWarning, filename, lineno)
+        depr_msg = warnings.formatwarning(
+          msg, DeprecationWarning, filename, lineno)
         self.log_obj.warning(depr_msg, *args, **kw)
 
     def flushOutput(self):
