@@ -1190,7 +1190,8 @@ def check_starter(host):
     else:
         return False
     
-def check_device(dev,attribute=None,command=None,full=False,admin=False,bad_state=False,throw=False):
+def check_device(dev,attribute=None,command=None,full=False,admin=False,
+        bad_state=False,throw=False, timeout=3000):
     """ 
     Command may be 'StateDetailed' for testing HdbArchivers 
     It will return True for devices ok, False for devices not running and None for unresponsive devices.
@@ -1205,6 +1206,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,bad_stat
             if not check_device('dserver/%s'%info.server,full=False):
                 return False
         dp = PyTango.DeviceProxy(dev)
+        dp.set_timeout_millis(int(timeout))
         dp.ping()
     except Exception,e:
         return e if throw else False
