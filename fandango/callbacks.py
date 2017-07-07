@@ -1023,7 +1023,7 @@ class EventSource(Logger,SingletonMap):
             #assert check_device_cached(self.device),\
             #  '%s_DevFailed'%self.device
             ## Do not merge these IF's, order matters
-            self.debug('read(): cache : %s'%self.attr_value)
+            self.debug('read(): cache : %s'%shortstr(self.attr_value))
             if asynch:
                 if self.pending_request is not None:
                     self.debug('read(): pending_request ...')

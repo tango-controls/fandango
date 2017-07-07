@@ -54,7 +54,7 @@ message
 
 import time, logging, weakref, traceback, sys
 from objects import Object,Decorator
-from pprint import pprint
+from pprint import pprint,pformat
 from functional import \
   time2str,first,matchCl,isSequence,isMapping,isCallable,isString,shortstr
 import warnings
