@@ -170,8 +170,9 @@ class EventListener(Logger,Object): #Logger,
                 
         else:
             rvalue = getattr(value,'value',getattr(value,'rvalue',type(value)))
-            self.debug('%s: eventReceived(%s,%s,%s): +%2.1f ms (%2.1f delay)'%(
-                self.name,src,type_,rvalue,1e3*inc,delay))
+            self.logPrint('debug','\n',head=False)
+            self.debug('eventReceived:%s\n\t%s\n\t%s\n\t+%2.1fms(%2.1f delay)'
+                        %(src,type_,rvalue,1e3*inc,delay))
             
             if rvalue is not None:
                 if isinstance(rvalue,PyTango.DevError):
@@ -727,23 +728,35 @@ class EventSource(Logger,SingletonMap):
             and not hasattr(listener,'event_received'):
               raise Exception('NotAValidListener!: %s'%listener)
         
-        if not use_events: use_events = []
-        elif use_events is True: use_events = self.use_events or self.DEFAULT_EVENTS
+        if not use_events: 
+            use_events = []
+        elif use_events is True: 
+            use_events = self.use_events or self.DEFAULT_EVENTS
+            
         use_events = toList(use_events or self.use_events)
-        self.debug('addListener(%s,use_events=%s,polled=%s)'%(listener,use_events,use_polling))
+        self.debug('addListener(%s,use_events=%s,polled=%s)'
+                    %(listener,use_events,use_polling))
         self.forced = self.forced or use_polling
-        if isNumber(use_polling): self.changePollingPeriod(use_polling)
+        
+        if isNumber(use_polling): 
+            self.changePollingPeriod(use_polling)
+        
         self.get_thread().register(self)
         if use_events:
-            self.subscribeEvents(types=use_events,asynchronous=self.checkState('UNSUBSCRIBED'))
+            #If state is UNSUBSCRIBED, event subscription will be delayed
+            self.subscribeEvents(types=use_events,
+                asynchronous=self.checkState('UNSUBSCRIBED'))
+
         if self.forced and not self.polled:
             self.activatePolling()
+
         weak = weakref.ref(listener,self._listenerDied)
         if weak not in self.listeners:
-          #This line is needed, as listeners may be polling only
-          self.listeners[weak] = set()
+            #This line is needed, as listeners may be polling only
+            self.listeners[weak] = set()
         for e in use_events:
             self.listeners[weak].add(e)
+
         return True
 
     def removeListener(self, listener, exclude='dummy'):
@@ -838,17 +851,18 @@ class EventSource(Logger,SingletonMap):
           
           types = toList(types) if types else []
           if not isIterable(self.use_events): self.use_events = []
-          self.use_events = sorted(set((self.use_events+types) or self.DEFAULT_EVENTS))
+          self.use_events = sorted(set((self.use_events+types) 
+                            or self.DEFAULT_EVENTS))
 
           if self.isUsingEvents() and self.checkEventsReceived(self.use_events):
               self.warning('AlreadySubscribed!')
               return False
             
-          self.info('subscribeEvents(%s,asynch=%s)'%(self.use_events,asynchronous))
+          self.info('subscribeEvents(%s,asynch=%s)'
+            %(self.use_events,asynchronous and 'delayed ...'))
 
           if asynchronous:
-              # Subscription to be done by checkEvents()
-              #if self.checkState('SUBSCRIBING','PENDING'):
+              # Subscription will be done by checkEvents()
               self.setState('UNSUBSCRIBED')
 
           else:
@@ -901,6 +915,7 @@ class EventSource(Logger,SingletonMap):
         r  =  True
 
         if self.use_events:
+        
             if self.checkState('UNSUBSCRIBED'):
                 self.subscribeEvents(asynchronous=False)
           
@@ -918,10 +933,15 @@ class EventSource(Logger,SingletonMap):
                 r = False
 
         if self.listeners:
+            # NOTE: a device with listeners and neither use_events nor polled 
+            # not forced would be just a dummy CachedAttributeProxy and should
+            # be updated "by hand"
+          
             if not self.polled and check_device_cached(self.device) and (
-              self.forced or self.use_events and not self.isUsingEvents()):
+              self.forced or (self.use_events and not self.isUsingEvents())):
+              
                 self.info('checkEvents(): events not subscribed, enabling polling')
-                self.activatePolling()    
+                self.activatePolling()
             
         else:
             if self.polled and not self.forced:
@@ -979,69 +999,68 @@ class EventSource(Logger,SingletonMap):
         
         If asynch=True/False, self.tango_asynch will be overriden for this call.
         """
-        self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
+        #self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
         asynch = notNone(asynch,self.tango_asynch)
         t0 = now()
         
         # If it was just updated, return cache
         if cache is None:
-          vtime = ctime2time(getattr(self.attr_value,'time',None))
-          if self.fake or (t0 < (vtime + self.keep_time*1e-3)):
-              cache = True
-          # If not polled, force HW reading
-          elif not self.getMode():
-              cache = False
-          else:
-              cache = True
+            vtime = ctime2time(getattr(self.attr_value,'time',None))
+            if self.fake or (t0 < (vtime + self.keep_time*1e-3)):
+                cache = True
+            # If not polled, force HW reading
+            elif not self.getMode():
+                cache = False
+            else:
+                cache = True
        
+        self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
         self.asynch_hook() # Check for pending asynchronous results
         
         if not cache or self.attr_value is None:
           
-          if self.checkState('SUBSCRIBED') and not self.last_event:
-                self.info('Attribute subscribed but no events received yet!!')
-          
-          self.stats['read']+=1
-          self.read_hw(asynch=asynch)
-              
-          self.last_read_time = t0
-          if self.attr_value is not None: 
-              #if None, asynch has not been read yet
-              self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
+            if self.checkState('SUBSCRIBED') and not self.last_event:
+                  self.info('Attribute subscribed but no events received yet!!')
+            
+            self.stats['read']+=1
+            self.read_hw(asynch=asynch)
+                
+            self.last_read_time = t0
+            if self.attr_value is not None: 
+                #if None, asynch has not been read yet
+                self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
             
         if _raise and getattr(self.attr_value,'error',False):
-          raise self.attr_value.value
+            raise self.attr_value.value
         else:
-          return self.attr_value
+            return self.attr_value
         
     def read_hw(self,asynch=False):
       
-        self.debug('%s.read_hw(%s,%s,%s)'%(
-          self.device,self.simple_name,self.tango_asynch,self.pending_request))
-
+        self.debug('read_hw(asynch=%s,\n\tpending=%s)'
+                          %(asynch,self.pending_request))
         try:
-            #assert check_device_cached(self.device),\
-            #  '%s_DevFailed'%self.device
             ## Do not merge these IF's, order matters
-            self.debug('read(): cache : %s'%shortstr(self.attr_value))
+            #self.debug('read(): cache : %s'%shortstr(self.attr_value))
             if asynch:
                 if self.pending_request is not None:
-                    self.debug('read(): pending_request ...')
+                    #self.debug('read(): pending_request ...')
                     self.attr_value = notNone(self.asynch_hook(),
                                               self.attr_value)
                 else:
-                    self.debug('read(): new_request ...')
-                    self.pending_request = \
-                      self.proxy.read_attribute_asynch(self.simple_name),now()
+                    #self.debug('read(): new_request ...')
+                    self.pending_request = (
+                        self.proxy.read_attribute_asynch(self.simple_name),
+                        now())
                     self.attr_value = \
-                      notNone(self.asynch_hook(),self.attr_value)
+                        notNone(self.asynch_hook(),self.attr_value)
             else:
-                self.debug('read(): not asynch')
+                #self.debug('read(): not asynch')
                 self.attr_value = self.proxy.read_attribute(self.simple_name)
-                self.debug('read(%s(%s),%s): %s:%s'%(
-                    type(self.proxy),self.proxy,self.simple_name,
-                    getattr(self.attr_value,'value','null'),
-                    shortstr(self.attr_value)))
+                self.debug('read_hw(asynch=False):\n\tvalue:%s\n\tdata:%s'
+                    %(getattr(self.attr_value,'value','null'),
+                        shortstr(self.attr_value,256)))
+                    
         except Exception,e:
             # fakeAttributeValue initialized with full_name
             self.info('EventSource.read(%s) failed!,'
@@ -1050,8 +1069,8 @@ class EventSource(Logger,SingletonMap):
             self.attr_value = fakeAttributeValue(
                                   self.full_name,value=e,error=e)
             if (not check_device_cached(self.device) 
-                and self.polled and not self.forced):
-                self.deactivatePolling()      
+                    and self.polled and not self.forced):
+                self.deactivatePolling()
         
     
     def asynch_hook(self):
@@ -1084,6 +1103,7 @@ class EventSource(Logger,SingletonMap):
 
     def poll(self):
         t0 = now()
+        self.logPrint('DEBUG','\n\n',False)
         self.debug('poll(+%s): %s'%(t0-self.last_read_time,self.stats['poll']))
         self.stats['poll']+=1
         if self.checkState('SUBSCRIBING'):

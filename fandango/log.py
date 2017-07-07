@@ -232,20 +232,20 @@ class Logger(Object):
         ms = int((t-int(t))*1e3)
         return '%s.%d'%(s,ms)
         
-    def logPrint(self,prio,msg):
+    def logPrint(self,prio,msg,head=True):
         name = self.log_name or ''
         l = self.__levelAliases.get(prio,prio)
         if l<self.log_obj.level: return
-        print('%s %7s %s: %s'%(name,prio,
-                self.getTimeString(),str(msg).replace('\r','')))
+        head = '%s %7s %s: '%(name,prio,self.getTimeString()) if head else ''
+        print(head+str(msg).replace('\r',''))
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
         #if isinstance(level,basestring): level = level.upper() 
         if type(level)==type(logging.NOTSET):
             self.log_obj.setLevel(level)
-            self.debug('log.Logger: Logging  level set to %s'%
-                       str(level).upper())
+            #self.debug('log.Logger: Logging  level set to %s'%
+                       #str(level).upper())
         else:
             l = self.getLogLevel(level)
             if l is not None:
@@ -283,6 +283,13 @@ class Logger(Object):
                              if k.lower()==alias.lower()).next()
                 except: return None
         return
+      
+    def checkLogLevel(self,level):
+        """ 
+        returns True if the current log level is equal or lower than arg
+        """
+        l = LogLevels(self.getLogLevel(level))
+        return LogLevels[self.getLogLevel()] <= l
 
     def getRootLog(self):
         return logging.getLogger()

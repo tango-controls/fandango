@@ -45,7 +45,7 @@ from threading import Event,Lock,RLock,Thread
 try: import Queue
 except: import queue as Queue
 
-from log import except2str,shortstr
+from log import except2str,shortstr,tracer
 from functional import *
 from excepts import trial,Catched,CatchedArgs
 from operator import isCallable
@@ -321,7 +321,7 @@ class ThreadedObject(Object):
                 self._errors += 1
                 args,kwargs = [],{}
             
-            print('ThreadedObject(%s).Start() ...'%type(self))
+            tracer('ThreadedObject(%s).Start() ...'%type(self))
             self._started = time.time()
             self._next = self._started + self._timewait
             while not self._stop.isSet():
