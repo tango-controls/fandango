@@ -4,11 +4,13 @@
 ##
 ## file :       callbacks..py
 ##
-## description : This class manages a list of attributes subscribed to events that could have multiple receivers each one.
+## description : This class manages a list of attributes subscribed to events 
+##      that could have multiple receivers each one.
 ##      It supplies the ATK AttributeList behaviour.
 ##      device.DevChild and those inherited classes depends on that.
 ##      Global objects are:
-##      _EventsList, _EventReceivers, _StatesList, _AttributesList, GlobalCallback
+##      _EventsList, _EventReceivers, _StatesList, _AttributesList, 
+##      ... GlobalCallback,
 ##      ... _EventReceivers must be substituted by DevicesList
 ##
 ## project :     Tango Control System
@@ -50,7 +52,7 @@ from dicts import *
 from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
 from tango import get_full_name,get_attribute_events, check_device_cached
 from threads import ThreadedObject,Queue,timed_range,wait,threading
-from log import Logger,printf
+from log import Logger,printf,tracer
 
 """
 @package callbacks
@@ -192,13 +194,13 @@ class EventThread(Logger,ThreadedObject):
     This class processes both Events and Polling.
     All listeners should implement eventReceived method
     All sources must have a listeners list
-    On Current EventSource implementation this is a SINGLETONE!!!, its configuration
-    will apply for the whole running process!
+    On Current EventSource implementation this is a SINGLETONE!!!, 
+    its configuration will apply for the whole running process!
     
 
     The filtered argument will just forward last event received 
-    on each loop iteration for each source. It can be set to False, True or a factor
-    of latency.
+    on each loop iteration for each source. 
+    It can be set to False, True or a factor of latency.
     
     The latency (ms) specifies a time condition to abort event checking
     and proceed to callback execution.
@@ -207,14 +209,22 @@ class EventThread(Logger,ThreadedObject):
     and get_avg_delay methods
     
     """
-    MinWait = 0.0001 #Event processing limited to 10KHz maximum (rest are queued)
-    EVENT_POLLING_RATIO = 1000 #How many events to process before checking polled attributes
     
-    def __init__(self,period_ms=None,filtered=False,latency=10.,loglevel='WARNING'):
+    MinWait = 0.0001 
+    #Event processing limited to 10KHz maximum (rest are queued)
+    EVENT_POLLING_RATIO = 1000 
+    #How many events to process before checking polled attributes
+    SHOW_ALIVE = 10000
+    #Will printout some logs every SHOW_ALIVE*period cycles
+    
+    def __init__(self,period_ms=None,filtered=False,latency=10.,
+                 loglevel='WARNING'):
+        self.tinit = now()
+        self.count = 0
         self.queue = Queue.Queue()
         self.sources = set()
         self.event = threading.Event()
-        period = 1e-3*(period_ms or 0) or self.MinWait
+        period = max((1e-3*(period_ms or 0),self.MinWait))
         ThreadedObject.__init__(self,target=self.process,period=period)
         Logger.__init__(self,type(self).__name__)
         self.filtered,self.latency = filtered,latency
@@ -231,6 +241,10 @@ class EventThread(Logger,ThreadedObject):
           self.set_period(period)
         if loglevel is not None:
           self.setLogLevel(loglevel)
+          
+    def set_period(self,period):
+        period = max(((period or 0),self.MinWait))
+        ThreadedObject.set_period(self,period)
         
     def set_period_ms(self,period):
         self.set_period(period*1e-3)
@@ -282,11 +296,14 @@ class EventThread(Logger,ThreadedObject):
         Currently, this implementation will process 100 events for each polling
         each time as max.
         """
-        self.debug('Processing EventThread ...')
         WAS_EMPTY = False
         queue = CaselessSortedDict()
         t0,evs,polls = now(),0,0
         filtered = self.filtered >= True
+        lg = (partial(tracer,obj=self) if not self.count%self.SHOW_ALIVE 
+                      else self.debug)
+        lg('EventThread.process(filtered=%s,count=%d,period=%f)'
+                      %(filtered,self.count,self.get_period()) + '<'*16)
         
         #First, extract events from the queue
         for i in range(self.EVENT_POLLING_RATIO):
@@ -325,7 +342,7 @@ class EventThread(Logger,ThreadedObject):
         #Sequential execution of events received is relatively guaranteed
         for s,events in sorted(queue.items()):
             #@TODO: Event Filters should be implemented here 
-            #including removal of PERIODIC events if a change event is already in queue
+            #including removal of PERIODIC events if a change event is queued
             if filtered:
                 events = events[-1:]
             while events:
@@ -338,7 +355,8 @@ class EventThread(Logger,ThreadedObject):
                       sources = [source] #each source should push its own events
                     for source in sources:
                       if True:
-                        # Update timestamp also for errors not filtered in push_event
+                        # Update timestamp also for errors 
+                        # not filtered in push_event
                         source.last_read_time = now()
                           
                       self.fireEvent(source,*args)
@@ -362,8 +380,10 @@ class EventThread(Logger,ThreadedObject):
                 #self.debug('Executing pollings (%d/%d)'%(polls,len(pollings)))
                 try:
                   if WAS_EMPTY: 
-                    self.debug('KeepAlive(%s) after %s ms'%(source.full_name,source.KeepAlive))
-                  source.poll() #poll->read->fireEvent
+                    lg('KeepAlive(%s) after %s ms'%(
+                                source.full_name,source.KeepAlive))
+                  #poll->read->fireEvent
+                  source.poll() 
                   polls+=1
                 except:
                   traceback.print_exc()
@@ -372,21 +392,25 @@ class EventThread(Logger,ThreadedObject):
                   source.last_read_time = now()
             self.wait(self.MinWait/10.) #breathing
                 
-        asynch_hw = [s[1] for s in pollings if getattr(s,'pending_request',None) is not None]
+        asynch_hw = [s[1] for s in pollings 
+                     if getattr(s,'pending_request',None) is not None]
         if asynch_hw: self.warning('Check pending HW asynch requests')
         for source in randomize(asynch_hw):
             try: 
               source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
             except Exception,e:
               traceback.print_exc()
-            source.last_read_time = now() #<<< DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
+            #@TODO: DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
+            source.last_read_time = now() 
             break
           
         self.wait(0)
-        if evs or polls: self.debug('Processed %d events, %d pollings'%(evs,polls))
+        if evs or polls: lg('Processed %d events, %d pollings'%(evs,polls))
         self.info('%d/%d sources not updated'%(
           len([s for s in self.sources if not s.stats['fired']]),
           len(self.sources)))
+
+        self.count += 1
         return
                 
     def fireEvent(self,source,*args):
@@ -585,10 +609,10 @@ class EventSource(Logger,SingletonMap):
         return t0
         
     @staticmethod
-    def thread():
+    def get_thread(period_ms=None):
         """
         It returns the current EventThread INSTANCE
-        Use EventSource.thread().setup(...) to configure it
+        Use EventSource.get_thread().setup(...) to configure it
         """
         if EventSource.QUEUE is None:
             EventSource.QUEUE = EventThread()
@@ -596,7 +620,7 @@ class EventSource(Logger,SingletonMap):
     
     @staticmethod
     def start_thread():
-        th = EventSource.thread()
+        th = EventSource.get_thread()
         if not th.get_started():
             th.start()
             
@@ -659,7 +683,7 @@ class EventSource(Logger,SingletonMap):
             self.polled = True
             self.info('activatePolling(%s,%s)'%(self.full_name,self.polling_period))
             self.resetStats()
-            self.thread().register(self)
+            self.get_thread().register(self)
         except:
             self.warning('activatePolling() failed!: %s'%
               traceback.format_exc())
@@ -709,7 +733,7 @@ class EventSource(Logger,SingletonMap):
         self.debug('addListener(%s,use_events=%s,polled=%s)'%(listener,use_events,use_polling))
         self.forced = self.forced or use_polling
         if isNumber(use_polling): self.changePollingPeriod(use_polling)
-        self.thread().register(self)
+        self.get_thread().register(self)
         if use_events:
             self.subscribeEvents(types=use_events,asynchronous=self.checkState('UNSUBSCRIBED'))
         if self.forced and not self.polled:
@@ -765,7 +789,7 @@ class EventSource(Logger,SingletonMap):
         event type filtering is done here
         poll() events will be allowed to pass through
         """
-        pending = self.thread().get_pending()
+        pending = self.get_thread().get_pending()
         if pending:
           self.warning('fireEvent(%s), %d events still in queue'%
                        (event_type,pending))
@@ -829,7 +853,7 @@ class EventSource(Logger,SingletonMap):
 
           else:
               self.last_event_time = now()
-              ##self.thread().stop() #DONT DO THIS WITHIN THE LOOP HOOK!
+              ##self.get_thread().stop() #DONT DO THIS WITHIN THE LOOP HOOK!
 
               try:
                 for k,type_ in EventType.names.items():
@@ -855,7 +879,7 @@ class EventSource(Logger,SingletonMap):
                 pass 
           
           #self.start_thread() #DONT DO THIS WITHIN THE LOOP HOOK!
-          self.thread().register(self)
+          self.get_thread().register(self)
 
         except:
           self.error('subscribeEvents(): \n'+traceback.format_exc())
@@ -1064,7 +1088,7 @@ class EventSource(Logger,SingletonMap):
         self.stats['poll']+=1
         if self.checkState('SUBSCRIBING'):
             ## While subscribing, polling is ignored and resumed on SUBSCRIBED/PENDING state
-            self.thread().lasts[self.full_name] = self.last_read_time = t0
+            self.get_thread().lasts[self.full_name] = self.last_read_time = t0
             return
         try:
             prev = self.attr_value and self.attr_value.value
@@ -1163,7 +1187,7 @@ class EventSource(Logger,SingletonMap):
             self.last_event[type_] = event
 
             #Instead of firingEvent, I return and pass the value to the queue
-            self.thread().put((self,type_,value))
+            self.get_thread().put((self,type_,value))
         except:
             self.error(type(event),dir(event))
             traceback.print_exc()
@@ -1192,8 +1216,8 @@ def get_test_objects(model='controls02:10000/test/sim/tonto/Pressure',period=1.)
     tl = TangoListener('test')
     tv.setLogLevel('DEBUG')
     tl.setLogLevel('DEBUG')
-    tv.thread().set_period(period)
-    tv.thread().setLogLevel('DEBUG')
+    tv.get_thread().set_period(period)
+    tv.get_thread().setLogLevel('DEBUG')
     #tv.addListener(tl,use_events=False)
     return tv,tl
     
@@ -1509,9 +1533,9 @@ def __test__(args):
     import fandango.callbacks as fb
     a = args and args[0] or 'test/events/1/currentime'
     es = fb.EventSource(a)
-    es.thread().set_period_ms(1000.)
-    es.thread().setLogLevel('DEBUG')
-    es.thread().filtered = True
+    es.get_thread().set_period_ms(1000.)
+    es.get_thread().setLogLevel('DEBUG')
+    es.get_thread().filtered = True
     #es.setLogLevel('DEBUG')
     es.KeepAlive = 10000.
     el = fb.EventListener('listener')
