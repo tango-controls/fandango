@@ -109,6 +109,15 @@ def printtest(obj,meth='',args=[],kwargs={}):
     r,v = test2str(obj,meth,args,kwargs)
     print(r)
     return v
+  
+def tracer(msg,obj=None):
+    if obj is not None:
+        o = getattr(obj,'name',type(obj).__name__)
+        msg = o+':'+msg
+    msg = time2str()+':'+msg
+    printf(msg)
+    return msg
+    
 
 ERROR,WARNING,INFO,DEBUG = \
   logging.ERROR,logging.WARNING,logging.INFO,logging.DEBUG
