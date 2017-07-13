@@ -835,9 +835,10 @@ class EventSource(Logger,SingletonMap):
         for l in listeners:
             try:
                 #event filter will allow poll() events to pass through
+                et = EVENT_TYPES[event_type]
+                em = et in [EVENT_TYPES[e] for e in self.listeners.get(l,[])]
                 if (event_type not in ('periodic',EventType.PERIODIC_EVENT) 
-                  and l in self.listeners 
-                  and event_type not in self.listeners[l]):
+                  and event_type not in self.listeners.get(l,[])):
                     self.debug('%s event discarded (not in %s - %s)'
                       %(event_type,self.listeners[l],self.use_events))
                     continue
