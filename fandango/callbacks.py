@@ -93,22 +93,24 @@ EVENT_CONF_EXCEPTIONS = (
     'API_BadConfigurationProperty', #Must be in both lists
     )
 
-EVENT_TYPES = {'attr_conf':EventType.ATTR_CONF_EVENT,
-               'data_ready':'DATA_READY_EVENT'
-               'user_event':'USER_EVENT',
-               'periodic':'PERIODIC_EVENT',
-               'change':'CHANGE_EVENT',
-               'archive':'ARCHIVE_EVENT',
-               'quality':'QUALITY_EVENT',
+EVENT_TYPES = {'attr_conf': EventType.ATTR_CONF_EVENT,
+               'data_ready':EventType.DATA_READY_EVENT,
+               'user_event':EventType.USER_EVENT,
+               'periodic':  EventType.PERIODIC_EVENT,
+               'change':    EventType.CHANGE_EVENT,
+               'archive':   EventType.ARCHIVE_EVENT,
+               'quality':   EventType.QUALITY_EVENT,
                
-               'ATTR_CONF_EVENT':'ATTR_CONF_EVENT',
-               'DATA_READY_EVENT':'DATA_READY_EVENT',
-               'USER_EVENT':'USER_EVENT',
-               'PERIODIC_EVENT':'PERIODIC_EVENT',
-               'CHANGE_EVENT':'CHANGE_EVENT',
-               'ARCHIVE_EVENT':'ARCHIVE_EVENT',
-               'QUALITY_EVENT':'QUALITY_EVENT',
+               'ATTR_CONF_EVENT': EventType.ATTR_CONF_EVENT,
+               'DATA_READY_EVENT':EventType.DATA_READY_EVENT,
+               'USER_EVENT':      EventType.USER_EVENT,
+               'PERIODIC_EVENT':  EventType.PERIODIC_EVENT,
+               'CHANGE_EVENT':    EventType.CHANGE_EVENT,
+               'ARCHIVE_EVENT':   EventType.ARCHIVE_EVENT,
+               'QUALITY_EVENT':   EventType.QUALITY_EVENT,
                }
+# EVENT_TYPES needed to translate different event definitions
+EVENT_TYPES.update((v,v) for v in set(EVENT_TYPES.values()))
 
 class AttrCallback(Logger,Object):
   
@@ -175,10 +177,10 @@ class EventListener(Logger,Object): #Logger,
         error = (isinstance(value,(PyTango.DevError,Exception)) 
                 or getattr(value,'err',False)) #getattr(value,'err',False))
         if error:
-            if str(src) not in self.error_sources:
-                self.info('eventReceived(%s,ERROR): +%2.1f ms'
-                  ' (%2.1f delay)'%(src,1e3*inc,delay))
-                self.debug(str(value))
+            l = self.info if str(src) not in self.error_sources else self.debug
+            l('eventReceived(%s,ERROR): +%2.1f ms (%2.1f delay)'
+                %(src,1e3*inc,delay))
+            self.debug(str(value))
             self.error_sources.add(str(src))
             #print(self.error_sources)
             if self.error_hook is not None:
@@ -835,10 +837,10 @@ class EventSource(Logger,SingletonMap):
         for l in listeners:
             try:
                 #event filter will allow poll() events to pass through
-                et = EVENT_TYPES[event_type]
-                em = et in [EVENT_TYPES[e] for e in self.listeners.get(l,[])]
-                if (event_type not in ('periodic',EventType.PERIODIC_EVENT) 
-                  and event_type not in self.listeners.get(l,[])):
+                evtype = EVENT_TYPES[event_type]
+                evlist = [EVENT_TYPES[e] for e in self.listeners.get(l,[])]
+                if (evtype not in ('periodic',EventType.PERIODIC_EVENT) 
+                  and evtype not in evlist):
                     self.debug('%s event discarded (not in %s - %s)'
                       %(event_type,self.listeners[l],self.use_events))
                     continue

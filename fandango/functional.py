@@ -747,7 +747,7 @@ def code2atoms(code):
     #l2 = [a for l in l1 for a in str2list(l,ops,1,-1)]
     return l1
     
-def shortstr(s,max_len=144,replace={'\n':'  '}):
+def shortstr(s,max_len=144,replace={'\n':';'}):
     s = str(s)
     for k,v in replace.items():
         s = s.replace(k,v)
