@@ -51,22 +51,12 @@ srubio@cells.es,
 
 import time,traceback
 import collections
-from objects import self_locked
+from collections import defaultdict, deque
+try: from collections import OrderedDict
+except: pass
+
+from .objects import self_locked
             
-try:
-    import numpy
-    class fuzzyDict(dict):
-        ## @todo TODO
-        def __getitem__(self,key):
-            try:
-                return dict.__getitem__(self,key)
-            except:
-                a=numpy.arange(6)*1.1    
-                array([ 0. ,  1.1,  2.2,  3.3,  4.4,  5.5])  #The keys of the dictionary
-                numpy.abs(a-key).argmin() #returns the index of the nearest key                
-                pass
-except:
-    pass
             
 class ThreadDict(dict):
     ''' Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.
@@ -126,7 +116,7 @@ class ThreadDict(dict):
             print 'ThreadDict.start(): ThreadDict.stop() must be executed first!'
             return
         print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()        
-        import threading        
+        import threading
         self.event = threading.Event()
         self.event.clear()
         self._Thread = threading.Thread(target=self.run)
@@ -259,7 +249,7 @@ class ThreadDict(dict):
     def __repr__(self):
         return "{\n" +"\n,".join(["'"+str(k)+"'"+":"+"'"+str(v)+"'" for k,v in zip(dict.keys(self),dict.values(self))])+ "\n}"      
 
-class defaultdict_fromkey(collections.defaultdict):
+class defaultdict_fromkey(defaultdict):
     """ Creates a dictionary with a default_factory function that creates new elements using key as argument.
     Usage : new_dict = defaultdict_fromkey(method); where method like (lambda key: return new_obj(key))
     Each time that new_dict[key] is called with a key that doesn't exist, method(key) is used to create the value
@@ -523,8 +513,6 @@ class CaselessSortedDict(SortedDict,CaselessDict):
 
     
 ##################################################################################################
-
-from collections import defaultdict
 
 def reversedict(dct,key=None,default=None):
     #it just exchanges keys/values in a dictionary
