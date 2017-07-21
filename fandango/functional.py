@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: iso-8859-1 -*-
+
 """
 #############################################################################
 ##
-## project :     Tango Control System
+## project :     Functional tools for Tango Control System
 ##
-## $Author: Sergi Rubio Manrique, srubio@cells.es $
+## $Author:      Sergi Rubio Manrique, srubio@cells.es $
 ##
-## $Revision: 2008 $
+## $Revision:    2008 $
 ##
 ## copyleft :    ALBA Synchrotron Controls Section, CELLS
 ##               Bellaterra
@@ -29,8 +30,9 @@
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
-###########################################################################
+####################################################################@########
 """
+
 
 __doc__ = """
 fandango.functional::

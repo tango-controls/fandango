@@ -591,6 +591,18 @@ def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,AUTO
         
 ###############################################################################
 
+class FuzzyDict(dict):
+    ## @todo TODO
+    def __getitem__(self,key):
+        try:
+            return dict.__getitem__(self,key)
+        except:
+            a=np.arange(6)*1.1    
+            array([ 0. ,  1.1,  2.2,  3.3,  4.4,  5.5])  #The keys of the dictionary
+            np.abs(a-key).argmin() #returns the index of the nearest key                
+            pass
+
+
 class Grid(dict):
     """ Sat May 28 13:07:53 CEST 2005
     You caught me in a good mood this morning. I woke to sunshine for the first time in
