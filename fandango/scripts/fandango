@@ -34,7 +34,7 @@ __doc__ = """
 
 Usage:
 
-  fandango [qt] [-h/--help] [-x/--extra] [fandango_method_0] [fandango_method_1/argument_0] [...]
+  fandango [qt] [-h/--help] [-x/--extra] [-n/--new-line] [fandango_method_0] [fandango_method_1/argument_0] [...]
   
   Execute python and fandango methods from shell
 
@@ -149,10 +149,12 @@ if __name__ == '__main__':
         cmd = '%s(*[%s])'%(comms[0],args)
         r = evalX(cmd,_locals=locals())
         
-    if opts.get('-l'): print(cmd)
-    #print(r if not isSequence(r) else list2str(r,'\n'))
-    print(obj2str(r,sep=' '))
-    
+    if opts.get('l'): print(cmd)
+    s = obj2str(r,sep=' ')
+    if opts.get('n'):
+      s = '\n'.join(s.split())
+    print(s)
+ 
   except AssertionError,e:
     print(__doc__)
     
