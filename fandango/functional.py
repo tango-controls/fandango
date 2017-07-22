@@ -201,7 +201,8 @@ def djoin(a,b):
     return dct
   
 def kmap(method,keys,values=None,sort=True):
-    g = ((k,method((values or keys)[i])) for i,k in enumerate(keys))
+    g = ((k,method(k if not values else values[i])) 
+           for i,k in enumerate(keys))
     return sorted(g) if sort else list(g)
 __test__['kmap'] = [
   {'args':[str.lower,'BCA','YZX',False],'result':[('A', 'x'), ('B', 'y'), ('C', 'z')]}

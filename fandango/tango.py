@@ -782,7 +782,8 @@ def parse_tango_model(name,use_tau=False,use_host=False):
         if 'attribute' in values: 
             values['attributename'] = values['attribute']
             values['model'] = values['model']+'/'+values['attribute']
-    return values
+
+    return Struct(values)
 
 TANGO_KEEPTIME = 60 #This variable controls how often the Tango Database will be queried
 
