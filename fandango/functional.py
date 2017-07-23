@@ -896,9 +896,9 @@ def time2date(epoch=None):
     elif epoch<0: epoch = now()-epoch
     return datetime.datetime.fromtimestamp(epoch)
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False):
+def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True):
     if epoch is None: epoch = now() 
-    elif epoch<0: epoch = now()+epoch
+    elif bt and epoch<0: epoch = now()+epoch
     t = time.strftime(cad,time2tuple(epoch))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
