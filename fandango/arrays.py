@@ -855,10 +855,16 @@ class CSVArray(object):
         return (self.get(i) for i in range(len(self)))
        
     #@Catched
-    def load(self,filename,comment=None,delimiter=None,prune_empty_lines=True,filters=None):
+    def load(self,filename,comment=None,delimiter=None,
+             prune_empty_lines=True,filters=None):
+        
         if not comment: comment=self.comment
-        filters = filters or {} # filters={key:filter} Lines will be added only if columnName.lower()==key and re.match(filter,value.lower()); header line does not apply
-        rows = [];cols = []; readed = []; header = self.header if self.header is not None else self.xoffset
+        filters = filters or {} 
+        # filters={key:filter} Lines will be added only 
+        # if columnName.lower()==key and re.match(filter,value.lower()); 
+        # header line does not apply
+        rows = [];cols = []; readed = []; 
+        header = self.header if self.header is not None else self.xoffset
         
         try:
             fl=open(filename)
@@ -867,11 +873,13 @@ class CSVArray(object):
                 index = header
                 sample = flines[index]
                 self.dialect = csv.Sniffer().sniff(sample)
-                if self.trace: print 'Dialect extracted is %s'%(str(self.dialect.__dict__))
+                if self.trace: 
+                    print 'Dialect extracted is %s'%(str(self.dialect.__dict__))
                 readed = [r for r in csv.reader(flines, self.dialect)]
             else:
                 readed = [ r for r in csv.reader(flines, delimiter=delimiter)]
                 #readed = csv.reader(fl, delimiter='\t')
+                
         except Exception,e:
             print 'Exception while reading %s: %s' % (filename,str(e))
         finally:
@@ -889,19 +897,47 @@ class CSVArray(object):
                     row2 = [str(r).strip() for r in row] 
                     if i == header: 
                         headers = [s.lower() for s in row2]
-                    elif i>header and filters: #In all rows excepting header it is checked that the filter is matched for any column in filters
-                        check = all( (k not in headers or re.match(f,row2[headers.index(k)].lower()) ) for k,f in filters.items())
+                        
+                    elif i>header and filters: 
+                        #In all rows excepting header it is checked 
+                        #that the filter is matched for any column in filters
+                        check = all( (k not in headers 
+                            or re.match(f,row2[headers.index(k)].lower()) ) 
+                            for k,f in filters.items())
+                        
                     if i<=header or not filters or not rows or check:
                         rows.append(row2)                        
-                #Correcting initial header and offset when previous lines are being erased
+                        
+                #Correcting initial header and offset when 
+                #previous lines are being erased
                 else: #The row is discarded
                     if i<=self.header: 
                         self.header-=1
                     if i<self.xoffset: 
                         self.xoffset-=1
                 i=i+1
-            if self.trace: print 'Header line is %d: %s' % (len(rows[header]),rows[header])
-            ncols = max(len(row) for row in rows) if rows else 0
+                
+            longer = []
+            for r in rows:
+                ll = r[:]
+                while ll and not ll[-1].strip():
+                    ll.pop(-1)
+                if len(ll)>len(longer):
+                    longer = ll
+
+            ncols = len(longer) if longer else 0
+            headers = headers[:ncols]
+            for i,r in enumerate(rows): 
+                rows[i] = r[:ncols]
+            
+            if 1: #self.trace: 
+                print('Longer line is %d: %s'
+                      % (ncols,longer))
+                print('Header line is %d: %s' 
+                      % (len(rows[header]),rows[header]))
+                
+            #ncols = max(len(row) for row in rows) if rows else 0
+            
             for i in range(len(rows)):
                 while len(rows[i])<ncols:
                     rows[i].append('')#'\t')
@@ -912,10 +948,13 @@ class CSVArray(object):
 
         del self.rows; del self.cols
         self.rows=rows;self.cols=cols; self.nrows=len(rows); self.ncols=len(cols)
-        if self.trace: print 'CSVArray initialized as a ',self.nrows,'x',self.ncols,' matrix'
+        if self.trace: 
+            print('CSVArray initialized as a ',
+                  self.nrows,'x',self.ncols,' matrix')
     
     #@Catched
     def save(self,filename=None):
+        
         if filename is not None:
             self.filename=filename
         if self.filename is None:
@@ -923,7 +962,9 @@ class CSVArray(object):
         fl = open(self.filename,'w')
         writer = csv.writer(fl,delimiter='\t')
         writer.writerows(self.rows);
-        if self.trace: print 'CSVArray written as a ',self.nrows,'x',self.ncols,' matrix'
+
+        if self.trace: 
+            print('CSVArray written as a ',self.nrows,'x',self.ncols,' matrix')
         fl.close()
         
     #@Catched
