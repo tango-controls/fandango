@@ -43,23 +43,14 @@ Methods for Astor-like management will go to fandango.servers
 
 """
 
-from .defaults import *
+from .defaults import * ## Regular expressions defined here!
 from .methods import *
 
 ####################################################################################################################
 ##@name Methods for searching the database with regular expressions
 #@{
 
-#Regular Expressions
-metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
-#alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
-alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
-no_alnum = '[^a-zA-Z0-9-_]'
-no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
-redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)' #Matches attribute and extension
-retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
+
 
 def parse_labels(text):
     if any(text.startswith(c[0]) and text.endswith(c[1]) for c in [('{','}'),('(',')'),('[',']')]):
@@ -285,6 +276,50 @@ def get_all_models(expressions,limit=1000):
     if 'SimulationDatabase' in str(type(db)): #used by TauWidgets displayable in QtDesigner
       return expressions
     return get_matching_attributes(expressions,limit)
+
+def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',
+                                   port=10000,trace=False):
+    """
+    get_matching_device_properties enhanced with multi-host support
+    @props: regexp are enabled!
+    get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
+    @TODO: Compare performance of this method with get_devices_properties
+    """    
+    db = get_database()
+    result = {}
+    if not isSequence(devs): devs = [devs]
+    if not isSequence(props): props = [props]
+    if hosts:
+        hosts = [h if ':' in h else '%s:%s'%(h,port) for h in hosts]
+    else:
+        hosts = set(get_tango_host(d) for d in devs)
+
+    result = {}
+    for h in hosts:
+        result[h] = {}
+        db = get_database(h)
+        exps  = [h+'/'+e if ':' not in e else e for e in devs]
+        if trace: print(exps)
+        hdevs = [d.replace(h+'/','') for d in get_matching_devices(exps,fullname=False)]
+        if trace: print('%s: %s vs %s'%(h,hdevs,props))
+        for d in hdevs:
+            if exclude and matchCl(exclude,d): continue
+            dprops = [p for p in db.get_device_property_list(d,'*') if matchAny(props,p)]
+            if not dprops: continue
+            if trace: print(d,dprops)
+            vals = db.get_device_property(d,dprops)
+            vals = dict((k,list(v) if isSequence(v) else v) for k,v in vals.items())
+            if len(hosts)==1 and len(hdevs)==1:
+                return vals
+            else: 
+                result[h][d] = vals
+        if len(hosts)==1: 
+            return result[h]
+    return result
+
+def find_properties(devs,props='*'):
+    """ helper for get_matching_device_properties """
+    return get_matching_device_properties(devs,props)
               
 #@}
 ########################################################################################    

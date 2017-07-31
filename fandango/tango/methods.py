@@ -395,7 +395,8 @@ def put_device_property(device,property,value=None,db=None):
                     property[p] = v[0]
                 elif not isinstance(value,list):
                     property[p] = list(v)
-    return (db or get_database()).put_device_property(device,property)
+    (db or get_database()).put_device_property(device,property)
+    return property
             
 def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     """
@@ -411,51 +412,6 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     else: tango_dbs = {get_tango_host():get_database()}
     return dict(('/'.join((host,d) if hosts else (d,)),db.get_device_property(d,properties))
                  for host,db in tango_dbs.items() for d in get_devs(db,expr))
-    
-    
-def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',
-                                   port=10000,trace=False):
-    """
-    get_matching_device_properties enhanced with multi-host support
-    @props: regexp are enabled!
-    get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
-    @TODO: Compare performance of this method with get_devices_properties
-    """    
-    db = get_database()
-    result = {}
-    if not isSequence(devs): devs = [devs]
-    if not isSequence(props): props = [props]
-    if hosts:
-        hosts = [h if ':' in h else '%s:%s'%(h,port) for h in hosts]
-    else:
-        hosts = set(get_tango_host(d) for d in devs)
-
-    result = {}
-    for h in hosts:
-        result[h] = {}
-        db = get_database(h)
-        exps  = [h+'/'+e if ':' not in e else e for e in devs]
-        if trace: print(exps)
-        hdevs = [d.replace(h+'/','') for d in get_matching_devices(exps,fullname=False)]
-        if trace: print('%s: %s vs %s'%(h,hdevs,props))
-        for d in hdevs:
-            if exclude and matchCl(exclude,d): continue
-            dprops = [p for p in db.get_device_property_list(d,'*') if matchAny(props,p)]
-            if not dprops: continue
-            if trace: print(d,dprops)
-            vals = db.get_device_property(d,dprops)
-            vals = dict((k,list(v) if isSequence(v) else v) for k,v in vals.items())
-            if len(hosts)==1 and len(hdevs)==1:
-                return vals
-            else: 
-                result[h][d] = vals
-        if len(hosts)==1: 
-            return result[h]
-    return result
-
-def find_properties(self,devs,props):
-    """ helper for get_matching_device_properties """
-    get_matching_device_properties(devs,props)
     
 def property_undo(dev,prop,epoch):
     db = get_database()

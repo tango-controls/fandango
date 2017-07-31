@@ -98,6 +98,19 @@ ATTR_WARNING = AttrQuality.ATTR_WARNING
 ATTR_VALID = AttrQuality.ATTR_VALID
 ATTR_INVALID = AttrQuality.ATTR_INVALID
 
+
+#Regular Expressions
+metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
+#alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
+alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
+no_alnum = '[^a-zA-Z0-9-_]'
+no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
+rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
+redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)' #Matches attribute and extension
+retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
+
+
 ####################################################################################################################
 ##@name Access Tango Devices and Database
 
