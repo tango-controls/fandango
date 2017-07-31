@@ -578,7 +578,8 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
                  for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
     
-def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=10000,trace=False):
+def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',
+                                   port=10000,trace=False):
     """
     get_matching_device_properties enhanced with multi-host support
     @props: regexp are enabled!
@@ -616,6 +617,10 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',port=
         if len(hosts)==1: 
             return result[h]
     return result
+
+def find_properties(self,devs,props):
+    """ helper for get_matching_device_properties """
+    get_matching_device_properties(devs,props)
     
 def property_undo(dev,prop,epoch):
     db = get_database()
