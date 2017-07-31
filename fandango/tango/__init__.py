@@ -13,4 +13,13 @@ if os.path.exists(p):
   print('')
   sys.exit(-1)
 
+
+from .defaults import *
 from .methods import *
+from .search import *
+from .export import *
+from .tangoeval import *
+from .command import *
+
+
+

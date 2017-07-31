@@ -56,6 +56,7 @@ if 'Device_4Impl' not in dir(PyTango):
 
 import fandango
 import fandango.objects as objects
+import fandango.dicts as dicts
 from fandango.functional import *
 
 from fandango.dicts import CaselessDefaultDict,CaselessDict,Enumeration
@@ -217,3 +218,184 @@ def get_database_device(use_tau=False,db=None):
         if db is None: 
           TangoDevice = td
     return td
+
+
+########################################################################################
+## A useful fake attribute value and event class
+    
+class fakeAttributeValue(object):
+    """ 
+    This class simulates a modifiable AttributeValue object (not available in PyTango)
+    It is the class used to read values from Dev4Tango devices (valves, pseudos, composer, etc ...)
+    It also has a read(cache) method to be used as a TaurusAttribute or AttributeProxy (but it returns self if cache is not used)
+    The cache is controlled by keeptime variable (milliseconds)
+    :param parent: Apart of common Attribute arguments, parent will be used to keep a proxy to the parent object (a DeviceProxy or DeviceImpl) 
+    """
+    def __init__(self,name,value=None,time_=0.,
+                 quality=PyTango.AttrQuality.ATTR_VALID,
+                 dim_x=1,dim_y=1,parent=None,device='',
+                 error=False,keeptime=0):
+        self.name=name
+        self.device=device or (self.name.rsplit('/',1)[0] if '/' in self.name else '')
+        self.set_value(value,dim_x,dim_y)
+        self.set_date(time_ or time.time())
+        self.write_value = self.wvalue = None
+        self.quality=quality
+        self.parent=parent
+        self.error = self.err = error
+        self.keeptime = keeptime*1e3 if keeptime<10. else keeptime
+        self.lastread = 0
+        self.type = type(value)
+        
+    def __repr__(self):
+        return 'fakeAttributeValue(%s,%s,%s,%s,error=%s)'%(self.name,fandango.log.shortstr(self.value),time.ctime(self.get_time()),self.quality,self.error)
+    __str__ = __repr__
+        
+    def get_name(self): return self.name
+    def get_value(self): return self.value
+    def get_date(self): return self.time
+    def get_time(self): return self.time.totime()
+    def get_quality(self): return self.quality
+    
+    def read(self,cache=True):
+        #Method to emulate AttributeProxy returning an AttributeValue
+        #print '\t\tfakeAttributeValue(%s/%s).read(%s)'%(self.device,self.name,cache)
+        if not self.parent:
+            self.parent = get_device(self.device,use_tau=False,keep=True)
+        if not cache or 0<self.keeptime<(time.time()-self.read()):
+            return read_internal_attribute(self.parent,self) #it's important to pass self as argument so values will be kept
+        return self 
+    
+    def throw_exception(self,msg=''):
+        self.err = self.error = msg or traceback.format_exc()
+        print 'fakeAttributeValue(%s).throw_exception(%s)'%(self.name,self.error)
+        #event_type = fakeEventType.lookup['Error']
+        self.set_value(None)
+        self.set_quality(PyTango.AttrQuality.ATTR_INVALID)
+        raise Exception(self.error)
+    
+    def set_value(self,value,dim_x=1,dim_y=1,err=False):
+        self.value = self.rvalue = value
+        self.err = (err or 
+              isinstance(self.value,(PyTango.DevFailed,PyTango.DevError)))
+        
+        if (dim_x,dim_y) == (1,1):
+            if isSequence(value): 
+                dim_x = len(value)
+                if len(value)>1 and isSequence(value[0]):
+                    dim_y = len(value[0])
+                    
+        self.dim_x = dim_x
+        self.dim_y = dim_y
+        self.set_date(time.time())
+        self.lastread = time.time()
+        
+    def set_date(self,timestamp):
+        if not isinstance(timestamp,PyTango.TimeVal): 
+            timestamp=PyTango.TimeVal(timestamp)
+        self.time=timestamp
+    def set_quality(self,quality):
+        self.quality=quality
+        
+    def set_value_date(self,value,date):
+        self.set_value(value)
+        self.set_date(date)
+    def set_value_date_quality(self,value,date,quality):
+        self.set_value_date(value,date)
+        self.set_quality(quality)
+        
+    def set_write_value(self,value):
+        self.write_value = self.wvalue = value
+    def get_write_value(self,data = None):
+        if data is None: data = []
+        if isSequence(self.write_value):
+            [data.append(v) for v in self.write_value]
+        else:
+            data.append(self.write_value)
+        return data
+        
+fakeEventType = Enumeration(
+    'fakeEventType', (
+        'Change',
+        'Config',
+        'Periodic',
+        'Error'
+    ))
+    
+class fakeEvent(object):
+    def __init__(self,device,attr_name,attr_value,err,errors):
+        self.device=device
+        self.attr_name=attr_name
+        self.attr_value=attr_value
+        self.err=err
+        self.errors=errors
+        
+####################################################################################################################
+## The ProxiesDict class, to manage DeviceProxy pools
+
+class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logger):
+    ''' Dictionary that stores PyTango.DeviceProxies
+    It is like a normal dictionary but creates a new proxy each time that the "get" method is called
+    An earlier version is used in PyTangoArchiving.utils module
+    This class must be substituted by Tau.Core.TauManager().getFactory()()
+    '''
+    def __init__(self,use_tau = False, tango_host = ''):
+        self.log = Logger('ProxiesDict')
+        self.log.setLogLevel('INFO')
+        self.use_tau = TAU and use_tau
+        self.tango_host = tango_host
+        self.call__init__(CaselessDefaultDict,self.__default_factory__)
+
+    def __default_factory__(self,dev_name):
+        '''
+        Called by defaultdict_fromkey.__missing__ method
+        If a key doesn't exists this method is called and 
+        returns a proxy for a given device.
+        If the proxy caused an exception (usually because device 
+        doesn't exists) a None value is returned
+        '''
+        
+        if self.tango_host and ':' not in dev_name:
+            dev_name = self.tango_host + '/' + dev_name
+            
+        if dev_name not in self.keys():
+            self.log.debug( 'Getting a Proxy for %s'%dev_name)
+            
+            try:
+                devklass,attrklass = (TAU.Device,TAU.Attribute) \
+                    if self.use_tau else \
+                    (PyTango.DeviceProxy,PyTango.AttributeProxy)
+                dev = (attrklass if 
+                    str(dev_name).count('/')==(4 if ':' in dev_name else 3) 
+                    else devklass)(dev_name)
+            except Exception,e:
+                print('ProxiesDict: %s doesnt exist!'%dev_name)
+                #print traceback.format_exc()
+                #raise e
+                dev = None
+        return dev
+      
+    def __getitem__(self,key):
+        if self.tango_host and ':' not in key:
+            key = self.tango_host + '/' + key
+        return CaselessDefaultDict.__getitem__(self,key)
+            
+    def get(self,dev_name):
+        return self[dev_name]
+      
+    def get_admin(self,dev_name):
+        '''Adds to the dictionary the admin device for a given device name
+        and returns a proxy to it.'''
+        dev = self[dev_name]
+        class_ = dev.info().dev_class
+        admin = dev.info().server_id
+        return self['dserver/'+admin]
+      
+    def pop(self,dev_name):
+        '''Removes a device from the dict'''
+        if self.tango_host and ':' not in dev_name:
+            dev_name = self.tango_host + '/' + dev_name
+        if dev_name not in self.keys(): return
+        self.log.debug( 'Deleting the Proxy for %s'%dev_name)
+        return CaselessDefaultDict.pop(self,dev_name)
+        
