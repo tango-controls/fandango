@@ -646,33 +646,6 @@ def rtf2plain(t,e='[<][^>]*[>]'):
 def html2text(txt):
     return rtf2plain(txt)
   
-def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
-    """
-    It will check that all objects in dict are serializable.
-    If throw is False, a corrected dictionary will be returned.
-    If filename is given, dict will be saved as a .json file.
-    """
-    import json
-    result = {}
-    for k,v in dct.items():
-        try:
-            json.dumps(v,encoding=encoding)
-            result[k] = v
-        except Exception,e:
-            if throw: raise e
-            if isString(v): result[k] = ''
-            elif isSequence(v):
-                try:
-                    result[k] = toList(v)
-                    json.dumps(result[k])
-                except:
-                    result[k] = []
-            elif isMapping(v,strict=True) and recursive:
-                result[k] = dict2json(v,None,False,True,encoding=encoding)
-    if filename:
-        json.dump(result,open(filename,'w'),encoding=encoding)
-    return result if not filename else filename
-  
 def unicode2str(obj):
     """
     Converts an unpacked unicode object (json) to 

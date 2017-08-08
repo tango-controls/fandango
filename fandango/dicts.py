@@ -49,14 +49,94 @@ srubio@cells.es,
 2008 
 """
 
-import time,traceback
+import time,traceback,os
 import collections
 from collections import defaultdict, deque
 try: from collections import OrderedDict
 except: pass
 
 from .objects import self_locked
+from .functional import *
+
+ENC = 'latin-1'
             
+def dict2json(dct,filename=None,throw=False,recursive=True,
+              encoding=ENC,as_dict=False):
+    """
+    It will check that all objects in dict are serializable.
+    If throw is False, a corrected dictionary will be returned.
+    If filename is given, dict will be saved as a .json file.
+    """
+    import json
+
+    result = {}
+    for k,v in dct.items():
+        try:
+            json.dumps(v,encoding=encoding)
+            result[k] = v
+        except Exception,e:
+            if throw: raise e
+            if isString(v): result[k] = ''
+            elif isSequence(v):
+                try:
+                    result[k] = toList(v)
+                    json.dumps(result[k])
+                except:
+                    result[k] = []
+            elif isMapping(v,strict=True) and recursive:
+                result[k] = dict2json(v,None,False,True,encoding=encoding)
+    if filename:
+        json.dump(result,open(filename,'w'),encoding=encoding)
+    elif not as_dict:
+        result = json.dumps(result)
+
+    return result if not filename else filename
+
+def dec(s,encoding=ENC):
+    #dec = lambda s: str(s.decode(encoding) if isinstance(s,unicode) else s)
+    try:
+        if isinstance(s,unicode):
+            s = s.encode(encoding)
+            return str(s)
+        else:
+            return str(s)
+    except Exception,e:
+        print('dec(%s) failed!'%(s))
+        traceback.print_exc()
+        raise e
+            
+def json2dict(jstr,encoding=ENC):
+    """
+    Converts unicode to str recursively.
+    
+    :param jstr: may be json string, filename or dictionary
+    
+    in the last case, this method is equivalent to fandango.unicode2str(obj)
+    """
+    import json
+    if not hasattr(jstr,'items'):
+        if '{' not in jstr and os.path.exists(jstr):
+            f = open(jstr)
+            jstr = json.load(f,encoding=encoding)
+            f.close()
+        else:
+            jstr = json.loads(jstr,encoding=encoding)
+    
+    d = {}
+
+    for k,v in jstr.items():
+        k = dec(k)
+        if isinstance(v,basestring):
+            d[k] = dec(v)
+        elif isinstance(v,(list,tuple)):
+            d[k] = [(dec(i)
+                    if isinstance(i,basestring) else i)
+                    for i in v]
+        elif hasattr(v,'items'):
+            d[k] = json2dict(v,encoding=encoding)
+        else:
+            d[k] = v
+    return d
             
 class ThreadDict(dict):
     ''' Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.

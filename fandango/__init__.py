@@ -116,7 +116,7 @@ try:
         CaselessDefaultDict,DefaultThreadDict, \
         Enumeration,SortedDict,CaselessList, \
         defaultdict,defaultdict_fromkey, \
-        reversedict,collections,deque
+        reversedict,collections,deque, json2dict, dict2json
 except: 
     print('Unable to import dicts module')
     traceback.print_exc()
