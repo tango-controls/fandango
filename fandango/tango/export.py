@@ -31,7 +31,8 @@
 ###########################################################################
 
 """
-provides tango utilities for fandango, like database search methods and emulated Attribute Event/Value types
+provides tango utilities for fandango, like database search methods and 
+emulated Attribute Event/Value types
 
 This module is a light-weight set of utilities for PyTango.
 Classes dedicated for device management will go to fandango.device
@@ -47,12 +48,13 @@ from .defaults import *
 from .methods import *
 from .search import *
 
-########################################################################################
+###############################################################################
 ## Methods to export device/attributes/properties to dictionaries
 
-def export_attribute_to_dict(model,attribute=None,value=None,keep=False,as_struct=False):
+def export_attribute_to_dict(model,attribute=None,value=None,
+                             keep=False,as_struct=False):
     """
-    get attribute config, format and value from Tango and return it as a dictionary:
+    get attribute config, format and value from Tango and return it as a dict
     
     :param model: can be a full tango model, a device name or a device proxy
     
@@ -71,6 +73,7 @@ def export_attribute_to_dict(model,attribute=None,value=None,keep=False,as_struc
     attr.model = '/'.join((attr.database,attr.device,attr.name))
     attr.color = 'Lime'
     attr.time = 0
+    attr.events = Struct()
     
     def vrepr(v):
       try: return str(attr.format)%(v)
@@ -82,25 +85,32 @@ def export_attribute_to_dict(model,attribute=None,value=None,keep=False,as_struc
       return d
 
     try:
-        v = value or check_attribute(attr.database+'/'+attr.device+'/'+attr.name)
+        v = (value 
+             or check_attribute(attr.database+'/'+attr.device+'/'+attr.name))
 
         if v and 'DevFailed' not in str(v):
             ac = proxy.get_attribute_config(attr.name)
-            attr.description = ac.description if ac.description!='No description' else ''
+            attr.description = (ac.description
+                if ac.description!='No description' else '')
+            
             attr.data_format = str(ac.data_format)
             attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
             attr.writable = str(ac.writable)
-            attr.label,attr.min_alarm,attr.max_alarm = ac.label,ac.min_alarm,ac.max_alarm
+            attr.label,attr.min_alarm,attr.max_alarm = \
+                ac.label,ac.min_alarm,ac.max_alarm
             attr.unit,attr.format = ac.unit,ac.format
-            attr.standard_unit,attr.display_unit = ac.standard_unit,ac.display_unit
-            attr.ch_event = fandango.obj2dict(ac.events.ch_event)
-            attr.arch_event = fandango.obj2dict(ac.events.arch_event)
+            attr.standard_unit,attr.display_unit = \
+                ac.standard_unit,ac.display_unit
+            attr.events.ch_event = fandango.obj2dict(ac.events.ch_event)
+            attr.events.arch_event = fandango.obj2dict(ac.events.arch_event)
+            attr.events.per_event = fandango.obj2dict(ac.events.per_event)
             attr.alarms = fandango.obj2dict(ac.alarms)
             attr.quality = str(v.quality)
             attr.time = ctime2time(v.time)
               
             if attr.data_format!='SCALAR': 
-                attr.value = list(v.value if v.value is not None and v.dim_x else [])
+                attr.value = list(v.value 
+                    if v.value is not None and v.dim_x else [])
                 sep = '\n' if attr.data_type == 'DevString' else ','
                 svalue = map(vrepr,attr.value)
                 attr.string = sep.join(svalue)
@@ -136,11 +146,18 @@ def export_attribute_to_dict(model,attribute=None,value=None,keep=False,as_struc
     except Exception,e:
         print(str((attr,traceback.format_exc())))
         raise(e)
-    return dict(attr) if not as_struct else Struct(dict(attr))
+
+    if as_struct:
+        r = Struct(dict(attr))
+    else:
+        attr.events = dict(attr.events)
+        r = dict(attr)
+    return r
             
 def export_commands_to_dict(device,target='*'):
     """ export all device commands config to a dictionary """
-    name,proxy = (device,get_device(device)) if isString(device) else (device.name(),device)
+    name,proxy = ((device,get_device(device)) if isString(device) 
+                  else (device.name(),device))
     dct = {}
     for c in proxy.command_list_query():
         if not fandango.matchCl(target,c.cmd_name): continue
@@ -155,13 +172,17 @@ def export_properties_to_dict(device,target='*'):
         return get_matching_device_properties(device,target)
     else:
         db = get_database()
-        props = [p for p in db.get_class_property_list(device) if fandango.matchCl(target,p)]
-        return dict((k,v if isString(v) else list(v)) for k,v in db.get_class_property(device,props).items())
+        props = [p for p in db.get_class_property_list(device) 
+                 if fandango.matchCl(target,p)]
+        return dict((k,v if isString(v) else list(v)) for k,v in
+                    db.get_class_property(device,props).items())
     
 def export_device_to_dict(device,commands=True,properties=True):
     """
-    This method can be used to export the current configuration of devices, attributes and properties to a file.
-    The dictionary will get properties, class properties, attributes, commands, attribute config, event config, alarm config and pollings.
+    This method can be used to export the current configuration of devices, 
+    attributes and properties to a file.
+    The dictionary will get properties, class properties, attributes, 
+    commands, attribute config, event config, alarm config and pollings.
     
     .. code-block python:
     
@@ -170,12 +191,14 @@ def export_device_to_dict(device,commands=True,properties=True):
         
     """
     i = get_device_info(device)
-    dct = Struct(fandango.obj2dict(i,fltr=lambda n: n in 'dev_class host level name server'.split()))
+    dct = Struct(fandango.obj2dict(i,
+            fltr=lambda n: n in 'dev_class host level name server'.split()))
     dct.attributes,dct.commands = {},{}
     if check_device(device):
       try:
         proxy = get_device(device)
-        dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) for a in proxy.get_attribute_list())
+        dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) 
+                              for a in proxy.get_attribute_list())
         if commands:
           dct.commands = export_commands_to_dict(proxy)
       except:
@@ -184,3 +207,78 @@ def export_device_to_dict(device,commands=True,properties=True):
       dct.properties = export_properties_to_dict(device)
       dct.class_properties = export_properties_to_dict(dct.dev_class)
     return dict(dct)
+
+def import_device_from_dict(dct,device=None,server=None,create=True,
+                            properties=True,attributes=True,events=True,
+                            init=True,start=False,host=''):
+    """
+    This method will read a dictionary as generated by export_device_to_dict
+    
+    From the dictionary, properties for device and attributes will be applied
+    
+    properties,attributes,events can be boolean or regexp filter
+    
+    """
+    name = device or dct['name']
+    server = server or dct['server']
+    if name not in get_all_devices():
+        assert create,'Device %s does not exist!'%name  
+        add_new_device(server,dct['dev_class'],name)
+    
+    properties = '*' if properties is True else properties
+    if properties:
+        props = dict((k,v) for k,v in dct['properties'].items() 
+                     if clmatch(properties,k))
+        put_device_property(name,props)
+        
+    dp = get_device(name)
+    if not attributes:
+        return
+    elif not check_device(dp):
+        if not start:
+            print('Device must be running to import attributes!')
+            return
+        from fandango import ServersDict
+        sd = ServersDict(name)
+        sd.start_servers(host=host)
+    elif init:
+        dp.init()
+
+    if attributes is True:
+        attributes = '*'
+        
+    attrs = dict((k,v) for k,v in dct['attributes'].items()
+                 if clmatch(attributes,k))
+    alist = map(str.lower,dp.get_attribute_list())
+    
+    for a,v in attrs.items():
+        if a.lower() not in alist:
+            print('Attribute %s does not exist yet!'%a)
+            continue
+        if a.lower() not in ('state','status'):
+
+            ac = dp.get_attribute_config(a)
+            for c,vv in v.items():
+                try:
+                    if c.lower() == 'events' and not events:
+                        continue                
+                    if not hasattr(ac,c):
+                        continue
+                    if isinstance(vv,dict):
+                        for cc,vvv in vv.items():
+                            acc = getattr(ac,c)
+                            if not hasattr(acc,cc):
+                                continue
+                            elif getattr(acc,cc)!=vvv:
+                                print('%s.%s.%s = %s'%(a,c,cc,vvv))
+                    elif getattr(ac,c)!=vv:
+                        print('%s.%s = %s'%(a,c,vv))
+                        setattr(ac,c,vv)
+                except:
+                    print('%s/%s.%s=%s failed!'%(device,a,c,v))
+                    traceback.print_exc()
+                    
+    return           
+                    
+    
+    
