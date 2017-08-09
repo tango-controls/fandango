@@ -266,9 +266,20 @@ def main():
                   print('Device Property ',device,'.',prop,' already exists: ',oldprops[prop])
 
           # Attribute properties should be managed here
-          if attr_props:
-              #@TODO ...
-              fn.tango.set_attribute_config(device,attr,prop,value)
+          for attr,props in attr_props.items():
+              for p,v in props.items():
+                  if '.' in p:
+                      raise Exception,'TODO: implement nested dicts smarter'
+                      #attr.events
+                      np = dict()
+                      pp,vv = p.split('.',1)
+                      #attr.events.ch_event
+                      if '.' in vv:
+                          nv,nvv = vv.split('.',1)
+                          
+                      np[pp] = vv
+                      
+              fn.tango.set_attribute_config(device,attr,configs)
               
 if __name__ == '__main__':
   main()    
