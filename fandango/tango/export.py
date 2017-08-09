@@ -51,53 +51,6 @@ from .search import *
 ###############################################################################
 ## Methods to export device/attributes/properties to dictionaries
 
-AC_PARAMS = [
-    'color',
-    'display_unit',
-    #'writable',
-    'standard_unit',
-    'quality',
-    'unit',
-    'string',
-    'label',
-    'min_alarm',
-    'events',
-    'description',
-    #'data_type',
-    'format',
-    'max_alarm',
-    #'device',
-    #'name',
-    #'database',
-    #'data_format',
-    #'value',
-    #'polling',
-    #'time',
-    'alarms',
-    #'model',
-    #ALARMS
-    'delta_t',
-    'max_alarm',
-    'min_warning',
-    #'extensions',
-    'delta_val',
-    'min_alarm',
-    'max_warning'
-    #EVENTS
-    #'extensions',
-    'period',
-    'archive_period',
-    #'extensions',
-    'archive_rel_change',
-    'archive_abs_change',
-    'rel_change',
-    #'extensions',
-    'abs_change',
-    'per_event',
-    'ch_event',
-    'arch_event',
-    ]
-
 
 def export_attribute_to_dict(model,attribute=None,value=None,
                              keep=False,as_struct=False):
@@ -309,62 +262,8 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
             print('Attribute %s does not exist yet!'%a)
             continue
         
-        if a.lower() not in ('state','status'):
-            
-            ac = dp.get_attribute_config(a)
-            for c,vv in v.items():
-                try:
-                    if c not in AC_PARAMS:
-                        continue                    
-                    if c.lower() == 'events' and not events:
-                        continue                
-                    if not hasattr(ac,c):
-                        continue
-                    
-                    #print('%s.%s.%s'%(name,a,c))
-                    
-                    if isinstance(vv,dict):
-                        for cc,vvv in vv.items():
-                            if cc not in AC_PARAMS:
-                                continue
-                            acc = getattr(ac,c)
-                            if not hasattr(acc,cc):
-                                continue
-                            elif isinstance(vvv,dict):
-                                for e,p in vvv.items():
-                                    if e not in AC_PARAMS:
-                                        continue
-                                    ae = getattr(acc,cc)
-                                    if not hasattr(ae,e):
-                                        continue
-                                    elif getattr(ae,e)!=p:
-                                        print('%s.%s.%s.%s = %s'%(a,c,cc,e,p))
-                                        setattr(ae,e,p)                                        
-                            elif getattr(acc,cc)!=vvv:
-                                print('%s.%s.%s = %s'%(a,c,cc,vvv))
-                                setattr(acc,cc,vvv)
-                                
-                    elif getattr(ac,c)!=vv:
-                        print('%s.%s = %s'%(a,c,vv))
-                        setattr(ac,c,vv)
-                except:
-                    print('%s/%s.%s=%s failed!'%(device,a,c,vv))
-                    traceback.print_exc()
-                    
-            dp.set_attribute_config(ac)
-            
-    for a,v in attrs.items():
-        if a.lower() in alist:
-            p = v.get('polling')
-            if p is not None:
-                try:
-                    print('%s.poll_attribute(%s,%s)'%(name,a,p))
-                    if not p:
-                        dp.stop_poll_attribute(a)
-                    else:
-                        dp.poll_attribute(a,p)
-                except:
-                    traceback.print_exc()
+        #set attribute config implemented in .methods
+        set_attribute_config(dp,a,v,events=events)
             
     return           
                     

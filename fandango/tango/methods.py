@@ -272,6 +272,79 @@ def get_attribute_info(device,attribute):
 def get_attribute_config(target):
     d,a = target.rsplit('/',1)
     return get_device(d).get_attribute_config(a)
+
+def set_attribute_config(device,attribute,config,events=True):
+    """
+    device may be a DeviceProxy object
+    config may be a dictionary
+    """
+    print('fandango.tango.set_attribute_config(%s,%s,%s)'
+          %(device,attribute,config))
+    dp = get_device(device) if isString(device) else device
+    name,a,v = dp.name(),attribute,config    
+    polling = None
+    
+    if isMapping(v):
+        print('parsing dictionary ...')
+
+        polling = v.get('polling',None)
+        
+        if a.lower() not in ('state','status'):           
+            ac = dp.get_attribute_config(a)
+            for c,vv in v.items():
+                try:
+                    if c not in AC_PARAMS:
+                        continue                    
+                    if c.lower() == 'events' and not events:
+                        continue                
+                    if not hasattr(ac,c):
+                        continue
+                    
+                    #print('%s.%s.%s'%(name,a,c))
+                    
+                    if isinstance(vv,dict):
+                        for cc,vvv in vv.items():
+                            if cc not in AC_PARAMS:
+                                continue
+                            acc = getattr(ac,c)
+                            if not hasattr(acc,cc):
+                                continue
+                            elif isinstance(vvv,dict):
+                                for e,p in vvv.items():
+                                    if e not in AC_PARAMS:
+                                        continue
+                                    ae = getattr(acc,cc)
+                                    if not hasattr(ae,e):
+                                        continue
+                                    elif getattr(ae,e)!=p:
+                                        print('%s.%s.%s.%s = %s'%(a,c,cc,e,p))
+                                        setattr(ae,e,p)                                        
+                            elif getattr(acc,cc)!=vvv:
+                                print('%s.%s.%s = %s'%(a,c,cc,vvv))
+                                setattr(acc,cc,vvv)
+                                
+                    elif getattr(ac,c)!=vv:
+                        print('%s.%s = %s'%(a,c,vv))
+                        setattr(ac,c,vv)
+                except:
+                    print('%s/%s.%s=%s failed!'%(device,a,c,vv))
+                    traceback.print_exc()
+                                                   
+            config = ac
+            dp.set_attribute_config(config)    
+            
+    if polling is not None:
+        p = polling
+        try:
+            print('%s.poll_attribute(%s,%s)'%(name,a,p))
+            if not p and dp.get_attribute_poll_period(a):
+                dp.stop_poll_attribute(a)
+            else:
+                dp.poll_attribute(a,p)
+        except:
+            traceback.print_exc()
+            
+    return config
   
 def get_attribute_events(target,polled=True,throw=False):
     try:

@@ -98,7 +98,6 @@ ATTR_WARNING = AttrQuality.ATTR_WARNING
 ATTR_VALID = AttrQuality.ATTR_VALID
 ATTR_INVALID = AttrQuality.ATTR_INVALID
 
-
 #Regular Expressions
 metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 #alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
@@ -109,6 +108,53 @@ rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'(?:\.'+alnu
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
 reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)' #Matches attribute and extension
 retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
+
+AC_PARAMS = [
+    'color',
+    'display_unit',
+    #'writable',
+    'standard_unit',
+    'quality',
+    'unit',
+    'string',
+    'label',
+    'min_alarm',
+    'events',
+    'description',
+    #'data_type',
+    'format',
+    'max_alarm',
+    #'device',
+    #'name',
+    #'database',
+    #'data_format',
+    #'value',
+    #'polling',
+    #'time',
+    'alarms',
+    #'model',
+    #ALARMS
+    'delta_t',
+    'max_alarm',
+    'min_warning',
+    #'extensions',
+    'delta_val',
+    'min_alarm',
+    'max_warning'
+    #EVENTS
+    #'extensions',
+    'period',
+    'archive_period',
+    #'extensions',
+    'archive_rel_change',
+    'archive_abs_change',
+    'rel_change',
+    #'extensions',
+    'abs_change',
+    'per_event',
+    'ch_event',
+    'arch_event',
+    ]
 
 
 ####################################################################################################################

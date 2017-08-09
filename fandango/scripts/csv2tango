@@ -243,19 +243,33 @@ def main():
 
           # oldprops values must be updated with new values
           oldprops = db.get_device_property(device,props.keys())
+          
+          attr_props = fn.defaultdict(dict)
 
           # Set properties in the Database (overwriting iff specified)
           #----------------------------------------------------------------------------------------
           for prop,value in props.items():
-              if not prop: continue
-              if overwrite or not oldprops[prop]:
+              if not prop: 
+                  continue
+
+              if prop.startswith('/'):
+                  attr,prop = prop.strip('/').split('.',1)
+                  attr_props[attr][prop] = value
+                  
+              elif overwrite or not oldprops[prop]:
                   value = type(value) in (list,set) and value or [value]
                   while not value[-1] and len(value)>1: value.pop(-1)
                   print('Device Property ',device,'.',prop,', creating: ',value)
                   db.put_device_property(device,{prop:value})
+
               else:
                   print('Device Property ',device,'.',prop,' already exists: ',oldprops[prop])
 
+          # Attribute properties should be managed here
+          if attr_props:
+              #@TODO ...
+              fn.tango.set_attribute_config(device,attr,prop,value)
+              
 if __name__ == '__main__':
   main()    
 
