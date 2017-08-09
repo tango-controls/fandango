@@ -271,6 +271,7 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
     server = server or dct['server']
     if name not in get_all_devices():
         assert create,'Device %s does not exist!'%name  
+        print('Creating %s at %s ...'%(name,server))
         add_new_device(server,dct['dev_class'],name)
     
     properties = '*' if properties is True else properties
@@ -287,6 +288,7 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
             print('Device must be running to import attributes!')
             return
         from fandango import ServersDict
+        print('Starting %s ...'%server)
         sd = ServersDict(name)
         sd.start_servers(host=host)
         time.sleep(5.)
@@ -306,6 +308,7 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
         if a.lower() not in alist:
             print('Attribute %s does not exist yet!'%a)
             continue
+        
         if a.lower() not in ('state','status'):
             
             ac = dp.get_attribute_config(a)
@@ -349,6 +352,19 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
                     traceback.print_exc()
                     
             dp.set_attribute_config(ac)
+            
+    for a,v in attrs.items():
+        if a.lower() in alist:
+            p = v.get('polling')
+            if p is not None:
+                try:
+                    print('%s.poll_attribute(%s,%s)'%(name,a,p))
+                    if not p:
+                        dp.stop_poll_attribute(a)
+                    else:
+                        dp.poll_attribute(a,p)
+                except:
+                    traceback.print_exc()
             
     return           
                     
