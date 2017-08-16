@@ -131,7 +131,7 @@ class AttrCallback(Logger,Object):
 
 class EventListener(Logger,Object): #Logger,
     """
-    The EventListener class accepts 3 event hooks:
+    The EventListener accepts 3 event hooks:
         self.set_event_hook()
         self.set_error_hook()
         self.set_value_hook()
@@ -538,7 +538,10 @@ class EventSource(Logger,SingletonMap):
       })
     
     def __init__(self, name, keeptime=1000., fake=False, parent=None, **kw):
-        """ Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, enablePolling, use_events """
+        """ 
+        Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, 
+        enablePolling, use_events 
+        """
         if 0 < name.replace('//','/').count('/') < name.count(':')+3:
             name += '/state'
         self.simple_name = name.split('/')[-1]
