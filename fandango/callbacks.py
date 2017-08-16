@@ -189,7 +189,7 @@ class EventListener(Logger,Object): #Logger,
                 
         else:
             rvalue = getattr(value,'value',getattr(value,'rvalue',type(value)))
-            self.logPrint('debug','\n',head=False)
+            #self.logPrint('debug','\n',head=False)
             self.debug('eventReceived:%s\n\t%s\n\t%s\n\t+%2.1fms(%2.1f delay)'
                         %(src,type_,rvalue,1e3*inc,delay))
             
@@ -560,9 +560,12 @@ class EventSource(Logger,SingletonMap):
                 raise Exception('A valid device name is needed: %s'%
                                 ([name,self.simple_name,parent]))
               
-        self.full_name = get_full_name('/'.join((self.device,self.simple_name)))
-        self.normal_name = '/'.join(self.device.split('/')[-3:]+[self.simple_name])
-        assert self.fake or self.proxy,'A valid device name is needed'
+        self.full_name = get_full_name('/'.join(
+                        (self.device,self.simple_name)))
+        self.normal_name = '/'.join(self.device.split('/')[-3:]
+                        +[self.simple_name])
+        assert self.fake or self.proxy,\
+            '%s,%s: A valid device name is needed'%(name,parent)
         
         ##Set logging
         #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
@@ -1152,7 +1155,7 @@ class EventSource(Logger,SingletonMap):
 
     def poll(self):
         t0 = now()
-        self.logPrint('DEBUG','\n\n',False)
+        #self.logPrint('DEBUG','\n\n',False)
         self.debug('poll(+%s): %s'%(t0-self.last_read_time,self.stats['poll']))
         self.stats['poll']+=1
         if self.checkState('SUBSCRIBING'):
