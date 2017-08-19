@@ -417,12 +417,47 @@ def parse_db_command_array(data,keys=1,depth=2):
         #print '\t%s,%s'%(k,v)
         dict.update([(k,v)])
     return dict
-  
-def get_class_property(klass,property,db=None):
+
+def get_free_property(name,prop,db=None):
     """
     It returns class property value or just first item if value list has lenght==1
     """
-    prop = (db or get_database()).get_class_property(klass,[property])[property]
+    host = get_tango_host(name)
+    name = name.split('/')[-1]    
+    db = db or get_database(host)
+    prop = db.get_property(name,[prop])[prop]
+    return prop if len(prop)!=1 else prop[0]
+
+def put_free_property(name,prop,value=None,db=None):
+    """
+    Two syntax are possible:
+     - put_free_property(free,{property:value})
+     - put_free_property(free,property,value)
+    """
+    host = get_tango_host(name)
+    name = name.split('/')[-1]
+    db = db or get_database(host)    
+    if not isMapping(prop):
+        if isSequence(value) and not isinstance(value,list):
+            value = list(value)
+        prop = {prop:value}
+    else:
+        for p,v in prop.items():          
+            if isSequence(v):
+                if len(v)==1:
+                    prop[p] = v[0]
+                elif not isinstance(value,list):
+                    prop[p] = list(v)
+                    
+    return db.put_property(name,prop)
+  
+def get_class_property(klass,property,db=None):
+    """
+    It returns class property value or just first item 
+    if value list has lenght==1
+    """
+    prop = (db or get_database()
+            ).get_class_property(klass,[property])[property]
     return prop if len(prop)!=1 else prop[0]
 
 def put_class_property(klass,property,value=None,db=None):
@@ -473,9 +508,16 @@ def put_device_property(device,property,value=None,db=None):
             
 def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     """
-    get_devices_properties('*alarms*',props,hosts=[get_bl_host(i) for i in bls])
-    props must be an string as passed to Database.get_device_property(); regexp are not enabled!
+    Usage:
+
+      get_devices_properties('*alarms*',props,
+        hosts=[get_bl_host(i) for i in bls])
+
+    props must be an string as passed to Database.get_device_property(); 
+    regexp are not enabled!
+    
     get_matching_device_properties enhanced with multi-host support
+
     @TODO: Compare performance of this method with get_matching_device_properties
     """
     expr = device_expr
@@ -531,7 +573,8 @@ def _file_extension(prop,row,db=None):
       
 def _attr_extension(prop,row,db=None):
     """
-    This extension will replace the line by an attribute forwarding formula ($Arg = Type(ATTR('arg'))
+    This extension will replace the line by an attribute forwarding formula 
+      ($Arg = Type(ATTR('arg'))
     
     Syntax is @ATTR:[alias=]model [+formula]
     """
@@ -553,7 +596,9 @@ def _attr_extension(prop,row,db=None):
       return []
       
 
-EXTENSIONS = {'@COPY:':_copy_extension,'@FILE:':_file_extension,'@ATTR:':_attr_extension}
+EXTENSIONS = {'@COPY:':_copy_extension,
+              '@FILE:':_file_extension,
+              '@ATTR:':_attr_extension}
 
 def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS,filters=[]):
     db = db or get_database()
@@ -573,10 +618,9 @@ def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS,filters=[
 
 
     
-########################################################################################
+###############################################################################
 ## Methods for checking device/attribute availability
    
-    
 def get_server_pid(server):
     try:
         return get_device_info('dserver/'+server).PID

@@ -172,11 +172,15 @@ def get_tango_host(dev_name='',use_db=False):
     """
     try:
         if dev_name:
+            
             if isString(dev_name):
+              dev_name = str(dev_name).replace('tango://','')
               m  = matchCl(rehost,dev_name)
             else: 
               m,use_db = None,dev_name
+              
             return m.groups()[0] if m else get_tango_host(use_db=use_db)
+        
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
             host,port = use_db.get_db_host(),int(use_db.get_db_port())

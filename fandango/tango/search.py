@@ -97,16 +97,22 @@ def parse_tango_model(name,use_tau=False,use_host=False):
         if not use_tau or not TAU: raise Exception('NotTau')
         from taurus.core import tango as tctango
         from taurus.core import AttributeNameValidator,DeviceNameValidator
-        validator = {tctango.TangoDevice:DeviceNameValidator,tctango.TangoAttribute:AttributeNameValidator}
-        values.update((k,v) for k,v in validator[tctango.TangoFactory().findObjectClass(name)]().getParams(name).items() if v)
+        validator = {tctango.TangoDevice:DeviceNameValidator,
+                     tctango.TangoAttribute:AttributeNameValidator}
+        values.update((k,v) for k,v in 
+                      validator[tctango.TangoFactory().findObjectClass(name)
+                                ]().getParams(name).items() if v)
     except:
         name = str(name).replace('tango://','')
         m = re.match(fandango.tango.retango,name)
         if m:
             gd = m.groupdict()
-            values['device'] = '/'.join([s for s in gd['device'].split('/') if ':' not in s])
-            if gd.get('attribute'): values['attribute'] = gd['attribute']
-            if gd.get('host'): values['host'],values['port'] = gd['host'].split(':',1)
+            values['device'] = '/'.join([s for s in gd['device'].split('/') 
+                                         if ':' not in s])
+            if gd.get('attribute'): 
+                values['attribute'] = gd['attribute']
+            if gd.get('host'): 
+                values['host'],values['port'] = gd['host'].split(':',1)
     if 'device' not in values: 
         return None
     else:
