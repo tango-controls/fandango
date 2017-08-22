@@ -1,52 +1,26 @@
 #!/usr/bin/env python
 
-__usage__ = """
+__doc__ = """
 tango2csv
+
     This script allows to extract all the device servers matching the given filters.
     The arguments are:
+    
        ./tango2csv filter1 filter2 filter3 filter4 ... destination.csv
        
-Sergi Rubio, srubio@cells.es, 2008
+    Since fandango 13 it returns the new format as a nested dictionary. 
+    To use the old format with column headers use the --old option.
+    New implementation is imported from fandango/tango/export.py
+    
 """
 
 import sys
 import traceback
 import re
 from PyTango import *
+import fandango as fd
 from fandango.arrays import CSVArray
 from fandango.servers import ServersDict
-
-"""
-Search: Domain/Family/Member[/Attribute] (QLineEdit)
-It must allow wildcards (*) to select any device or attribute from the database.
-                 The database allows to search only for devices ... so the search_string must be split in 
-                 dev_name and att_name
-                    search_string='domain/family/member/attribute'
-                    search_string,att_search = search_string.rsplit('/',1) if search_string.count('/')>2 else (search_string,'')
-
-        Results: List of d/f/m or d/f/m/a names (A text widget with multiple lines and scrollable)
-                It will show all the device or attribute names matching with the Search string.
-                It must allow multiple (shift/ctrl+mouse_button) selection of lines
-                How to get the list of running devices from Database:
-                    PyTango.Database().get_device_exported('*') or .get_device_exported(search_string)
-                How to get the list of attributes from the Device name:
-                    import re
-                    try:
-                        atts_list=[a.name for a in PyTango.DeviceProxy(dev_name).attribute_list_query() if not att_search or re.match(att_search.replace('*','.*'),a.name)]
-                    except Exception,e:
-                        print 'Unable to contact with device %s: %s'%(dev_name,str(e))
-                        atts_list=[]
-
-And two buttons:
-        Open/Add: It will return to the main application the list of selected items in Results widget
-
-Future improvements:
-        List filtering:
-            Add a list of regular expressions or allowed names as an argument for Widgets creation
-            The widget will show only those names that match:
-                import re
-                if any(re.match(reg,item_name) for reg in reg_exps): show_item(item_name)
-"""
 
 def isregexp(s): 
     return any(c in s for c in ['.','[','(','{','|','^'])
@@ -103,10 +77,16 @@ def add_properties_to_csv(out_csv,counter,server,klass,device,properties,exclude
         print('add_properties_to_csv(%s,%s,%s,%s): failed!: %s'%(
             counter,server,klass,device,traceback.format_exc()))
     
-if __name__ == '__main__':
+
+def tango2csv(filters):
+    """
+    Old method with fixed format
+    
+    This method is now deprecated by fandango.tango.export.tango2table
+    """
     try:
-        print sys.argv
-        filters = sys.argv[1:-1]
+        print('DEPRECATED: use fandango/tango/export.py instead')
+        
         print filters
         if not filters:
             print __usage__ #'Syntax is ./tango2csv filter1 [more filters] destination.csv'
@@ -170,3 +150,30 @@ if __name__ == '__main__':
         
     except Exception,e:
         print '-------> An unforeseen exception occured....',traceback.format_exc()
+
+        
+if __name__ == '__main__':        
+
+        opts = [a for a in sys.argv[1:] if a.startswith('-')]
+        args = [a for a in sys.argv[1:] if not a.startswith('-')]
+        if not args:
+            print(__doc__)
+        elif '--old' in opts:
+            tango2csv(args)
+        else:
+            if len(args)>1:
+                fout = args[-1]
+                args = args[:-1]
+            else:
+                fout = ''
+
+            text = fd.tango.tango2table(args,opts=opts+['--text'])
+            
+            if fout:
+                fout = open(fout,'w')
+                fout.write(text)
+                fout.close()
+            else:
+                print(text)
+            
+            

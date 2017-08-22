@@ -267,5 +267,58 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
             
     return           
                     
+                    
+def tango2table(filters,opts=[]):
+    """
+    New method to generate .csv using export_device_to_dict and dict2array
     
+    Valid options are:
+        --hosts, --text, --print, --skip-attributes
+        
+    Calling tango2table(filters,['--hosts','--skip-attributes']) will 
+        return same output that the old tango2csv scripts
+        
+    """
+    import fandango as fd
+    import fandango.tango as ft
+    devices = []
+    [devices.extend(ft.find_devices(f)) for f in filters]
+    output = fd.defaultdict(lambda :fd.defaultdict(dict))
+    attr_info = ('display_unit','standard_unit','label','unit','min_alarm',
+        'events','description','format','max_alarm','polling','alarms',)
+    excluded = ('None','No standard unit','No display unit','Not specified'
+                'nada',)
+
+    for d in devices:
+        v = ft.export_device_to_dict(d)
+        if '--hosts' in opts:
+            d = output[v['host']][v['server']]
+        else:
+            d = output[v['server']]
+            
+        if '--skip-attributes' not in opts:
+            d[v['name']] = {'properties':v['properties']}
+            
+            da = d[v['name']]['attributes'] = fd.defaultdict(dict)
+            for a,t in v['attributes'].items():
+                da[a] = dict((i,t.get(i)) for i in attr_info)
+                
+        else:
+            d[v['name']] = v['properties']
+        
+
+    table = fd.arrays.dict2array(output,
+                branch_filter = (lambda x: 
+                    str(x)!='extensions'),
+                leave_filter = (lambda y: 
+                    y and str(y).split()[0] not in excluded),
+                empty='')
+                
+    if '--text' in opts or '--print' in opts:
+        text = '\n'.join('\t'.join(map(str,r)) for r in table)
+    
+    if '--print' in opts: 
+        print(text)
+
+    return text if '--text' in opts else table
     
