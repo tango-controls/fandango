@@ -490,6 +490,12 @@ reint = '[0-9]+'
 refloat = '[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?'
         
 def isString(seq):
+    """
+    Returns True if seq type can be considered as string
+    
+    @TODO: repleace by this code: 
+      import types;isinstance(seq,types.StringTypes)
+    """
     if isinstance(seq,basestring): return True # It matches most python str-like classes
     if any(s in str(type(seq)).lower() for s in ('vector','array','list',)): return False
     if 'qstring' == str(type(seq)).lower(): return True # It matches QString
