@@ -116,7 +116,7 @@ try:
         CaselessDefaultDict,DefaultThreadDict, \
         Enumeration,SortedDict,CaselessList, \
         defaultdict,defaultdict_fromkey, \
-        reversedict,collections,deque
+        reversedict,collections,deque, json2dict, dict2json
 except: 
     print('Unable to import dicts module')
     traceback.print_exc()
@@ -137,8 +137,10 @@ try:
     from tango import TGet,get_device,get_database,get_database_device, \
         get_all_devices,get_device_info,get_alias_for_device, \
         get_device_for_alias,get_tango_host, \
-        find_devices,find_attributes, \
+        find_devices,find_attributes, find_properties,\
         get_matching_devices,get_matching_attributes,\
+        get_device_property,put_device_property,\
+        get_device_commands,get_device_attributes,\
         cast_tango_type,parse_tango_model,check_attribute, \
         read_attribute,check_device,except2str,\
         TangoEval,ProxiesDict,getTangoValue,TangoCommand, \

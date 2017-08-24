@@ -201,7 +201,8 @@ def djoin(a,b):
     return dct
   
 def kmap(method,keys,values=None,sort=True):
-    g = ((k,method((values or keys)[i])) for i,k in enumerate(keys))
+    g = ((k,method(k if not values else values[i])) 
+           for i,k in enumerate(keys))
     return sorted(g) if sort else list(g)
 __test__['kmap'] = [
   {'args':[str.lower,'BCA','YZX',False],'result':[('A', 'x'), ('B', 'y'), ('C', 'z')]}
@@ -651,33 +652,6 @@ def rtf2plain(t,e='[<][^>]*[>]'):
 def html2text(txt):
     return rtf2plain(txt)
   
-def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
-    """
-    It will check that all objects in dict are serializable.
-    If throw is False, a corrected dictionary will be returned.
-    If filename is given, dict will be saved as a .json file.
-    """
-    import json
-    result = {}
-    for k,v in dct.items():
-        try:
-            json.dumps(v,encoding=encoding)
-            result[k] = v
-        except Exception,e:
-            if throw: raise e
-            if isString(v): result[k] = ''
-            elif isSequence(v):
-                try:
-                    result[k] = toList(v)
-                    json.dumps(result[k])
-                except:
-                    result[k] = []
-            elif isMapping(v,strict=True) and recursive:
-                result[k] = dict2json(v,None,False,True,encoding=encoding)
-    if filename:
-        json.dump(result,open(filename,'w'),encoding=encoding)
-    return result if not filename else filename
-  
 def unicode2str(obj):
     """
     Converts an unpacked unicode object (json) to 
@@ -901,9 +875,9 @@ def time2date(epoch=None):
     elif epoch<0: epoch = now()-epoch
     return datetime.datetime.fromtimestamp(epoch)
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False):
+def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True):
     if epoch is None: epoch = now() 
-    elif epoch<0: epoch = now()+epoch
+    elif bt and epoch<0: epoch = now()+epoch
     t = time.strftime(cad,time2tuple(epoch))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
