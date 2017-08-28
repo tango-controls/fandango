@@ -268,8 +268,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
         self.useDynStates = useDynStates
         if self.useDynStates:
-            self.warning('useDynamicStates is set, disabling automatic State generation by attribute config.'+
-                    'States fixed with set/get_state will continue working.')
+            self.warning('useDynamicStates is set, '
+                'disabling automatic State generation by attribute config.'
+                'States fixed with set/get_state will continue working.')
             self.State = self.rawState
             self.dev_state = self.rawState
         print('< '+'~'*78)
@@ -283,8 +284,16 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.updateDynamicAttributes()
             for c,f in self.dyn_comms.items(): 
                 k = c.split('/')[-1]
-                if self.get_name().lower() in c.lower() and k not in self._locals:
-                   self._locals.update({k:(lambda argin,cmd=k:self.evalCommand(cmd,argin))})
+                if self.get_name().lower() in c.lower() \
+                    and k not in self._locals:
+                   self._locals.update({k:
+                        (lambda argin,cmd=k:self.evalCommand(cmd,argin))})
+            for i in self.InitDevice:
+                try:
+                    self.evalAttr(i)
+                except Exception,e:
+                    print('Unable to execute InitDevice(%s)'%i)
+                    raise e
         except: 
             print(traceback.format_exc()) #self.warning(traceback.format_exc())
         self._init_count +=1
