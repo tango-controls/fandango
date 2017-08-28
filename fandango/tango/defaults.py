@@ -31,7 +31,8 @@
 ###########################################################################
 
 """
-provides tango utilities for fandango, like database search methods and emulated Attribute Event/Value types
+provides tango utilities for fandango, like database search methods and 
+emulated Attribute Event/Value types
 
 This module is a light-weight set of utilities for PyTango.
 Classes dedicated for device management will go to fandango.device
@@ -49,7 +50,7 @@ import time,re,os,traceback,threading
 #pytango imports
 import PyTango
 from PyTango import AttrQuality,EventType,DevState,AttrDataFormat,\
-  AttrWriteType,CmdArgType,AttributeProxy,DeviceProxy
+  AttrWriteType,CmdArgType,AttributeProxy,DeviceProxy, AttReqType
 
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
@@ -68,8 +69,7 @@ from fandango.excepts import exc2str
 global TAU,USE_TAU,TAU_LOGGER
 TAU,USE_TAU = None,False
 def loadTaurus():
-    print '#'*80
-    print '%s fandango.tango.loadTaurus()'%time.ctime()
+    print('%s fandango.tango.loadTaurus()'%time.ctime())
     global TAU,USE_TAU,TAU_LOGGER
     try:
         assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
@@ -77,9 +77,10 @@ def loadTaurus():
         TAU = taurus
         USE_TAU=True
         TAU_LOGGER = taurus.core.util.Logger
-        """USE_TAU will be used to choose between taurus.Device and PyTango.DeviceProxy"""
+        """USE_TAU will be used to choose between taurus.Device 
+        and PyTango.DeviceProxy"""
     except:
-        print 'fandango.tango: USE_TAU disabled'
+        print('fandango.tango: USE_TAU disabled')
         TAU = None
         USE_TAU=False
         TAU_LOGGER = Logger
@@ -87,9 +88,11 @@ def loadTaurus():
 
 
 TANGO_STATES = \
-  'ON OFF CLOSE OPEN INSERT EXTRACT MOVING STANDBY FAULT INIT RUNNING ALARM DISABLE UNKNOWN'.split()
+  'ON OFF CLOSE OPEN INSERT EXTRACT MOVING STANDBY FAULT INIT RUNNING ALARM '\
+      'DISABLE UNKNOWN'.split()
 TANGO_COLORS = \
-  'Lime White White Lime White Lime LightBlue Yellow Red Brown LightBlue Orange Magenta Grey'.split()
+  'Lime White White Lime White Lime LightBlue Yellow Red Brown LightBlue'\
+      ' Orange Magenta Grey'.split()
 
 TANGO_STATE_COLORS = dict(zip(TANGO_STATES,TANGO_COLORS))
 
@@ -104,9 +107,12 @@ metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
+rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
+    +'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-reattr = '(?:/(?P<attribute>'+alnum+')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)' #Matches attribute and extension
+reattr = '(?:/(?P<attribute>'+alnum\
+    +')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)'
+    #reattr matches attribute and extension
 retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
 
 AC_PARAMS = [
@@ -157,7 +163,7 @@ AC_PARAMS = [
     ]
 
 
-####################################################################################################################
+###############################################################################
 ##@name Access Tango Devices and Database
 
 ##TangoDatabase singletone
@@ -167,7 +173,8 @@ TangoDatabase,TangoDevice,TangoProxies = None,None,None
 def get_tango_host(dev_name='',use_db=False):
     """
     If device is a tango model, it will extract the host from the model URL
-    If devicesis none, then environment variable or PyTango.Database are used to extract the host
+    If devicesis none, then environment variable or PyTango.Database are used 
+    to extract the host
     If TANGO_HOST is not defined it will always fallback to PyTango.Database()
     """
     try:
@@ -182,7 +189,8 @@ def get_tango_host(dev_name='',use_db=False):
             return m.groups()[0] if m else get_tango_host(use_db=use_db)
         
         elif use_db:
-            use_db = use_db if hasattr(use_db,'get_db_host') else get_database()
+            use_db = use_db if hasattr(use_db,'get_db_host') \
+                            else get_database()
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
             if (matchCl('.*[a-z].*',host.lower())
               #and PyTango.__version_number__ < 800):
@@ -201,11 +209,14 @@ def get_database(host='',port='',use_tau=False):
     """
     Method to get a singleton instance of the Tango Database
     host/port can be a host,port tuple; a 'host:port' string or a taurus model.
-    @TODO: host/port is checked only at first creation, once initialized you can't change HOST
+    @TODO: host/port is checked only at first creation, once initialized 
+    you can't change HOST
     """
     global TangoDatabase
     global TAU,USE_TAU
-    if host in (True,False): use_tau,host,port = host,'','' #For backwards compatibility
+    if host in (True,False): 
+        #For backwards compatibility
+        use_tau,host,port = host,'','' 
     else:
       if '/' in host: 
         # Parsing a taurus model
@@ -220,20 +231,22 @@ def get_database(host='',port='',use_tau=False):
         try:
             t = time.time()
             #TangoDatabase.get_info() #TOO SLOW TO BE A CHECK!
-            #TangoDatabase.check_tango_host(TangoDatabase.get_db_host()+':'+TangoDatabase.get_db_port())
+            #TangoDatabase.check_tango_host(TangoDatabase.get_db_host()\
+                #+':'+TangoDatabase.get_db_port())
             #TangoDatabase.get_timeout_millis()
-            print time.time()-t
+            print(time.time()-t)
             return TangoDatabase 
         except:
             #traceback.print_exc()
             pass #defaulting to Taurus/PyTango
     try: 
         if use_tau and not TAU: TAU = loadTaurus()
-        db = (use_tau and TAU and TAU.Database(*args)) or PyTango.Database(*args)
+        db = (use_tau and TAU and TAU.Database(*args)) \
+            or PyTango.Database(*args)
         if not args: TangoDatabase = db
         return db
     except:
-        print traceback.format_exc()
+        print(traceback.format_exc())
     return
         
 def get_proxy(argin,use_tau=False,keep=False):
@@ -259,7 +272,8 @@ def get_device(dev,use_tau=False,keep=False):
                 return TangoProxies[dev]
             else: 
                 return PyTango.DeviceProxy(dev)
-    elif isinstance(dev,PyTango.DeviceProxy) or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
+    elif isinstance(dev,PyTango.DeviceProxy) \
+        or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
         return dev
     else:
         return None
@@ -273,33 +287,40 @@ def get_database_device(use_tau=False,db=None):
     else:
         try:
            dev_name = (db or get_database(use_tau=use_tau)).dev_name()
-           dev_name = get_tango_host(use_db=db)+'/'+dev_name if db else dev_name
+           dev_name = get_tango_host(use_db=db)+'/'+dev_name \
+               if db else dev_name
            td = get_device(dev_name,use_tau=use_tau)
         except: 
-           print('get_database_device(%s,use_tau=%s,db=%s)'%(dev_name,use_tau,db))
+           print('get_database_device(%s,use_tau=%s,db=%s)'
+                 %(dev_name,use_tau,db))
            traceback.print_exc()
         if db is None: 
           TangoDevice = td
     return td
 
 
-########################################################################################
+###############################################################################
 ## A useful fake attribute value and event class
     
 class fakeAttributeValue(object):
     """ 
-    This class simulates a modifiable AttributeValue object (not available in PyTango)
-    It is the class used to read values from Dev4Tango devices (valves, pseudos, composer, etc ...)
-    It also has a read(cache) method to be used as a TaurusAttribute or AttributeProxy (but it returns self if cache is not used)
+    This class simulates a modifiable AttributeValue object 
+        (not available in PyTango)
+    It is the class used to read values from Dev4Tango devices 
+        (valves, pseudos, composer, etc ...)
+    It also has a read(cache) method to be used as a TaurusAttribute 
+        or AttributeProxy (but it returns self if cache is not used)
     The cache is controlled by keeptime variable (milliseconds)
-    :param parent: Apart of common Attribute arguments, parent will be used to keep a proxy to the parent object (a DeviceProxy or DeviceImpl) 
+    :param parent: Apart of common Attribute arguments, 
+        parent will be used to keep a proxy to the parent object (a DeviceProxy or DeviceImpl) 
     """
     def __init__(self,name,value=None,time_=0.,
                  quality=PyTango.AttrQuality.ATTR_VALID,
                  dim_x=1,dim_y=1,parent=None,device='',
                  error=False,keeptime=0):
         self.name=name
-        self.device=device or (self.name.rsplit('/',1)[0] if '/' in self.name else '')
+        self.device=device or (self.name.rsplit('/',1)[0] 
+                               if '/' in self.name else '')
         self.set_value(value,dim_x,dim_y)
         self.set_date(time_ or time.time())
         self.write_value = self.wvalue = None
@@ -311,7 +332,10 @@ class fakeAttributeValue(object):
         self.type = type(value)
         
     def __repr__(self):
-        return 'fakeAttributeValue(%s,%s,%s,%s,error=%s)'%(self.name,fandango.log.shortstr(self.value),time.ctime(self.get_time()),self.quality,self.error)
+        return 'fakeAttributeValue(%s,%s,%s,%s,error=%s)'\
+                %(self.name,fandango.log.shortstr(self.value),
+                  time.ctime(self.get_time()),self.quality,self.error)
+
     __str__ = __repr__
         
     def get_name(self): return self.name
@@ -322,16 +346,17 @@ class fakeAttributeValue(object):
     
     def read(self,cache=True):
         #Method to emulate AttributeProxy returning an AttributeValue
-        #print '\t\tfakeAttributeValue(%s/%s).read(%s)'%(self.device,self.name,cache)
         if not self.parent:
             self.parent = get_device(self.device,use_tau=False,keep=True)
         if not cache or 0<self.keeptime<(time.time()-self.read()):
-            return read_internal_attribute(self.parent,self) #it's important to pass self as argument so values will be kept
+            #it's important to pass self as argument so values will be kept
+            return read_internal_attribute(self.parent,self) 
         return self 
     
     def throw_exception(self,msg=''):
         self.err = self.error = msg or traceback.format_exc()
-        print 'fakeAttributeValue(%s).throw_exception(%s)'%(self.name,self.error)
+        print('fakeAttributeValue(%s).throw_exception(%s)'
+              %(self.name,self.error))
         #event_type = fakeEventType.lookup['Error']
         self.set_value(None)
         self.set_quality(PyTango.AttrQuality.ATTR_INVALID)
@@ -393,12 +418,13 @@ class fakeEvent(object):
         self.err=err
         self.errors=errors
         
-####################################################################################################################
+###############################################################################
 ## The ProxiesDict class, to manage DeviceProxy pools
 
-class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logger):
+class ProxiesDict(CaselessDefaultDict,Object): 
     ''' Dictionary that stores PyTango.DeviceProxies
-    It is like a normal dictionary but creates a new proxy each time that the "get" method is called
+    It is like a normal dictionary but creates a new proxy each time 
+        that the "get" method is called
     An earlier version is used in PyTangoArchiving.utils module
     This class must be substituted by Tau.Core.TauManager().getFactory()()
     '''
@@ -433,8 +459,6 @@ class ProxiesDict(CaselessDefaultDict,Object): #class ProxiesDict(dict,log.Logge
                     else devklass)(dev_name)
             except Exception,e:
                 print('ProxiesDict: %s doesnt exist!'%dev_name)
-                #print traceback.format_exc()
-                #raise e
                 dev = None
         return dev
       
