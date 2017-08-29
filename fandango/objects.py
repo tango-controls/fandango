@@ -382,7 +382,7 @@ class ReleaseNumber(object):
         if self.patch() < other.patch():
             return -1
         if self.patch() > other.patch():
-            return -1
+            return 1
         return 0
         
     def __gt__(self,other): return self.__cmp__(other) > 0
