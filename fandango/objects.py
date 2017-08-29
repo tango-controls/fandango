@@ -51,7 +51,7 @@ import __builtin__
 from __builtin__ import object
 
 from fandango.functional import *
-from operator import isCallable
+from operator import isCallable, isSequenceType
 from collections import Hashable
 from types import MethodType
 import Queue
@@ -319,6 +319,79 @@ def NewClass(classname,classparent=None,classdict=None):
     """
     if classparent and not isSequence(classparent): classparent = (classparent,)
     return type(classname,classparent or (object,),classdict or {})
+
+class ReleaseNumber(object):
+    """
+    ReleaseNumber = type('ReleaseNumber',(tuple,),{
+    '__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))
+    })
+    """
+    def __init__(self,*args):
+        assert args
+        if len(args)==1:
+            if isinstance(args[0],basestring):
+                args = args[0].split('.')
+            elif isSequenceType(args[0]):
+                args = args[0]
+            else:
+                args = [args]
+        self._tuple = tuple(args)
+        
+    def __iter__(self): return self._tuple.__iter__()
+    def __len__(self): return self._tuple.__len__()
+    def __getitem__(self,i): return self._tuple.__getitem__(i)
+    def __hash__(self): return self._tuple.__hash__()
+
+    def __repr__(self):
+        return '.'.join(map(str,self))
+    
+    def major(self):
+        try:
+            m = int(self[0])
+            return m
+        except:
+            return '0'
+    
+    def minor(self):
+        try:
+            m = int(self[1])
+            return m
+        except:
+            return '0'
+    
+    def patch(self):
+        try:
+            m = int(self[2])
+            return m
+        except:
+            return self[2] if len(self)>2 else '0'
+        
+    def __cmp__(self,other):
+        if not isinstance(other,ReleaseNumber):
+            other = ReleaseNumber(other)
+        if self._tuple == other._tuple:
+            return 0
+        if int(self.major()) < other.major():
+            return -1
+        if int(self.major()) > other.major():
+            return 1
+        if int(self.minor()) < other.minor():
+            return -1
+        if int(self.minor()) > other.minor():
+            return 1
+        if self.patch() < other.patch():
+            return -1
+        if self.patch() > other.patch():
+            return -1
+        return 0
+        
+    def __gt__(self,other): return self.__cmp__(other) > 0
+    def __ge__(self,other): return self.__cmp__(other) >= 0
+    def __lt__(self,other): return self.__cmp__(other) < 0
+    def __le__(self,other): return self.__cmp__(other) <= 0
+    def __eq__(self,other): return not self.__cmp__(other)
+    def __ne__(self,other): return self.__cmp__(other)
+
     
 ###############################################################################
 

@@ -50,10 +50,8 @@ import os,traceback
 try:
     # LOAD VERSION NUMBER
     import objects,imp
+    from objects import ReleaseNumber
     PATH = os.path.dirname(objects.__file__)
-    ReleaseNumber = type('ReleaseNumber',(tuple,),{
-      '__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))
-      })
     vf = open(PATH+'/VERSION')
     RELEASE = ReleaseNumber(map(int,vf.read().strip().split('.')))
     vf.close()
