@@ -114,7 +114,8 @@ def delete_device(device,server=True):
         db.delete_server(server)
     
     return True
-    
+
+@Cached(depth=1000,expire=30)
 def get_device_info(dev,db=None):
     """
     This method provides an alternative to DeviceProxy.info() for those 
@@ -124,20 +125,23 @@ def get_device_info(dev,db=None):
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
     vals = None
     if ':' in dev:
-      model = fandango.Struct(parse_tango_model(dev))
-      db = get_database(model.host,model.port)
-      dev = '/'.join(model.device.split('/')[-3:])
+        from fandango.tango.search import parse_tango_model
+        model = fandango.Struct(parse_tango_model(dev))
+        db = get_database(model.host,model.port)
+        dev = '/'.join(model.device.split('/')[-3:])
+  
     try:
-      dd = get_database_device(db=db)
-      vals = dd.DbGetDeviceInfo(dev)
-      di = Struct([(k,v) for k,v in zip(('name','ior','level','server',
-                                         'host','started','stopped'),vals[1])])
-      di.exported,di.PID = vals[0]
-      di.dev_class = dd.DbGetClassForDevice(dev)
-      return di
+        dd = get_database_device(db=db)
+        vals = dd.DbGetDeviceInfo(dev)
+        di = Struct([(k,v) for k,v in zip(('name','ior','level','server',
+                        'host','started','stopped'),vals[1])])
+        di.exported,di.PID = vals[0]
+        di.dev_class = dd.DbGetClassForDevice(dev)
+        return di
+  
     except:
-      raise Exception('get_device_info(%s,%s,%s): %s'%(
-        dev,db,vals,traceback.format_exc()))
+        raise Exception('get_device_info(%s,%s,%s): %s'%(
+            dev,db,vals,traceback.format_exc()))
 
 def get_device_host(dev):
     """
@@ -735,7 +739,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
     except Exception,e:
         return e if throw else None
 
-@Cached(depth=200,expire=10)
+@Cached(depth=1000,expire=10)
 def check_device_cached(*args,**kwargs):
     """ 
     Cached implementation of check_device method
