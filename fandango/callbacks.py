@@ -197,7 +197,8 @@ class EventListener(Logger,Object): #Logger,
                 if isinstance(rvalue,PyTango.DevError):
                     self.warning('%s hidden ERROR: %s'%(src,rvalue))
                 elif str(src) in self.error_sources:
-                    self.warning('%s restored: %s'%(str(src),rvalue))
+                    self.warning('%s restored: %s ...'
+                                 %(str(src),str(rvalue)[:80]))
                     self.error_sources.remove(str(src))
 
                 if self.value_hook is not None:
@@ -1582,7 +1583,8 @@ def subscribeDeviceAttributes(self,dev_name,attrs):
             continue
         if not dev.is_attribute_polled(att) and self.ForcePolling:
             self.info('::AddDevice(): forcing %s polling to %s' % (att,argin))
-            period = dev.get_attribute_poll_period(att) or 3000
+            period = dev.get_attribute_poll_period(att) or \
+                EventSource.DefaultPolling
             dev.poll_attribute(att,period)
             self.debug("%s.poll_attribute(%s,%s)" % (argin,att,period))
         #cb = self 
