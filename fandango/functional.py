@@ -312,18 +312,21 @@ def matchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless match between expression and given string """
     if extend:
         if '&' in exp:
-            return all(matchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
+            return all(matchCl(e.strip(),seq,terminate=False,extend=True) 
+                       for e in exp.split('&'))
+        if re.match('^[!~]',exp):
             return not matchCl(exp[1:],seq,terminate,extend=True) 
     return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clmatch = matchCl #For backward compatibility
 
 def searchCl(exp,seq,terminate=False,extend=False):
-    """ Returns a caseless regular expression search between expression and given string """
+    """ Returns a caseless regular expression search between 
+    expression and given string """
     if extend:
         if '&' in exp:
-            return all(searchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
+            return all(searchCl(e.strip(),seq,terminate=False,extend=True) 
+                       for e in exp.split('&'))
+        if re.match('^[!~]',exp):
             return not searchCl(exp[1:],seq,terminate,extend=True)
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
