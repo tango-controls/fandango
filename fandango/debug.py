@@ -49,11 +49,15 @@ def timeit(target,args=[],kwargs={},setup='pass',number=1):
       traceback.print_exc()
     return time.time()-t0
   
-def Timed(target):
+def Timed(target,tries=1):
     def wrapped(*args,**kwargs):
-        t0 = time.time()
-        r = target(*args,**kwargs)
-        print('%s needed %3.1f ms'%(target,(time.time()-t0)*1e3))
+        times = []
+        for i in range(tries):
+            t0 = time.time()
+            r = target(*args,**kwargs)
+            times.append(1e3*(time.time()-t0))
+        times = ', '.join('%3.1f'%t for t in times)
+        print('%s needed %s ms'%(target,times))
         return r
     return wrapped
 
