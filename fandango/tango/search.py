@@ -31,7 +31,8 @@
 ###########################################################################
 
 """
-provides tango utilities for fandango, like database search methods and emulated Attribute Event/Value types
+provides tango utilities for fandango, like database search methods and 
+emulated Attribute Event/Value types
 
 This module is a light-weight set of utilities for PyTango.
 Classes dedicated for device management will go to fandango.device
@@ -43,17 +44,19 @@ Methods for Astor-like management will go to fandango.servers
 
 """
 
+from fandango.objects import Cached
 from .defaults import * ## Regular expressions defined here!
 from .methods import *
 
-####################################################################################################################
+###############################################################################
 ##@name Methods for searching the database with regular expressions
 #@{
 
 
 
 def parse_labels(text):
-    if any(text.startswith(c[0]) and text.endswith(c[1]) for c in [('{','}'),('(',')'),('[',']')]):
+    if any(text.startswith(c[0]) and text.endswith(c[1]) for c in 
+           [('{','}'),('(',')'),('[',']')]):
         try:
             labels = eval(text)
             return labels
@@ -126,32 +129,48 @@ def parse_tango_model(name,use_tau=False,use_host=False):
 
     return Struct(values)
 
-TANGO_KEEPTIME = 60 #This variable controls how often the Tango Database will be queried
+#This variable controls how often the Tango Database will be queried
+TANGO_KEEPTIME = 60 
 
 class get_all_devices(objects.SingletonMap):
+    
     _keeptime = TANGO_KEEPTIME
-    def __init__(self,exported=False,keeptime=None,host=''):
+    
+    def __init__(self,exported=False,keeptime=None,host='',mask='*'):
+        """
+        mask will not be used at __init__ but in get_all_devs call
+        """
         self._all_devs = []
         self._last_call = 0
         self._exported = exported
         self._host = host and get_tango_host(host)
         if keeptime: self.set_keeptime(keeptime)
+        
     @classmethod
     def set_keeptime(klass,keeptime):
         klass._keeptime = max(keeptime,60) #Only 1 query/minute to DB allowed
-    def get_all_devs(self):
+        
+    def get_all_devs(self,mask='*'):
         now = time.time()
-        if not self._all_devs or now>(self._last_call+self._keeptime):
-            #print 'updating all_devs ...............................'
+
+        if (mask!='*' or not self._all_devs 
+                or now>(self._last_call+self._keeptime)):
+
             db = get_database(self._host)
-            self._all_devs = sorted(map(str.lower,
-                (db.get_device_exported('*') if self._exported 
-                 else db.get_device_name('*','*'))))
+            r = sorted(map(str.lower,
+                (db.get_device_exported(mask) if self._exported 
+                 else db.get_device_name(mask,mask))))
+            if mask != '*': 
+                return r
+
+            self._all_devs = r
             self._last_call = now
+
         return self._all_devs
+    
     def __new__(cls,*p,**k):
         instance = objects.SingletonMap.__new__(cls,*p,**k)
-        return instance.get_all_devs()
+        return instance.get_all_devs(mask=k.get('mask','*'))
     
 def get_class_devices(klass,db=None):
     """ Returns all registered devices for a given class 
@@ -162,33 +181,52 @@ def get_class_devices(klass,db=None):
         db = get_database(db)
     return sorted(str(d).lower() for d in db.get_device_name('*',klass))
     
-    
-def get_matching_devices(expressions,limit=0,exported=False,fullname=False,trace=False):
+@Cached(depth=100,expire=60.)
+def get_matching_devices(expressions,limit=0,exported=False,
+                         fullname=False,trace=False):
     """ 
-    Searches for devices matching expressions, if exported is True only running devices are returned 
-    Tango host will be included in the matched name if fullname is True
+    Searches for devices matching expressions, if exported is True only 
+    running devices are returned Tango host will be included in 
+    the matched name if fullname is True
     """
     if not isSequence(expressions): expressions = [expressions]
     defhost = get_tango_host()
-    hosts = list(set((m.groups()[0] if m else None) for m in (matchCl(rehost,e) for e in expressions)))
-    fullname = fullname or ':' in str(expressions) or len(hosts)>1 or hosts[0] not in (defhost,None) #Dont count slashes, as regexps may be complex
+    if ':' in str(expressions):
+        #Multi-host search
+        fullname = True
+        host = list(set((m.groups()[0] if m else None) 
+                     for m in (matchCl(rehost,e) for e in expressions)))
+    else:
+        hosts = [defhost]
+    
+    #Dont count slashes, as regexps may be complex
+    fullname = fullname or any(h not in (defhost,None) for h in hosts) 
+
     all_devs = []
     if trace: print(hosts,fullname)
+
     for host in hosts:
         if host in (None,defhost):
             db_devs = get_all_devices(exported)
         else:
             print('get_matching_devices(*%s)'%host)
             odb = PyTango.Database(*host.split(':'))
-            db_devs = odb.get_device_exported('*') if exported else odb.get_device_name('*','*')
-        prefix = '%s/'%(host or defhost)
+            db_devs = odb.get_device_exported('*') if exported \
+                        else odb.get_device_name('*','*')
+
+        prefix = '%s/'%(host or defhost) if fullname else ''
         all_devs.extend(prefix+d for d in db_devs)
-        
+    
     expressions = map(toRegexp,toList(expressions))
     if trace: print(expressions)
-    if not fullname: all_devs = [r.split('/',1)[-1] if matchCl(rehost,r) else r for r in all_devs]
-    condition = lambda d: any(matchCl("(%s/)?(%s)"%(defhost,e),d,terminate=True) for e in expressions)
+    #if not fullname: 
+        #all_devs = [r.split('/',1)[-1] if matchCl(rehost,r) else r 
+                    #for r in all_devs]
+
+    condition = lambda d: any(matchCl("(%s/)?(%s)"%(defhost,e),
+                                d,terminate=True) for e in expressions)
     result = sorted(filter(condition,all_devs))
+    
     return sorted(result[:limit] if limit else result)
   
 def get_matching_servers(expressions,tango_host='',exported=False):
@@ -225,13 +263,18 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
         if not match:
             if '/' not in e:
                 host,dev,attr = def_host,e.rsplit('/',1)[0],'state'
-                #raise Exception('Expression must match domain/family/member/attribute shape!: %s'%e)
+                #raise Exception('Expression must match domain/family/'
+                    #'member/attribute shape!: %s'%e)
             else:
                 host,dev,attr = def_host,e.rsplit('/',1)[0],e.rsplit('/',1)[1]
         else:
-            host,dev,attr = [d[k] for k in ('host','device','attribute') for d in (match.groupdict(),)]
+            host,dev,attr = [d[k] for k in ('host','device','attribute') 
+                             for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
-        if trace: print('get_matching_attributes(%s): match:%s,host:%s,dev:%s,attr:%s'%(e,bool(match),host,dev,attr))
+        if trace: 
+            print('get_matching_attributes(%s): match:%s,host:%s,'
+                  'dev:%s,attr:%s'%(e,bool(match),host,dev,attr))
+
         matches.append((host,dev,attr))
     
     fullname = fullname or any(m[0]!=def_host for m in matches)
