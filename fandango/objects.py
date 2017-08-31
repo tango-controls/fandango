@@ -36,8 +36,8 @@
 ###########################################################################
 
 """
-fandango.objects contains method for loading python modules and objects "on the run",
-as well as several advanced types used within the fandango library
+fandango.objects contains method for loading python modules and objects 
+"on the run", as well as several advanced types used within fandango library
 
 Struct, Decorator and Cached are fundamental types for all fandango API's
 
@@ -715,6 +715,16 @@ class Cached(Decorator):
             functools.update_wrapper(self,self.f)
         else:
             self.f = None
+            
+    def prune(self,expire=None,depth=None):
+        depth = notNone(depth,self.depth)
+        expire = time.time()-notNone(expire,self.expire)
+        cache = sorted(k for k in self.cache if k[0]>expire)
+        if (len(cache)!=len(self.cache) or len(cache)>self.depth):
+            self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
+            
+        self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
+        return sorted(self.cache.keys())
         
     def execute(self,*args,**kwargs):
         self._log('__call__(%s,%s)'%(args,kwargs))
@@ -733,12 +743,7 @@ class Cached(Decorator):
             return self.f(*args,**kwargs)
         
         else:
-            expire = (key[0]-expire)
-            cache = sorted(k for k in self.cache if k[0]>expire)
-            if (len(cache)!=len(self.cache) or len(cache)>self.depth):
-                self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
-                
-            self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
+            cache = self.prune(expire)
             match = first((k for k in cache if (k[1:]) == (key[1:])),None)
             
             if match:
