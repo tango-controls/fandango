@@ -74,8 +74,10 @@ class TangoedValue(object):
 
 def getTangoValue(obj,device=None):
     """
-    This method may be used to return objects from read_attribute or FIND() that are still computable and keep quality/time members
-    try to avoid spectrums.; this method doesn't work for numpy arrays so I have to convert them to less efficient lists.
+    This method may be used to return objects from read_attribute or FIND() 
+    that are still computable and keep quality/time members
+    try to avoid spectrums.; this method doesn't work for numpy arrays 
+    so I have to convert them to less efficient lists.
     """
     try:
         p = parse_tango_model(obj if type(obj) is str else (device or ''))
@@ -102,7 +104,8 @@ def getTangoValue(obj,device=None):
         except: domain,family,member = '','',''
             
         Type = type(value)
-        Type = Type if (Type not in (bool,None,type(None)) and ty!=CmdArgType.DevState) else int
+        Type = Type if (Type not in (bool,None,type(None)) \
+                        and ty!=CmdArgType.DevState) else int
         nt = type('tangoed_'+Type.__name__,(Type,TangoedValue),{})
         o = nt(value or 0)
         [setattr(o,k,v) for k,v in (('name',name),('type',ty),
@@ -130,10 +133,13 @@ class TangoEval(object):
       example:
         te = fandango.TangoEval(cache=3)
         te.eval('test/sim/test-00/A * test/sim/test-00/S.delta')
-        Out: 2.6307095848792521 #A value multiplied by delta of S in its last 3 values
+        Out: 2.6307095848792521 #A value multiplied by delta of S 
+                                in its last 3 values
     
-    Attributes in the formulas may be (it is recommended to insert spaces between attribute names and operators):
-    THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; IT IS TAKEN AS PART OF THE DEVICE NAME!!
+    Attributes in the formulas may be (it is recommended to insert spaces 
+    between attribute names and operators):
+    THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; IT 
+    IS TAKEN AS PART OF THE DEVICE NAME!!
     
     .. code::
     
@@ -144,30 +150,38 @@ class TangoEval(object):
         d/f/m/A.exception #True if exception occurred
         d/f/m/A.time #Attribute value time
         d/f/m/A.value #Explicit value
-        d/f/m/A.delta #Increase/decrease of the value since the first value in cache (if cache and cache_depth are set)
+        d/f/m/A.delta #Increase/decrease of the value since the first 
+                        value in cache (if cache and cache_depth are set)
         d/f/m/A.all #Instead of just value will return an AttributeValue object 
     
-    All tango-like variables are parsed. TangoEval.macros can be used to do regexp-based substitution. By default FIND(regexp) will be replaced by a list of matching attributes.
+    All tango-like variables are parsed. TangoEval.macros can be used to do 
+    regexp-based substitution. By default FIND(regexp) will be replaced 
+    by a list of matching attributes.
     
-        FIND([a-zA-Z0-9\/].*) macro allows to get any attribute matching a regular expression
-        Any variable in _locals is evaluated or explicitly replaced in the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
+        FIND([a-zA-Z0-9\/].*) macro allows to get any attribute matching 
+        a regular expression
+        Any variable in _locals is evaluated or explicitly replaced in 
+        the formula if matches $(); e.g. FIND($(VARNAME)/*/*)
         T() < T('YYYY/MM/DD hh:mm') allow to compare actual time with any time
         
-    :use_events: will manage events using the callbacks.EventSource object. It will redirect
-    all events to TangoEval.eventReceived method. If an event_hook callback is passed as argument,
-    both TangoEval object and result of eval will be sent to it.
+    :use_events: will manage events using the callbacks.EventSource object. 
+        It will redirect all events to TangoEval.eventReceived method. 
+        If an event_hook callback is passed as argument, both TangoEval 
+        object and result of eval will be sent to it.
     
     eval() will be triggered by events only if event_hook is True or a callable
     
     """
-    FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)' #FIND( optional quotes and whatever is not ')' )
+    #FIND( optional quotes and whatever is not ')' )
+    FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)' 
     
     #operators = '[><=][=>]?|and|or|in|not in|not'
     #l_split = re.split(operators,formula)#.replace(' ',''))
     alnum = '[a-zA-Z0-9-_]+'
     no_alnum = '[^a-zA-Z0-9-_]'
     no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
-    #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; IT IS TAKEN AS PART OF THE DEVICE NAME!!
+    #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; 
+    #IT IS TAKEN AS PART OF THE DEVICE NAME!!
     #It matches a device name
     redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
     #Matches attribute and extension
@@ -179,9 +193,8 @@ class TangoEval(object):
     regexp = no_quotes + retango + no_quotes.replace('\.','').replace(':','=') 
     
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,
-              trace=False, proxies=None, attributes=None, cache=0, use_events = False, 
-              event_hook = None,
-              **kwargs):
+              trace=False, proxies=None, attributes=None, cache=0, 
+              use_events = False, event_hook = None,**kwargs):
         self.formula = formula
         self.source = ''
         self.variables = []
@@ -203,10 +216,13 @@ class TangoEval(object):
             
           self.attributes = dicts.CaselessDefaultDict(proxy)
 
-        self.previous = dicts.CaselessDict() #Keeps last values for each variable
-        self.last = dicts.CaselessDict() #Keeps values from the last eval execution only
+        #Keeps last values for each variable
+        self.previous = dicts.CaselessDict() 
+        #Keeps values from the last eval execution only
+        self.last = dicts.CaselessDict() 
         self.cache_depth = cache
-        self.cache = dicts.CaselessDefaultDict(lambda k:list()) if self.cache_depth else None#Keeps [cache]
+        self.cache = dicts.CaselessDefaultDict(lambda k:list()) \
+                        if self.cache_depth else None#Keeps [cache]
         self.result = None
         self.macros = [('FIND(%s)',self.FIND_EXP,self.find_macro)]
         
@@ -221,24 +237,34 @@ class TangoEval(object):
         self._defaults['NOW'] = time.time
         self._defaults['DEVICES'] = self.proxies
         self._defaults['DEV'] = lambda x:self.proxies[x]
-        self._defaults['NAMES'] = lambda x: get_matching_devices(x) if x.count('/')<3 else get_matching_attributes(x)
+        self._defaults['NAMES'] = lambda x: get_matching_devices(x) \
+                            if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
         self._defaults['PREV'] = self.previous
         #For ComposerDS syntax compatibility
-        self._defaults['READ'] = self._defaults['ATTR'] = self._defaults['XATTR'] = self.read_attribute
+        self._defaults['READ'] = self._defaults['ATTR'] = \
+                self._defaults['XATTR'] = self.read_attribute
         #self._locals['now'] = time.time() #Updated at execution time
-        self._defaults.update((k,v) for k,v in {'get_domain':get_domain,'get_family':get_family,'get_member':get_member,'parse':parse_tango_model}.items())
-        #self._defaults.update((k,None) for k in ('os','sys',)) #Updating Not allowed models
-        self._locals = dict(self._defaults) #Having 2 dictionaries to reload defaults when needed
+        self._defaults.update((k,v) for k,v in {'get_domain':get_domain,
+                                          'get_family':get_family,
+                                          'get_member':get_member,
+                                          'parse':parse_tango_model
+                                          }.items())
+        
+        #Updating Not allowed models
+        #self._defaults.update((k,None) for k in ('os','sys',)) 
+        
+        #Having 2 dictionaries to reload defaults when needed
+        self._locals = dict(self._defaults) 
         
         if self.formula and launch: 
             self.eval()
             if not self._trace: 
-                print 'TangoEval: result = %s' % self.result
+                print('TangoEval: result = %s' % self.result)
         return
             
     def trace(self,msg):
-        if self._trace: print 'TangoEval: %s'%str(msg)
+        if self._trace: print('TangoEval: %s'%str(msg))
         
     def set_timeout(self,timeout):
         self.timeout = int(timeout)
@@ -246,11 +272,13 @@ class TangoEval(object):
         
     def find_macro(self,target):
         """
-        Gets a match of FIND_EXP and applies get_matching_attributes to the expresion found.
+        Gets a match of FIND_EXP and applies get_matching_attributes 
+        to the expresion found.
         """
         exp = target.replace('"','').replace("'",'').strip()
         exp,sep,what = exp.partition('.')
-        res = str(sorted(d.lower()+sep+what for d in get_matching_attributes([exp],trace=self._trace)))
+        res = str(sorted(d.lower()+sep+what 
+                for d in get_matching_attributes([exp],trace=self._trace)))
         return res.replace('"','').replace("'",'')
     
     def add_macro(self,macro_name,macro_expression,macro_function):
