@@ -231,7 +231,9 @@ def get_matching_devices(expressions,limit=0,exported=False,
   
 def get_matching_servers(expressions,tango_host='',exported=False):
     """
-    Return all servers in the given tango tango_host matching the given expressions.
+    Return all servers in the given tango tango_host matching 
+        the given expressions.
+        
     :param exported: whether servers should be running or not
     """
     expressions = toSequence(expressions)
@@ -245,12 +247,14 @@ def get_matching_servers(expressions,tango_host='',exported=False):
 def find_devices(*args,**kwargs):
     #A get_matching_devices() alias, just for backwards compatibility
     return get_matching_devices(*args,**kwargs) 
-    
+
+@Cached(depth=100,expire=30.)    
 def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
     """ 
     Returns all matching device/attribute pairs. 
     regexp only allowed in attribute names
-    :param expressions: a list of expressions like [domain_wild/family_wild/member_wild/attribute_regexp] 
+    :param expressions: a list of expressions like 
+        [domain_wild/family_wild/member_wild/attribute_regexp] 
     """
     attrs = []
     def_host = get_tango_host()

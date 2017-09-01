@@ -763,6 +763,8 @@ class Cached(Decorator):
                     self._log(traceback.format_exc())
                 return v
             else:
+                print(str(self.f),str(e))
+                traceback.print_exc()
                 raise v
         else:
             return v

@@ -281,6 +281,7 @@ def get_attribute_info(device,attribute):
         if getattr(ai,k)!=v)
     return [types,formats]
   
+@Cached(depth=100,expire=15.)
 def get_attribute_config(target):
     d,a = target.rsplit('/',1)
     return get_device(d).get_attribute_config(a)
