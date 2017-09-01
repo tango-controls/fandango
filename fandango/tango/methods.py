@@ -47,29 +47,7 @@ Methods for Astor-like management will go to fandango.servers
 from .defaults import *
 
 __test__ = {}
-
-###############################################################################
-def TGet(*args):
-    """ 
-    Universal fandango helper, it will return a matching Tango object 
-    depending on the arguments passed
-    Objects are: database (), server (*/*), attribute ((:/)?*/*/*/*),device (*)
-    """
-    if not args:
-        return get_database()
-    arg0 = args[0]
-    if arg0.count('/')==1:
-        return fandango.servers.ServersDict(arg0)
-    if arg0.count('/')>(2+(':' in arg0)):
-        return (sorted(get_matching_attributes(arg0)) 
-            if isRegexp(arg0,WILDCARDS+' ') 
-            else check_attribute(arg0,brief=True))
-    else:
-        return (sorted(get_matching_devices(arg0)) 
-            if isRegexp(arg0,WILDCARDS+' ') else get_device(arg0))
-        
-__test__['fandango.tango.TGet'] = ('sys/database/2',['sys/database/2'],{})
-        
+       
 ###############################################################################
 
 def add_new_device(server,klass,device):

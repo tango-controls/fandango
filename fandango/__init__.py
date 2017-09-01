@@ -132,7 +132,7 @@ except Exception,e:
 
 #TANGO related modules
 try:
-    from tango import TGet,get_device,get_database,get_database_device, \
+    from tango import finder,get_device,get_database,get_database_device, \
         get_all_devices,get_device_info,get_alias_for_device, \
         get_device_for_alias,get_tango_host, \
         find_devices,find_attributes, find_properties,\

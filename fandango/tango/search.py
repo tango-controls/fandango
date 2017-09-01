@@ -48,11 +48,11 @@ from fandango.objects import Cached
 from .defaults import * ## Regular expressions defined here!
 from .methods import *
 
+__test__ = {}
+
 ###############################################################################
 ##@name Methods for searching the database with regular expressions
 #@{
-
-
 
 def parse_labels(text):
     if any(text.startswith(c[0]) and text.endswith(c[1]) for c in 
@@ -293,8 +293,10 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                     attrs.extend([d+'/'+a for a in ats])
                     if limit and len(attrs)>limit: break
                 except: 
-                    print 'Unable to get attributes for %s'%d
+                    # This method should be silent!!!
+                    #print 'Unable to get attributes for %s'%d
                     #print traceback.format_exc()
+                    pass
                     
     result = sorted(set(attrs))
     return result[:limit] if limit else result
@@ -371,6 +373,33 @@ def find_properties(devs,props='*'):
     return get_matching_device_properties(devs,props)
               
 #@}
+
+###############################################################################
+@Cached(depth=200,expire=60.)
+def finder(*args):
+    """ 
+    Universal fandango helper, it will return a matching Tango object 
+    depending on the arguments passed
+    Objects are: database (), server (*/*), attribute ((:/)?*/*/*/*),device (*)
+    """
+    if not args:
+        return get_database()
+    arg0 = args[0]
+    if arg0.count('/')==1:
+        return fandango.servers.ServersDict(arg0)
+    if arg0.count('/')>(2+(':' in arg0)):
+        return (sorted(get_matching_attributes(*args)) 
+            if isRegexp(arg0,WILDCARDS+' ') 
+            else check_attribute(arg0,brief=True))
+    else:
+        return (sorted(get_matching_devices(*args)) 
+            if isRegexp(arg0,WILDCARDS+' ') else get_device(arg0))
+        
+__test__['fandango.tango.finder'] = ('sys/database/2',['sys/database/2'],{})
+
+#For backwards compatibility
+TGet = finder
+
 ########################################################################################    
 
 ########################################################################################
