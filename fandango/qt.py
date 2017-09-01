@@ -56,10 +56,23 @@ def getQt(full=False):
         return Qt,QtCore,QtGui
     else:
         return Qt
-
+    
 Qt,QtCore,QtGui = getQt(True)
 
 ###############################################################################
+
+def setTaurusLabelFormat():
+    try:
+        # taurus 4
+        from taurus.core.tango.util import tangoFormatter
+        from taurus.qt.qtgui.display import TaurusLabel
+        TaurusLabel.FORMAT=tangoFormatter  
+    except:
+        pass
+    
+def setTaurusWidgetFormat(widget):
+    from taurus.core.tango.util import tangoFormatter
+    widget.setFormat(tangoFormatter)
 
 def getStateLed(model):
     from taurus.qt.qtgui.display import TaurusStateLed
