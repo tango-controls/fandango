@@ -47,6 +47,23 @@ it replaces the previous PyTango_utils module
 
 import os,traceback
 
+#CLEAN DEPRECATED FILES
+p = __file__.rsplit(os.path.sep,1)[0]
+deprecated = [p+os.path.sep+'tango.pyc',p+os.path.sep+'tango.pyo',
+            p+os.path.sep+'device.pyc',p+os.path.sep+'device.pyo',]
+for p in deprecated:
+    if os.path.exists(p):
+        try:
+            os.remove(p)
+            print('%s removed ...'%p)
+        except Exception,e:
+            print(e)
+            print('fandango, CLEAN OLD FILES ERROR!:')
+            print('An old file still exists at:\n\t%s'%p)
+            print('Import fandango as sysadmin and try again')
+            print('')
+            sys.exit(-1)
+
 try:
     # LOAD VERSION NUMBER
     import objects,imp
