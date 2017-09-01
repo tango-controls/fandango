@@ -49,6 +49,7 @@ import time,datetime
 
 from operator import isCallable
 from functools import partial
+from collections import Hashable
 from itertools import count,cycle,repeat,chain,groupby,islice,imap,starmap
 from itertools import dropwhile,takewhile,ifilter,ifilterfalse,izip
 try: from itertools import combinations,permutations,product
@@ -558,20 +559,31 @@ def isDictionary(seq,strict=False):
     if strict: return False
     try:
         if seq and isSequence(seq) and isSequence(seq[0]):
-            if seq[0] and not isSequence(seq[0][0]): return True #First element of tuple must be hashable
+            #First element of tuple must be key-like
+            if seq[0] and not isIterable(seq[0][0]): 
+                return True 
     except: pass
     return False
 isMapping = isDictionary
+
+def isHashable(seq):
+    if isSequence(seq): 
+        return all(isHashable(s) for s in seq)
+    else:
+        return isinstance(seq,Hashable)
 
 def isIterable(seq):
     """ It includes dicts and listlikes but not strings """
     return hasattr(seq,'__iter__') and not isString(seq)
 
 def isNested(seq,strict=False):
-    if not isIterable(seq) or not len(seq): return False
+    if not isIterable(seq) or not len(seq): 
+        return False
     child = seq[0] if isSequence(seq) else seq.values()[0]
-    if not strict and isIterable(child): return True
-    if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
+    if not strict and isIterable(child): 
+        return True
+    if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): 
+        return True
     return False
   
 def shape(seq):
