@@ -278,20 +278,24 @@ class TangoEval(object):
         exp = target.replace('"','').replace("'",'').strip()
         exp,sep,what = exp.partition('.')
         res = str(sorted(d.lower()+sep+what 
-                for d in get_matching_attributes([exp],trace=self._trace)))
+                for d in get_matching_attributes(exp,trace=self._trace)))
         return res.replace('"','').replace("'",'')
     
     def add_macro(self,macro_name,macro_expression,macro_function):
         """
-        Add a new macro to be parsed by parse_formula. It will apply macro_function to the target found by macro_expression; the result will later replace macro_name%target
+        Add a new macro to be parsed by parse_formula. 
+        It will apply macro_function to the target found by macro_expression; 
+        the result will later replace macro_name%target
         
-        e.g: self.add_macro('FIND(%s)',self.FIND_EXP,self.find_macro) #where FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)'
+        e.g: self.add_macro('FIND(%s)',self.FIND_EXP,self.find_macro) 
+            #where FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)'
         """
         self.macros.insert(0,(macro_name,macro_expression,macro_function))
         
     def parse_formula(self,formula,_locals=None):
         """ 
-        This method just removes comments and applies self.macros (e.g FIND()) searches in the formula; 
+        This method just removes comments and applies self.macros 
+        (e.g FIND()) searches in the formula; 
         In this method there is no tango check, neither value replacement 
         """
         _locals = _locals or {}
@@ -300,7 +304,8 @@ class TangoEval(object):
             formula = formula.split('#',1)[0]
         if ':' in formula and not re.match('^',redev):
             tag,formula = formula.split(':',1)
-        if _locals and '$(' in formula: #explicit replacement of env variables if $() used
+        #explicit replacement of env variables if $() used            
+        if _locals and '$(' in formula: 
             for l,v in _locals.items():
                 formula = formula.replace('$(%s)'%str(l),str(v))
         for macro_name,macro_exp,macro_fun in self.macros:

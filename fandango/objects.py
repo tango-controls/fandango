@@ -732,7 +732,7 @@ class Cached(Decorator):
         
         try:
             key = time.time(),tuple(args),tuple(kwargs.items())
-            assert isinstance(key,Hashable)
+            assert all(isinstance(k,Hashable) for l in key[1:] for k in l)
         except:
             self._log('unhashable arguments!')
             expire = 0
