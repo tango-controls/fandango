@@ -1,15 +1,44 @@
-RELEASE = (13,0,1)
-RELEASE_NOTE = "Event Callbacks, Shell scripts and FolderDS for remote logging"
+RELEASE = (13,2,0)
+RELEASE_NOTE = "Cached tango database methods"
 
 """
 IMPORTANT:
 
-  Due to fandango.device module refactoring you may need to remove previous package before installing this one
+  Due to fandango.device and fandango.tango module refactoring you may need 
+  to remove previous package before installing this one
   
-BUGS PENDING for 13.1 (to not be released in master until bugs will be solved)
+BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
+
+-----------------------
+13.2.0 - September 2017
+-----------------------
+
+fandango.tango refactored in submodules, cache added to tango DB queries to
+improve performance of pyalarm/composers, new methods for importing/exporting 
+devices from csv/json/dicts
+
+commit 520cfb (develop)
+
+fandango.tango refactored into submodules
+TGet renamed to finder and moved to fandango.tango.search
+fandango.tango.search: optimize methods speeds adding cache and masks
+Add cache to get_device_info, solve multihost import bug
+Add '~' as negate character for extended regexp
+ReleaseNumber class refactored to be usable in PyAlarm
+New tango2csv methods to export attribute config and properties
+Add host-aware get/put_free_property methods
+Add set_attribute_config to fandango.tango
+Add attribute properties to csv2tango
+Add import_device_from_dict method
+add find_properties helper
+adapt kmap,parse_tango_model to Panic 6.1
+Harmonize EVENT_TYPES check (solved)
+EventSource/EventListener bugs solved
+Multi-host panic and ServersDict api's
+
 
 -------------------
 13.0.3 - June 2017
