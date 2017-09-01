@@ -350,7 +350,8 @@ class fakeAttributeValue(object):
             self.parent = get_device(self.device,use_tau=False,keep=True)
         if not cache or 0<self.keeptime<(time.time()-self.read()):
             #it's important to pass self as argument so values will be kept
-            return read_internal_attribute(self.parent,self) 
+            import fandango.tango.methods as fmt
+            return fmt.read_internal_attribute(self.parent,self) 
         return self 
     
     def throw_exception(self,msg=''):
