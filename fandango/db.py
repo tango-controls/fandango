@@ -158,12 +158,16 @@ class FriendlyDB(log.Logger):
         @return the executed cursor, values can be retrieved by executing cursor.fetchall()
         '''
         try:
-            q=self.getCursor(klass = dict if asDict else self.default_cursor)
-            q.execute(query)
+            try:
+                q=self.getCursor(klass = dict if asDict else self.default_cursor)
+                q.execute(query)
+            except:
+                self.renewMySQLconnection()
+                q=self.getCursor(klass = dict if asDict else None)
+                q.execute(query)
         except:
-            self.renewMySQLconnection()
-            q=self.getCursor(klass = dict if asDict else None)
-            q.execute(query)
+            print('Query(%s) failed!'%query)
+            raise
             
         if not export:
             return q
