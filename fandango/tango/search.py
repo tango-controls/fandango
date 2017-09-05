@@ -194,7 +194,7 @@ def get_matching_devices(expressions,limit=0,exported=False,
     if ':' in str(expressions):
         #Multi-host search
         fullname = True
-        host = list(set((m.groups()[0] if m else None) 
+        hosts = list(set((m.groups()[0] if m else None) 
                      for m in (matchCl(rehost,e) for e in expressions)))
     else:
         hosts = [defhost]

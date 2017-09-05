@@ -454,7 +454,9 @@ class Object(object):
         from inspect import getargspec
         #print '%s.call_all__init__(%s,%s)' % (klass.__name__,_args,_kw)
         for base in klass.__bases__:
-            if 'call__init__' in dir(base) and ('inited_class_list' not in self.__dict__ or base not in self.inited_class_list):
+            if 'call__init__' in dir(base) and \
+                ('inited_class_list' not in self.__dict__ 
+                 or base not in self.inited_class_list):
                 #print '\t%s.base is %s' % (klass.__name__,base.__name__)
                 nkw,i = {},0
                 try:
@@ -469,7 +471,8 @@ class Object(object):
                     self.call_all__init__(base,*_args,**_kw)
                     self.call__init__(base,**nkw)
                 except Exception,e:
-                    print 'Unable to execute %s.__init__!: %s' % (base.__name__,str(e))
+                    print('Unable to execute %s.__init__!: %s' 
+                          % (base.__name__,str(e)))
         return
             
     def getAttrDict(self):
@@ -756,7 +759,12 @@ class Cached(Decorator):
                 except Exception,e:
                     v = e
                 self._log('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
-                self.cache[key] = v
+                try:
+                    self.cache[key] = v
+                except:
+                    print('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
+                    print('cache[%s] = %s'%(key,v))
+                    raise
             
         if isinstance(v,Exception):
             if self.catched:

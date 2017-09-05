@@ -567,10 +567,12 @@ def isDictionary(seq,strict=False):
 isMapping = isDictionary
 
 def isHashable(seq):
-    if isSequence(seq): 
+    if not isinstance(seq,Hashable):
+        return False
+    elif isSequence(seq): 
         return all(isHashable(s) for s in seq)
     else:
-        return isinstance(seq,Hashable)
+        return True
 
 def isIterable(seq):
     """ It includes dicts and listlikes but not strings """

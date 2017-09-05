@@ -93,7 +93,8 @@ except Exception,e:
     print('Unable to import functional module: %s'%e)
 
 try:
-    from log import printf,Logger,LogFilter,shortstr,except2str,FakeLogger
+    from log import printf,Logger,LogFilter,shortstr,\
+        except2str,FakeLogger,pprint
 except Exception,e: 
     print('Unable to import log module: %s'%e)
 

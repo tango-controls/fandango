@@ -286,7 +286,7 @@ def get_attribute_config(target):
     d,a = target.rsplit('/',1)
     return get_device(d).get_attribute_config(a)
 
-def set_attribute_config(device,attribute,config,events=True):
+def set_attribute_config(device,attribute,config,events=True,verbose=False):
     """
     device may be a DeviceProxy object
     config may be a dictionary
@@ -298,7 +298,8 @@ def set_attribute_config(device,attribute,config,events=True):
     polling = None
     
     if isMapping(v):
-        print('parsing dictionary ...')
+        if verbose:
+            print('parsing dictionary ...')
 
         polling = v.get('polling',None)
         
@@ -308,12 +309,16 @@ def set_attribute_config(device,attribute,config,events=True):
                 try:
                     if c not in AC_PARAMS:
                         continue                    
-                    if c.lower() == 'events' and not events:
-                        continue                
+                    if c.lower() == 'events':
+                        if not events:
+                            continue                
+                        elif verbose:
+                            print('parsing events: %s'%vv)
                     if not hasattr(ac,c):
                         continue
                     
-                    #print('%s.%s.%s'%(name,a,c))
+                    if verbose:
+                        print('%s.%s.%s'%(name,a,c))
                     
                     if isinstance(vv,dict):
                         for cc,vvv in vv.items():

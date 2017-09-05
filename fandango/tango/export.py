@@ -257,13 +257,14 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
     alist = dp.get_attribute_list()
     alist = map(str.lower,alist)
     
+    print('Loading %d attributes'%len(attrs))
     for a,v in attrs.items():
         if a.lower() not in alist:
             print('Attribute %s does not exist yet!'%a)
             continue
         
         #set attribute config implemented in .methods
-        set_attribute_config(dp,a,v,events=events)
+        set_attribute_config(dp,a,v,events=events,verbose=True)
             
     return           
                     
