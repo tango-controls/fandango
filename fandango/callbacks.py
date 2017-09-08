@@ -752,6 +752,8 @@ class EventSource(Logger,SingletonMap):
         """change polling period to period miliseconds """
         self.polling_period = period
         self.activatePolling()
+        
+    setPollingPeriod = changePollingPeriod
 
     def getPollingPeriod(self):
         """returns the polling period """

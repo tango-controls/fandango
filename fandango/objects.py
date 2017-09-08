@@ -635,7 +635,7 @@ class Decorator(object):
         This bounding method will be called only when decorating an
         instance method
         """
-        return types.MethodType(self,obj,objtype)
+        return MethodType(self,obj,objtype)
       
 class ClassDecorator(Decorator): 
     """ 

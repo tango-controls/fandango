@@ -147,11 +147,11 @@ class FakeLogger():
     
 class Logger(Object):
     """
-    This class provides logging methods (debug,info,error,warning) 
+    This type provides logging methods (debug,info,error,warning) 
     to all classes inheriting it.
     To use it you must inherit from it and add it within your __init__ method:
     
-    class MyTangoDevice(Device_4Impl,Logger):
+    klass MyTangoDevice(Device_4Impl,Logger):
     
       def __init__(self,cl, name):
       
@@ -248,13 +248,14 @@ class Logger(Object):
                        #str(level).upper())
         else:
             l = self.getLogLevel(level)
-            if l is not None:
+            if l is None:
+                self.warning('log.Logger: Logging level cannot be set to "%s"'
+                  %level)
+            elif l!=self.log_obj.level:
                 self.log_obj.setLevel(l)
                 self.debug('log.Logger: Logging  level set to "%s" = %s'
                   %(level,l))
-            else:
-                self.warning('log.Logger: Logging level cannot be set to "%s"'
-                  %level)
+                
         return level
         
     setLevel = setLogLevel
