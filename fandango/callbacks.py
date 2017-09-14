@@ -726,6 +726,7 @@ class EventSource(Logger,SingletonMap):
               
             self.polling_period = notNone(period,self.polling_period)
             self.polled = True
+            self.KeepAlive = max((self.polling_period,EventSource.KeepAlive))
 
             self.info('activatePolling(%s,%s)'
                       %(self.forced,self.polling_period))
@@ -741,6 +742,7 @@ class EventSource(Logger,SingletonMap):
         self.info('deactivatePolling(%s,%s)'%(self.full_name,self.state))        
         self.polled = False
         self.forced = False
+        self.KeepAlive = EventSource.KeepAlive
 
     def isPollingActive(self):
         return self.polled or self.forced
