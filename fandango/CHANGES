@@ -1,4 +1,4 @@
-RELEASE = (13,2,0)
+RELEASE = (13,2,5)
 RELEASE_NOTE = "Cached tango database methods"
 
 """
@@ -13,8 +13,10 @@ threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
 -----------------------
-13.2.0 - September 2017
+13.2.5 - September 2017
 -----------------------
+
+Performance improvements on EventSources/Cached/tango.search for PANIC 6.2
 
 fandango.tango refactored in submodules, cache added to tango DB queries to
 improve performance of pyalarm/composers, new methods for importing/exporting 
