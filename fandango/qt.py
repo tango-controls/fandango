@@ -994,7 +994,8 @@ QDropable = Dropable(object)
 @ClassDecorator
 def DoubleClickable(QtKlass):
     """ 
-    This decorator enables a Qt class to execute a 'hook' method every time is double-clicked
+    This decorator enables a Qt class to execute a 'hook' method every 
+    time is double-clicked
     """    
     class DoubleClickableQtKlass(QtKlass): #,Decorated):
         __doc__ = DoubleClickable.__doc__
@@ -1004,6 +1005,8 @@ def DoubleClickable(QtKlass):
         def setClickHook(self,hook):
             """ the hook must be a function or callable """
             self._doubleclickhook = hook #self.onEdit
+        def getClickHook(self):
+            return getattr(self,'_doubleclickhook',None)
         def mouseDoubleClickEvent(self,event):
             if getattr(self,'_doubleclickhook',None) is not None:
                 self._doubleclickhook()
