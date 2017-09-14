@@ -514,6 +514,7 @@ if __name__ == '__main__':
     print sysargs_to_dict.__name__,'\n',sysargs_to_dict.__doc__
     print sysargs_to_dict(cast=False,split=True)
 
-from . import doc
-__doc__ = doc.get_fn_autodoc(__name__,vars())
+#from . import doc
+from fandango.doc import get_fn_autodoc
+__doc__ = get_fn_autodoc(__name__,vars())
 
