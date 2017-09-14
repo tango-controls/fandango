@@ -241,6 +241,7 @@ def get_database(host='',port='',use_tau=False):
             pass #defaulting to Taurus/PyTango
     try: 
         if use_tau and not TAU: TAU = loadTaurus()
+        if use_tau and TAU: print('LOADING TANGO DATABASE VIA TAURUS')
         db = (use_tau and TAU and TAU.Database(*args)) \
             or PyTango.Database(*args)
         if not args: TangoDatabase = db
