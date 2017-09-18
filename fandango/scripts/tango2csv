@@ -62,7 +62,12 @@ def add_properties_to_csv(out_csv,counter,server,klass,device,properties,exclude
         out_csv.set(counter,0,server)
         out_csv.set(counter,1,klass)
         out_csv.set(counter,2,device)
-        for prop,values in properties.items():
+
+        dprops = sorted(p for p in properties if '.' not in p)
+        aprops = sorted(p for p in properties if '.' in p)
+
+        for prop in (dprops+aprops):
+            values = properties[prop]
             #if prop in (
             #'__SubDevices','polled_attr','polled_cmd',
             #'doc_url','ProjectTitle','cvs_location','Description','InheritedFrom'): continue
@@ -70,7 +75,7 @@ def add_properties_to_csv(out_csv,counter,server,klass,device,properties,exclude
             out_csv.set(counter,3,prop)
             for value in values:
                 out_csv.set(counter,4,value)
-                print 'Added at %d: %s,%s,%s,%s' % (counter,server,device,prop,value)
+                #print 'Added at %d: %s,%s,%s,%s' % (counter,server,device,prop,value)
                 counter += 1         
         return counter if properties else counter+1
     except Exception,e:
@@ -78,7 +83,7 @@ def add_properties_to_csv(out_csv,counter,server,klass,device,properties,exclude
             counter,server,klass,device,traceback.format_exc()))
     
 
-def tango2csv(filters):
+def tango2csv(filters,options=[]):
     """
     Old method with fixed format
     
@@ -144,6 +149,15 @@ def tango2csv(filters):
                 print '%d: reading device %s properties: %s' % (counter,device,property_names)
                 properties = db.get_device_property(device,property_names)
             else: properties = {}
+
+            attr_props = fd.tango.get_attributes_properties(device)
+            print('loading %d attribute properties'%len(attr_props))
+            for a,ps in attr_props.items():
+                for p,v in ps.items():
+                    properties['%s.%s'%(a,p)] = fd.toList(v)
+                if '--value' in options:
+                    properties['%s.value'%(a)] = fd.toList(fd.read_attribute('%s/%s'%(device,a)))
+            
             counter = add_properties_to_csv(out_csv,counter,server,klass,device,properties)
         out_csv.save()
         
@@ -159,7 +173,7 @@ if __name__ == '__main__':
         if not args:
             print(__doc__)
         elif '--old' in opts:
-            tango2csv(args)
+            tango2csv(args,opts)
         else:
             if len(args)>1:
                 fout = args[-1]
