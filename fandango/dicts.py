@@ -49,24 +49,94 @@ srubio@cells.es,
 2008 
 """
 
-import time,traceback
+import time,traceback,os
 import collections
-from objects import self_locked
+from collections import defaultdict, deque
+try: from collections import OrderedDict
+except: pass
+
+from .objects import self_locked
+from .functional import *
+
+ENC = 'latin-1'
             
-try:
-    import numpy
-    class fuzzyDict(dict):
-        ## @todo TODO
-        def __getitem__(self,key):
-            try:
-                return dict.__getitem__(self,key)
-            except:
-                a=numpy.arange(6)*1.1    
-                array([ 0. ,  1.1,  2.2,  3.3,  4.4,  5.5])  #The keys of the dictionary
-                numpy.abs(a-key).argmin() #returns the index of the nearest key                
-                pass
-except:
-    pass
+def dict2json(dct,filename=None,throw=False,recursive=True,
+              encoding=ENC,as_dict=False):
+    """
+    It will check that all objects in dict are serializable.
+    If throw is False, a corrected dictionary will be returned.
+    If filename is given, dict will be saved as a .json file.
+    """
+    import json
+
+    result = {}
+    for k,v in dct.items():
+        try:
+            json.dumps(v,encoding=encoding)
+            result[k] = v
+        except Exception,e:
+            if throw: raise e
+            if isString(v): result[k] = ''
+            elif isSequence(v):
+                try:
+                    result[k] = toList(v)
+                    json.dumps(result[k])
+                except:
+                    result[k] = []
+            elif isMapping(v,strict=True) and recursive:
+                result[k] = dict2json(v,None,False,True,encoding=encoding)
+    if filename:
+        json.dump(result,open(filename,'w'),encoding=encoding)
+    elif not as_dict:
+        result = json.dumps(result)
+
+    return result if not filename else filename
+
+def dec(s,encoding=ENC):
+    #dec = lambda s: str(s.decode(encoding) if isinstance(s,unicode) else s)
+    try:
+        if isinstance(s,unicode):
+            s = s.encode(encoding)
+            return str(s)
+        else:
+            return str(s)
+    except Exception,e:
+        print('dec(%s) failed!'%(s))
+        traceback.print_exc()
+        raise e
+            
+def json2dict(jstr,encoding=ENC):
+    """
+    Converts unicode to str recursively.
+    
+    :param jstr: may be json string, filename or dictionary
+    
+    in the last case, this method is equivalent to fandango.unicode2str(obj)
+    """
+    import json
+    if not hasattr(jstr,'items'):
+        if '{' not in jstr and os.path.exists(jstr):
+            f = open(jstr)
+            jstr = json.load(f,encoding=encoding)
+            f.close()
+        else:
+            jstr = json.loads(jstr,encoding=encoding)
+    
+    d = {}
+
+    for k,v in jstr.items():
+        k = dec(k)
+        if isinstance(v,basestring):
+            d[k] = dec(v)
+        elif isinstance(v,(list,tuple)):
+            d[k] = [(dec(i)
+                    if isinstance(i,basestring) else i)
+                    for i in v]
+        elif hasattr(v,'items'):
+            d[k] = json2dict(v,encoding=encoding)
+        else:
+            d[k] = v
+    return d
             
 class ThreadDict(dict):
     ''' Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.
@@ -126,7 +196,7 @@ class ThreadDict(dict):
             print 'ThreadDict.start(): ThreadDict.stop() must be executed first!'
             return
         print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()        
-        import threading        
+        import threading
         self.event = threading.Event()
         self.event.clear()
         self._Thread = threading.Thread(target=self.run)
@@ -259,7 +329,7 @@ class ThreadDict(dict):
     def __repr__(self):
         return "{\n" +"\n,".join(["'"+str(k)+"'"+":"+"'"+str(v)+"'" for k,v in zip(dict.keys(self),dict.values(self))])+ "\n}"      
 
-class defaultdict_fromkey(collections.defaultdict):
+class defaultdict_fromkey(defaultdict):
     """ Creates a dictionary with a default_factory function that creates new elements using key as argument.
     Usage : new_dict = defaultdict_fromkey(method); where method like (lambda key: return new_obj(key))
     Each time that new_dict[key] is called with a key that doesn't exist, method(key) is used to create the value
@@ -427,6 +497,12 @@ class SortedDict(dict):
     @staticmethod
     def fromkeys(S,v=None):
         return SortedDict((s,v) for s in S)
+      
+    def insert(self,index,key,value):
+        """Insert key,value at given position"""
+        if key in self: self.pop(key)
+        self._keys.insert(index,key)
+        dict.__setitem__(self,key,value)
             
     def pop(self,k,d=None):
         """Removes key and returns its (self[key] or d or None)"""
@@ -517,8 +593,6 @@ class CaselessSortedDict(SortedDict,CaselessDict):
 
     
 ##################################################################################################
-
-from collections import defaultdict
 
 def reversedict(dct,key=None,default=None):
     #it just exchanges keys/values in a dictionary

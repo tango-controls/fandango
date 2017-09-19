@@ -40,12 +40,12 @@ srubio@cells.es,
 """
 import time,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
-from threading import Event,RLock,Thread
+from threading import Event,Lock,RLock,Thread
 
 try: import Queue
 except: import queue as Queue
 
-from log import except2str,shortstr
+from log import except2str,shortstr,tracer
 from functional import *
 from excepts import trial,Catched,CatchedArgs
 from operator import isCallable
@@ -321,7 +321,7 @@ class ThreadedObject(Object):
                 self._errors += 1
                 args,kwargs = [],{}
             
-            print('ThreadedObject.Start() ...')
+            tracer('ThreadedObject(%s).Start() ...'%type(self))
             self._started = time.time()
             self._next = self._started + self._timewait
             while not self._stop.isSet():
@@ -369,7 +369,7 @@ class ThreadedObject(Object):
                 self._count += 1
                 
               except Exception,e:
-                self.print_exc(e if not traceback else traceback.format_exc(),
+                self.print_exc(traceback and traceback.format_exc(),
                                'ThreadObject stop!')
                 raise e
                 
@@ -381,7 +381,7 @@ class ThreadedObject(Object):
         print('ThreadedObject.Kill() ...')
         return #<< Should never get to this point
     except Exception,e:
-        self.print_exc(e,'ThreadObject exit!')
+        self.print_exc(time and e,'ThreadObject exit!')
 
 ###############################################################################
 
@@ -522,7 +522,7 @@ WorkerException = type('WorkerException',(Exception,),{})
 
 class WorkerThread(object):
     """
-    This class allows to schedule tasks in a background thread or process
+    Allows to schedule tasks in a background thread or process
     
     If no process() method is overriden, the tasks introduced in the internal queue using put(Task) method may be:
          
@@ -678,7 +678,7 @@ class SingletonWorker(WorkerThread,objects.Singleton):
     """
     def put(self,target):
         if not hasattr(self,'_queued'): self._queued = []
-        self._queued.append(target)
+        self._queued.append(target) #<< saving a timestamp would be useful here
         WorkerThread.put(self,target)
     def get(self,target):
         """
@@ -687,13 +687,16 @@ class SingletonWorker(WorkerThread,objects.Singleton):
         """
         if not hasattr(self,'_values'): self._values = {}
         self._values.update(self.flush())
+        ## @OJO: If update values fails, all received values will be lost!?!
+        ## it seems that this should be done here instead of using flush(): self._queued.pop(target)
         return self._values.pop(target)
     def flush(self):
-        #It just flushes received values
+        #It just flushes all received values
         l = []
         l.extend(getattr(self,'_values',{}).items())
         l.extend(WorkerThread.flush(self))
-        [self._queued.remove(v) for v in l if v in self._queued]
+        # Removing already finished commands from entry queue
+        [self._queued.remove(v[0]) for v in l if v[0] in self._queued]
         return l
     def values(self):
         return self._values

@@ -243,19 +243,44 @@ def main():
 
           # oldprops values must be updated with new values
           oldprops = db.get_device_property(device,props.keys())
+          
+          attr_props = fn.defaultdict(dict)
 
           # Set properties in the Database (overwriting iff specified)
           #----------------------------------------------------------------------------------------
           for prop,value in props.items():
-              if not prop: continue
-              if overwrite or not oldprops[prop]:
+              if not prop: 
+                  continue
+
+              if prop.startswith('/'):
+                  attr,prop = prop.strip('/').split('.',1)
+                  attr_props[attr][prop] = value
+                  
+              elif overwrite or not oldprops[prop]:
                   value = type(value) in (list,set) and value or [value]
                   while not value[-1] and len(value)>1: value.pop(-1)
                   print('Device Property ',device,'.',prop,', creating: ',value)
                   db.put_device_property(device,{prop:value})
+
               else:
                   print('Device Property ',device,'.',prop,' already exists: ',oldprops[prop])
 
+          # Attribute properties should be managed here
+          for attr,props in attr_props.items():
+              for p,v in props.items():
+                  if '.' in p:
+                      raise Exception,'TODO: implement nested dicts smarter'
+                      #attr.events
+                      np = dict()
+                      pp,vv = p.split('.',1)
+                      #attr.events.ch_event
+                      if '.' in vv:
+                          nv,nvv = vv.split('.',1)
+                          
+                      np[pp] = vv
+                      
+              fn.tango.set_attribute_config(device,attr,configs)
+              
 if __name__ == '__main__':
   main()    
 

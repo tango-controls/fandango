@@ -1,12 +1,14 @@
 #!/usr/bin/env python
+# -*- coding: iso-8859-1 -*-
+
 """
 #############################################################################
 ##
-## project :     Tango Control System
+## project :     Functional tools for Tango Control System
 ##
-## $Author: Sergi Rubio Manrique, srubio@cells.es $
+## $Author:      Sergi Rubio Manrique, srubio@cells.es $
 ##
-## $Revision: 2008 $
+## $Revision:    2008 $
 ##
 ## copyleft :    ALBA Synchrotron Controls Section, CELLS
 ##               Bellaterra
@@ -28,8 +30,9 @@
 ##
 ## You should have received a copy of the GNU General Public License
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
-###########################################################################
+####################################################################@########
 """
+
 
 __doc__ = """
 fandango.functional::
@@ -46,6 +49,7 @@ import time,datetime
 
 from operator import isCallable
 from functools import partial
+from collections import Hashable
 from itertools import count,cycle,repeat,chain,groupby,islice,imap,starmap
 from itertools import dropwhile,takewhile,ifilter,ifilterfalse,izip
 try: from itertools import combinations,permutations,product
@@ -198,7 +202,8 @@ def djoin(a,b):
     return dct
   
 def kmap(method,keys,values=None,sort=True):
-    g = ((k,method((values or keys)[i])) for i,k in enumerate(keys))
+    g = ((k,method(k if not values else values[i])) 
+           for i,k in enumerate(keys))
     return sorted(g) if sort else list(g)
 __test__['kmap'] = [
   {'args':[str.lower,'BCA','YZX',False],'result':[('A', 'x'), ('B', 'y'), ('C', 'z')]}
@@ -308,18 +313,21 @@ def matchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless match between expression and given string """
     if extend:
         if '&' in exp:
-            return all(matchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
+            return all(matchCl(e.strip(),seq,terminate=False,extend=True) 
+                       for e in exp.split('&'))
+        if re.match('^[!~]',exp):
             return not matchCl(exp[1:],seq,terminate,extend=True) 
     return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clmatch = matchCl #For backward compatibility
 
 def searchCl(exp,seq,terminate=False,extend=False):
-    """ Returns a caseless regular expression search between expression and given string """
+    """ Returns a caseless regular expression search between 
+    expression and given string """
     if extend:
         if '&' in exp:
-            return all(searchCl(e.strip(),seq,terminate=False,extend=True) for e in exp.split('&'))
-        if exp.startswith('!'):
+            return all(searchCl(e.strip(),seq,terminate=False,extend=True) 
+                       for e in exp.split('&'))
+        if re.match('^[!~]',exp):
             return not searchCl(exp[1:],seq,terminate,extend=True)
     return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
 clsearch = searchCl #For backward compatibility
@@ -487,6 +495,12 @@ reint = '[0-9]+'
 refloat = '[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?'
         
 def isString(seq):
+    """
+    Returns True if seq type can be considered as string
+    
+    @TODO: repleace by this code: 
+      import types;isinstance(seq,types.StringTypes)
+    """
     if isinstance(seq,basestring): return True # It matches most python str-like classes
     if any(s in str(type(seq)).lower() for s in ('vector','array','list',)): return False
     if 'qstring' == str(type(seq)).lower(): return True # It matches QString
@@ -536,26 +550,42 @@ def isSequence(seq,INCLUDE_GENERATORS = True):
         return True
     return False
   
-def isDictionary(seq):
-    """ It includes dicts and also nested lists """
+def isDictionary(seq,strict=False):
+    """ 
+    It includes dict-like and also nested lists if strict is False
+    """
     if isinstance(seq,dict): return True
     if hasattr(seq,'items') or hasattr(seq,'iteritems'): return True
+    if strict: return False
     try:
         if seq and isSequence(seq) and isSequence(seq[0]):
-            if seq[0] and not isSequence(seq[0][0]): return True #First element of tuple must be hashable
+            #First element of tuple must be key-like
+            if seq[0] and not isIterable(seq[0][0]): 
+                return True 
     except: pass
     return False
 isMapping = isDictionary
+
+def isHashable(seq):
+    if not isinstance(seq,Hashable):
+        return False
+    elif isSequence(seq): 
+        return all(isHashable(s) for s in seq)
+    else:
+        return True
 
 def isIterable(seq):
     """ It includes dicts and listlikes but not strings """
     return hasattr(seq,'__iter__') and not isString(seq)
 
 def isNested(seq,strict=False):
-    if not isIterable(seq) or not len(seq): return False
+    if not isIterable(seq) or not len(seq): 
+        return False
     child = seq[0] if isSequence(seq) else seq.values()[0]
-    if not strict and isIterable(child): return True
-    if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): return True
+    if not strict and isIterable(child): 
+        return True
+    if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): 
+        return True
     return False
   
 def shape(seq):
@@ -599,6 +629,10 @@ def str2float(seq):
 def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
     return seq.lower().strip() not in ('false','0','none','no')
+  
+def str2bytes(seq):
+    """ Converts an string to a list of integers """
+    return map(ord,str(seq))
 
 def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     """ 
@@ -635,39 +669,12 @@ def rtf2plain(t,e='[<][^>]*[>]'):
 def html2text(txt):
     return rtf2plain(txt)
   
-def dict2json(dct,filename=None,throw=False,recursive=True,encoding='latin-1'):
-    """
-    It will check that all objects in dict are serializable.
-    If throw is False, a corrected dictionary will be returned.
-    If filename is given, dict will be saved as a .json file.
-    """
-    import json
-    result = {}
-    for k,v in dct.items():
-        try:
-            json.dumps(v,encoding=encoding)
-            result[k] = v
-        except Exception,e:
-            if throw: raise e
-            if isString(v): result[k] = ''
-            elif isSequence(v):
-                try:
-                    result[k] = toList(v)
-                    json.dumps(result[k])
-                except:
-                    result[k] = []
-            elif isMapping(v) and recursive:
-                result[k] = dict2json(v,None,False,True,encoding=encoding)
-    if filename:
-        json.dump(result,open(filename,'w'),encoding=encoding)
-    return result if not filename else filename
-  
 def unicode2str(obj):
     """
     Converts an unpacked unicode object (json) to 
     nested python primitives (map,list,str)
     """
-    if isMapping(obj):
+    if isMapping(obj,strict=True):
         n = dict(unicode2python(t) for t in obj.items())
     elif isSequence(obj):
         n = list(unicode2python(t) for t in obj)
@@ -709,9 +716,11 @@ def str2list(s,separator='',regexp=False,sep_offset=0):
     sep_offset = 1 : keep with precedent
     """
     if not regexp:
-      return map(str.strip,s.split(separator) if separator else s.split())
+      return map(str.strip,
+          s.split(separator) if separator else s.split())
     elif not sep_offset:
-      return map(str.strip,re.split(separator,s) if separator else re.split('[\ \\n]',s))
+      return map(str.strip,
+          re.split(separator,s) if separator else re.split('[\ \\n]',s))
     else:
       r,seps,m = [],[],1
       while m:
@@ -737,6 +746,13 @@ def code2atoms(code):
     #l2 = [a for l in l1 for a in str2list(l,ops,1,-1)]
     return l1
     
+def shortstr(s,max_len=144,replace={'\n':';'}):
+    s = str(s)
+    for k,v in replace.items():
+        s = s.replace(k,v)
+    if max_len>0 and len(s) > max_len:
+        s = s[:max_len-4]+' ...'
+    return s
 
 def text2list(s,separator='\n'):
     return filter(bool,str2list(s,separator))
@@ -744,10 +760,10 @@ def text2list(s,separator='\n'):
 def str2lines(s,length=80,separator='\n'):
     return separator.join(s[i:i+length] for i in range(0,len(s),length))
 
-def list2str(s,separator='\t',MAX_LENGTH=255):
+def list2str(s,separator='\t',MAX_LENGTH=0):
     s = str(separator).join(str(t) for t in s)
-    if MAX_LENGTH>0 and separator not in ('\n','\r') and len(s)>MAX_LENGTH: 
-        s = s[:MAX_LENGTH-4]+'... '
+    if MAX_LENGTH>0 and separator not in ('\n','\r'):
+      s = shortstr(s,MAX_LENGTH)
     return s
 
 def text2tuples(s,separator='\t'):
@@ -761,10 +777,32 @@ def dict2str(s,sep=':\t',linesep='\n',listsep='\n\t'):
       sep.join((str(k),list2str(toList(v),listsep,0))) 
       for k,v in s.items()))
   
-def obj2str(obj,sep=',',linesep='\n'):
-    if isMapping(obj): return dict2str(obj,sep,linesep)
-    elif isSequence(obj): return list2str(obj,sep)
-    else: return toString(obj)
+def str2dict(s,ksep='',vsep=''):
+    """ 
+    convert "name'ksep'value'vsep',..." to {name:value,...} 
+    argument may be string or sequence of strings
+    if s is a mapping type it will be returned
+    """
+    if isMapping(s,strict=True): return s
+  
+    if isString(s):
+      vsep = vsep or (
+          '\n' if '\n' in s 
+              else (',' if s.count(',')>=s.count(';') 
+                  else ';'))
+      s = str2list(s,vsep)
+    
+    if s:
+      ksep = ksep or (':' if s[0].count(':')>=s[0].count('=') else '=')
+      
+    return dict(str2list(t,ksep) for t in s)
+  
+def obj2str(obj,sep=',',linesep='\n',MAX_LENGTH=0):
+    if isMapping(obj,strict=True): s = dict2str(obj,sep,linesep)
+    elif isSequence(obj): s = list2str(obj,sep)
+    else: s = toString(obj)
+    s = shortstr(s,MAX_LENGTH)
+    return s
 
 ########################################################################
 ## Number conversion
@@ -830,22 +868,38 @@ def time2tuple(epoch=None):
 def tuple2time(tup):
     return time.mktime(tup)
 
-def date2time(date):
-    return tuple2time(date.timetuple())
+def date2time(date,us=True):
+    try:
+      t = tuple2time(date.timetuple())
+      us = us and getattr(date,'microsecond',0)
+      if us: t+=us*1e-6
+      return t
+    except Exception,e:
+      try:
+        return date.total_seconds()
+      except:
+        raise e
 
-def date2str(date):
+def date2str(date,us=False):
     #return time.ctime(date2time(date))
-    return time.strftime('%Y-%m-%d %H:%M:%S',time2tuple(date2time(date)))
+    t = time.strftime('%Y-%m-%d %H:%M:%S',time2tuple(date2time(date)))
+    us = us and getattr(date,'microsecond',0)
+    if us: t+='.%06d'%us
+    return t
 
 def time2date(epoch=None):
     if epoch is None: epoch = now()
     elif epoch<0: epoch = now()-epoch
     return datetime.datetime.fromtimestamp(epoch)
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S'):
+def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True):
     if epoch is None: epoch = now() 
-    elif epoch<0: epoch = now()+epoch
-    return time.strftime(cad,time2tuple(epoch))
+    elif bt and epoch<0: epoch = now()+epoch
+    t = time.strftime(cad,time2tuple(epoch))
+    us = us and epoch%1
+    if us: t+='.%06d'%(1e6*us)
+    return t
+  
 epoch2str = time2str
     
 def str2time(seq='',cad=''):
@@ -903,9 +957,10 @@ def ctime2time(time_struct):
     except:
       return -1
     
-def mysql2time(mysql_time):
+def mysql2time(mysql_time,us=True):
     try:
-      return time.mktime(mysql_time.timetuple())
+      return date2time(mysql_time,us=us)
+      #t = time.mktime(mysql_time.timetuple())
     except:
       return -1
     

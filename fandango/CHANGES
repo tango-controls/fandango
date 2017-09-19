@@ -1,10 +1,103 @@
-RELEASE = (12,6,1)
-RELEASE_NOTE = "Event Callbacks, Shell scripts and FolderDS for remote logging"
+RELEASE = (13,2,0)
+RELEASE_NOTE = "Cached tango database methods"
 
 """
 IMPORTANT:
 
-  Due to fandango.device module refactoring you may need to remove previous package before installing this one
+  Due to fandango.device and fandango.tango module refactoring you may need 
+  to remove previous package before installing this one
+  
+BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
+
+threads.wait: exceptions on ipython exit
+threads/WorkerDS: uncatched deadlocks
+
+-----------------------
+13.2.0 - September 2017
+-----------------------
+
+fandango.tango refactored in submodules, cache added to tango DB queries to
+improve performance of pyalarm/composers, new methods for importing/exporting 
+devices from csv/json/dicts
+
+commit 520cfb (develop)
+
+fandango.tango refactored into submodules
+TGet renamed to finder and moved to fandango.tango.search
+fandango.tango.search: optimize methods speeds adding cache and masks
+Add cache to get_device_info, solve multihost import bug
+Add '~' as negate character for extended regexp
+ReleaseNumber class refactored to be usable in PyAlarm
+New tango2csv methods to export attribute config and properties
+Add host-aware get/put_free_property methods
+Add set_attribute_config to fandango.tango
+Add attribute properties to csv2tango
+Add import_device_from_dict method
+add find_properties helper
+adapt kmap,parse_tango_model to Panic 6.1
+Harmonize EVENT_TYPES check (solved)
+EventSource/EventListener bugs solved
+Multi-host panic and ServersDict api's
+
+
+-------------------
+13.0.3 - June 2017
+-------------------
+
+From commit 781ea94 (develop)
+
+Decorators capable for bound methods
+New Cached decorator for replacing all previous caches
+New check_device_cached method
+Added autodoc hooks, and some PEP8 corrections
+
+
+
+scripts:
+ simplified : fandango , fandango -qt
+ added to path: csv2tango/ctds/tango2csv/tango2json/tango_cleanup
+ 
+WorkerDS.update_tasks method refactored (to detect deadlocks), limit queue size
+DynamicDS.InitDevice property: formulas to evaluate at startup
+
+debug.Timed : new decorator
+dicts.SortedDict.insert: new method
+doc: solve dependency bug
+qt: solve drag&drop issues
+linos.sysargs_to_dict: added multiflag/multiarg arguments (see the docs)
+  (deprecated by argparse after OS upgrade)
+
+
+tango: 
+ - add delete_device method
+ - add throw argument to check_device
+ - check_device_cached: using the Cached decorator 
+ - fakeAttributeValue: enable errors as value
+ - TangoedValue/TangoEval: add QUALITIES as boolean flags
+ 
+  
+objects:
+ - solve exceptions with functools.wraps
+ - new Cached Decorator (see the docs)
+ - deprecate BoundDecorator, replaced by Decorator
+
+functional: new methods and patches
+
+ - str2bytes
+ - date2time, date2str, time2str, mysql2time: micro-seconds resolution added
+ - patched dict parsing bugs: str2list, shortstr, list2str, tuples2text, 
+   dict2str, str2dict, dict2json, isMapping, isDictionary, obj2string
+
+callbacks:
+ - detect API_BadConfigurationProperty exceptiosn
+ - solve bug in default hooks
+ - add error_sources list
+ - reduce EVENT_TIMEOUT to 900s
+ - avoid deactivatePolling if forced=True
+ - add more naming methods
+ - improve exception caching
+ 
+
 
 -------------------
 12.6.1 - April 2017

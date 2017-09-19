@@ -64,6 +64,7 @@ def get_module_dict(module,ks=None):
 #   Device Server that processes attributes. Based on the code of PySignalSimulator by srubio
 #
 #==================================================================
+if __name__ == '__main__': print('WorkerDS 13.0')
     
 class WorkerDS(PyTango.Device_4Impl):
 
@@ -73,10 +74,39 @@ class WorkerDS(PyTango.Device_4Impl):
     OTHERS = {'fun':fandango.functional} #Use this dictionary to declare aliases
     
     def update_tasks(self):
+      
+      self.last_check = time.time()
+      self.info( 'In WorkerDS::updateTasks ...')
       while not self.event.isSet():
-        self.last_check = time.time()
+
+        self.info('#'*80)
+        self.info(' ---- Waiting %s seconds ---- '%self.PollingSeconds)
+        self._state = PyTango.DevState.ON
+        self.waiter.clear()
+        
+        while not self.waiter.isSet() and time.time()<(self.last_check+int(self.PollingSeconds)):
+          status = ['Worker DS waiting %s s for next cycle ..'%self.PollingSeconds]
+          status.append('Last check was at %s'%fandango.time2str(self.last_check))
+          status.append('')
+          for task,commands in sorted(self.tasks.items()):
+            if not commands[-1].startswith(task) and ' = ' not in commands[-1]:
+              commands[-1] = commands[-1].replace('return ','')
+              commands[-1] = task+'_result = '+commands[-1]
+            try:
+              self.worker.get(commands[-1])
+              self.dones[task] = time.time()
+            except:
+              pass
+            if self.dones[task]>self.sends[task]:
+              status.append('%s: Finished at %s'%(task,fandango.time2str(self.dones[task])))
+            elif self.sends[task]>self.dones[task]:
+              status.append('%s: Launched at %s'%(task,fandango.time2str(self.sends[task])))
+          self._status = ('\n'.join(status))
+          wait(1.,self.waiter)
+        #self.waiter.clear()
+
         self.info('-'*70)
-        self.info( 'In WorkerDS::updateTasks ...')
+        self.last_check = time.time()
         self._state = (PyTango.DevState.RUNNING)
         for task,commands in self.tasks.items():
           if task not in self.conditions:
@@ -104,31 +134,8 @@ class WorkerDS(PyTango.Device_4Impl):
             self.error(traceback.format_exc())
           wait(.1,self.event)
       
-        self.info(' ---- Waiting %s seconds ---- '%self.PollingSeconds)
-        self._state = PyTango.DevState.ON
-        while not self.waiter.isSet() and time.time()<(self.last_check+int(self.PollingSeconds)):
-          status = ['Worker DS waiting %s s for next cycle ..'%self.PollingSeconds]
-          status.append('Last check was at %s'%fandango.time2str(self.last_check))
-          status.append('')
-          for task,commands in sorted(self.tasks.items()):
-            if not commands[-1].startswith(task) and ' = ' not in commands[-1]:
-              commands[-1] = commands[-1].replace('return ','')
-              commands[-1] = task+'_result = '+commands[-1]            
-            try:
-              self.worker.get(commands[-1])
-              self.dones[task] = time.time()
-            except:
-              pass
-            if self.dones[task]>self.sends[task]:
-              status.append('%s: Finished at %s'%(task,fandango.time2str(self.dones[task])))
-            elif self.sends[task]>self.dones[task]:
-              status.append('%s: Launched at %s'%(task,fandango.time2str(self.sends[task])))
-          self._status = ('\n'.join(status))
-          wait(1.,self.waiter)
-        self.waiter.clear()
-          
-      print '#'*80
-      print '#'*80
+      #print '#'*80
+      #print '#'*80
           
         
     def get_task_conditions(self,prop=None):
@@ -164,7 +171,7 @@ class WorkerDS(PyTango.Device_4Impl):
     #------------------------------------------------------------------
     def __init__(self,cl, name):
         #PyTango.Device_4Impl.__init__(self,cl,name)
-        print 'IN WorkerDS.__INIT__'
+        #print 'IN WorkerDS.__INIT__'
         _locals = {}
         [_locals.update(get_module_dict(m)) for m in self.LIBS]
         _locals.update((k.__name__,k) for k in self.NAMES)

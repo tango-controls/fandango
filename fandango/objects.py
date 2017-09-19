@@ -36,19 +36,24 @@
 ###########################################################################
 
 """
-fandango.objects contains method for loading python modules and objects "on the run",
-as well as several advanced types used within the fandango library
+fandango.objects contains method for loading python modules and objects 
+"on the run", as well as several advanced types used within fandango library
 
-It includes 2 wonderful classes: Object (by Alejandro Homs) and Singleton (by Marc Santiago)
+Struct, Decorator and Cached are fundamental types for all fandango API's
 
-Other classes are borrowed from taurus.core.utils (by Tiago Coutinho)
+It includes 2 wonderful classes: Object (by Alejandro Homs) 
+and Singleton (by Marc Santiago)
+
+Enum classes are borrowed from taurus.core.utils (by Tiago Coutinho)
 
 """
 import __builtin__
 from __builtin__ import object
 
-from functional import *
-from operator import isCallable
+from fandango.functional import *
+from operator import isCallable, isSequenceType
+from collections import Hashable
+from types import MethodType
 import Queue
 import functools
 
@@ -166,7 +171,7 @@ class Struct(object):
       for k,v in self.items():
         if v == value:
           return k
-      raise Exception('NotFound!')
+      raise Exception('%s_NotFound!'%value)
       
     def set(self,k,v): return setattr(self,k,v)
     def setdefault(self,v): self.dict().setdefault(v)
@@ -314,6 +319,79 @@ def NewClass(classname,classparent=None,classdict=None):
     """
     if classparent and not isSequence(classparent): classparent = (classparent,)
     return type(classname,classparent or (object,),classdict or {})
+
+class ReleaseNumber(object):
+    """
+    ReleaseNumber = type('ReleaseNumber',(tuple,),{
+    '__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))
+    })
+    """
+    def __init__(self,*args):
+        assert args
+        if len(args)==1:
+            if isinstance(args[0],basestring):
+                args = args[0].split('.')
+            elif isSequenceType(args[0]):
+                args = args[0]
+            else:
+                args = [args]
+        self._tuple = tuple(args)
+        
+    def __iter__(self): return self._tuple.__iter__()
+    def __len__(self): return self._tuple.__len__()
+    def __getitem__(self,i): return self._tuple.__getitem__(i)
+    def __hash__(self): return self._tuple.__hash__()
+
+    def __repr__(self):
+        return '.'.join(map(str,self))
+    
+    def major(self):
+        try:
+            m = int(self[0])
+            return m
+        except:
+            return '0'
+    
+    def minor(self):
+        try:
+            m = int(self[1])
+            return m
+        except:
+            return '0'
+    
+    def patch(self):
+        try:
+            m = int(self[2])
+            return m
+        except:
+            return self[2] if len(self)>2 else '0'
+        
+    def __cmp__(self,other):
+        if not isinstance(other,ReleaseNumber):
+            other = ReleaseNumber(other)
+        if self._tuple == other._tuple:
+            return 0
+        if int(self.major()) < other.major():
+            return -1
+        if int(self.major()) > other.major():
+            return 1
+        if int(self.minor()) < other.minor():
+            return -1
+        if int(self.minor()) > other.minor():
+            return 1
+        if self.patch() < other.patch():
+            return -1
+        if self.patch() > other.patch():
+            return 1
+        return 0
+        
+    def __gt__(self,other): return self.__cmp__(other) > 0
+    def __ge__(self,other): return self.__cmp__(other) >= 0
+    def __lt__(self,other): return self.__cmp__(other) < 0
+    def __le__(self,other): return self.__cmp__(other) <= 0
+    def __eq__(self,other): return not self.__cmp__(other)
+    def __ne__(self,other): return self.__cmp__(other)
+
     
 ###############################################################################
 
@@ -376,7 +454,9 @@ class Object(object):
         from inspect import getargspec
         #print '%s.call_all__init__(%s,%s)' % (klass.__name__,_args,_kw)
         for base in klass.__bases__:
-            if 'call__init__' in dir(base) and ('inited_class_list' not in self.__dict__ or base not in self.inited_class_list):
+            if 'call__init__' in dir(base) and \
+                ('inited_class_list' not in self.__dict__ 
+                 or base not in self.inited_class_list):
                 #print '\t%s.base is %s' % (klass.__name__,base.__name__)
                 nkw,i = {},0
                 try:
@@ -391,7 +471,8 @@ class Object(object):
                     self.call_all__init__(base,*_args,**_kw)
                     self.call__init__(base,**nkw)
                 except Exception,e:
-                    print 'Unable to execute %s.__init__!: %s' % (base.__name__,str(e))
+                    print('Unable to execute %s.__init__!: %s' 
+                          % (base.__name__,str(e)))
         return
             
     def getAttrDict(self):
@@ -484,16 +565,15 @@ class SingletonMap(object):
 
 
 ###############################################################################
-from functools import wraps
 
 class nullDecorator(object):
     """
     Empty decorator with null arguments, used to replace pyqtSignal,pyqtSlot
     """
     def __init__(self,*args): 
-      pass
+        pass
     def __call__(self,f): 
-      return f
+        return f
 
 def decorator_with_args(decorator):
     '''
@@ -509,13 +589,24 @@ def decorator_with_args(decorator):
     # decorator_with_args = lambda decorator: lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
     return lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
 
-class Decorated(object): pass
+class Decorated(object): 
+    """
+    @TODO: This class should provide an API to get all decorators
+    applied to a python object and its methods
+    """
+    pass
 
 class Decorator(object):
     """
     This generic class allows to differentiate decorators from common classes.
-    Inherit from it and use issubclass(klass,Decorator) to know if a class is a decorator
+    
+    It uses the __get__ descriptor to allow decoration of Class methods
+    
+    Inherit from it and use issubclass(klass,Decorator) to know if a class
+    is a decorator
+    
     To add arguments to decorator reimplement __init__
+    
     To modify your wrapper reimplement __call__
     
     A decorator __init__ with a single argument can be called like:
@@ -533,18 +624,171 @@ class Decorator(object):
     """
     def __init__(self,f):
         self.f = f
-        self.call = wraps(f,self.__call__)
+         #self.call = wraps(self.f)(self.__call__) #Not for methods!!
+        functools.update_wrapper(self,self.f)
         
     def __call__(self,*args,**kwargs):
         return self.f(*args,**kwargs)
+      
+    def __get__(self,obj,objtype=None):
+        """
+        This bounding method will be called only when decorating an
+        instance method
+        """
+        return MethodType(self,obj,objtype)
+      
+class ClassDecorator(Decorator): 
+    """ 
+    This empty class is not trivial. It identifies the QObject decorators
+    from fandango.qt module
     
-class ClassDecorator(Decorator): pass
-        
-class BoundDecorator(Decorator):#object):
+    Although empty, it is critical for Vacca. Modify it with care
     """
-    Decorates class methods keeping the bound status of its members 
+    pass      
     
-    Inspired in https://wiki.python.org/moin/PythonDecoratorLibrary#Class_method_decorator_using_instance
+class Cached(Decorator):
+    """
+    This decorator will provide a function that caches up to N different
+    executions of a method (for different combinations of arguments) for 
+    a given period.
+    
+    e.g.: check_device_cached = Cached(check_device,depth=10,keep=3)
+    
+    It will keep cached for 3 seconds up to 10 different device check results.
+    
+    If "target" is not declared, then it can be used as a decorator_with_args
+    
+    @Cached(depth=10,keep=3)
+    def check_device(*a,**k): 
+      ...
+      return
+      
+    The catched argument will print and return exceptions instead of throwing
+    """
+  
+    def __init__(self,target=None,depth=10,expire=3.,log=False,catched=False):
+
+        self.log = log
+        self._im = None
+        self.cache = {}
+        self.depth = depth
+        self.expire = expire
+        self.catched = catched
+        self.decorate(target)
+          
+    def __call__(self,*args,**kwargs):
+        """
+        This method will either decorate a method (with args) or execute it
+        """
+        if self.f is None:
+            # Deferred decorator
+            self.decorate(args[0])
+            return self
+        else:
+            # Instantiated decorator
+            return self.execute(*args,**kwargs)
+          
+    def _log(self,msg):
+        if isCallable(self.log): 
+          self.log(msg) 
+        elif self.log: 
+          print(msg)
+      
+    @staticmethod
+    def getCachedObject(obj,methods=[],depth=10.,expire=3.,catched=False):
+        """ @RISKY
+        This method will try to apply Cached decorator to all methods 
+        of an object. USE IT AT YOUR OWN RISK!!
+        """
+        klass = obj if isinstance(obj,type) else type(obj)
+        if not methods:
+            methods = [k for k,f in klass.__dict__.items() if isCallable(f)]
+        for k in methods:
+            try:
+                m = Cached(getattr(klass,k),depth,expire,catched=catched)
+                setattr(obj,k,m)
+            except:pass
+        return obj
+    
+    def decorate(self,target):
+        if isCallable(target):
+            self._log('decorate(%s)'%str(target))
+            self.f = target
+            #self.call = wraps(self.f)(self.__call__) #Not for methods!!
+            functools.update_wrapper(self,self.f)
+        else:
+            self.f = None
+            
+    def prune(self,expire=None,depth=None):
+        depth = notNone(depth,self.depth)
+        expire = time.time()-notNone(expire,self.expire)
+        cache = sorted(k for k in self.cache if k[0]>expire)
+        if (len(cache)!=len(self.cache) or len(cache)>self.depth):
+            self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
+            
+        self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
+        return sorted(self.cache.keys())
+        
+    def execute(self,*args,**kwargs):
+        self._log('__call__(%s,%s)'%(args,kwargs))
+        v,match,expire = None,None,self.expire
+        
+        try:
+            key = time.time(),tuple(args),tuple(kwargs.items())
+            #assert all(isinstance(k,Hashable) for l in key[1:] for k in l)
+            assert isHashable(key)
+        except:
+            self._log('unhashable arguments!')
+            expire = 0
+        
+        if not self.depth or not expire:
+            self._log('disabling cache ...')
+            if not self.depth: self.cache = {}
+            return self.f(*args,**kwargs)
+        
+        else:
+            cache = self.prune(expire)
+            match = first((k for k in cache if (k[1:]) == (key[1:])),None)
+            
+            if match:
+                v = self.cache[match]
+                self._log('(%s,%s) was in cache: %s'%(args,kwargs,v))
+            else:
+                try:
+                    v = self.f(*args,**kwargs)
+                except Exception,e:
+                    v = e
+                self._log('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
+                try:
+                    self.cache[key] = v
+                except:
+                    print('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
+                    print('cache[%s] = %s'%(key,v))
+                    raise
+            
+        if isinstance(v,Exception):
+            if self.catched:
+                if not match:
+                    self._log(traceback.format_exc())
+                return v
+            else:
+                print(str(self.f),str(e))
+                traceback.print_exc()
+                raise v
+        else:
+            return v
+
+###########################################################################
+    
+## @DEPRECATED!
+class BoundDecorator(Decorator):
+    """
+    DEPRECATED , To be removed in Fandango 13; 
+    replaced by the use of __get__ descriptor
+    
+    Inspired in 
+    https://wiki.python.org/moin/PythonDecoratorLibrary
+      #Class_method_decorator_using_instance
         Class method decorator specific to the instance.
         It uses a descriptor to delay the definition of the
         method wrapper.
@@ -573,6 +817,11 @@ class BoundDecorator(Decorator):#object):
     X.f = D()(X.f)
     x.f()
     """
+    
+    def __init__(self,*args,**kwargs):
+        print('BoundDecorator is DEPRECATED!!!, Use Decorator.__get__ instead')
+        Decorator.__init__(self,*args,**kwargs)
+    
     @staticmethod
     def wrapper(instance,f,*args,**kwargs):
         return f(instance, *args, **kwargs)
@@ -600,7 +849,7 @@ class BoundDecorator(Decorator):#object):
                 return self.make_bound(instance)
             def make_unbound(self, klass):
                 BoundDecorator.tracer('make_unbound(%s)'%klass)
-                @wraps(self.f)
+                @functools.wraps(self.f)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)
                     This method may work well only without arguments
@@ -613,7 +862,7 @@ class BoundDecorator(Decorator):#object):
                 return wrapper
             def make_bound(self, instance):
                 BoundDecorator.tracer('make_bound(%s)'%instance)
-                @wraps(self.f)
+                @functools.wraps(self.f)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)'''
                     BoundDecorator.tracer("Called the decorated method %s of %s"%(self.f.__name__, instance))
@@ -625,6 +874,7 @@ class BoundDecorator(Decorator):#object):
                 setattr(instance, self.f.__name__, wrapper)
                 return wrapper
         return _Descriptor(f)
+
 
 from . import doc
 __doc__ = doc.get_fn_autodoc(__name__,vars())

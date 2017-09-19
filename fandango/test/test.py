@@ -58,9 +58,9 @@ try:
     import fandango.tango as f_tango
     assert isinstance(f_tango.get_proxy('sys/database/2'),fandango.tango.PyTango.DeviceProxy)
     assert isinstance(f_tango.get_proxy('sys/database/2/state'),fandango.tango.PyTango.AttributeProxy)
-    assert isinstance(f_tango.TGet(),fandango.tango.PyTango.Database)
-    assert isinstance(f_tango.TGet(f_tango.TGet('sys/database/*')[0]),fandango.tango.PyTango.DeviceProxy)
-    assert isinstance(f_tango.TGet(f_tango.TGet('sys/database/*/st[a]te')[0]),int)
+    assert isinstance(f_tango.finder(),fandango.tango.PyTango.Database)
+    assert isinstance(f_tango.finder(f_tango.finder('sys/database/*')[0]),fandango.tango.PyTango.DeviceProxy)
+    assert isinstance(f_tango.finder(f_tango.finder('sys/database/*/st[a]te')[0]),int)
     assert f_tango.get_device_info('sys/database/2').dev_class == 'DataBase'
     assert fandango.isNaN(f_tango.TangoEval(trace=False).eval('da/do/di/du',_raise=fandango.NaN))
     assert fandango.tango.TangoEval(trace=False).eval('sys/database/2',_raise=None) in (0,None)

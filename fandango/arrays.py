@@ -3,11 +3,12 @@
 ##
 ## file :       arrays.py
 ##
-## description : Module developed to manage CSV-like files and generic 2D arrays, using headers for columns
+## description : Module developed to manage CSV-like files and generic 2D 
+##               arrays, using headers for columns
 ##
 ## project :     Tango Control System
 ##
-## $Author: Sergi Rubio Manrique, srubio@cells.es $
+## $Author:     Sergi Rubio Manrique, srubio@cells.es $
 ##              Grid Class thanks to Kent Johnson kent37 at tds.net
 ##
 ## $Revision: 2008 $
@@ -51,7 +52,8 @@ h1. fandango.arrays module
 
 h2. Array Decimation
 
-It contains many decimation methods, the one used by taurustrend is filter_array; which averages data at some given time intervals
+It contains many decimation methods, the one used by taurustrend 
+is filter_array; which averages data at some given time intervals
 
 """
 
@@ -60,33 +62,43 @@ It contains many decimation methods, the one used by taurustrend is filter_array
 from fandango.functional import reldiff,absdiff,seqdiff
 MAX_DATA_SIZE = 2*1024
 
-def decimator(data,min_inc=.05,min_rel=None,max_size=MAX_DATA_SIZE,max_iter=1000):
+def decimator(data,min_inc=.05,min_rel=None,
+              max_size=MAX_DATA_SIZE,max_iter=1000):
     """
-    @NOTE, this is intensive when focusing on size, filter_array is better if you want to keep the shape over time++89+77
-    This size-focused decimator sequentially iterates until reducing the size of the array 
+    @NOTE, this is intensive when focusing on size, filter_array is better 
+    if you want to keep the shape over time++89+77
+    This size-focused decimator sequentially iterates until 
+    reducing the size of the array 
     """
     start,count = len(data),0
     while len(data)>max_size and count<max_iter:
         d = []
         for i,t in enumerate(data[:-1]):
             if not d or i>=(len(data)-2): d.append((t[0],t[1]))
-            elif abs(t[1])<min_inc and xor(abs(d[-1][1])>min_inc,abs(data[i+1][1])>min_inc):
+            elif abs(t[1])<min_inc and \
+                    xor(abs(d[-1][1])>min_inc,abs(data[i+1][1])>min_inc):
                 d.append((t[0],0)) #zeroing
-            elif abs(d[-1][1]-t[1])>min_inc or abs(t[1]-data[i+1][1])>min_inc:
-                # if min_inc is not None else min_rel*max((d[-1][1],t[1],min_inc or min_rel))):
+            elif abs(d[-1][1]-t[1])>min_inc or \
+                    abs(t[1]-data[i+1][1])>min_inc:
+                # if min_inc is not None else \
+                #   min_rel*max((d[-1][1],t[1],min_inc or min_rel))):
                 d.append((t[0],t[1]))
+                
         data = d
         min_inc = min_inc*1.5
         count += 1
+        
     if count>=max_iter: print('Unable to decimate data!')
-    print('\t[%d] -> [%d] in %d iterations, inc = %s'%(start,len(data),count,min_inc))
+    print('\t[%d] -> [%d] in %d iterations, inc = %s'
+          %(start,len(data),count,min_inc))
     return data
     
 def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
     """ 
-    @NOTE: Although faster, filter_array provides a better decimation for trends
+    @NOTE: Although faster, filter_array does a better decimation for trends
     It will remove all values from a list that doesn't provide information.
-    In a set of X consecutive identical values it will remove all except the first and the last.
+    In a set of X consecutive identical values it will remove all except 
+    the first and the last.
     A custom compare method can be passed as argument
     :param seq: a list of (timestamp,value) values
     """
@@ -99,46 +111,64 @@ def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
     x0,x1,x2 = seq[0],seq[1],seq[2]
     
     for i in range(len(seq)-2):
-        #if (seq[i+2][0]-seq[i][0])<keeptime and not cmp(seq[i][1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
+
         if not cmp(x0[1],seq[i+1][1]) and not cmp(seq[i+1][1],seq[i+2][1]):
             pops.append(i+1)
-        else: x0 = seq[i+1]
+        else: 
+            x0 = seq[i+1]
+
     for i in reversed(pops):
         seq.pop(i)
     return seq
 
-def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fixed_time=0,logger=None):
+def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,
+                   fixed_rate=0,fixed_time=0,logger=None):
     """ 
     @NOTE: filter_array provides a better decimation for trends
     Decimates a [(time,numeric value)] buffer by size/rate/increment/time
     Repeated values are always decimated.
+    
     keep_nones forces value-to-None steps to be kept
-    fixed_size: smaller increments of data will be pruned until fitting in a fixed_size array
-    fixed_inc: keeps all values with an absolute increment above fixed_inc; overrides fixed_size
-    fixed_step keeps some random values by order, overrides fixed_inc and fixed_size
+    
+    fixed_size: smaller increments of data will be pruned until fitting 
+                in a fixed_size array
+    fixed_inc: keeps all values with an absolute increment above fixed_inc; 
+                overrides fixed_size
+    fixed_step keeps some random values by order, overrides fixed_inc 
+                and fixed_size
     fixed_time keeps some time-fixed values; it takes preference over the rest
+    
     """
     
     t0 = time.time()
     if hasattr(data[0],'value'):
         get_value = lambda v: v.value
-        get_time = lambda t: hasattr(t.time,'tv_sec') and (t.time.tv_sec+1e-6*t.time.tv_usec) or t.time
+        get_time = lambda t: hasattr(t.time,'tv_sec') and \
+                (t.time.tv_sec+1e-6*t.time.tv_usec) or t.time
     else:
         get_value = lambda t: t[1]
         get_time = lambda t: t[0]
 
     last,last_slope,buff,nones,fixed = data[0],0,[],[],[0,len(data)-1]
+
     for i in range(1,len(data)-1):
         #v is the data to check, using previous and later values
         u,v,w = get_value(data[i-1]),get_value(data[i]),get_value(data[i+1])
-        if u == v == w: continue
-        if fixed_time and max((get_time(data[i])-get_time(data[i-1]),get_time(data[i])-get_time(last)))>=fixed_time:
+        if u == v == w: 
+            continue
+        
+        if fixed_time and max((get_time(data[i])-get_time(data[i-1]),
+                               get_time(data[i])-get_time(last)))>=fixed_time:
             fixed.append(i)
             last = data[i]
+            
         elif None not in (u,v,w): 
             if fixed_rate and not i%fixed_rate: 
-                fixed.append(i) #It would help to keep shape around slowly changing curves (e.g. parabollic)
+                #It would help to keep shape around slowly changing curves 
+                # (e.g. parabollic)
+                fixed.append(i) 
                 last = data[i]
+
             elif fixed_inc or fixed_size:
                 slope = (u-v)>0
                 if slope!=last_slope:
@@ -169,7 +199,8 @@ def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,fixed_rate=0,fi
     else:
         buff = [] #[t[1] for t in buff]
     new_data = [data[i] for i in sorted(buff+nones+fixed)]
-    if logger: logger.debug('data[%d] -> buff[%d],nones[%d],fixed[%d]; %f seconds'%(
+    if logger: 
+        logger.debug('data[%d] -> buff[%d],nones[%d],fixed[%d]; %f seconds'%(
             len(data),len(buff),len(nones),len(fixed),(time.time()-t0)))
     return new_data
     
@@ -184,7 +215,8 @@ F_INT = 3 #linear interpolation
 F_ZERO = 4 #fill with zeroes
 F_NEXT = 5 #fill with next value
 
-# For all this methos arguments may be just values sequence or currentsequence / previousvalue
+# For all this methos arguments may be just values sequence or 
+# currentsequence / previousvalue
 
 def average(*args):
     return fun.avg(args[0])
@@ -203,11 +235,15 @@ def maxdiff(*args):
         raise e
 
 def notnone(*args):
-    seq,ref,method = args[0],fun.first(args[1:] or [0]),fun.first(args[2:] or [average])
+    seq,ref = args[0],fun.first(args[1:] or [0])
+    method = fun.first(args[2:] or [average])
     print 'notnone from %s'%ref
     try:
-      if np: return method(*((v for v in seq if v is not None and not np.isnan(v)),ref))
-      else: return method(*((v for v in seq if v is not None),ref))
+      if np: 
+          return method(*((v for v in seq if v is not None 
+                           and not np.isnan(v)),ref))
+      else: 
+          return method(*((v for v in seq if v is not None),ref))
     except:
       traceback.print_exc()
       return ref
@@ -215,7 +251,8 @@ def notnone(*args):
 def maxmin(*args):
     """ 
     Returns timed ((t,max),(t,min)) values from a (t,v) dataset 
-    When used to filter an array the winndow will have to be doubled to allocate both values (or just keep the one with max absdiff from previous).
+    When used to filter an array the winndow will have to be doubled to 
+    allocate both values (or just keep the one with max absdiff from previous).
     """
     data = args[0]
     t = sorted((v,t) for t,v in data)
@@ -331,15 +368,19 @@ def print_histogram(data,n=20):
             ' *'*(1+int(r/10.))
             ))
 
-def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,trace=False):
+def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
+                 trace=False):
     """
-    The array returned will contain @method applied to @data split in @window intervals
-    First interval will be floor(data[0][0],window)+window, containing average of data[t0:t0+window]
+    The array returned will contain @method applied to @data split 
+        in @window intervals
+    First interval will be floor(data[0][0],window)+window, containing average 
+        of data[t0:t0+window]
     If begin,end intervals are passed, cut-off and filling methods are applied
     The value at floor(time) is the value that closes each interval
     
-    IF YOUR DATA SOURCE IS A PYTHON LIST; THIS METHOD IS AS FAST AS NUMPY CAN BE 
-    (crosschecked with 1e6 samples against the PyTangoArchiving.utils.decimate_array method using numpy)
+    IF YOUR DATA SOURCE IS A PYTHON LIST; THIS METHOD IS AS FAST AS NUMPY 
+    (crosschecked with 1e6 samples against the 
+    PyTangoArchiving.utils.decimate_array method using numpy)
     """
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     tfloor = lambda x: int(fun.floor(x,window))
@@ -349,7 +390,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     #--------------------------------------------------------------------------
     if not data or (begin and begin>data[-1][0]) or (end and end<data[0][0]): 
         return []
-    #Using loop instead of list comprehension (50% faster with normally-sorted data than list comprehensions)
+    #Using loop instead of list comprehension (50% faster with normally-sorted 
+    # data than list comprehensions)
     prev,post = None,None
     if begin and data and data[0][0]<begin:
         if data[-1][0]<begin: 
@@ -368,14 +410,16 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     if not data:
         if prev or post:
             nx = prev and prev[1] or post[1]
-            return [(t,nx) for t in range(tfloor(begin)+window,end,window)]+[(tfloor(end)+window,post and post[1] or nx)]
+            return [(t,nx) for t in range(tfloor(begin)+window,end,window)]\
+                +[(tfloor(end)+window,post and post[1] or nx)]
         else: return []
     
     #Filling initial range with data
     #--------------------------------------------------------------------------
     if begin:
         nx =  prev and prev[1] or data[0][1]
-        ndata = [(tt+window,nx) for tt in range(tfloor(begin),tfloor(data[0][0]),window)]
+        ndata = [(tt+window,nx) for tt in range(tfloor(begin),
+                                                tfloor(data[0][0]),window)]
         if trace: print 'prev: %s'%str(ndata and ndata[-1])
     else: 
         ndata =[]
@@ -387,7 +431,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     ilast = len(data)-1
     if trace: print 't0: %s' % (window+tfloor(data[0][0]-1))
     try:
-        for t in range(window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window):
+        for t in range(window+tfloor(data[0][0]-1),
+                       1+window+tfloor(max((end,data[-1][0]))),window):
             if i<=ilast:
                 if data[i][0]>t:
                     #Filling "whitespace" with last data
@@ -401,15 +446,17 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
                 else:
                     #Averaging data within interval
                     i0 = i
-                    while i<=ilast and data[i][0]<=t: i+=1
-                    #val = method([v[1] for v in data[i0:i]],ndata and ndata[-1][-1] or 0)
+                    while i<=ilast and data[i][0]<=t: 
+                        i+=1
+
                     a1 = list(v[1] for v in data[i0:i])
                     a2 = ndata and ndata[-1][-1] or 0
                     val = method(a1,a2)
                     ndata.append((t,val))
                     #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
             else:
-                #Adding data at the end, it will be applied whenever the size of array is smaller than expected value
+                # Adding data at the end, it will be applied whenever the size 
+                # of array is smaller than expected value
                 if ndata: nx = ndata[-1][1]
                 else: nx = None
                 ndata.append((t,nx))
@@ -423,32 +470,79 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,tra
     
 ###############################################################################
 
-def dict2array(dct):
-    """ Converts a dictionary in a table showing nested data, lists are unnested columns """
+def get_tree_depth(tree,depth=0):
+    if not hasattr(tree,'values'):
+        return depth
+    else:
+        depths = [get_tree_depth(v,depth) for v in tree.values()]
+        return 1+depth+(max(depths) if depths else 0)
+
+def dict2array(dct,branch_filter=None,leave_filter=None,empty=None):
+    """ 
+    Converts a dictionary in a table showing nested data, 
+    lists are unnested columns 
+    
+    {A:{AA:{1:{}},AB:{2:{}}},B:{BA:{3:{}},BB:[4,5]}}}
+
+    should be represented like
+    A    AA 1
+        AB    2
+    B    BA 3
+        BB    4
+            5    
+    
+    It can be used to export a tango device to .csv
+    (see fandango.tango.export.tango2table):
+    
+    d = fandango.tango.export_device_to_dict('test/panic/sim-01')
+    dict2array(d,
+        branch_filter = (lambda x: 
+                        str(x)!='extensions'),
+        leave_filter = (lambda y: 
+                        str(y).split()[0] not in ('None','No','Not'))
+        )    
+        
+        
+    
+    """
     data,table = {},[]
     data['nrows'],data['ncols'] = 0,2 if fun.isDictionary(dct) else 1
+    
     def expand(d,level):#,nrows=nrows,ncols=ncols):
         #self.debug('\texpand(%s(%s),%s)'%(type(d),d,level))
         for k,v in sorted(d.items() if hasattr(d,'items') else d):
+            if branch_filter and not branch_filter(k):
+                continue
             zero = data['nrows']
             data[(data['nrows'],level)] = k
             if fun.isDictionary(v): 
                 data['ncols']+=1
                 expand(v,level+1)
             else:
-                if not fun.isSequence(v): v = [v]
+                if not fun.isSequence(v): 
+                    v = [v]
                 for t in v:
+                    if leave_filter and not leave_filter(t):
+                        continue
                     data[(data['nrows'],level+1)] = t
                     data['nrows']+=1
             #for i in range(zero+1,nrows): data[(i,level)] = None
+            
     expand(dct,0)
     [table.append([]) for r in range(data.pop('nrows'))]
-    [table[r].append(None) for c in range(data.pop('ncols')) for r in range(len(table))]
-    for coord,value in data.items(): table[coord[0]][coord[1]] = value
+    [table[r].append(empty) for c in range(data.pop('ncols')) 
+        for r in range(len(table))]
+    
+    for coord,value in data.items(): 
+        table[coord[0]][coord[1]] = value
+        
     return table
 
 def array2dict(table):
-    """ Converts a table in a dictionary of left-to-right nested data, unnested columns are lists"""
+    """ 
+    Converts a table in a dictionary of left-to-right nested data, 
+    unnested columns are lists
+    """
     nrows,ncols = len(table),len(table[0])
     r,c = 0,0
     def expand(r,c,end):
@@ -476,138 +570,224 @@ def array2dict(table):
     data = expand(0,0,nrows)
     return data
 
-def tree2table(tree):
+def tree2table(tree,branch_filter=None,leave_filter=None):
     """
-    tree2table is different from dict2array, because allows list=row instead list=column
-    {A:{AA:{1:{}},AB:{2:{}}},B:{BA:{3:{}},BB:{4:{}}}}
+    tree2table is different from dict2array, 
+    because allows list=row instead list=column
+    
+    {A:{AA:{1:{}},AB:{2:{}}},B:{BA:{3:{}},BB:[4,5]}}}
+
     should be represented like
     A    AA 1
         AB    2
     B    BA 3
-        BB    4
+        BB    4    5
+        
+    :param *_filter: a callable returning False to some rows to be excluded
+
     """
     from collections import deque
+    
     if not isinstance(tree,dict): #The tree arrived to a leave
-        if any(map(isinstance,2*[tree],(list,tuple))): return [tree]
-        else: return [(tree,)]
+        if leave_filter is not None and not leave_filter(tree):
+            return []
+        elif any(map(isinstance,2*[tree],(list,tuple))): 
+            return [tree]
+        else: 
+            return [(tree,)]
+    
     result = []
-    for k in sorted(tree.keys()): #K=AA; v = {1:{}}
+    for k in sorted(tree.keys()):
+        if branch_filter is not None and not branch_filter(k):
+            continue
         v = tree[k]
         #print '%s:%s' % (k,v)
         if not v:
             #print '%s is empty' % k
             result.append([k])
         else:
-            _lines = tree2table(v)
-            #print 'tree2table(%s): tree2table(v) returned: %s' % (k,_lines)
-            lines = [deque(dq) for dq in _lines]
-            lines[0].appendleft(k)
-            [line.appendleft('') for line in lines[1:]]
-            [result.append(list(line)) for line in lines]
+            _lines = tree2table(v,branch_filter,leave_filter)
+            #print 'tree2table(%s): tree2table(%s) returned: %s' % (k,v,_lines)
+            if _lines:
+                lines = [deque(dq) for dq in _lines]
+                lines[0].appendleft(k)
+                [line.appendleft('') for line in lines[1:]]
+                [result.append(list(line)) for line in lines]
+
     #print 'result: tree2table(tree) returned: %s' % (result)
     return result
 
 def values2text(table,order=None,sep='\t',eof='\n',header=True):
     """ 
-    Input is a dictionary of {variable:[(time,values)]}; it will convert the dictionary into a text table with a column for each variable
+    Input is a dictionary of {variable:[(time,values)]}; it will convert the 
+    dictionary into a text table with a column for each variable
     It assumes that values in diferent columns have been already correlated
     """
     start = time.time()
-    if not order or not all(k in order for k in table): keys = list(sorted(table.keys()))
+    if not order or not all(k in order for k in table): 
+        keys = list(sorted(table.keys()))
     else: keys = sorted(table.keys(),key=order.index)
-    value_to_text = lambda s: str(s).replace('None','').replace('[','').replace(']','')
-    is_timed = fun.isSequence(table.values()[0][0]) and len(table.values()[0][0])==2
-    csv = '' if not header else (sep.join((['date','time'] if is_timed else [])+keys)+eof)
+    value_to_text = \
+        lambda s: str(s).replace('None','').replace('[','').replace(']','')
+    is_timed = fun.isSequence(table.values()[0][0]) \
+                and len(table.values()[0][0])==2
+    csv = '' if not header else (sep.join((['date','time'] \
+            if is_timed else [])+keys)+eof)
+
     for i,t in enumerate(table.values()[0]):
         if is_timed:
-            row = [fun.time2str(t[0]),str(t[0])]+[value_to_text(table[k][i][-1]) for k in keys]
+            row = [fun.time2str(t[0]),str(t[0])]+\
+                [value_to_text(table[k][i][-1]) for k in keys]
         else:
             row = [value_to_text(table[k][i]) for k in keys]
         csv+=sep.join(row) + eof
     #print('Text file generated in %d milliseconds'%(1000*(time.time()-start)))
     return csv
         
-def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,AUTO_SIZE=50000,MAX_SIZE=0,MIN_RESOLUTION=0.05):
+def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,
+                     AUTO_SIZE=50000,MAX_SIZE=0,MIN_RESOLUTION=0.05):
     ''' Correlates values to have all epochs in all columns
     :param values:  {curve_name:[values]}
-    :param resolution: two epochs with difference smaller than resolution will be considered equal
+    :param resolution: two epochs with difference smaller than resolution 
+                       will be considered equal
     :param stop: an end date for correlation
-    :param rule: a method(tupleA,tupleB,epoch) like (min,max,median,average,last,etc...) that will take two last column (t,value) tuples and time and will return the tuple to keep
+    :param rule: a method(tupleA,tupleB,epoch) like (min,max,median,average,
+                 last,etc...) that will take two last column (t,value) tuples 
+                 and time and will return the tuple to keep
     '''
     start = time.time()
-    #print('correlate_values(%d x %d,resolution=%s,MAX_SIZE=%d) started at %s'%(len(values),max(len(v) for v in values.values()),resolution,MAX_SIZE,time.ctime(start)))
+    #print('correlate_values(%d x %d,resolution=%s,MAX_SIZE=%d) started
+    #at %s'%(len(values),max(len(v) for v in values.values()),
+    #resolution,MAX_SIZE,time.ctime(start)))
+    
     stop = stop or start
     keys = sorted(values.keys())
     table = dict((k,list()) for k in keys)
     index = dict((k,0) for k in keys)
     lasts = dict((k,(0,None)) for k in keys)
-    first,last = min([t[0][0] if t else 1e12 for t in values.values()]),max([t[-1][0] if t else 0 for t in values.values()])
+    first = min([t[0][0] if t else 1e12 for t in values.values()])
+    last = max([t[-1][0] if t else 0 for t in values.values()])
+
     if resolution is None:
         #Avg: aproximated time resolution of each row
-        avg = (last-first)/min((AUTO_SIZE/6,max(len(v) for v in values.values()) or 1))
-        if avg < 10: resolution = 1
-        elif 10 <= avg<60: resolution = 10
-        elif 60 <= avg<600: resolution = 60
-        elif 600 <= avg<3600: resolution = 600
-        else: resolution = 3600 #defaults
-        print('correlate_values(...) resolution set to %2.3f -> %d s'%(avg,resolution))
+        avg = ((last-first)/
+               min((AUTO_SIZE/6,max(len(v) for v in values.values()) or 1)))
+        if avg < 10: 
+            resolution = 1
+        elif 10 <= avg<60: 
+            resolution = 10
+        elif 60 <= avg<600: 
+            resolution = 60
+        elif 600 <= avg<3600: 
+            resolution = 600
+        else: 
+            resolution = 3600 #defaults
+        print('correlate_values(...) resolution set to %2.3f -> %d s'
+              %(avg,resolution))
+        
     assert resolution>MIN_RESOLUTION, 'Resolution must be > %s'%MIN_RESOLUTION
     if rule is None: rule = fun.partial(choose_first_value,tmin=-resolution*10)
-    #if rule is None: rule = fun.partial(choose_last_max_value,tmin=-resolution*10)
-    epochs = range(int(first*1000-resolution*1000),int(last*1000+resolution*1000),int(resolution*1000)) #Ranges in milliseconds
+    
+    #if rule is None: 
+    #   rule = fun.partial(choose_last_max_value,tmin=-resolution*10)
+    epochs = range(int(first*1000-resolution*1000),
+                   int(last*1000+resolution*1000),
+                   int(resolution*1000)) #Ranges in milliseconds
+    
     if MAX_SIZE: epochs = epochs[:MAX_SIZE]
+    
     for k,data in values.items():
         #print('Correlating %s->%s values from %s'%(len(data),len(epochs),k))
-        i,v,end = 0,data[0] if data else (first,None),data[-1][0] if data else (last,None)
+        i,v = 0,data[0] if data else (first,None)
+        end = data[-1][0] if data else (last,None)
+        
+        """
+        Inserted value will  be (<end of interval>,<correlated value>)
+        The idea is that if there's a value in the interval, it is chosen
+        If there's no value, then it will be generated 
+        using previous/next values
+        
+        If there's no next or previous then value will be None
+        NOTE: Already tried a lot of optimization, reducing number 
+        of IFs doesn't improve
+        
+        Only could guess if iterating through values 
+        could be better than iterating times        
+        """
+        
         for t in epochs:
             t = t*1e-3 #Correcting back to seconds
             v,tt = None,t+resolution
-            #Inserted value will  be (<end of interval>,<correlated value>)
-            #The idea is that if there's a value in the interval, it is chosen
-            #If there's no value, then it will be generated using previous/next values
-            #If there's no next or previous then value will be None
-            #NOTE: Already tried a lot of optimization, reducing number of IFs doesn't improve
-            #Only could guess if iterating through values could be better than iterating times
+
             if i<len(data):
                 for r in data[i:]:
                     if r[0]>(tt):
                         if v is None: #No value in the interval
                             if not table[k]: v = (t,None)
-                            else: v = rule(*[table[k][-1],r,tt]) #Generating value from previous/next
+                            #Generating value from previous/next
+                            else: v = rule(*[table[k][-1],r,tt]) 
                         break
                     #therefore, r[0]<=(t+resolution)
-                    else: i,v = i+1,(t,r[1])
+                    else: 
+                        i,v = i+1,(t,r[1])
+                        
                     ## A more ellaborated election (e.g. to maximize change)
                     #elif v is None: 
                         #i,v = i+1,(t,r[1])
                     #else:
                         #i,v = i+1,rule(*[v,r,tt])
+                        
             else: #Filling table with Nones
                 v = (t+resolution,None)
             table[k].append((tt,v[1]))
+            
         #print('\t%s values in table'%(len(table[k])))
+        
     #print('Values correlated in %d milliseconds'%(1000*(time.time()-start)))
     return table
         
 ###############################################################################
 
+class FuzzyDict(dict):
+    ## @todo TODO
+    def __getitem__(self,key):
+        raise Exception,'FuzzyDictNotImplemented'
+        try:
+            return dict.__getitem__(self,key)
+        except:
+            a=np.arange(6)*1.1    
+            #The keys of the dictionary
+            array([ 0. ,  1.1,  2.2,  3.3,  4.4,  5.5])  
+            np.abs(a-key).argmin() #returns the index of the nearest key                
+            pass
+
+
 class Grid(dict):
-    """ Sat May 28 13:07:53 CEST 2005
-    You caught me in a good mood this morning. I woke to sunshine for the first time in
-    many days, that
+    """ Obtained from Kent Johnson (kent37 at tds.net)
+    
+    Sat May 28 13:07:53 CEST 2005
+    You caught me in a good mood this morning. I woke to sunshine for the 
+    first time in many days, that
     might have something to do with it :-)
-    Here is a dict subclass that extends __getitem__ and __setitem__ to allow setting
-    an entire row. I
+    
+    Here is a dict subclass that extends __getitem__ and __setitem__ 
+    to allow setting an entire row. I
     included extensive doctests to show you what it does.
-    Note: you can write d['A',1] instead of d[('A',1)], which looks a little cleaner.
+    Note: you can write d['A',1] instead of d[('A',1)], 
+    which looks a little cleaner.
+    
     Kent
     
     A two-dimensional array that can be accessed by row, by column, or by cell.
-    Create with lists of row and column names plus any valid dict() constructorargs.
+    
+    Create with lists of row and column names plus any 
+    valid dict() constructorargs.
+    
     >>> data = Grid( ['A', 'B'], [1, 2] )
     Row and column lists must not have any values in common.
     >>> data = Grid([1, 2], [2, 3])
-    Traceback (most recent call last): ValueError: Row and column lists must not have any values in common
+    Traceback (most recent call last): 
+        ValueError: Row and column lists must not have any values in common
     """
     def __init__(self, rowNames, colNames, *args, **kwds):
         dict.__init__(self, *args, **kwds)
@@ -615,7 +795,8 @@ class Grid(dict):
         self.colNames = list(colNames)
         # Check for no shared row and col names
         if set(rowNames).intersection(colNames):
-            raise ValueError, 'Row and column lists must not have any values in common'
+            raise ValueError, 'Row and column lists must not have '\
+                'any values in common'
     def __getitem__(self, key):
         """
         Here is an example with data:
@@ -642,7 +823,9 @@ class Grid(dict):
         ...
         KeyError: 3
         >>> data['C', 2] = 5
-        Traceback (most recent call last): ValueError: Invalid key or value: Grid[('C', 2)] = 5
+        Traceback (most recent call last): 
+            ValueError: Invalid key or value: Grid[('C', 2)] = 5
+            
         Data can be accessed by row or column index alone to set or retrieve
         an entire row or column:
         >>> print data['A']
@@ -654,14 +837,18 @@ class Grid(dict):
         ['dog', 2]
         When setting a row or column, data must be the correct length.
         >>> data['A'] = ['dog']
-        Traceback (most recent call last): ValueError: Invalid key or value: Grid['A'] = ['dog']
+        Traceback (most recent call last): 
+            ValueError: Invalid key or value: 
+            Grid['A'] = ['dog']
         """
         if self._isCellKey(key):
             return dict.__getitem__(self, key)
         elif key in self.rowNames:
-            return [ dict.__getitem__(self, (key, col)) for col in self.colNames ]
+            return [ dict.__getitem__(self, (key, col)) 
+                    for col in self.colNames ]
         elif key in self.colNames:
-            return [ dict.__getitem__(self, (row, key)) for row in self.rowNames ]
+            return [ dict.__getitem__(self, (row, key)) 
+                    for row in self.rowNames ]
         else:
             raise KeyError, key
     def __setitem__(self, key, value):
@@ -674,7 +861,8 @@ class Grid(dict):
             for row, val in zip(self.rowNames, value):
                 dict.__setitem__(self, (row, key), val)
         else:
-            raise ValueError, 'Invalid key or value: Grid[%r] = %r' % (key, value)
+            raise ValueError, 'Invalid key or value: Grid[%r] = %r' \
+                                % (key, value)
     def _isCellKey(self, key):
         """ Is key a valid cell index? """
         return isinstance(key, tuple) \
@@ -758,8 +946,11 @@ class DictFile(object):
 import time
 
 class TimedQueue(list):
-    """ A FIFO that keeps all the values introduced at least for a given time.
-    Applied to some device servers, to force States to be kept at least a minimum time.
+    """ 
+    A FIFO that keeps all the values introduced at least for a given time.
+    Applied to some device servers, to force States to 
+    be kept at least a minimum time.
+    
     Previously named as device.StateQueue
     pop(): The value is removed only if delete_time has been reached.
     at least 1 value is always kept in the list
@@ -779,7 +970,9 @@ class TimedQueue(list):
         l=(obj,now,now+keep)
         list.append(self,l)
     def pop(self,index=0):
-        """ Returns the indicated value, or the first one; but removes only if delete_time has been reached.
+        """ 
+        Returns the indicated value, or the first one; but removes 
+        only if delete_time has been reached.
         All values are returned at least once.
         When the queue has only a value, it is not deleted.
         """
@@ -807,7 +1000,8 @@ class CSVArray(object):
         return (len(self.rows)-self.xoffset, len(self.cols)-self.yoffset)
     
     #@Catched
-    def __init__(self,filename=None,header=None,labels=None,comment=None,offset=0,trace=False):
+    def __init__(self,filename=None,header=None,labels=None,
+                        comment=None,offset=0,trace=False):
         """
         @param[in] filename file to load
         @param[in] header row to use as column headers
@@ -833,7 +1027,8 @@ class CSVArray(object):
         result = ''
         for row in self.rows:
             for n in range(self.ncols):
-                result = result + str(row[n]) + ('\t' if n<self.ncols-1 else '\n')
+                result = result + str(row[n]) + (
+                    '\t' if n<self.ncols-1 else '\n')
         return result
             
     def __len__(self):
@@ -843,10 +1038,16 @@ class CSVArray(object):
         return (self.get(i) for i in range(len(self)))
        
     #@Catched
-    def load(self,filename,comment=None,delimiter=None,prune_empty_lines=True,filters=None):
+    def load(self,filename,comment=None,delimiter=None,
+             prune_empty_lines=True,filters=None):
+        
         if not comment: comment=self.comment
-        filters = filters or {} # filters={key:filter} Lines will be added only if columnName.lower()==key and re.match(filter,value.lower()); header line does not apply
-        rows = [];cols = []; readed = []; header = self.header if self.header is not None else self.xoffset
+        filters = filters or {} 
+        # filters={key:filter} Lines will be added only 
+        # if columnName.lower()==key and re.match(filter,value.lower()); 
+        # header line does not apply
+        rows = [];cols = []; readed = []; 
+        header = self.header if self.header is not None else self.xoffset
         
         try:
             fl=open(filename)
@@ -855,11 +1056,14 @@ class CSVArray(object):
                 index = header
                 sample = flines[index]
                 self.dialect = csv.Sniffer().sniff(sample)
-                if self.trace: print 'Dialect extracted is %s'%(str(self.dialect.__dict__))
+                if self.trace: 
+                    print('Dialect extracted is %s'
+                          %(str(self.dialect.__dict__)))
                 readed = [r for r in csv.reader(flines, self.dialect)]
             else:
                 readed = [ r for r in csv.reader(flines, delimiter=delimiter)]
                 #readed = csv.reader(fl, delimiter='\t')
+                
         except Exception,e:
             print 'Exception while reading %s: %s' % (filename,str(e))
         finally:
@@ -871,25 +1075,53 @@ class CSVArray(object):
             for row in readed:
                 #Empty rows are avoided, Row is added only if not commented
                 if ( (not prune_empty_lines)
-                     or (   max([len(el) for el in row] or [0]) is not 0 and
-                            (not comment or not str(row[0]).startswith(comment))
+                     or (max([len(el) for el in row] or [0]) is not 0 and
+                        (not comment or not str(row[0]).startswith(comment))
                         ) ):
                     row2 = [str(r).strip() for r in row] 
                     if i == header: 
                         headers = [s.lower() for s in row2]
-                    elif i>header and filters: #In all rows excepting header it is checked that the filter is matched for any column in filters
-                        check = all( (k not in headers or re.match(f,row2[headers.index(k)].lower()) ) for k,f in filters.items())
+                        
+                    elif i>header and filters: 
+                        #In all rows excepting header it is checked 
+                        #that the filter is matched for any column in filters
+                        check = all( (k not in headers 
+                            or re.match(f,row2[headers.index(k)].lower()) ) 
+                            for k,f in filters.items())
+                        
                     if i<=header or not filters or not rows or check:
                         rows.append(row2)                        
-                #Correcting initial header and offset when previous lines are being erased
+                        
+                #Correcting initial header and offset when 
+                #previous lines are being erased
                 else: #The row is discarded
                     if i<=self.header: 
                         self.header-=1
                     if i<self.xoffset: 
                         self.xoffset-=1
                 i=i+1
-            if self.trace: print 'Header line is %d: %s' % (len(rows[header]),rows[header])
-            ncols = max(len(row) for row in rows) if rows else 0
+                
+            longer = []
+            for r in rows:
+                ll = r[:]
+                while ll and not ll[-1].strip():
+                    ll.pop(-1)
+                if len(ll)>len(longer):
+                    longer = ll
+
+            ncols = len(longer) if longer else 0
+            headers = headers[:ncols]
+            for i,r in enumerate(rows): 
+                rows[i] = r[:ncols]
+            
+            if 1: #self.trace: 
+                print('Longer line is %d: %s'
+                      % (ncols,longer))
+                print('Header line is %d: %s' 
+                      % (len(rows[header]),rows[header]))
+                
+            #ncols = max(len(row) for row in rows) if rows else 0
+            
             for i in range(len(rows)):
                 while len(rows[i])<ncols:
                     rows[i].append('')#'\t')
@@ -899,11 +1131,15 @@ class CSVArray(object):
                 cols.append([str(row[i]).strip() for row in rows])
 
         del self.rows; del self.cols
-        self.rows=rows;self.cols=cols; self.nrows=len(rows); self.ncols=len(cols)
-        if self.trace: print 'CSVArray initialized as a ',self.nrows,'x',self.ncols,' matrix'
+        self.rows=rows;self.cols=cols; 
+        self.nrows=len(rows); self.ncols=len(cols)
+        if self.trace: 
+            print('CSVArray initialized as a ',
+                  self.nrows,'x',self.ncols,' matrix')
     
     #@Catched
     def save(self,filename=None):
+        
         if filename is not None:
             self.filename=filename
         if self.filename is None:
@@ -911,7 +1147,9 @@ class CSVArray(object):
         fl = open(self.filename,'w')
         writer = csv.writer(fl,delimiter='\t')
         writer.writerows(self.rows);
-        if self.trace: print 'CSVArray written as a ',self.nrows,'x',self.ncols,' matrix'
+
+        if self.trace: 
+            print('CSVArray written as a ',self.nrows,'x',self.ncols,' matrix')
         fl.close()
         
     #@Catched
@@ -924,9 +1162,13 @@ class CSVArray(object):
         TODO: This method seems quite buggy, a refactoring should be done
         """
         x,y = x+self.xoffset,y+self.yoffset
-        if self.trace: print 'CSVArray.resize(',x,',',y,'), actual size is (%d,%d)' % (self.nrows,self.ncols)
-        if len(self.rows)!=self.nrows: print 'The Size of the Array has been corrupted!'
-        if len(self.cols)!=self.ncols: print 'The Size of the Array has been corrupted!'
+        if self.trace: 
+            print('CSVArray.resize(',x,',',y,'), '
+                  'actual size is (%d,%d)' % (self.nrows,self.ncols))
+        if len(self.rows)!=self.nrows: 
+            print 'The Size of the Array has been corrupted!'
+        if len(self.cols)!=self.ncols: 
+            print 'The Size of the Array has been corrupted!'
         
         if x<self.nrows:
             #print 'Deleting %d rows' % (self.nrows-x)
@@ -941,7 +1183,8 @@ class CSVArray(object):
             for i in range(self.ncols):
                 self.cols[i]=self.cols[i]+['']*(x-self.nrows)
         self.nrows = x
-        if len(self.rows)!=self.nrows: print 'The Size of the Array Rows has been corrupted!'
+        if len(self.rows)!=self.nrows: 
+            print 'The Size of the Array Rows has been corrupted!'
         
         if y<self.ncols:
             #print 'Deleting %d columns' % (self.ncols-y)
@@ -955,12 +1198,15 @@ class CSVArray(object):
             for i in range(self.nrows):
                 self.rows[i]=self.rows[i] + (y-len(self.rows[i]))*['']
         self.ncols = y
-        if len(self.cols)!=self.ncols: print 'The Size of the Array Columns has been corrupted!'
+        if len(self.cols)!=self.ncols: 
+            print('The Size of the Array Columns has been corrupted!')
         
         if 1: #self.trace: 
-            print 'CSVArray.rows dimension is now ',len(self.rows),'x',max([len(r) for r in self.rows])
+            print('CSVArray.rows dimension is now ',
+                  len(self.rows),'x',max([len(r) for r in self.rows]))
         if self.trace: 
-            print 'CSVArray.cols dimension is now ',len(self.cols),'x',max([len(c) for c in self.cols])
+            print('CSVArray.cols dimension is now ',
+                  len(self.cols),'x',max([len(c) for c in self.cols]))
         return x,y
         
     ###########################################################################
@@ -968,7 +1214,8 @@ class CSVArray(object):
     ###########################################################################
       
     #@Catched
-    def get(self,x=None,y=None,head=None,row=None,column=None,distinct=False,xsubset=[],ysubset=[]):
+    def get(self,x=None,y=None,head=None,row=None,column=None,distinct=False,
+            xsubset=[],ysubset=[]):
         """
         get(x=None,y=None,head=None,distinct=False):
         """
@@ -994,14 +1241,21 @@ class CSVArray(object):
         if self.trace and ysubset: print 'using ysubset ',ysubset
         
         if not distinct: 
-            #if getting a column and theres an xsubset ... prune the rows not in xsubset
+            #if getting a column and theres an xsubset
+            # ... prune the rows not in xsubset
             if x is None and xsubset: result = [result[i] for i in xsubset]
             if y is None and ysubset: result = [result[i] for i in ysubset]
             return result
 
-        if self.trace: print 'Getting only distinct values from ',['%d:%s'%(i,result[i]) for i in range(len(result))]
-        ## DISTINCT VALUES, returns a dictionary with the distinct values (initialized with first match)
-        #values={result[0]:[0]} #Doesn't add self.xoffset here, it has been done before!
+        if self.trace: 
+            print('Getting only distinct values from ',
+                  ['%d:%s'%(i,result[i]) for i in range(len(result))])
+            
+        ## DISTINCT VALUES, returns a dictionary with the distinct values 
+        # (initialized with first match)
+        #values={result[0]:[0]} #Doesn't add self.xoffset here,
+        # it has been done before!
+        
         values={}
         #for i in range(1,len(result)):
         for i in range(len(result)):
@@ -1017,7 +1271,8 @@ class CSVArray(object):
         return values
     
     def getd(self,row):
-        """This method returns a line as a dictionary using the headers as keys"""
+        """This method returns a line as a dictionary using the 
+        headers as keys"""
         d = {}
         Hrow = self.rows[self.header or 0]
         line = self.get(x=row)
@@ -1041,19 +1296,21 @@ class CSVArray(object):
         def set(self,x,y,val):
         """
         try:
-            if self.trace: print 'CSVArray.set(x=',x,',y=',y,',val=',val,',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'
+            if self.trace: 
+                print('CSVArray.set(x=',x,',y=',y,',val=',val,
+                      ',xoffset=',self.xoffset,',yoffset=',self.yoffset,')')
             val = val if type(val) in [int,long,float] else (val or '')
             if x is None or x<0:
                 #Setting a column
                 if len(val)>self.nrows or len(val)<0: 
-                    raise Exception('CSVArray.set(column) ... wrong size of column')
+                    raise Exception('CSVArray.set(column) ... wrong size')
                 for i,v in enumerate(val):
                     self.cols[y][i]=v
                     self.rows[i][y]=v;
             elif y is None or y<0:
                 #Setting an entire row
                 if len(val)>self.ncols or len(val)<0: 
-                    raise Exception('CSVArray.set(row) ... wrong size of row')           
+                    raise Exception('CSVArray.set(row) ... wrong size')           
                 for i,v in enumerate(val):
                     self.rows[x][i]=v
                     self.cols[i][x]=v;             
@@ -1061,8 +1318,8 @@ class CSVArray(object):
                 self.rows[self.xoffset+int(x)][self.yoffset+int(y)]=val
                 self.cols[self.yoffset+int(y)][self.xoffset+int(x)]=val
         except Exception,e:
-            print('CSVArray[%d,%d].set(%s,%s,%s) failed!\n%s' 
-                  % (len(self.rows),len(self.cols),x,y,val,traceback.format_exc()))
+            print('CSVArray[%d,%d].set(%s,%s,%s) failed!\n%s'%(len(self.rows),
+                len(self.cols),x,y,val,traceback.format_exc()))
             raise e
     
     def setRow(self,x,val):
@@ -1087,7 +1344,8 @@ class CSVArray(object):
         else:
             Hrow = self.rows[header]
         if head not in Hrow:
-            if self.trace: print 'colByHead: Head="',head,'" does not exist in: %s'%Hrow
+            if self.trace:
+                print('colByHead: Head="',head,'" does not exist in: %s'%Hrow)
             return None
         return Hrow.index(head)
         
@@ -1097,11 +1355,15 @@ class CSVArray(object):
         
     #@Catched
     def fill(self,y=None,head=None,previous=[]):
-        """Fill all the empty cells in a column with the last value introduced on it
-        By default this method adds new values to a column only when the previous column remains unchanged
+        """Fill all the empty cells in a column with the last value 
+        introduced on it
+        By default this method adds new values to a column only when the 
+        previous column remains unchanged
         To force all the values to be filled set previous=True
         """
-        if self.trace: print 'CSVArray.fill(%s,%s,%s)'%tuple(str(s) for s in [y,head,previous])
+        if self.trace: 
+            print('CSVArray.fill(%s,%s,%s)'
+                  %tuple(str(s) for s in [y,head,previous]))
         if type(y) is str: head,y =  y,None
         c = y if y in range(self.ncols+1) else self.colByHead(head)
         column = self.get(y=c)
@@ -1111,7 +1373,8 @@ class CSVArray(object):
           or (c and self.get(y=c-1)) or []
         
         for r in range(len(column)):
-            if r and column[r]=='' and (not previous or previous[r-1]==previous[r]):
+            if r and column[r]=='' and (
+                not previous or previous[r-1]==previous[r]):
                 self.set(r,c,last)
             else: last = column[r]
 
@@ -1125,14 +1388,15 @@ class CSVArray(object):
     def getAsTree(self,root=0,xsubset=[],lastbranch=None,expand=False):
         """
         This method returns the content of the array as recursive dicts
-        It will produce the right output only if the array has been filled before!
+        It will produce the right output only if the array 
+        has been filled before!
         [self.fill(head=h) for h in self.getHeaders()]
         
         headers={dict with headers as keys}
         for h in headers: fill with distinct keys on each column
         get the keys on first column
-            for each key, get the distinct keys in the next column matching lines
-                for each key, get the distinct keys in the next column matching lines       
+          for each key, get the distinct keys in the next col matching lines
+            for each key, get the distinct keys in the next col matching lines       
         """
         if lastbranch is None: lastbranch=self.ncols-1
         elif type(lastbranch) is str: lastbranch=self.colByHead(lastbranch)
@@ -1140,13 +1404,15 @@ class CSVArray(object):
         
         klines=self.get(y=root,distinct=True,xsubset=xsubset)
         if len(klines)==1 and root>lastbranch: #Return last columns as a list
-            return self.get(x=klines.values()[0][0],ysubset=range(root,self.ncols))
+            return self.get(x=klines.values()[0][0],
+                            ysubset=range(root,self.ncols))
         elif root+1>=self.ncols: #Last columns as a dictionary
             return dict.fromkeys(klines.keys(),{})
         else:
             tree={}
             for k in klines.keys():
-                tree[k]=self.getAsTree(root=root+1,xsubset=klines[k],lastbranch=lastbranch)
+                tree[k]=self.getAsTree(root=root+1,xsubset=klines[k],
+                                       lastbranch=lastbranch)
             return tree
         
     def updateFromTree(self,tree):
@@ -1155,7 +1421,9 @@ class CSVArray(object):
         and converts it into a grid like level0 \t level1 \t level2
         WARNING!: This method deletes the actual content of the array!
         """
-        if self.trace: print 'WARNING!: updateFromTree deletes the actual content of the array!'
+        if self.trace: 
+            print('WARNING!: updateFromTree deletes '
+                'the actual content of the array!')
         table = tree2table(tree)
         self.resize(1,1)
         self.resize(len(table),max(len(line) for line in table))
@@ -1175,8 +1443,6 @@ class CSVArray(object):
     def printArray(self):
         for r in range(len(self.rows)):
             print r,':','\t'.join([str(e or '\t') for e in self.rows[r]])
-        #for r in range(len(self.rows)):
-            #print r,':','\t'.join([self.cols[c][r] for c in range(len(self.cols))])
     
     pass #END OF CSVARRAY
 
