@@ -532,6 +532,25 @@ def put_device_property(device,property,value=None,db=None):
                     property[p] = list(v)
     (db or get_database()).put_device_property(device,property)
     return property
+
+def get_attribute_property(device,attribute,prop,db=None):
+    """
+    It returns attribute property value or just first item 
+    if value list has lenght==1
+    """    
+    return (db or get_databse()).get_device_attribute_property(
+                                            device,attribute,prop)[prop]
+    
+def get_attributes_properties(device,attribute='*',db=None):
+    """
+    For a single device, it returns all matching attribute 
+    property values as dict
+    """
+    db = db or get_database()
+    dbd = get_database_device(db=db)
+    attrs = dbd.DbGetDeviceAttributeList([device,attribute])
+    props = db.get_device_attribute_property(device,attrs)
+    return props
             
 def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     """
@@ -860,6 +879,7 @@ def get_internal_devices():
     except:
         return {}
     
+@fandango.excepts.Catched
 def read_internal_attribute(device,attribute):
     """
     This method allows several things:

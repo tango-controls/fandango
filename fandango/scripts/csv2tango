@@ -230,7 +230,7 @@ def main():
           
           # Create the Device if it doesn't exists
           #----------------------------------------------------------------------------------------
-          if device.lower() not in alldevs:
+          if device.count('/')>=2 and device.lower() not in alldevs:
               #DO NOT RECREATE EVEN ON OVERWRITE
               print('Creating %s.%s(%s) '%(server,klass,device))
               addTangoDev(server,klass,device)
@@ -259,9 +259,13 @@ def main():
               elif overwrite or not oldprops[prop]:
                   value = type(value) in (list,set) and value or [value]
                   while not value[-1] and len(value)>1: value.pop(-1)
-                  print('Device Property ',device,'.',prop,', creating: ',value)
-                  db.put_device_property(device,{prop:value})
-
+                  if '.' not in prop:
+                      print('Device Property ',device,'.',prop,', creating: ',value)
+                      db.put_device_property(device,{prop:value})
+                  else:
+                      print('Attribute Property ',device,'.',prop,', creating: ',value)
+                      attr,prop = prop.split('.',1)
+                      db.put_device_attribute_property(device,{attr:{prop:value}})
               else:
                   print('Device Property ',device,'.',prop,' already exists: ',oldprops[prop])
 

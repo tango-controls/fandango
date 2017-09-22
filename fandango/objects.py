@@ -50,6 +50,7 @@ Enum classes are borrowed from taurus.core.utils (by Tiago Coutinho)
 import __builtin__
 from __builtin__ import object
 
+import traceback
 from fandango.functional import *
 from operator import isCallable, isSequenceType
 from collections import Hashable
@@ -772,8 +773,8 @@ class Cached(Decorator):
                     self._log(traceback.format_exc())
                 return v
             else:
-                print(str(self.f),str(e))
-                traceback.print_exc()
+                self._log(str(self.f))
+                self._log(traceback.format_exc())
                 raise v
         else:
             return v

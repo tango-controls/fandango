@@ -100,6 +100,21 @@ WATTR()::
         Allows to Write a VALUE in an external attribute
         WritableAttribute = type(READ and XATTR('Attribute') or WRITE and WATTR('Attribute',VALUE)).
         
+Writable Attributes
+-------------------
+
+You can use the VAR keyword to create a variable that will be stored as a writable attribute
+
+        WritableAttribute = type(VAR(ATTRIBUTE,default=0.0,WRITE=True))
+        
+        
+Type can be any Tango or python type; 
+default will be the value returned if the attribute has not been read yet; 
+
+The WRITE argument marks this attribute as writable; if you want to read afterwards just call VAR without WRITE argument.
+
+        OtherAttributeUsingTheValue = type( 3 * VAR('WritableAttribute') )
+        
 
 Dynamic Commands
 ================
