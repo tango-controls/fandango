@@ -543,6 +543,7 @@ class EventSource(Logger,SingletonMap):
         Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, 
         enablePolling, use_events 
         """
+        #@TODO: All this mangling to be replaced by fandango.parse_tango_model
         if 0 < name.replace('//','/').count('/') < name.count(':')+3:
             name += '/state'
         self.simple_name = name.split('/')[-1]

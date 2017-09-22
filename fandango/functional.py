@@ -311,25 +311,35 @@ def inCl(exp,seq,regexp=True):
     
 def matchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless match between expression and given string """
-    if extend:
-        if '&' in exp:
-            return all(matchCl(e.strip(),seq,terminate=False,extend=True) 
-                       for e in exp.split('&'))
-        if re.match('^[!~]',exp):
-            return not matchCl(exp[1:],seq,terminate,extend=True) 
-    return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
+    try:
+        if extend:
+            if '&' in exp:
+                return all(matchCl(e.strip(),seq,terminate=False,extend=True) 
+                        for e in exp.split('&'))
+            if re.match('^[!~]',exp):
+                return not matchCl(exp[1:],seq,terminate,extend=True) 
+        return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
+    except:
+        print('matchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        raise
+    
 clmatch = matchCl #For backward compatibility
 
 def searchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless regular expression search between 
     expression and given string """
-    if extend:
-        if '&' in exp:
-            return all(searchCl(e.strip(),seq,terminate=False,extend=True) 
-                       for e in exp.split('&'))
-        if re.match('^[!~]',exp):
-            return not searchCl(exp[1:],seq,terminate,extend=True)
-    return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
+    try:
+        if extend:
+            if '&' in exp:
+                return all(searchCl(e.strip(),seq,terminate=False,extend=True) 
+                        for e in exp.split('&'))
+            if re.match('^[!~]',exp):
+                return not searchCl(exp[1:],seq,terminate,extend=True)
+        return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
+    except:
+        print('searchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        raise
+    
 clsearch = searchCl #For backward compatibility
 
 def replaceCl(exp,repl,seq,regexp=True,lower=False):
@@ -675,9 +685,9 @@ def unicode2str(obj):
     nested python primitives (map,list,str)
     """
     if isMapping(obj,strict=True):
-        n = dict(unicode2python(t) for t in obj.items())
+        n = dict(unicode2str(t) for t in obj.items())
     elif isSequence(obj):
-        n = list(unicode2python(t) for t in obj)
+        n = list(unicode2str(t) for t in obj)
     elif isString(obj):
         n = str(obj)
     else:
