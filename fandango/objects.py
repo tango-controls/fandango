@@ -601,6 +601,9 @@ class Decorator(object):
     """
     This generic class allows to differentiate decorators from common classes.
     
+    SEE THE Cached DECORATOR CLASS FOR A REAL EXAMPLE, THIS IS JUST AN
+    ABSTRACT CLASS WITHOUT IMPLEMENTATION
+    
     It uses the __get__ descriptor to allow decoration of Class methods
     
     Inherit from it and use issubclass(klass,Decorator) to know if a class
