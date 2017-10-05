@@ -233,6 +233,8 @@ class EventThread(Logger,ThreadedObject):
     
     MinWait = 0.0001 
     #Event processing limited to 10KHz maximum (rest are queued)
+    DEFAULT_PERIOD_ms = 50.
+    #Event queue check done at 20Hz
     EVENT_POLLING_RATIO = 1000 
     #How many events to process before checking polled attributes
     SHOW_ALIVE = 10000
@@ -248,7 +250,7 @@ class EventThread(Logger,ThreadedObject):
         self.queue = Queue.Queue()
         self.sources = set()
         self.event = threading.Event()
-        period = max((1e-3*(period_ms or 0),self.MinWait))
+        period = max((1e-3*(period_ms or self.DEFAULT_PERIOD_ms),self.MinWait))
         ThreadedObject.__init__(self,target=self.process,period=period)
         Logger.__init__(self,type(self).__name__)
         self.filtered,self.latency = filtered,latency
@@ -1071,7 +1073,8 @@ class EventSource(Logger,SingletonMap):
             else:
                 cache = True
        
-        self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
+        self.debug('read(cache=%s,asynch=%s,threaded=%s)'
+           %(cache,asynch,self.get_thread().is_alive()))
         self.asynch_hook() # Check for pending asynchronous results
         
         if not cache or self.attr_value is None:
