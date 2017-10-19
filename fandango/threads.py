@@ -243,6 +243,7 @@ class ThreadedObject(Object):
   ## MAIN METHODS
     
   def start(self):
+    # If already started, it forces the next cycle
     if self._started: 
       self.stop()
     else: #abort stop wait
