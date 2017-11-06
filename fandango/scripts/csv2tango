@@ -149,7 +149,7 @@ def main():
   print createStarter.__doc__
   #######################################################################
   
-  kprops,dprops,wildcards = {},{},fn.dicts.SortedDict()
+  kprops,dprops,wildcards = {},fn.dicts.CaselessDict(),fn.dicts.SortedDict()
   for lines,klass in sorted((v,k) for k,v in classes.items()):
       kdevs = array.get(head='device',distinct=True,xsubset=lines)
       print('%s has %d devices'%(klass,len(kdevs)))

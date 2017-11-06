@@ -9,7 +9,7 @@ tango2csv
        ./tango2csv filter1 filter2 filter3 filter4 ... destination.csv
        
     Since fandango 13 it returns the new format as a nested dictionary. 
-    To use the old format with column headers use the --old option.
+    To use the new treeish format without column headers use the --tree option.
     New implementation is imported from fandango/tango/export.py
     
 """
@@ -172,7 +172,7 @@ if __name__ == '__main__':
         args = [a for a in sys.argv[1:] if not a.startswith('-')]
         if not args:
             print(__doc__)
-        elif '--old' in opts:
+        elif '--tree' not in opts:
             tango2csv(args,opts)
         else:
             if len(args)>1:
