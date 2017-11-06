@@ -60,8 +60,8 @@ def parse_labels(text):
         try:
             labels = eval(text)
             return labels
-        except Exception,e:
-            print 'ERROR! Unable to parse labels property: %s'%str(e)
+        except Exception as e:
+            print('ERROR! Unable to parse labels property: %s'%str(e))
             return []
     else:
         exprs = text.split(',')
@@ -81,7 +81,7 @@ def get_model_name(model):
         try:
             model = model.getModelName()
         except:
-            print traceback.format_exc()
+            print(traceback.format_exc())
     return str(model).lower()
         
 def parse_tango_model(name,use_tau=False,use_host=False):
@@ -103,8 +103,8 @@ def parse_tango_model(name,use_tau=False,use_host=False):
         validator = {tctango.TangoDevice:DeviceNameValidator,
                      tctango.TangoAttribute:AttributeNameValidator}
         values.update((k,v) for k,v in 
-                      validator[tctango.TangoFactory().findObjectClass(name)
-                                ]().getParams(name).items() if v)
+                      list(validator[tctango.TangoFactory().findObjectClass(name)
+                                ]().getParams(name).items()) if v)
     except:
         name = str(name).replace('tango://','')
         m = re.match(fandango.tango.retango,name)
@@ -203,13 +203,13 @@ def get_matching_devices(expressions,limit=0,exported=False,
     fullname = fullname or any(h not in (defhost,None) for h in hosts) 
 
     all_devs = []
-    if trace: print(hosts,fullname)
+    if trace: print((hosts,fullname))
 
     for host in hosts:
         if host in (None,defhost):
             db_devs = get_all_devices(exported)
         else:
-            print('get_matching_devices(*%s)'%host)
+            print(('get_matching_devices(*%s)'%host))
             odb = PyTango.Database(*host.split(':'))
             db_devs = odb.get_device_exported('*') if exported \
                         else odb.get_device_name('*','*')
@@ -217,7 +217,7 @@ def get_matching_devices(expressions,limit=0,exported=False,
         prefix = '%s/'%(host or defhost) if fullname else ''
         all_devs.extend(prefix+d for d in db_devs)
     
-    expressions = map(toRegexp,toList(expressions))
+    expressions = list(map(toRegexp,toList(expressions)))
     if trace: print(expressions)
     #if not fullname: 
         #all_devs = [r.split('/',1)[-1] if matchCl(rehost,r) else r 
@@ -276,8 +276,8 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                              for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
         if trace: 
-            print('get_matching_attributes(%s): match:%s,host:%s,'
-                  'dev:%s,attr:%s'%(e,bool(match),host,dev,attr))
+            print(('get_matching_attributes(%s): match:%s,host:%s,'
+                  'dev:%s,attr:%s'%(e,bool(match),host,dev,attr)))
 
         matches.append((host,dev,attr))
     
@@ -326,7 +326,7 @@ def get_all_models(expressions,limit=1000):
         if isinstance(expressions,types):
             expressions = list(str(e) for e in expressions)
     
-    print 'In get_all_models(%s:"%s") ...' % (type(expressions),expressions)
+    print('In get_all_models(%s:"%s") ...' % (type(expressions),expressions))
     db = get_database()
     if 'SimulationDatabase' in str(type(db)): #used by TauWidgets displayable in QtDesigner
       return expressions
@@ -356,14 +356,14 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',
         exps  = [h+'/'+e if ':' not in e else e for e in devs]
         if trace: print(exps)
         hdevs = [d.replace(h+'/','') for d in get_matching_devices(exps,fullname=False)]
-        if trace: print('%s: %s vs %s'%(h,hdevs,props))
+        if trace: print(('%s: %s vs %s'%(h,hdevs,props)))
         for d in hdevs:
             if exclude and matchCl(exclude,d): continue
             dprops = [p for p in db.get_device_property_list(d,'*') if matchAny(props,p)]
             if not dprops: continue
-            if trace: print(d,dprops)
+            if trace: print((d,dprops))
             vals = db.get_device_property(d,dprops)
-            vals = dict((k,list(v) if isSequence(v) else v) for k,v in vals.items())
+            vals = dict((k,list(v) if isSequence(v) else v) for k,v in list(vals.items()))
             if len(hosts)==1 and len(hdevs)==1:
                 return vals
             else: 
@@ -474,5 +474,5 @@ def reduce_distinct(group1,group2):
         vals[target] = [k for k in k1 if k not in k2]
         rates[target] = float(len(vals[target]))/(len(k1))
     except: vals[target],rates[target] = [],0
-    return first((vals[k],rates[k]) for k,r in rates.items() if r == max(rates.values()))
+    return first((vals[k],rates[k]) for k,r in list(rates.items()) if r == max(rates.values()))
  

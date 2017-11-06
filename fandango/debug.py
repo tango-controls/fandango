@@ -57,7 +57,7 @@ def Timed(target,tries=1):
             r = target(*args,**kwargs)
             times.append(1e3*(time.time()-t0))
         times = ', '.join('%3.1f'%t for t in times)
-        print('%s needed %s ms'%(target,times))
+        print(('%s needed %s ms'%(target,times)))
         return r
     return wrapped
 
@@ -70,8 +70,8 @@ def test_xtreme(device,attribute,value):
             dp.read_attribute(attribute)
             threading.Event().wait(0.01)
     except:
-        print '%s.read_attribute(%s) failed after %d retries' % (device,attribute,i)
-        print traceback.format_exc()
+        print('%s.read_attribute(%s) failed after %d retries' % (device,attribute,i))
+        print(traceback.format_exc())
         PyTango.DeviceProxy(dp.adm_name()).command_inout('kill')
     return
        

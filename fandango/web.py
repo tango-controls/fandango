@@ -103,7 +103,7 @@ def dicts2table(dcts,keys=None,formatter=None):
     :param dcts:  a list of dictionaries
     :param keys: an alternative list of keys
     """
-    if not keys: keys = sorted(set(k for dct in dcts for k in dct.keys()))
+    if not keys: keys = sorted(set(k for dct in dcts for k in list(dct.keys())))
     if not formatter: formatter = lambda s:s
     lines = [keys,]
     for dct in dcts:
@@ -115,7 +115,7 @@ def dict2dict2table(seq,keys=None,formatter=None):
     :param seq: a nested dictionary {:{}}
     :param keys:  a list of header names
     """
-    if not keys: keys = [""]+sorted(set(k for v in seq.values() for k in v.keys()))
+    if not keys: keys = [""]+sorted(set(k for v in list(seq.values()) for k in list(v.keys())))
     if not formatter: formatter = lambda s:s
     lines = [keys,]
     for k,v in sorted(seq.items()):
@@ -153,7 +153,7 @@ HEXs = {
  'violet': '#ee82ee'
  }
 
-all_colors = COLORS.values()
+all_colors = list(COLORS.values())
 
 
 #ats = [CURRENT]+FRONTENDS

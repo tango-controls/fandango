@@ -53,16 +53,16 @@ message
 """
 
 import time, logging, weakref, traceback, sys
-from objects import Object,Decorator
+from .objects import Object,Decorator
 from pprint import pprint,pformat
-from functional import \
+from .functional import \
   time2str,first,matchCl,isSequence,isMapping,isCallable,isString,shortstr
 import warnings
 
 
 def printf(*args):
     # This is a 'lambdable' version of print
-    print(''.join(map(str,args)))
+    print((''.join(map(str,args))))
     
 def printerr(*args):
     sys.stderr.write(*args)
@@ -92,7 +92,7 @@ def test2str(obj,meth='',args=[],kwargs={}):
       f = getattr(obj,meth) if meth and isString(meth) else (meth or obj)
       v = f(*args,**kwargs)
       if isMapping(v):
-        s = '\n'.join(map(str,v.items()))
+        s = '\n'.join(map(str,list(v.items())))
       elif isSequence(v):
         s = '\n'.join(map(str,v))
       else: s = str(v)
@@ -137,13 +137,13 @@ class FakeLogger():
         self.LogLevel = str(s).lower()!='DEBUG'
     def trace(self,s):
         if not self.LogLevel:
-          print(time2str()+' '+'TRACE\t'+self.header+s)
+          print((time2str()+' '+'TRACE\t'+self.header+s))
     def debug(self,s):
         if not self.LogLevel:
-          print(time2str()+' '+'DEBUG\t'+self.header+s)
-    def info(self,s):print(time2str()+' '+'INFO\t'+self.header+s)
-    def warning(self,s):print(time2str()+' '+'WARNING\t'+self.header+s)
-    def error(self,s):print(time2str()+' '+'ERROR\t'+self.header+s)
+          print((time2str()+' '+'DEBUG\t'+self.header+s))
+    def info(self,s):print((time2str()+' '+'INFO\t'+self.header+s))
+    def warning(self,s):print((time2str()+' '+'WARNING\t'+self.header+s))
+    def error(self,s):print((time2str()+' '+'ERROR\t'+self.header+s))
     
 class Logger(Object):
     """
@@ -237,7 +237,7 @@ class Logger(Object):
         l = self.__levelAliases.get(prio,prio)
         if l<self.log_obj.level: return
         head = '%s %7s %s: '%(name,prio,self.getTimeString()) if head else ''
-        print(head+str(msg).replace('\r',''))
+        print((head+str(msg).replace('\r','')))
 
     def setLogLevel(self,level):
         ''' This method allows to change the default logging level'''
@@ -268,20 +268,20 @@ class Logger(Object):
     def getLogLevel(self,alias=None):
         if alias is None:
             l = self.log_obj.level
-            for k,v in self.__levelAliases.items():
+            for k,v in list(self.__levelAliases.items()):
               if v==l:
                 l = k
             return l
         else:
-            if not isinstance(alias,basestring):
-                try: return (k for k,v in self.__levelAliases.iteritems() 
-                             if v==alias).next()
+            if not isinstance(alias,str):
+                try: return next((k for k,v in list(self.__levelAliases.items()) 
+                             if v==alias))
                 except: return None
             elif alias.lower() in ('debug','info','warning','error'):
                 return logging.__dict__.get(alias.upper())
             else:
-                try: return (v for k,v in self.__levelAliases.iteritems() 
-                             if k.lower()==alias.lower()).next()
+                try: return next((v for k,v in list(self.__levelAliases.items()) 
+                             if k.lower()==alias.lower()))
                 except: return None
         return
       
@@ -305,7 +305,7 @@ class Logger(Object):
             #Will trigger exception if Tango object is not ready
             self.__tango_log = self
         except:
-            print(traceback.format_exc())
+            print((traceback.format_exc()))
             self.warning('Unable to setup tango logging for %s'%self.log_name)
             self.__tango_log = None
         return self.__tango_log
@@ -379,10 +379,10 @@ class Logger(Object):
                 stream = (self.log_obj.error,self.log_obj.warning,
                           self.log_obj.info,self.log_obj.debug)[prio]
                 stream(msg, *args, **kw)
-        except Exception,e:
-            print('Exception in Logger.%s! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'
-              %(level,msg,e,str(args),str(kw)))
-            print(traceback.format_exc())
+        except Exception as e:
+            print(('Exception in Logger.%s! \nmsg:%s\ne:%s\nargs:%s\nkw:%s'
+              %(level,msg,e,str(args),str(kw))))
+            print((traceback.format_exc()))
         
 
     def deprecated(self, msg, *args, **kw):

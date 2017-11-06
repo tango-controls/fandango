@@ -46,6 +46,7 @@ it replaces the previous PyTango_utils module
 """
 
 import os,traceback
+RELEASE = '?.?'
 
 #CLEAN DEPRECATED FILES
 p = __file__.rsplit(os.path.sep,1)[0]
@@ -55,32 +56,33 @@ for p in deprecated:
     if os.path.exists(p):
         try:
             os.remove(p)
-            print('%s removed ...'%p)
-        except Exception,e:
+            print(('%s removed ...'%p))
+        except Exception as e:
             print(e)
             print('fandango, CLEAN OLD FILES ERROR!:')
-            print('An old file still exists at:\n\t%s'%p)
+            print(('An old file still exists at:\n\t%s'%p))
             print('Import fandango as sysadmin and try again')
             print('')
             sys.exit(-1)
 
 try:
     # LOAD VERSION NUMBER
-    import objects,imp
-    from objects import ReleaseNumber
+    import imp
+    from . import objects
+    from .objects import ReleaseNumber
     PATH = os.path.dirname(objects.__file__)
     vf = open(PATH+'/VERSION')
-    RELEASE = ReleaseNumber(map(int,vf.read().strip().split('.')))
+    RELEASE = ReleaseNumber(list(map(int,vf.read().strip().split('.'))))
     vf.close()
     
-except Exception,e: 
-    print(traceback.format_exc())
-    print('Unable to load RELEASE number: %s'%e)
+except Exception as e: 
+    print((traceback.format_exc()))
+    print(('Unable to load RELEASE number: %s'%e))
 
 try:
     import pkg_resources
     __version__ = pkg_resources.get_distribution(__name__).version
-except Exception, e:
+except Exception as e:
       #print ('Unable to get distribution version number, fandango has '
       #       'probably not been installed as a package')
     __version__ = RELEASE
@@ -88,48 +90,48 @@ except Exception, e:
 __test__ = ['tango']
 
 try:
-    from functional import *
-except Exception,e: 
-    print('Unable to import functional module: %s'%e)
+    from .functional import *
+except Exception as e: 
+    print(('Unable to import functional module: %s'%e))
 
 try:
-    from log import printf,Logger,LogFilter,shortstr,\
+    from .log import printf,Logger,LogFilter,shortstr,\
         except2str,FakeLogger,pprint
-except Exception,e: 
-    print('Unable to import log module: %s'%e)
+except Exception as e: 
+    print(('Unable to import log module: %s'%e))
 
 try:
-    from excepts import trial,getLastException,getPreviousExceptions, \
+    from .excepts import trial,getLastException,getPreviousExceptions, \
         ExceptionWrapper,Catched,CatchedArgs
 except: 
     print('Unable to import excepts module')
 
 try:
-    from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
-    from objects import dirModule,loadModule,dirClasses,obj2dict,copy
-    from objects import Decorator,ClassDecorator,Decorated,BoundDecorator
-    from objects import Cached
-except Exception,e: 
-    print('Unable to import objects module: %s'%traceback.format_exc())
+    from .objects import Object,Singleton,SingletonMap,Struct,NamedProperty
+    from .objects import dirModule,loadModule,dirClasses,obj2dict,copy
+    from .objects import Decorator,ClassDecorator,Decorated,BoundDecorator
+    from .objects import Cached
+except Exception as e: 
+    print(('Unable to import objects module: %s'%traceback.format_exc()))
     
 try:
-    from linos import shell_command,ping,sysargs_to_dict,listdir, \
+    from .linos import shell_command,ping,sysargs_to_dict,listdir, \
         sendmail,MyMachine
 except: 
-    print('Unable to import linos module: %s\n'%traceback.format_exc())
+    print(('Unable to import linos module: %s\n'%traceback.format_exc()))
 
 try: 
-    from arrays import CSVArray, TimedQueue
+    from .arrays import CSVArray, TimedQueue
 except: 
     print('Unable to import arrays module')
 
 try:
-    from doc import *
+    from .doc import *
 except: 
     print('Unable to import doc module')
 
 try:
-    from dicts import ThreadDict,CaselessDict,ReversibleDict, \
+    from .dicts import ThreadDict,CaselessDict,ReversibleDict, \
         CaselessDefaultDict,DefaultThreadDict, \
         Enumeration,SortedDict,CaselessList, \
         defaultdict,defaultdict_fromkey, \
@@ -139,19 +141,19 @@ except:
     traceback.print_exc()
 
 try:
-    from threads import WorkerProcess,WorkerThread,SingletonWorker,\
+    from .threads import WorkerProcess,WorkerThread,SingletonWorker,\
         wait,timed_range
 except: 
     print('Unable to import threads module')
 
 try:
-    from debug import Timed, timeit
-except Exception,e: 
+    from .debug import Timed, timeit
+except Exception as e: 
     print('Unable to import debug module')
 
 #TANGO related modules
 try:
-    from tango import finder,get_device,get_database,get_database_device, \
+    from .tango import finder,get_device,get_database,get_database_device, \
         get_all_devices,get_device_info,get_alias_for_device, \
         get_device_for_alias,get_tango_host, \
         find_devices,find_attributes, find_properties,\
@@ -164,49 +166,49 @@ try:
         fakeEvent,fakeEventType
 
     try: 
-        from device import Dev4Tango,DevChild,TangoCommand
-    except Exception,e: raise Exception('fandango.device: %s'%e)
+        from .device import Dev4Tango,DevChild,TangoCommand
+    except Exception as e: raise Exception('fandango.device: %s'%e)
 
     try: 
-        from servers import ServersDict,Astor,ProxiesDict,ComposersDict
-    except Exception,e: raise Exception('fandango.servers: %s'%e)
+        from .servers import ServersDict,Astor,ProxiesDict,ComposersDict
+    except Exception as e: raise Exception('fandango.servers: %s'%e)
 
     try: 
         path = imp.find_module('fandango')[1]
         deprecated = [f for f in (os.path.join(path,'interface'+ext) 
               for ext in ('.py','.pyc','.pyo','py~')) if os.path.exists(f)]
         if deprecated:
-            print('fandango.interface: deprecated files still exist: %s'
-                %','.join(deprecated))
+            print(('fandango.interface: deprecated files still exist: %s'
+                %','.join(deprecated)))
             try: [os.remove(f) for f in deprecated]
             except: print('... and should be removed manually!')
-        from interface import FullTangoInheritance,NewTypeInheritance
-    except Exception,e: raise Exception('fandango.interface: %s'%e)
+        from .interface import FullTangoInheritance,NewTypeInheritance
+    except Exception as e: raise Exception('fandango.interface: %s'%e)
 
     try: 
-        from dynamic import DynamicDS,DynamicDSClass,DynamicAttribute, \
+        from .dynamic import DynamicDS,DynamicDSClass,DynamicAttribute, \
             DynamicDSTypes,CreateDynamicCommands,DynamicServer
-    except Exception,e: raise Exception('fandango.dynamic: %s'%e)
+    except Exception as e: raise Exception('fandango.dynamic: %s'%e)
   
     try:
-        from callbacks import EventSource,EventThread,EventListener, \
+        from .callbacks import EventSource,EventThread,EventListener, \
             CachedAttributeProxy,TangoListener,TangoAttribute
-    except Exception,e: raise Exception('fandango.callbacks: %s'%e)
+    except Exception as e: raise Exception('fandango.callbacks: %s'%e)
 
-except Exception,e: 
-    print('Unable to import fandango.*tango modules: %s'%e)
-    print traceback.format_exc()
+except Exception as e: 
+    print(('Unable to import fandango.*tango modules: %s'%e))
+    print((traceback.format_exc()))
 
 
 
 #OTHER fancy modules
 if False: #Disabled to avoid extra dependencies!!
-    try: import web
-    except: print 'Unable to import fandango.web module'
-    try: import qt
-    except: print 'Unable to import fandango.qt module'
-    try: from db import FriendlyDB
-    except: print 'Unable to import db module'
+    try: from . import web
+    except: print('Unable to import fandango.web module')
+    try: from . import qt
+    except: print('Unable to import fandango.qt module')
+    try: from .db import FriendlyDB
+    except: print('Unable to import db module')
 
 __all__ = ['dicts','excepts','log','objects','db','device','web','threads',
       'dynamic','callbacks','arrays','servers','linos','functional',

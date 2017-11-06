@@ -84,7 +84,7 @@ class TangoCommand(object):
         
         self.device = device
         self.proxy = TangoCommand.Proxies[self.device]
-        if isinstance(command,basestring):
+        if isinstance(command,str):
             if '/' in command:
                 d,self.command = command.rsplit('/',1)
                 if not self.device: self.device = d
@@ -109,12 +109,12 @@ class TangoCommand(object):
         pass
         
     def trace(self,msg,severity='DEBUG'):
-        print '%s %s fandango.TangoCommand: %s'%(severity,time.ctime(),msg)
+        print('%s %s fandango.TangoCommand: %s'%(severity,time.ctime(),msg))
     
     def _parse_feedback(self,feedback):
         if isCallable(feedback):
             self.feedback = feedback
-        elif isinstance(feedback,basestring):
+        elif isinstance(feedback,str):
             if '/' in feedback:
                 device,target = feedback.rsplit('/',1) if feedback.count('/')>=(4 if ':' in feedback else 3) else (feedback,state)
             else:
@@ -159,7 +159,7 @@ class TangoCommand(object):
                     try: 
                         result = self.proxy.command_inout_reply(cid)
                         break
-                    except PyTango.DevFailed,e:
+                    except PyTango.DevFailed as e:
                         if 'AsynReplyNotArrived' in str(e): 
                             pass
                         #elif any(q in str(e) for q in ('DeviceTimedOut','BadAsynPollId')):

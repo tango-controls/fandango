@@ -57,7 +57,7 @@ It will centralize the DeviceProxy access, and will avoid its use when internal 
 
 import PyTango
 import threading
-import objects
+from . import objects
 
 #These objects will be used by DeviceServer to create PyTango.PyUtil and PyTango.Util and keep servers data
 #py = None
@@ -144,15 +144,15 @@ class DeviceList(dict):
         #signal.signal(signal.SIGABRT,self.delete_device)
         #signal.signal(signal.SIGKILL,self.delete_device)
         while not self.dp_stopEvent.isSet():
-            for dname,idev in self.iteritems():
+            for dname,idev in self.items():
                 if self.dp_stopEvent.isSet(): break
-                print '*'*80
-                print 'in DevsList.check_proxies, ...'
-                print '*'*80
+                print('*'*80)
+                print('in DevsList.check_proxies, ...')
+                print('*'*80)
                 
                 self.dp_lock.acquire()
                 if self[dname].State==PyTango.DevState.UNKNOWN:
-                    print 'in DevsList.check_proxies, [%s] is UNKNOWN'%dname
+                    print('in DevsList.check_proxies, [%s] is UNKNOWN'%dname)
                     try:
                         idev.dp = PyTango.DeviceProxy(dname)
                         idev.dp.set_timeout_millis(1000)
@@ -161,9 +161,9 @@ class DeviceList(dict):
                         #idev.check_dp_attributes()
                         idev.dp_errors=0
                         idev.last_time=time.time()                    
-                        print "In DevsList.check_proxies: proxy to "+self.ParentName+" device initialized."
-                    except Exception,e:
-                        print 'EXCEPTION in DevsList.check_proxies:, %s Proxy Initialization failed!'%dname,getLastException()
+                        print("In DevsList.check_proxies: proxy to "+self.ParentName+" device initialized.")
+                    except Exception as e:
+                        print('EXCEPTION in DevsList.check_proxies:, %s Proxy Initialization failed!'%dname,getLastException())
                         idev.State=PyTango.DevState.UNKNOWN
                         idev.dp_errors+=1
                         #del self.dp; self.dp=None
@@ -171,13 +171,13 @@ class DeviceList(dict):
                     try:
                         idev.dp.ping()
                         #idev.check_dp_attributes_epoch()
-                    except Exception,e:
-                        print 'EXCEPTION in DevsList.check_proxies, Ping to device ',self.ParentName,' failed!: ',getLastException()
+                    except Exception as e:
+                        print('EXCEPTION in DevsList.check_proxies, Ping to device ',self.ParentName,' failed!: ',getLastException())
                         idev.State=PyTango.DevState.UNKNOWN
                         self.dp_errors+=1
                         #del self.dp; self.dp=None
                 
-                if all([v.State==UNKNOWN for v in self.values()]):
+                if all([v.State==UNKNOWN for v in list(self.values())]):
                     self.set_state(PyTango.DevState.UNKNOWN)
                 elif idev.State==PyTango.DevState.INIT:
                     self.set_state(PyTango.DevState.INIT)

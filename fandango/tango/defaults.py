@@ -69,7 +69,7 @@ from fandango.excepts import exc2str
 global TAU,USE_TAU,TAU_LOGGER
 TAU,USE_TAU = None,False
 def loadTaurus():
-    print('%s fandango.tango.loadTaurus()'%time.ctime())
+    print(('%s fandango.tango.loadTaurus()'%time.ctime()))
     global TAU,USE_TAU,TAU_LOGGER
     try:
         assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
@@ -94,7 +94,7 @@ TANGO_COLORS = \
   'Lime White White Lime White Lime LightBlue Yellow Red Brown LightBlue'\
       ' Orange Magenta Grey'.split()
 
-TANGO_STATE_COLORS = dict(zip(TANGO_STATES,TANGO_COLORS))
+TANGO_STATE_COLORS = dict(list(zip(TANGO_STATES,TANGO_COLORS)))
 
 ATTR_ALARM = AttrQuality.ATTR_ALARM
 ATTR_WARNING = AttrQuality.ATTR_WARNING
@@ -202,7 +202,7 @@ def get_tango_host(dev_name='',use_db=False):
             host = os.getenv('TANGO_HOST') 
             return host or get_tango_host(use_db=True) 
     except:
-        print('ERROR: get_tango_host(): '+traceback.format_exc())
+        print(('ERROR: get_tango_host(): '+traceback.format_exc()))
         return 'localhost:10000'
     
 def get_database(host='',port='',use_tau=False): 
@@ -234,7 +234,7 @@ def get_database(host='',port='',use_tau=False):
             #TangoDatabase.check_tango_host(TangoDatabase.get_db_host()\
                 #+':'+TangoDatabase.get_db_port())
             #TangoDatabase.get_timeout_millis()
-            print(time.time()-t)
+            print((time.time()-t))
             return TangoDatabase 
         except:
             #traceback.print_exc()
@@ -247,7 +247,7 @@ def get_database(host='',port='',use_tau=False):
         if not args: TangoDatabase = db
         return db
     except:
-        print(traceback.format_exc())
+        print((traceback.format_exc()))
     return
         
 def get_proxy(argin,use_tau=False,keep=False):
@@ -261,7 +261,7 @@ def get_proxy(argin,use_tau=False,keep=False):
 
 def get_device(dev,use_tau=False,keep=False): 
     if use_tau and not TAU: use_tau = loadTaurus()
-    if isinstance(dev,basestring): 
+    if isinstance(dev,str): 
         if dev.count('/')==1: dev = 'dserver/'+dev
         if use_tau and TAU: 
             return TAU.Device(dev)
@@ -292,8 +292,8 @@ def get_database_device(use_tau=False,db=None):
                if db else dev_name
            td = get_device(dev_name,use_tau=use_tau)
         except: 
-           print('get_database_device(%s,use_tau=%s,db=%s)'
-                 %(dev_name,use_tau,db))
+           print(('get_database_device(%s,use_tau=%s,db=%s)'
+                 %(dev_name,use_tau,db)))
            traceback.print_exc()
         if db is None: 
           TangoDevice = td
@@ -357,8 +357,8 @@ class fakeAttributeValue(object):
     
     def throw_exception(self,msg=''):
         self.err = self.error = msg or traceback.format_exc()
-        print('fakeAttributeValue(%s).throw_exception(%s)'
-              %(self.name,self.error))
+        print(('fakeAttributeValue(%s).throw_exception(%s)'
+              %(self.name,self.error)))
         #event_type = fakeEventType.lookup['Error']
         self.set_value(None)
         self.set_quality(PyTango.AttrQuality.ATTR_INVALID)
@@ -449,7 +449,7 @@ class ProxiesDict(CaselessDefaultDict,Object):
         if self.tango_host and ':' not in dev_name:
             dev_name = self.tango_host + '/' + dev_name
             
-        if dev_name not in self.keys():
+        if dev_name not in list(self.keys()):
             self.log.debug( 'Getting a Proxy for %s'%dev_name)
             
             try:
@@ -459,8 +459,8 @@ class ProxiesDict(CaselessDefaultDict,Object):
                 dev = (attrklass if 
                     str(dev_name).count('/')==(4 if ':' in dev_name else 3) 
                     else devklass)(dev_name)
-            except Exception,e:
-                print('ProxiesDict: %s doesnt exist!'%dev_name)
+            except Exception as e:
+                print(('ProxiesDict: %s doesnt exist!'%dev_name))
                 dev = None
         return dev
       
@@ -484,7 +484,7 @@ class ProxiesDict(CaselessDefaultDict,Object):
         '''Removes a device from the dict'''
         if self.tango_host and ':' not in dev_name:
             dev_name = self.tango_host + '/' + dev_name
-        if dev_name not in self.keys(): return
+        if dev_name not in list(self.keys()): return
         self.log.debug( 'Deleting the Proxy for %s'%dev_name)
         return CaselessDefaultDict.pop(self,dev_name)
         

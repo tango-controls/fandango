@@ -58,26 +58,26 @@ TM4 = '.',False
 
 def generate_rest_files(module,path='source'):
   import fandango
-  print '\n'*5
-  print 'Writing documentation settings to %s/*rst' % (path)
+  print('\n'*5)
+  print('Writing documentation settings to %s/*rst' % (path))
   if fandango.isString(module): module = fandango.loadModule(module)
-  submodules = [(o,v) for o,v in vars(module).items()
+  submodules = [(o,v) for o,v in list(vars(module).items())
     if inspect.ismodule(v) and v.__name__.startswith(module.__name__)]
 
   for o,v in submodules:
     filename = path+'/'+o+'.rst'
     if not os.path.isfile(filename):
-      print('writing %s'%filename)
+      print(('writing %s'%filename))
       open(filename,'w').write(DEFAULT_MODULE%(v.__name__,'='*len(v.__name__),v.__name__))
       
         
   print('\nWrite this into index.rst:\n')
-  print("""
+  print(("""
   .. toctree::
      :maxdepth: 2
      
      """+
-     '\n     '.join([t[0] for t in submodules]))
+     '\n     '.join([t[0] for t in submodules])))
 
 def get_rest_title(string,char='=',double_line=False):
     txt = char*len(string) if double_line else ''
@@ -95,7 +95,7 @@ def get_vars_docs(module_name,module_vars,title='Variables',subtitle=True):
     return ''
 
 def get_function_docs(module_name,module_vars,title='Functions',subtitle=True):
-  functions = [(f,v) for f,v in module_vars.items() 
+  functions = [(f,v) for f,v in list(module_vars.items()) 
                if inspect.isfunction(v) and v.__module__==module_name]
   defs = [(get_rest_title(f[0],*TM3) if subtitle else '')+DEFAULT_FUNCTION%(module_name,f[0]) 
           for f in functions]
@@ -105,7 +105,7 @@ def get_function_docs(module_name,module_vars,title='Functions',subtitle=True):
     return ''
 
 def get_class_docs(module_name,module_vars,title='Classes',subtitle=True):
-  classes = [(f,v) for f,v in module_vars.items() 
+  classes = [(f,v) for f,v in list(module_vars.items()) 
              if inspect.isclass(v) and v.__module__==module_name]
   defs = [(get_rest_title(f[0],*TM3) if subtitle else '')+DEFAULT_CLASS%(module_name,f[0]) 
           for f in classes]
@@ -138,7 +138,7 @@ def get_fn_autodoc(module_name,module_scope,module_vars=[],module_doc='',module_
       if not any(c in module_doc for c in ('contents::','toctree::')):
           module_doc = '.. contents::\n\n' + module_doc
       module_doc = get_autodoc(module_name,module_scope,module_vars,module_doc ,module_postdoc=post)
-    except: print('failed to update %s.__doc__'%module_name)
+    except: print(('failed to update %s.__doc__'%module_name))
     return module_doc
 
 if __name__ == '__main__':

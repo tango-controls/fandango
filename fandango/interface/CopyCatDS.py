@@ -47,7 +47,7 @@ def get_cmd_descriptions(device):
 def copy_cmd_list(device):
     cmd_list = {}
     cmd_objs = get_cmd_descriptions(device)
-    for c,obj in cmd_objs.items():
+    for c,obj in list(cmd_objs.items()):
         cmd_list[c] = [[obj.in_type,obj.in_type_desc],[obj.out_type,obj.out_type_desc]]
     return cmd_list
         
@@ -59,7 +59,7 @@ def get_attr_descriptions(device):
 def copy_attr_list(device):
     attr_list = {}
     attr_objs = get_attr_descriptions(device)
-    for a,obj in attr_objs.items():
+    for a,obj in list(attr_objs.items()):
         attr_list[a] = [[PyTango.CmdArgType.values[obj.data_type],obj.data_format,obj.writable]]
         if obj.data_format == PyTango.SPECTRUM: attr_list[a][0].append(obj.max_dim_x)
         if obj.data_format == PyTango.IMAGE: attr_list[a][0].append(obj.max_dim_y)
@@ -70,7 +70,7 @@ def choose_db(url,default=None):
         return default
     import os
     thost = os.getenv('TANGO_HOST') if ':' not in url else url.split('/')[0]
-    print 'TANGO_HOST=%s'%thost
+    print('TANGO_HOST=%s'%thost)
     return PyTango.Database(*thost.split(':'))
     
 class Doppelganger(fandango.SingletonMap):
@@ -195,19 +195,19 @@ class CopyCatServer(DynamicServer):
         #fandango.tango.get_device_property failed!     desc = BAD_INV_ORDER CORBA system exception: BAD_INV_ORDER_ORBHasShutdown
         #doppels = dict((d,(db.get_device_property(d,['TargetDevice'])['TargetDevice'] or [''])[0]) for d in self.classes['CopyCatDS'])
         ks = [k for k in self.classes if fandango.matchCl('CopyCatDS|(^*Copy$)',k)]
-        print 'classes: %s'%ks
+        print('classes: %s'%ks)
         doppels = sorted(set(t for k in ks for t in self.classes[k]))
-        print 'copycat devices: %s'%doppels
+        print('copycat devices: %s'%doppels)
         targets = dict((d,fandango.tango.get_device_property(d,'TargetDevice')) for d in doppels)
         classes = {}
-        print 'targets: %s'%targets
+        print('targets: %s'%targets)
         if class_override:
             for t in set(targets.values()):
                 if t: classes[t] = choose_db(t,self.db).get_class_for_device(t if ':' not in t else t.split('/',1)[-1])
-            print 'Devices: \n%s'%"\n".join(sorted('%s = %s(%s)'%(d,t,classes.get(t,None)) for d,t in targets.items()))
+            print('Devices: \n%s'%"\n".join(sorted('%s = %s(%s)'%(d,t,classes.get(t,None)) for d,t in list(targets.items()))))
         if class_override and classes:
             for c in set(classes.values()):
-                print('Adding %s_Copy ...'%c)
+                print(('Adding %s_Copy ...'%c))
                 import fandango.interface
                 setattr(fandango.interface,'%s_Copy',CopyCatDS),setattr(fandango.interface,'%s_CopyClass',CopyCatDSClass)
                 self.util.add_TgClass(CopyCatDSClass,CopyCatDS,c+'_Copy')
@@ -223,11 +223,11 @@ class CopyCatServer(DynamicServer):
         
 def __test_Doppelganger(target = 'sys/tg_test/1'):
     dg = Doppelganger(target)
-    print('%d commands'%len(dg.commands))
-    print(dg.commands.items()[0])
+    print(('%d commands'%len(dg.commands)))
+    print((list(dg.commands.items())[0]))
     print('\n')
-    print('%d attributes'%len(dg.attributes))
-    print(dg.attributes.items()[0])
+    print(('%d attributes'%len(dg.attributes)))
+    print((list(dg.attributes.items())[0]))
     
 def __test_CopyCatDS(target = 'sys/tg_test/1'):
     fandango.tango.add_new_device('CopyCatDS/test','CopyCatDS','test/copycatds/01')
@@ -240,7 +240,7 @@ def main(args=None):
     args = args or sys.argv
     if '--test' in sys.argv:
         __test_Doppelganger('sys/tg_test/1')
-        print '\n'
+        print('\n')
         __test_CopyCatDS('sys/tg_test/1',class_override=True)
     else:
         ds = CopyCatServer('CopyCatDS/'+sys.argv[1],log=(sys.argv[2:] or ['-v2'])[0])

@@ -34,13 +34,14 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
 
-import Queue,traceback,time,sys,os
+import traceback,time,sys,os
 from functools import partial
 import fandango
 from fandango.functional import *
 from fandango.log import Logger,shortstr
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton,Decorated,Decorator,ClassDecorator,BoundDecorator
+from fandango.threads import Queue
 
 def getQt(full=False):
     """
@@ -728,8 +729,6 @@ class QWorker(Qt.QThread):
     
         <pre>
         #Applying TauEmitterThread to an existing class:
-        import Queue
-        from functools import partial
         
         def modelSetter(args):
             obj,model = args[0],args[1]

@@ -36,9 +36,10 @@
 ###########################################################################
 
 import csv,sys,re,operator,traceback
-import functional as fun
+from . import functional as fun
 from fandango.log import printf
 from fandango.dicts import SortedDict
+import collections
 try: import numpy as np
 except: np = None
 
@@ -89,8 +90,8 @@ def decimator(data,min_inc=.05,min_rel=None,
         count += 1
         
     if count>=max_iter: print('Unable to decimate data!')
-    print('\t[%d] -> [%d] in %d iterations, inc = %s'
-          %(start,len(data),count,min_inc))
+    print(('\t[%d] -> [%d] in %d iterations, inc = %s'
+          %(start,len(data),count,min_inc)))
     return data
     
 def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
@@ -104,8 +105,8 @@ def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
     """
     if len(seq)<3: return seq
     if len(seq[0])<2: return seq
-    import __builtin__
-    cmp = cmp or __builtin__.cmp
+    import builtins
+    cmp = cmp or builtins.cmp
     pops = pops if pops is not None else []
     while pops: pops.pop() 
     x0,x1,x2 = seq[0],seq[1],seq[2]
@@ -230,14 +231,14 @@ def maxdiff(*args):
     if None in seq: return None
     try:
         return sorted((fun.absdiff(s,ref),s) for s in seq)[-1][-1]
-    except Exception,e:
-        print args
+    except Exception as e:
+        print(args)
         raise e
 
 def notnone(*args):
     seq,ref = args[0],fun.first(args[1:] or [0])
     method = fun.first(args[2:] or [average])
-    print 'notnone from %s'%ref
+    print('notnone from %s'%ref)
     try:
       if np: 
           return method(*((v for v in seq if v is not None 
@@ -318,13 +319,13 @@ from math import log10
 def logroof(x):
     m = math.floor(log10(x))
     i = float(x)/10**m
-    v = (v for v,k in ((1,i<1),(2,i<2),(5,i<5),(10,True)) if k).next()
+    v = next((v for v,k in ((1,i<1),(2,i<2),(5,i<5),(10,True)) if k))
     return v*(10**m)
 
 def logfloor(x):
     m = math.floor(log10(x))
     i = float(x)/10**m
-    v = (v for v,k in ((0.1,i<1),(1,i<2),(2,i<5),(5,True)) if k).next()
+    v = next((v for v,k in ((0.1,i<1),(1,i<2),(2,i<5),(5,True)) if k))
     return v*(10**m)
 
 def get_max_step(data,index=False):
@@ -343,10 +344,10 @@ def get_histogram(data,n=20,log=False):
     import math
     mn = logfloor(min(data))
     mx = logroof(max(data))
-    print('data=[%e:%e],ranges=[%e:%e]'%(min(data),max(data),mn,mx))
+    print(('data=[%e:%e],ranges=[%e:%e]'%(min(data),max(data),mn,mx)))
     if log: mn,mx = log10(mn),log10(mx)
     step = float(mx-mn)/n
-    print('mn,mx,step = %s, %s, %s'%(mn,mx,step))
+    print(('mn,mx,step = %s, %s, %s'%(mn,mx,step)))
     ranges = []
     for i in range(n):     
         r0 = mn+i*step
@@ -362,11 +363,11 @@ def print_histogram(data,n=20):
     ranges = [min(data)]+[h[0] for h in hist[1:]]+[mx]
     for i,h in enumerate(hist):
         r = 100*float(h[1])/total
-        print('%25s : %6s : %s'%(
+        print(('%25s : %6s : %s'%(
             '%e < %e'%(ranges[i],ranges[i+1]),
             '%2.1f%%'%r,
             ' *'*(1+int(r/10.))
-            ))
+            )))
 
 def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                  trace=False):
@@ -384,7 +385,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     """
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     tfloor = lambda x: int(fun.floor(x,window))
-    begin,end,window = map(int,((begin,end,window)))
+    begin,end,window = list(map(int,((begin,end,window))))
     
     #CUT-OFF; removing data out of interval    
     #--------------------------------------------------------------------------
@@ -397,15 +398,15 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         if data[-1][0]<begin: 
             prev,data = data[-1],[]
         else: 
-            i = (i for i,v in enumerate(data) if v[0]>=begin).next()-1
+            i = next((i for i,v in enumerate(data) if v[0]>=begin))-1
             prev,data = data[i],data[i+1:]
     if end and data and data[-1][0]>end:
         if data[0][0]>end:
             post,data = data[0],[]
         else:
-            j = (j for j,v in enumerate(data) if v[0]>end).next()
+            j = next((j for j,v in enumerate(data) if v[0]>end))
             post,data = data[j],data[:j]
-    if trace: print 'prev,post: %s,%s'%(prev,post)
+    if trace: print('prev,post: %s,%s'%(prev,post))
     
     if not data:
         if prev or post:
@@ -420,7 +421,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         nx =  prev and prev[1] or data[0][1]
         ndata = [(tt+window,nx) for tt in range(tfloor(begin),
                                                 tfloor(data[0][0]),window)]
-        if trace: print 'prev: %s'%str(ndata and ndata[-1])
+        if trace: print('prev: %s'%str(ndata and ndata[-1]))
     else: 
         ndata =[]
     
@@ -429,7 +430,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     i,i0 = 0,0
     next = []
     ilast = len(data)-1
-    if trace: print 't0: %s' % (window+tfloor(data[0][0]-1))
+    if trace: print('t0: %s' % (window+tfloor(data[0][0]-1)))
     try:
         for t in range(window+tfloor(data[0][0]-1),
                        1+window+tfloor(max((end,data[-1][0]))),window):
@@ -461,10 +462,10 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                 else: nx = None
                 ndata.append((t,nx))
                 #print 'post: %s'%str(ndata[-1])
-    except Exception,e:
-        print i0,'-',i,'/',ilast,':',filling,':',data[i0:i]
-        print ndata and ndata[-1] 
-        print ndata and ndata[-1] and ndata[-1][-1]
+    except Exception as e:
+        print(i0,'-',i,'/',ilast,':',filling,':',data[i0:i])
+        print(ndata and ndata[-1]) 
+        print(ndata and ndata[-1] and ndata[-1][-1])
         raise Exception(traceback.format_exc())
     return ndata
     
@@ -474,7 +475,7 @@ def get_tree_depth(tree,depth=0):
     if not hasattr(tree,'values'):
         return depth
     else:
-        depths = [get_tree_depth(v,depth) for v in tree.values()]
+        depths = [get_tree_depth(v,depth) for v in list(tree.values())]
         return 1+depth+(max(depths) if depths else 0)
 
 def dict2array(dct,branch_filter=None,leave_filter=None,empty=None):
@@ -510,7 +511,7 @@ def dict2array(dct,branch_filter=None,leave_filter=None,empty=None):
     
     def expand(d,level):#,nrows=nrows,ncols=ncols):
         #self.debug('\texpand(%s(%s),%s)'%(type(d),d,level))
-        for k,v in sorted(d.items() if hasattr(d,'items') else d):
+        for k,v in sorted(list(d.items()) if hasattr(d,'items') else d):
             if branch_filter and not branch_filter(k):
                 continue
             zero = data['nrows']
@@ -533,7 +534,7 @@ def dict2array(dct,branch_filter=None,leave_filter=None,empty=None):
     [table[r].append(empty) for c in range(data.pop('ncols')) 
         for r in range(len(table))]
     
-    for coord,value in data.items(): 
+    for coord,value in list(data.items()): 
         table[coord[0]][coord[1]] = value
         
     return table
@@ -626,15 +627,15 @@ def values2text(table,order=None,sep='\t',eof='\n',header=True):
     start = time.time()
     if not order or not all(k in order for k in table): 
         keys = list(sorted(table.keys()))
-    else: keys = sorted(table.keys(),key=order.index)
+    else: keys = sorted(list(table.keys()),key=order.index)
     value_to_text = \
         lambda s: str(s).replace('None','').replace('[','').replace(']','')
-    is_timed = fun.isSequence(table.values()[0][0]) \
-                and len(table.values()[0][0])==2
+    is_timed = fun.isSequence(list(table.values())[0][0]) \
+                and len(list(table.values())[0][0])==2
     csv = '' if not header else (sep.join((['date','time'] \
             if is_timed else [])+keys)+eof)
 
-    for i,t in enumerate(table.values()[0]):
+    for i,t in enumerate(list(table.values())[0]):
         if is_timed:
             row = [fun.time2str(t[0]),str(t[0])]+\
                 [value_to_text(table[k][i][-1]) for k in keys]
@@ -665,13 +666,13 @@ def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,
     table = dict((k,list()) for k in keys)
     index = dict((k,0) for k in keys)
     lasts = dict((k,(0,None)) for k in keys)
-    first = min([t[0][0] if t else 1e12 for t in values.values()])
-    last = max([t[-1][0] if t else 0 for t in values.values()])
+    first = min([t[0][0] if t else 1e12 for t in list(values.values())])
+    last = max([t[-1][0] if t else 0 for t in list(values.values())])
 
     if resolution is None:
         #Avg: aproximated time resolution of each row
         avg = ((last-first)/
-               min((AUTO_SIZE/6,max(len(v) for v in values.values()) or 1)))
+               min((AUTO_SIZE/6,max(len(v) for v in list(values.values())) or 1)))
         if avg < 10: 
             resolution = 1
         elif 10 <= avg<60: 
@@ -682,21 +683,21 @@ def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,
             resolution = 600
         else: 
             resolution = 3600 #defaults
-        print('correlate_values(...) resolution set to %2.3f -> %d s'
-              %(avg,resolution))
+        print(('correlate_values(...) resolution set to %2.3f -> %d s'
+              %(avg,resolution)))
         
     assert resolution>MIN_RESOLUTION, 'Resolution must be > %s'%MIN_RESOLUTION
     if rule is None: rule = fun.partial(choose_first_value,tmin=-resolution*10)
     
     #if rule is None: 
     #   rule = fun.partial(choose_last_max_value,tmin=-resolution*10)
-    epochs = range(int(first*1000-resolution*1000),
+    epochs = list(range(int(first*1000-resolution*1000),
                    int(last*1000+resolution*1000),
-                   int(resolution*1000)) #Ranges in milliseconds
+                   int(resolution*1000))) #Ranges in milliseconds
     
     if MAX_SIZE: epochs = epochs[:MAX_SIZE]
     
-    for k,data in values.items():
+    for k,data in list(values.items()):
         #print('Correlating %s->%s values from %s'%(len(data),len(epochs),k))
         i,v = 0,data[0] if data else (first,None)
         end = data[-1][0] if data else (last,None)
@@ -751,7 +752,7 @@ def correlate_values(values,stop=None,resolution=None,debug=False,rule=None,
 class FuzzyDict(dict):
     ## @todo TODO
     def __getitem__(self,key):
-        raise Exception,'FuzzyDictNotImplemented'
+        raise Exception('FuzzyDictNotImplemented')
         try:
             return dict.__getitem__(self,key)
         except:
@@ -795,8 +796,8 @@ class Grid(dict):
         self.colNames = list(colNames)
         # Check for no shared row and col names
         if set(rowNames).intersection(colNames):
-            raise ValueError, 'Row and column lists must not have '\
-                'any values in common'
+            raise ValueError('Row and column lists must not have '\
+                'any values in common')
     def __getitem__(self, key):
         """
         Here is an example with data:
@@ -850,7 +851,7 @@ class Grid(dict):
             return [ dict.__getitem__(self, (row, key)) 
                     for row in self.rowNames ]
         else:
-            raise KeyError, key
+            raise KeyError(key)
     def __setitem__(self, key, value):
         if self._isCellKey(key):
             return dict.__setitem__(self, key, value)
@@ -861,8 +862,8 @@ class Grid(dict):
             for row, val in zip(self.rowNames, value):
                 dict.__setitem__(self, (row, key), val)
         else:
-            raise ValueError, 'Invalid key or value: Grid[%r] = %r' \
-                                % (key, value)
+            raise ValueError('Invalid key or value: Grid[%r] = %r' \
+                                % (key, value))
     def _isCellKey(self, key):
         """ Is key a valid cell index? """
         return isinstance(key, tuple) \
@@ -959,7 +960,7 @@ class TimedQueue(list):
         """ Initializes the list with a sequence or an initial value. """
         if arg is None:
             list.__init__(self)
-        elif operator.isSequenceType(arg):
+        elif isinstance(arg, collections.Sequence):
             list.__init__(self,arg)
         else:
             list.__init__(self)
@@ -1057,15 +1058,15 @@ class CSVArray(object):
                 sample = flines[index]
                 self.dialect = csv.Sniffer().sniff(sample)
                 if self.trace: 
-                    print('Dialect extracted is %s'
-                          %(str(self.dialect.__dict__)))
+                    print(('Dialect extracted is %s'
+                          %(str(self.dialect.__dict__))))
                 readed = [r for r in csv.reader(flines, self.dialect)]
             else:
                 readed = [ r for r in csv.reader(flines, delimiter=delimiter)]
                 #readed = csv.reader(fl, delimiter='\t')
                 
-        except Exception,e:
-            print 'Exception while reading %s: %s' % (filename,str(e))
+        except Exception as e:
+            print('Exception while reading %s: %s' % (filename,str(e)))
         finally:
             try: fl.close()
             except: pass
@@ -1087,7 +1088,7 @@ class CSVArray(object):
                         #that the filter is matched for any column in filters
                         check = all( (k not in headers 
                             or re.match(f,row2[headers.index(k)].lower()) ) 
-                            for k,f in filters.items())
+                            for k,f in list(filters.items()))
                         
                     if i<=header or not filters or not rows or check:
                         rows.append(row2)                        
@@ -1115,10 +1116,10 @@ class CSVArray(object):
                 rows[i] = r[:ncols]
             
             if 1: #self.trace: 
-                print('Longer line is %d: %s'
-                      % (ncols,longer))
-                print('Header line is %d: %s' 
-                      % (len(rows[header]),rows[header]))
+                print(('Longer line is %d: %s'
+                      % (ncols,longer)))
+                print(('Header line is %d: %s' 
+                      % (len(rows[header]),rows[header])))
                 
             #ncols = max(len(row) for row in rows) if rows else 0
             
@@ -1134,8 +1135,8 @@ class CSVArray(object):
         self.rows=rows;self.cols=cols; 
         self.nrows=len(rows); self.ncols=len(cols)
         if self.trace: 
-            print('CSVArray initialized as a ',
-                  self.nrows,'x',self.ncols,' matrix')
+            print(('CSVArray initialized as a ',
+                  self.nrows,'x',self.ncols,' matrix'))
     
     #@Catched
     def save(self,filename=None):
@@ -1149,7 +1150,7 @@ class CSVArray(object):
         writer.writerows(self.rows);
 
         if self.trace: 
-            print('CSVArray written as a ',self.nrows,'x',self.ncols,' matrix')
+            print(('CSVArray written as a ',self.nrows,'x',self.ncols,' matrix'))
         fl.close()
         
     #@Catched
@@ -1163,12 +1164,12 @@ class CSVArray(object):
         """
         x,y = x+self.xoffset,y+self.yoffset
         if self.trace: 
-            print('CSVArray.resize(',x,',',y,'), '
-                  'actual size is (%d,%d)' % (self.nrows,self.ncols))
+            print(('CSVArray.resize(',x,',',y,'), '
+                  'actual size is (%d,%d)' % (self.nrows,self.ncols)))
         if len(self.rows)!=self.nrows: 
-            print 'The Size of the Array has been corrupted!'
+            print('The Size of the Array has been corrupted!')
         if len(self.cols)!=self.ncols: 
-            print 'The Size of the Array has been corrupted!'
+            print('The Size of the Array has been corrupted!')
         
         if x<self.nrows:
             #print 'Deleting %d rows' % (self.nrows-x)
@@ -1184,7 +1185,7 @@ class CSVArray(object):
                 self.cols[i]=self.cols[i]+['']*(x-self.nrows)
         self.nrows = x
         if len(self.rows)!=self.nrows: 
-            print 'The Size of the Array Rows has been corrupted!'
+            print('The Size of the Array Rows has been corrupted!')
         
         if y<self.ncols:
             #print 'Deleting %d columns' % (self.ncols-y)
@@ -1202,11 +1203,11 @@ class CSVArray(object):
             print('The Size of the Array Columns has been corrupted!')
         
         if 1: #self.trace: 
-            print('CSVArray.rows dimension is now ',
-                  len(self.rows),'x',max([len(r) for r in self.rows]))
+            print(('CSVArray.rows dimension is now ',
+                  len(self.rows),'x',max([len(r) for r in self.rows])))
         if self.trace: 
-            print('CSVArray.cols dimension is now ',
-                  len(self.cols),'x',max([len(c) for c in self.cols]))
+            print(('CSVArray.cols dimension is now ',
+                  len(self.cols),'x',max([len(c) for c in self.cols])))
         return x,y
         
     ###########################################################################
@@ -1229,16 +1230,16 @@ class CSVArray(object):
         ##Getting row/column/cell using 'axxis is None' as a degree of freedom
         if y is None: #Returning a row
             x = x or 0
-            if self.trace: print 'Getting the row ',x
+            if self.trace: print('Getting the row ',x)
             result = self.rows[self.xoffset+x][self.yoffset:]
         elif x is None: #Returning a column
-            if self.trace: print 'Getting the column ',y
+            if self.trace: print('Getting the column ',y)
             result = self.cols[self.yoffset+y][self.xoffset:]
         else: #Returning a single Cell
             result = self.rows[self.xoffset+x][self.yoffset+y]
 
-        if self.trace and xsubset: print 'using xsubset ',xsubset
-        if self.trace and ysubset: print 'using ysubset ',ysubset
+        if self.trace and xsubset: print('using xsubset ',xsubset)
+        if self.trace and ysubset: print('using ysubset ',ysubset)
         
         if not distinct: 
             #if getting a column and theres an xsubset
@@ -1248,8 +1249,8 @@ class CSVArray(object):
             return result
 
         if self.trace: 
-            print('Getting only distinct values from ',
-                  ['%d:%s'%(i,result[i]) for i in range(len(result))])
+            print(('Getting only distinct values from ',
+                  ['%d:%s'%(i,result[i]) for i in range(len(result))]))
             
         ## DISTINCT VALUES, returns a dictionary with the distinct values 
         # (initialized with first match)
@@ -1263,11 +1264,11 @@ class CSVArray(object):
             if x is None and xsubset and i not in xsubset: continue
             #If we are returning a row, columns must be in the subset
             if y is None and ysubset and i not in ysubset: continue
-            if result[i] not in values.keys():
+            if result[i] not in list(values.keys()):
                 values[result[i]]=[i]
             else:
                 values[result[i]].append(i)
-        if self.trace: print 'Values are ',values
+        if self.trace: print('Values are ',values)
         return values
     
     def getd(self,row):
@@ -1297,9 +1298,9 @@ class CSVArray(object):
         """
         try:
             if self.trace: 
-                print('CSVArray.set(x=',x,',y=',y,',val=',val,
-                      ',xoffset=',self.xoffset,',yoffset=',self.yoffset,')')
-            val = val if type(val) in [int,long,float] else (val or '')
+                print(('CSVArray.set(x=',x,',y=',y,',val=',val,
+                      ',xoffset=',self.xoffset,',yoffset=',self.yoffset,')'))
+            val = val if type(val) in [int,int,float] else (val or '')
             if x is None or x<0:
                 #Setting a column
                 if len(val)>self.nrows or len(val)<0: 
@@ -1317,9 +1318,9 @@ class CSVArray(object):
             else:
                 self.rows[self.xoffset+int(x)][self.yoffset+int(y)]=val
                 self.cols[self.yoffset+int(y)][self.xoffset+int(x)]=val
-        except Exception,e:
-            print('CSVArray[%d,%d].set(%s,%s,%s) failed!\n%s'%(len(self.rows),
-                len(self.cols),x,y,val,traceback.format_exc()))
+        except Exception as e:
+            print(('CSVArray[%d,%d].set(%s,%s,%s) failed!\n%s'%(len(self.rows),
+                len(self.cols),x,y,val,traceback.format_exc())))
             raise e
     
     def setRow(self,x,val):
@@ -1345,7 +1346,7 @@ class CSVArray(object):
             Hrow = self.rows[header]
         if head not in Hrow:
             if self.trace:
-                print('colByHead: Head="',head,'" does not exist in: %s'%Hrow)
+                print(('colByHead: Head="',head,'" does not exist in: %s'%Hrow))
             return None
         return Hrow.index(head)
         
@@ -1362,8 +1363,8 @@ class CSVArray(object):
         To force all the values to be filled set previous=True
         """
         if self.trace: 
-            print('CSVArray.fill(%s,%s,%s)'
-                  %tuple(str(s) for s in [y,head,previous]))
+            print(('CSVArray.fill(%s,%s,%s)'
+                  %tuple(str(s) for s in [y,head,previous])))
         if type(y) is str: head,y =  y,None
         c = y if y in range(self.ncols+1) else self.colByHead(head)
         column = self.get(y=c)
@@ -1381,7 +1382,7 @@ class CSVArray(object):
     #@Catched
     def expandAll(self):
         for c in range(self.ncols): 
-          if self.trace: print('CSVArray.expandAll(c=%s)'%c)
+          if self.trace: print(('CSVArray.expandAll(c=%s)'%c))
           self.fill(y=c)
         return self
         
@@ -1404,13 +1405,13 @@ class CSVArray(object):
         
         klines=self.get(y=root,distinct=True,xsubset=xsubset)
         if len(klines)==1 and root>lastbranch: #Return last columns as a list
-            return self.get(x=klines.values()[0][0],
-                            ysubset=range(root,self.ncols))
+            return self.get(x=list(klines.values())[0][0],
+                            ysubset=list(range(root,self.ncols)))
         elif root+1>=self.ncols: #Last columns as a dictionary
-            return dict.fromkeys(klines.keys(),{})
+            return dict.fromkeys(list(klines.keys()),{})
         else:
             tree={}
-            for k in klines.keys():
+            for k in list(klines.keys()):
                 tree[k]=self.getAsTree(root=root+1,xsubset=klines[k],
                                        lastbranch=lastbranch)
             return tree
@@ -1442,7 +1443,7 @@ class CSVArray(object):
                 
     def printArray(self):
         for r in range(len(self.rows)):
-            print r,':','\t'.join([str(e or '\t') for e in self.rows[r]])
+            print(r,':','\t'.join([str(e or '\t') for e in self.rows[r]]))
     
     pass #END OF CSVARRAY
 

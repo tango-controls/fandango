@@ -39,17 +39,20 @@ srubio@cells.es,
 2010
 """
 import time,threading,multiprocessing,traceback
-import imp,__builtin__,pickle,re
+import imp,builtins,pickle,re
 from threading import Event,Lock,RLock,Thread
 
-try: import Queue
-except: import queue as Queue
+try:
+    import Queue
+    import Queue as queue
+except:
+    import queue
+    import queue as Queue
 
-from log import except2str,shortstr,tracer
-from functional import *
-from excepts import trial,Catched,CatchedArgs
-from operator import isCallable
-from objects import Singleton,Object,SingletonMap
+from .log import except2str,shortstr,tracer
+from .functional import *
+from .excepts import trial,Catched,CatchedArgs
+from .objects import Singleton,Object,SingletonMap
 
 try: from collections import namedtuple #Only available since python 2.6
 except: pass
@@ -73,14 +76,14 @@ def wait(seconds,event=True,hook=None):
       elif hasattr(event,'wait'):
         try:
           event.wait(seconds)
-        except Exception,e:
+        except Exception as e:
           raise e
       else:
           _EVENT and _EVENT.wait(seconds)
       r+=2
-    except Exception,e:
+    except Exception as e:
       ## This method triggers unexpected exceptions on ipython exit
-      print('wait.hook failed!: %s,%s,%s,%s'%(event,event.wait,r,e))
+      print(('wait.hook failed!: %s,%s,%s,%s'%(event,event.wait,r,e)))
       if time: time.sleep(seconds)
         
 def timed_range(seconds,period,event=None):
@@ -229,7 +232,7 @@ class ThreadedObject(Object):
     if not e and traceback: 
       e = traceback.format_exc()
     self._last_exc = str(e)
-    print(msg+':'+self._last_exc)
+    print((msg+':'+self._last_exc))
   
   def set_queue(self,queue): 
     """
@@ -277,9 +280,9 @@ class ThreadedObject(Object):
   def start_hook(self,*args,**kwargs):
     """ redefine at convenience, it will return the arguments for target method """
     return [],{}
-    print('Starting push_loop(%s)'%self._timewait)
-    print('Sending %d events in bunches of %d every %f seconds'%(
-      self.MaxEvents,self.ConsecutiveEvents,self._timewait))
+    print(('Starting push_loop(%s)'%self._timewait))
+    print(('Sending %d events in bunches of %d every %f seconds'%(
+      self.MaxEvents,self.ConsecutiveEvents,self._timewait)))
     
     t0,t1,ts,self.send_buffer = time.time(),0,0,[]
     tnext = t0 + self._timewait  
@@ -368,7 +371,7 @@ class ThreadedObject(Object):
                 
                 self._count += 1
                 
-              except Exception,e:
+              except Exception as e:
                 self.print_exc(traceback and traceback.format_exc(),
                                'ThreadObject stop!')
                 raise e
@@ -380,7 +383,7 @@ class ThreadedObject(Object):
     
         print('ThreadedObject.Kill() ...')
         return #<< Should never get to this point
-    except Exception,e:
+    except Exception as e:
         self.print_exc(time and e,'ThreadObject exit!')
 
 ###############################################################################
@@ -412,7 +415,7 @@ class CronTab(object):
         self.keep = keep
         
         self.THREAD_CLASS = threading.Thread if not process else multiprocessing.Process
-        self.QUEUE_CLASS = Queue.Queue if not process else multiprocessing.Queue
+        self.QUEUE_CLASS = queue.Queue if not process else multiprocessing.Queue
         self.EVENT_CLASS = threading.Event if not process else multiprocessing.Event
         self.LOCK_CLASS = threading.RLock if not process else multiprocessing.RLock
 
@@ -425,7 +428,7 @@ class CronTab(object):
         """
         Crontab line parsing
         """
-        print 'In CronTab().load(%s)'%line
+        print(('In CronTab().load(%s)'%line))
         vals = line.split()
         if len(vals)<5: raise Exception('NotEnoughArguments')
         self.minute,self.hour,self.day,self.month,self.weekday = vals[:5]
@@ -465,7 +468,7 @@ class CronTab(object):
         """
         trace = trace or self.trace
         task = task or self.task
-        if trace: print 'In CronTab(%s).do_task(%s)'%(self.line,task)
+        if trace: print(('In CronTab(%s).do_task(%s)'%(self.line,task)))
         if isCallable(task):
             ret = task()
         elif isString(task):
@@ -477,13 +480,13 @@ class CronTab(object):
             if self._queue.full(): self.get()
             self._queue.put(ret,False)
         if trace: 
-            print 'CronTab(%s).do_task() => %s'%(self.line,ret)
+            print(('CronTab(%s).do_task() => %s'%(self.line,ret)))
             
     def get(self):
         return self._queue.get(False)
         
     def _run(self):
-        print 'CronTab thread started' 
+        print('CronTab thread started') 
         from fandango.linos import shell_command
         while not self.event.is_set():
             now = time.time()
@@ -491,14 +494,14 @@ class CronTab(object):
                 try:
                     self.do_task()
                 except:
-                    print 'CronTab thread exception' 
-                    print traceback.format_exc()
+                    print('CronTab thread exception') 
+                    print((traceback.format_exc()))
             self.event.wait(15)
-        print 'CronTab thread finished' 
+        print('CronTab thread finished') 
         return 
         
     def start(self):
-        print 'In CronTab(%s).start()'%self.line
+        print(('In CronTab(%s).start()'%self.line))
         if self._thread and self._thread.is_alive:
             self.stop()
         self._thread = self.THREAD_CLASS(target=self._run)
@@ -507,7 +510,7 @@ class CronTab(object):
         self._thread.start()
         
     def stop(self):
-        print 'In CronTab(%s).stop()'%self.line
+        print(('In CronTab(%s).stop()'%self.line))
         if self._thread and self._thread.is_alive:
             self.event.set()
             self._thread.join()
@@ -555,7 +558,7 @@ class WorkerThread(object):
         self._trace = trace
         self.hook=hook
         self.THREAD_CLASS = threading.Thread if not process else multiprocessing.Process
-        self.QUEUE_CLASS = Queue.Queue if not process else multiprocessing.Queue
+        self.QUEUE_CLASS = queue.Queue if not process else multiprocessing.Queue
         self.EVENT_CLASS = threading.Event if not process else multiprocessing.Event
         self.LOCK_CLASS = threading.RLock if not process else multiprocessing.RLock
 
@@ -586,11 +589,11 @@ class WorkerThread(object):
         try:
             self.getDone()
             try:
-                while True: print self.errorQueue.get(False)
-            except Queue.Empty: 
+                while True: print((self.errorQueue.get(False)))
+            except queue.Empty: 
                 pass
             return self.outQueue.get(False)
-        except Queue.Empty: 
+        except queue.Empty: 
             #if self.outQueue.qsize():
                 #print('FATAL PickleError, output queue has been lost')
                 #self.outQueue = self.QUEUE_CLASS()
@@ -602,7 +605,7 @@ class WorkerThread(object):
         result = []
         try:
             while True: result.append(self.outQueue.get(False))
-        except Queue.Empty:
+        except queue.Empty:
             pass
         return result
         
@@ -633,7 +636,7 @@ class WorkerThread(object):
             _trace=self._trace,_exception=WorkerException)
         
     def run(self):
-        print 'WorkerThread(%s) started!'%self._name
+        print(('WorkerThread(%s) started!'%self._name))
         logger = getattr(__builtin__,'print') if not self._process else (lambda s:(getattr(__builtin__,'print')(s),self.errorQueue.put(s)))
         while not self.stopEvent.is_set():
             try:
@@ -645,10 +648,10 @@ class WorkerThread(object):
                         value = self.process(target)
                         try: pickle.dumps(value)
                         except pickle.PickleError: 
-                            print traceback.format_exc()
+                            print((traceback.format_exc()))
                             raise WorkerException('UnpickableValue')
                         self.outQueue.put((model,value))
-                    except Exception,e:
+                    except Exception as e:
                         msg = 'Exception in WorkerThread(%s).run()\n%s'%(self._name,except2str())
                         print( msg)
                         self.outQueue.put((target,e))
@@ -658,15 +661,15 @@ class WorkerThread(object):
                     try: 
                         self.hook()
                     except: 
-                        print('Exception in WorkerThread(%s).hook()\n%s'%(self._name,except2str()))
-            except Queue.Empty:
+                        print(('Exception in WorkerThread(%s).hook()\n%s'%(self._name,except2str())))
+            except queue.Empty:
                 pass
             except:
-                print 'FATAL Exception in WorkerThread(%s).run()'%self._name
-                print except2str()
-        print 'WorkerThread(%s) finished!'%self._name
+                print(('FATAL Exception in WorkerThread(%s).run()'%self._name))
+                print((except2str()))
+        print(('WorkerThread(%s) finished!'%self._name))
         
-import objects
+from . import objects
 
 class SingletonWorker(WorkerThread,objects.Singleton):
     """
@@ -693,7 +696,7 @@ class SingletonWorker(WorkerThread,objects.Singleton):
     def flush(self):
         #It just flushes all received values
         l = []
-        l.extend(getattr(self,'_values',{}).items())
+        l.extend(list(getattr(self,'_values',{}).items()))
         l.extend(WorkerThread.flush(self))
         # Removing already finished commands from entry queue
         [self._queued.remove(v[0]) for v in l if v[0] in self._queued]
@@ -794,7 +797,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         self.stop()
         type(self).__base__.__del__(self)
     def trace(self,msg,level=0):
-        print '%s, %s: %s'%(time2str(),type(self).__name__,str(msg))
+        print(('%s, %s: %s'%(time2str(),type(self).__name__,str(msg))))
         
     def bind(self,target,args=None):
         self.send(self.__BIND,target=target,args=args)
@@ -813,7 +816,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         return self._process.is_alive() and self._receiver.is_alive()
     
     def keys(self): 
-        return self.data.keys()
+        return list(self.data.keys())
     def add(self,key,target=None,args=None,period=0,expire=0,callback=None):
         # Adds a command to be periodically executed
         data = self.data[key] = ProcessedData(key,target=target,args=args,period=period,expire=expire,callback=callback)
@@ -862,7 +865,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     @staticmethod
     def get_hash(d):
         """This method just converts a dictionary into a hashable type""" 
-        if isMapping(d): d = d.items()
+        if isMapping(d): d = list(d.items())
         if isSequence(d): d = sorted(d)
         return str(d)
         
@@ -870,17 +873,17 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
     def get_callable(key,executor=None):
         try:
             x = []
-            if isinstance(key,basestring):
+            if isinstance(key,str):
                 trial(lambda:x.append(evalX(key)),lambda:x.append(None))
             return first(a for a in (
                 key,
                 x and x[0],
-                isinstance(key,basestring) and getattr(executor,key,None), #key is a member of executor
+                isinstance(key,str) and getattr(executor,key,None), #key is a member of executor
                 getattr(executor,'process',None), #executor is a process object
                 executor, #executor is a callable
                 #isinstance(key,basestring) and evalX(key), # key may be name of function
                 ) if a and isCallable(a))
-        except StopIteration,e:
+        except StopIteration as e:
             return None
         
     #@staticmethod
@@ -912,7 +915,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                     if key!=self.__ALIVE: self.trace(shortstr('.Process: Received: %s => (%s,%s,%s)'%(str(t),key,target,args)))
                     last_alive,idle = time.time(),0 #Keep Alive Thread
                 elif scheduled and time.time()>paused:
-                    data = first(sorted((v.date+v.period,v) for n,v in scheduled.items()))[-1]
+                    data = first(sorted((v.date+v.period,v) for n,v in list(scheduled.items())))[-1]
                     if key not in scheduled and key is not None:
                         self.trace('Nothing in queue, checking scheduled tasks ...')
                     if (data.date+data.period)<=now: 
@@ -945,7 +948,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                         elif key == self.__BIND:
                             # Setting a new executor object
                             if isCallable(target): executor = target
-                            elif isinstance(target,basestring): executor = evalX(target,locals_,modules,instances)
+                            elif isinstance(target,str): executor = evalX(target,locals_,modules,instances)
                             else: executor = target
                             if isCallable(executor) and args is not None:
                                 if isMapping(args): executor = executor(**args)
@@ -958,7 +961,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                                 # Target is a set of arguments to Executor object
                                 exec_ = getattr(executor,'process',executor)
                                 args = target
-                            elif isinstance(target,basestring):
+                            elif isinstance(target,str):
                                 # Target is a member of executor or an string to be evaluated
                                 # e.g. getattr(Reader,'get_attribute_values')(*(attr,start,stop))
                                 if hasattr(executor,target): exec_ = getattr(executor,target)
@@ -982,16 +985,16 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                                 value = exec_ 
 
                             pipe.send((key,getPickable(value)))
-                    except Exception,e:
+                    except Exception as e:
                         self.trace('.Process:\tError in %s process!\n%s\n%s\n%s'%(key,target,args,except2str(e)))
                         #print traceback.format_exc()
                         #print e
                         pipe.send((key,getPickable(e)))
-            except Exception,e:
+            except Exception as e:
                 self.trace('.Process:\tUnknown Error in process!\n%s'%traceback.format_exc())
             key = None
             event.wait(self.timewait)
-        print '!'*80
+        print(('!'*80))
         self.trace('.Process: exit_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive))
                         
     def _receive_data(self):
@@ -1003,9 +1006,9 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                 if self._pipe1.poll():
                     key,query = self._pipe1.recv()
                     if key not in self.data: 
-                        self.trace('.Thread: received %s data; pending: %s'%(key,self.callbacks.keys()))
+                        self.trace('.Thread: received %s data; pending: %s'%(key,list(self.callbacks.keys())))
                         pass
-                    if key in self.keys():
+                    if key in list(self.keys()):
                         self.data[key].set(query)
                         if self.data[key].callback: 
                             try:
@@ -1031,7 +1034,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                     self.last_alive = time.time()
             except: self.trace('.Thread.is_alive(),Exception:%s'%traceback.format_exc())
             self._threading_event.wait(self.timewait)
-        print '!'*80
+        print(('!'*80))
         self.trace('.Thread: exit_data_thread')
         self.trace('<'*80)
         self.trace('<'*80)
@@ -1061,9 +1064,9 @@ class Pool(object):
             self._myThread = multiprocessing.Process
             self._myQueue = multiprocessing.Queue
         else:
-            import Queue
+            import queue
             self._myThread = threading.Thread
-            self._myQueue = Queue.Queue
+            self._myQueue = queue.Queue
         self._action = action
         self._max_threads = max_threads
         self._threads = []
@@ -1134,7 +1137,7 @@ class Pool(object):
                     self._action(item)
             except:
                 import traceback
-                print('objects.Pool.worker(%s) failed: %s'%(str(item),traceback.format_exc()))
+                print(('objects.Pool.worker(%s) failed: %s'%(str(item),traceback.format_exc())))
             self._remove_task(item)
         return
                 
@@ -1170,13 +1173,13 @@ def SubprocessMethod(obj,method,*args,**kwargs):
     """
     timeout = kwargs.pop('timeout',30.)
     callback = kwargs.pop('callback',None)
-    print args
-    print kwargs
+    print(args)
+    print(kwargs)
     local,remote = multiprocessing.Pipe(False)
     def do_query(o,m,conn,*a,**k):
         if None in (o,m): m = o or m
         else: m = getattr(o,m)
-        print m,a,k
+        print((m,a,k))
         conn.send(m(*a,**k))
         conn.close()
     args = (obj,method,remote)+args
@@ -1227,7 +1230,7 @@ class AsynchronousFunction(threading.Thread):
         try:
             self.wait(0.01)
             self.result = self.function()
-        except Exception,e:
+        except Exception as e:
             self.result = None            
             self.exception = e
         self.finished.set() #Not really needed, simply call AsynchronousFunction.isAlive() to know if it has finished

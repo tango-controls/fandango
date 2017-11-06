@@ -35,6 +35,7 @@ from fandango.log import printtest
 from fandango.tango import ProxiesDict
 from fandango.servers import ServersDict
 from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
+import imp
 
 #==================================================================
 #   FolderDS Class Description:
@@ -75,9 +76,9 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
         except: pass
             
     def get_all_devices(self,exported=False):
-        devs = self.keys()
+        devs = list(self.keys())
         if exported: 
-          devs = filter(fn.check_device,devs)
+          devs = list(filter(fn.check_device,devs))
         return devs
             
     def get_host_devices(self,host):
@@ -123,7 +124,7 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
           r = len(data)
         else:
           r = d.SaveFile([filename,data])
-        print('%s.SaveFile() : %s)'%(device,r))
+        print(('%s.SaveFile() : %s)'%(device,r)))
         return r
 
     def read(self,uri,filename=''):
@@ -140,7 +141,7 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
           device = '*'+device+'*'
         m = [d for d in self.get_all_devices() if fn.clmatch(device,d)]
         if not m:
-            for d in self.values():
+            for d in list(self.values()):
               try:
                 if fn.clmatch(device,d.SaveFolder):
                   m.append(d.name())
@@ -163,11 +164,11 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
     @staticmethod
     def __test__():
         import fandango.device
-        try: reload(fandango.device)
+        try: imp.reload(fandango.device)
         except: pass
         folders = fandango.device.FolderAPI('*')
         printtest(folders,'get_all_devices')
-        printtest(folders,'get_host_devices',args=[folders.hosts.keys()[0]])
+        printtest(folders,'get_host_devices',args=[list(folders.hosts.keys())[0]])
         d = printtest(folders,'get_device',args=['*'])
         n = folders.get_device_name(d)
         printtest(folders,'save',[n,'test.txt','----\nHello World!\n----\n'])
@@ -181,7 +182,7 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #--------- Add you global variables here --------------------------
 
     def save_text_file(self,filename,data):
-        print('In FolderDS.save_text_file(%s,%d)'%(filename,sys.getsizeof(data)))
+        print(('In FolderDS.save_text_file(%s,%d)'%(filename,sys.getsizeof(data))))
         #if self.SaveFolder and not filename.startswith('/'):
         filename = self.SaveFolder + '/' + filename #SAFER TO FORCE  ALWAYS PATH
         f = open(filename,'w')
@@ -226,23 +227,23 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #    Device destructor
 #------------------------------------------------------------------
     def delete_device(self):
-        print "[Device delete_device method] for device",self.get_name()
+        print("[Device delete_device method] for device",self.get_name())
 
 
 #------------------------------------------------------------------
 #    Device initialization
 #------------------------------------------------------------------
     def init_device(self):
-        print "In ", self.get_name(), "::init_device()"
+        print("In ", self.get_name(), "::init_device()")
         DynamicDS.init_device(self)
         if self.DynamicStates: self.set_state(PyTango.DevState.UNKNOWN)
-        print "Out of ", self.get_name(), "::init_device()"
+        print("Out of ", self.get_name(), "::init_device()")
 
 #------------------------------------------------------------------
 #    Always excuted hook method
 #------------------------------------------------------------------
     def always_executed_hook(self):
-        print "In "+self.get_name()+ "::always_excuted_hook()"
+        print("In "+self.get_name()+ "::always_excuted_hook()")
         DynamicDS.always_executed_hook(self)
 
 #==================================================================
@@ -254,7 +255,7 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #    Read Attribute Hardware
 #------------------------------------------------------------------
     def read_attr_hardware(self,data):
-        print("In "+self.get_name()+"::read_attr_hardware()")
+        print(("In "+self.get_name()+"::read_attr_hardware()"))
 
 
     def read_SaveFolder(self,attr):
@@ -368,7 +369,7 @@ class FolderDSClass(DynamicDSClass):
     def __init__(self, name):
         PyTango.DeviceClass.__init__(self, name)
         self.set_type(name);
-        print "In FolderDSClass  constructor"
+        print("In FolderDSClass  constructor")
 
 #==================================================================
 #
@@ -383,10 +384,10 @@ def main(args = None):
         U.server_init()
         U.server_run()
 
-    except PyTango.DevFailed,e:
-        print( '-------> Received a DevFailed exception:',traceback.format_exc())
-    except Exception,e:
-        print( '-------> An unforeseen exception occured....',traceback.format_exc())
+    except PyTango.DevFailed as e:
+        print(( '-------> Received a DevFailed exception:',traceback.format_exc()))
+    except Exception as e:
+        print(( '-------> An unforeseen exception occured....',traceback.format_exc()))
         
 def test(args = None):
     print('\n')
@@ -404,7 +405,7 @@ if __name__ == '__main__':
     if '--test' in sys.argv:
         test()
     if '--gui' in sys.argv:
-        from FolderGUI import FolderGUI
+        from .FolderGUI import FolderGUI
         FolderGUI.main()
     else:
         main()

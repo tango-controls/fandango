@@ -1,4 +1,4 @@
-from __future__ import with_statement
+
 #!/usr/bin/env python2.5
 """
 #############################################################################
@@ -76,7 +76,7 @@ import traceback
 import functools
 import contextlib
 from fandango import log
-from objects import decorator_with_args
+from .objects import decorator_with_args
 import fandango.functional as fun
 
 try:
@@ -99,7 +99,7 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
         excepts = fun.notNone(excepts,lambda e: log.printf(str(e)))
         result = [t(*args,**kwargs) for t in tries if fun.isCallable(t)]
         return result[0] if len(result)==1 else result
-    except Exception,e:
+    except Exception as e:
         if fun.isCallable(excepts):
             v = excepts(e)
             return v if return_exception else None
@@ -156,8 +156,8 @@ def getPreviousExceptions(limit=0):
                                 ]))
         else:
             return ''
-    except Exception,e:
-        print 'Aaaargh!'
+    except Exception as e:
+        print('Aaaargh!')
         return traceback.format_exc()
     
 class RethrownException(Exception):
@@ -187,7 +187,7 @@ def ExceptionWrapper(fun,logger=exLogger,postmethod=None, showArgs=False,verbose
             #logger.trace('%s Succeed!\n'%fun)
             return result
               
-        except Exception,e:
+        except Exception as e:
             etype = type(e).__name__
             exstring=getPreviousExceptions()
             
@@ -254,10 +254,10 @@ class ExceptionManager(object):
             stack = traceback.format_tb(tb)
             exstring = '\n'.join(stack)
             if self.verbose:
-                print '-'*80
+                print('-'*80)
                 self.logger.warning('%s Exception Catched, Tracebacks (most recent call last): %s;\n%s'%(etype.__name__,str(e),exstring))
                 sys.stdout.flush(); sys.stderr.flush()
-                print '-'*80
+                print('-'*80)
 
             if self.postmethod: self.postmethod(exstring)
             if etype is DevFailed:
@@ -289,7 +289,7 @@ def __test__(args=[]):
   print('\n')
   exLogger.info('Show custom message:\n')
   def custom_msg(s):
-    print('CUSTOM: %s'%s.split('\n')[-1])
+    print(('CUSTOM: %s'%s.split('\n')[-1]))
   @CatchedArgs(postmethod=custom_msg,verbose=False)
   def failed_f():
     return 1/0
@@ -312,7 +312,7 @@ def __test__(args=[]):
   exLogger.info('Try a rethrow:\n')
   try:
     CatchedArgs(rethrow=True)(devfailed)('sys/tg_test/1','throw_exception')
-  except DevFailed,e:
+  except DevFailed as e:
     exLogger.info('Catched!')
 
 if __name__ == '__main__':

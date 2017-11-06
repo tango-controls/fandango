@@ -93,17 +93,19 @@ This Module includes several classes:
 import PyTango,sys,threading,time,traceback,re,inspect
 from PyTango import AttrQuality,DevState
 
-import fandango,tango,objects
-from excepts import *
-from objects import self_locked
-from dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
-from log import Logger,shortstr
-import functional as fun
+import fandango
+from . import tango
+from . import objects
+from .excepts import *
+from .objects import self_locked
+from .dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
+from .log import Logger,shortstr
+from . import functional as fun
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 if getattr(PyTango,'__version_number__',0)<722:
     USE_STATIC_METHODS = True
-    print('PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS))
+    print(('PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS)))
 else: 
     USE_STATIC_METHODS = False
 
@@ -136,7 +138,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     dyn_comms = {} # To be defined here, not at __init__ nor init_device as it is shared by all instances
 
     def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
-        print('> '+'~'*78)
+        print(('> '+'~'*78))
         self.call__init__('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
         # Logger must be called after init to use Tango logs properly
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',level='INFO')
@@ -160,12 +162,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
         #Setting default values for Class/Device properties
         for d in (DynamicDSClass.class_property_list,DynamicDSClass.device_property_list):
-            for prop,value in d.items():
+            for prop,value in list(d.items()):
                 if not hasattr(self,prop): 
                     setattr(self,prop,(value[-1] if 'Array' in str(value[0]) else 
                         (value[-1][0] if (value and fun.isSequence(value[-1])) else value and value[-1]))
                         )
-        print('UseTaurus = %s'%getattr(self,'UseTaurus',False))
+        print(('UseTaurus = %s'%getattr(self,'UseTaurus',False)))
         if getattr(self,'UseTaurus',False): self.UseTaurus = bool(tango.loadTaurus())
         
         # Internal object references
@@ -257,11 +259,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if MEM_CHECK:
             self._locals['guppy'] = guppy
             self._locals['heapy'] = HEAPY
-        [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
-        [self._locals.__setitem__(k,dst.pytype) for k,dst in DynamicDSTypes.items()]
+        [self._locals.__setitem__(str(quality),quality) for quality in list(AttrQuality.values.values())]
+        [self._locals.__setitem__(k,dst.pytype) for k,dst in list(DynamicDSTypes.items())]
         
         #Adding states for convenience evaluation
-        self.TangoStates = dict((str(v),v) for k,v in PyTango.DevState.values.items())
+        self.TangoStates = dict((str(v),v) for k,v in list(PyTango.DevState.values.items()))
         self._locals.update(self.TangoStates)
         
         if _locals: self._locals.update(_locals) #New submitted methods have priority over the old ones
@@ -273,7 +275,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 'States fixed with set/get_state will continue working.')
             self.State = self.rawState
             self.dev_state = self.rawState
-        print('< '+'~'*78)
+        print(('< '+'~'*78))
         
     def init_device(self):
         self.info( 'DynamicDS.init_device(%d)'%(self.get_init_count()))
@@ -282,7 +284,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.get_DynDS_properties()
             else:
                 self.updateDynamicAttributes()
-            for c,f in self.dyn_comms.items(): 
+            for c,f in list(self.dyn_comms.items()): 
                 k = c.split('/')[-1]
                 if self.get_name().lower() in c.lower() \
                     and k not in self._locals:
@@ -291,11 +293,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             for i in self.InitDevice:
                 try:
                     self.evalAttr(i)
-                except Exception,e:
-                    print('Unable to execute InitDevice(%s)'%i)
+                except Exception as e:
+                    print(('Unable to execute InitDevice(%s)'%i))
                     raise e
         except: 
-            print(traceback.format_exc()) #self.warning(traceback.format_exc())
+            print((traceback.format_exc())) #self.warning(traceback.format_exc())
         self._init_count +=1
 
     def delete_device(self):
@@ -321,8 +323,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             #Check polled to be repeated here but using admin (not allowed at Init()); not needed with Tango8 but needed again in Tango9!! (sigh)
             #if getattr(PyTango,'__version_number__',0) < 804:
             #self.check_polled_attributes(use_admin=True) ###@TODO REMOVE!!! IT IS CRASHING DEVICES IN TANGO9!!
-        except Exception,e:
-            print('prepare_DynDS failed!: %s' % str(e).replace('\n',';')) #traceback.format_exc()
+        except Exception as e:
+            print(('prepare_DynDS failed!: %s' % str(e).replace('\n',';'))) #traceback.format_exc()
         finally:
             self.__prepared = True
         return
@@ -404,12 +406,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             (self._db.get_device_property,self.get_name(),dict(list(DynamicDSClass.device_property_list.items())+[('polled_attr',[PyTango.DevVarStringArray,[]])])),
             ):
             #Default property values already loaded in __init__; here we are just updating
-            props = [(prop,value) for prop,value in method(target,list(config)).items() if value]
+            props = [(prop,value) for prop,value in list(method(target,list(config)).items()) if value]
             for prop,value in props:
                 #Type of each property is adapted to python types
                 dstype = DynamicDSTypes.get(str(config[prop][0]),DynamicDSType('','',pytype=list))
                 try: value = dstype.pytype(value if dstype.dimx>1 or dstype.dimy>1 else value[0])
-                except Exception,e:
+                except Exception as e:
                     self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
                     
@@ -439,7 +441,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         
     @staticmethod
     def open_file(filename,device=None):
-        print('DynamicDS().open_file(%s)'%(filename))
+        print(('DynamicDS().open_file(%s)'%(filename)))
         r = []
         try:
             if device:
@@ -448,7 +450,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             f = open(filename)
             r = f.readlines()
             f.close()
-        except: print(traceback.format_exc())
+        except: print((traceback.format_exc()))
         return r
 
     @staticmethod
@@ -494,12 +496,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else:
             self._db = getattr(self,'_db',None) or PyTango.Database()
         new_attr = dict.fromkeys(new_attr,self.DEFAULT_POLLING_PERIOD) if isinstance(new_attr,list) else new_attr
-        dyn_attrs = list(set(map(str.lower,['state','status']+self.dyn_attrs.keys()+new_attr.keys())))
+        dyn_attrs = list(set(map(str.lower,['state','status']+list(self.dyn_attrs.keys())+list(new_attr.keys()))))
         pattrs = self.get_polled_attrs()
         npattrs = []
         self.info('Already polled: '+str(pattrs))
         #First: propagate all polled_attrs if they appear in the new attribute list or remove them if don't
-        for att,period in pattrs.items():
+        for att,period in list(pattrs.items()):
             if att in npattrs: continue #remove duplicated
             elif att.lower() in dyn_attrs: 
                 (npattrs.append(att.lower()),npattrs.append(period))
@@ -507,9 +509,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.info('Removing Attribute %s from %s.polled_attr Property' % (att,my_name))
                 if use_admin:
                     try: admin.rem_obj_polling([my_name,'attribute',att])
-                    except: print(traceback.format_exc())
+                    except: print((traceback.format_exc()))
         #Second: add new attributes to the list of attributes to configure; attributes where value is None will not be polled
-        for n,v in new_attr.iteritems():
+        for n,v in new_attr.items():
             if n.lower() not in npattrs and v:
                 (npattrs.append(n.lower()),npattrs.append(v))
                 self.info('Attribute %s added to %s.polled_attr Property' % (n,my_name))
@@ -523,8 +525,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     else:
                         admin.upd_obj_polling_period([[int(period)],[my_name,'attribute',att]])
                 except:
-                    print('Unable to set %s polling' % (npattrs[i]))
-                    print(traceback.format_exc())
+                    print(('Unable to set %s polling' % (npattrs[i])))
+                    print((traceback.format_exc()))
         else:
            self.info('Updating polled_attr: %s'%(npattrs,))
            self._db.put_device_property(my_name,{'polled_attr':npattrs})
@@ -537,11 +539,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self._cycle_start = now-self._cycle_start
             if 'POLL' in self.dyn_values: self.debug('dyn_values[POLL] = %s ; locals[POLL] = %s' % (self.dyn_values['POLL'].value,self._locals['POLL']))
             self.info('Last complete reading cycle took: %f seconds' % self._cycle_start)
-            self.info('There were %d attribute readings.'%(sum(self._read_count.values() or [0])))
+            self.info('There were %d attribute readings.'%(sum(list(self._read_count.values()) or [0])))
             head = '%24s\t\t%10s\t\ttype\tinterval\tread_count\tread_time\teval_time\tcpu'%('Attribute','value')
             lines = []
-            target = list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_times.items())))[:7]
-            target.extend(list(t[-1] for t in reversed(sorted((v,k) for k,v in self._read_count.items())) if t not in target)[:7])
+            target = list(t[-1] for t in reversed(sorted((v,k) for k,v in list(self._read_times.items()))))[:7]
+            target.extend(list(t[-1] for t in reversed(sorted((v,k) for k,v in list(self._read_count.items()))) if t not in target)[:7])
             for key in target:
                 value = (self.dyn_values[key].value if key in self.dyn_values else 'NotKept')
                 value = str(value)[:16-3]+'...' if len(str(value))>16 else str(value)
@@ -555,8 +557,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     '%1.2e'%self._eval_times[key],
                     '%1.2f%%'%(100*self._eval_times[key]/(self._total_usage or 1.))]))
             print(head)
-            print('-'*max(len(l)+4*l.count('\t') for l in lines))
-            print('\n'.join(lines))
+            print(('-'*max(len(l)+4*l.count('\t') for l in lines)))
+            print(('\n'.join(lines)))
             print('')
             self.info('%f s empty seconds in total; %f of CPU Usage' % (self._cycle_start-self._total_usage,self._total_usage/self._cycle_start))
             self.info('%f of time used in expressions evaluation' % (sum(self._eval_times.values())/(sum(self._read_times.values()) or 1)))
@@ -570,7 +572,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         NEW_GARBAGE = [o for o in grb if o not in self.GARBAGE]
                         self.info('New objects added to garbage are: %s' % ([str(o) for o in NEW_GARBAGE],))
                 except:
-                    print(traceback.format_exc())
+                    print((traceback.format_exc()))
                 self.GARBAGE = grb
             #if MEM_CHECK:
                 #self._locals['heap'] = h = HEAPY.heap()
@@ -620,7 +622,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     return bool(v!=new_value)
             else:
                 try: v,new_value = (float(v) if v is not None else None),float(new_value)
-                except Exception,e: 
+                except Exception as e: 
                     self.info('In check_changed_event(%s): values not evaluable (%s,%s): %s'%(aname,shortstr(v),shortstr(new_value),e))
                     return bool((cabs>0 or crel>0) and v!=new_value) #False
                 if cabs>0 and not v-cabs<new_value<v+cabs: 
@@ -633,7 +635,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.debug('In check_changed_event(%s,%s): nothing changed'%(aname,shortstr(new_value)))
                     return False
         except: #Needed to prevent fails if attribute_config_3 is not available
-            print(traceback.format_exc())
+            print((traceback.format_exc()))
         return False
         
     #------------------------------------------------------------------------------------------------------
@@ -725,7 +727,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 
                 max_size = hasattr(self,'DynamicSpectrumSize') and self.DynamicSpectrumSize
                 AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ =,\+]',formula) else PyTango.AttrWriteType.READ
-                for typename,dyntype in DynamicDSTypes.items():
+                for typename,dyntype in list(DynamicDSTypes.items()):
                     if dyntype.match(formula):
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
                         if formula.startswith(typename+'('): #DevULong should not match DevULong64
@@ -748,7 +750,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
                 if not self.dyn_types[aname]:
                     self.debug("DynamicDS.dyn_attr(...): Type not matched for '"+line+"', using DevDouble by default"    )
-                    if max(map(formula.startswith,['list(','['])):
+                    if max(list(map(formula.startswith,['list(','[']))):
                             dyntype = DynamicDSTypes['DevVarDoubleArray']
                             self.info('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
                             if (create): self.add_attribute(PyTango.SpectrumAttr(aname,dyntype.tangotype, AttrType,max_size or dyntype.dimx), \
@@ -771,7 +773,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.dyn_values[aname].type=self.dyn_types[aname]
 
                 #Adding attributes to DynamicStates queue:
-                for k,v in self.dyn_states.items():
+                for k,v in list(self.dyn_states.items()):
                     if aname in v['formula']:
                         #self.dyn_values[aname]=None
                         self.dyn_values[aname].states_queue.append(k)
@@ -797,8 +799,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if '*' in exp and '.*' not in exp: exp=exp.replace('*','.*')
                 if not exp.endswith('$'): exp+='$'
                 exprs[exp] = value
-            for aname in self.dyn_values.keys():
-                for exp,value in exprs.items():
+            for aname in list(self.dyn_values.keys()):
+                for exp,value in list(exprs.items()):
                     try:
                         match = re.match(exp,aname)
                         if match:
@@ -806,9 +808,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             for group in (match.groups()): #It will replace $ in the formula for all strings matched by .* in the expression
                                 value=value.replace('$',group,1) #e.g: (.*)_VAL=ATTR_ALARM if ATTR('$_ALRM') ... => RF_VAL=ATTR_ALARM if ATTR('RF_ALRM') ...
                             self.dyn_qualities[aname.lower()] = value
-                    except Exception,e:
+                    except Exception as e:
                         self.warning('In dyn_attr(qualities), re.match(%s(%s),%s(%s)) failed' % (type(exp),exp,type(aname),aname))
-                        print(traceback.format_exc())
+                        print((traceback.format_exc()))
                         
         #Setting up state events:
         #THESE SETTINGS MAY BE NO LONGER NEEDED IN TANGO >= 7
@@ -821,7 +823,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try:
             self.check_polled_attributes(new_attr=dict.fromkeys(new_polled_attrs,self.DEFAULT_POLLING_PERIOD))
         except:
-            print('DynamicDS.dyn_attr( ... ), unable to set polling for (%s): \n%s'%(new_polled_attrs,traceback.format_exc()))
+            print(('DynamicDS.dyn_attr( ... ), unable to set polling for (%s): \n%s'%(new_polled_attrs,traceback.format_exc())))
         
         print('DynamicDS.dyn_attr( ... ), finished. Attributes ready to accept request ...')
 
@@ -830,7 +832,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def get_dyn_attr_list(self):
         """Gets all dynamic attribute names."""
-        return self.dyn_attrs.keys()
+        return list(self.dyn_attrs.keys())
       
     def get_attr_formula(self,aname,full=False):
         """
@@ -844,10 +846,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else:
             #Getting a caseless attribute that match
             try:
-                aname,formula,compiled = ((k,self.dyn_values[k].formula,
+                aname,formula,compiled = next(((k,self.dyn_values[k].formula,
                                            self.dyn_values[k].compiled) for 
                                           k in self.dyn_values if 
-                                          k.lower()==aname.lower()).next()
+                                          k.lower()==aname.lower()))
             except: 
                 self.warning('DynamicDS.evalAttr: %s doesnt match any Attribute name,'
                              ' trying to evaluate ...'%(aname,))
@@ -875,7 +877,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 v = self.dyn_values[aname]
                 self.debug('Returning cached (%s) value for %s: %s(%s)'%(time.ctime(self._last_read[aname]),aname,type(v.value),shortstr(v.value)))
                 return attr.set_value_date_quality(v.value,v.date,v.quality)
-        except Exception,e:
+        except Exception as e:
             self.warning('Unable to reload %s kept values, %s'%(aname,str(e)))
         try:
             result = self.evalAttr(aname)
@@ -909,17 +911,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             if 'debug' in str(self.getLogLevel()) and (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==sorted(self.dyn_values.keys())[-1]):
                 self.attribute_polling_report()
                 
-        except Exception, e:           
+        except Exception as e:           
             now=time.time()
             self.dyn_values[aname].update(e,now,PyTango.AttrQuality.ATTR_INVALID) #Exceptions always kept!
             self._last_period[aname]=now-self._last_read.get(aname,0)
             self._last_read[aname]=now
             self._read_times[aname]=now-self._hook_epoch #Internal debugging
             self._eval_times[aname]=now-tstart #Internal debugging
-            if aname==self.dyn_values.keys()[-1]: self._cycle_start = now
+            if aname==list(self.dyn_values.keys())[-1]: self._cycle_start = now
             last_exc = str(e)
             self.error('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
-            if not isinstance(e,RethrownException): print(traceback.format_exc())
+            if not isinstance(e,RethrownException): print((traceback.format_exc()))
             raise Exception('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
     
     ##This hook has been used to force self to be passed always as argument and avoid dynattr missmatching
@@ -972,7 +974,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.dyn_values[aname].dependencies = set()
                     a = aname.lower().strip()
                     fs = (formula+'\n'+self.dyn_qualities.get(a,'')).lower()
-                    for k,v in self.dyn_values.items():
+                    for k,v in list(self.dyn_values.items()):
                         ks = k.lower().strip()
                         if a==ks: continue
                         if ks in fun.re.split("[^'\"_0-9a-zA-Z]",fs): #fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula):
@@ -994,7 +996,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         else: self._locals[k]=v.value #.value 
             else:
                 self.debug("In evalAttr ... updating locals from dyn_values")
-                for k,v in self.dyn_values.items():
+                for k,v in list(self.dyn_values.items()):
                     if v.keep and k in formula:
                         self._locals[k]=v.value
             
@@ -1014,7 +1016,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                   'XATTRS':self._external_attributes,
                   }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
               if _locals is not None: self._locals.update(_locals) #High Priority: variables passed as argument
-            except Exception,e:
+            except Exception as e:
               self.error('<'*80)
               self.error(traceback.format_exc())
               for t in (VALUE,type(VALUE),aname,self.dyn_types.get(aname,None),aname in self.dyn_types and self.dyn_types[aname].pytype):
@@ -1056,20 +1058,20 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self.warning(traceback.format_exc())
             return result
 
-        except PyTango.DevFailed, e:
+        except PyTango.DevFailed as e:
             if self.trace:
-                print('-'*80)
-                print('\n'.join(['DynamicDS_evalAttr(%s)_WrongFormulaException:'%aname,'\t"%s"'%(formula,),str(traceback.format_exc())]))
-                print('\n'.join([str(e.args[0])]) + '\n'+'*'*80)
-                print('-'*80)
+                print(('-'*80))
+                print(('\n'.join(['DynamicDS_evalAttr(%s)_WrongFormulaException:'%aname,'\t"%s"'%(formula,),str(traceback.format_exc())])))
+                print(('\n'.join([str(e.args[0])]) + '\n'+'*'*80))
+                print(('-'*80))
             err = e.args[0]
             self.error(e)
             raise e #Exception,';'.join([err.origin,err.reason,err.desc])
-        except Exception,e:
+        except Exception as e:
             if self.last_attr_exception and self.last_attr_exception[0]>tstart:
                 e = self.last_attr_exception[-1]
             if 1:
-                print('\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%(formula,),]))
+                print(('\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%(formula,),])))
             s = traceback.format_exc()
             self.error(s)
             raise Exception(s)
@@ -1089,14 +1091,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #MODIFIIED!! to use pure DynamicAttributes
         #Attr = lambda a: self.dyn_values[a].value
         t = time.time()-self.time0
-        for k,v in self.dyn_values.items(): self._locals[k]=v#.value #Updating Last Attribute Values
+        for k,v in list(self.dyn_values.items()): self._locals[k]=v#.value #Updating Last Attribute Values
         __locals = {}#__locals=locals().copy() #Low priority: local variables
         __locals.update(self._locals) #Second priority: object statements
         __locals.update(_locals) #High Priority: variables passed as argument
         __locals.update(
             {'STATE':self.get_state(),'t':time.time()-self.time0,'NAME': self.get_name(),
             'ATTRIBUTES':sorted(self.dyn_values.keys()),#'ATTRIBUTES':dict((a,getattr(self.dyn_values[a],'value',None)) for a in self.dyn_values if a in self._locals),
-            'FORMULAS':dict((k,v.formula) for k,v in self.dyn_values.items()),
+            'FORMULAS':dict((k,v.formula) for k,v in list(self.dyn_values.items())),
             'WRITE':False,'VALUE':None,
             })
         return eval(formula,self._globals,__locals)
@@ -1104,7 +1106,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def evalCommand(self,cmd,argin=None):
         """This method will execute a command declared using DynamicCommands property"""
         k = cmd if '/' in cmd else self.get_name()+'/'+cmd
-        assert k in self.dyn_comms.keys(),('%s command not declared in properties!'%(k,))
+        assert k in list(self.dyn_comms.keys()),('%s command not declared in properties!'%(k,))
         return self.evalAttr(self.dyn_comms[k],_locals={'ARGS':argin})
 
     #------------------------------------------------------------------------------------------------------
@@ -1121,7 +1123,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
               value = self.get_state()
           elif al=='status': 
               value = self.get_status()
-          elif al in map(str.lower,self.dyn_values.keys()):
+          elif al in list(map(str.lower,list(self.dyn_values.keys()))):
               value = self.evalAttr(aname,WRITE=write,VALUE=fun.notNone(wvalue,default))
           else:
               #Getting an Static attribute that match:
@@ -1135,7 +1137,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                   self.warning('DynamicDS.getAttr: %s doesnt match any Attribute name, trying to evaluate ...'%(aname,))
                   value = default
           return value
-        except Exception,e:
+        except Exception as e:
           if default is not None:
             return default
           else:
@@ -1150,11 +1152,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
         def log(prio,s,obj=self): #,level=self.log_obj.level): 
             if obj.getLogLevel(prio)>=obj.log_obj.level:
-                print('%s(%s) %s %s: %s' % (
+                print(('%s(%s) %s %s: %s' % (
                   prio.upper(),
                   (obj.getLogLevel(prio),obj.log_obj.level),
                   time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),
-                  obj.get_name(),s))
+                  obj.get_name(),s)))
 
         if type_ == tango.fakeEventType.Config:
             log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Config Event Not Implemented!'%(
@@ -1180,7 +1182,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             log('info','\tforwarding event to %s ...'%aname)
                             self.evalAttr(aname)
             except:
-                print(traceback.format_exc())
+                print((traceback.format_exc()))
         return
       
     def get_attr_models(self,attribute):
@@ -1265,7 +1267,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         attrval = self._external_attributes[full_name].read()
                         result = attrval.value
                     self.debug('%s.read() = %s ...'%(full_name,str(result)[:40])) 
-        except Exception,e:
+        except Exception as e:
             msg = 'Unable to read attribute %s from device %s: \n%s' % (str(aname),str(device),traceback.format_exc())
             print(msg)
             self.error(msg)
@@ -1317,7 +1319,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         else:
                             result = self._external_commands[full_name].command_inout(cmd,args)
                         #result = self._external_commands[full_name].command_inout(*([cmd,argin] if argin is not None else [cmd]))
-            except Exception,e:
+            except Exception as e:
                 msg = 'Unable to execute %s(%s): %s' % (full_name,args,traceback.format_exc())
                 self.last_attr_exception = (time.time(),msg,e)
                 self.error(msg)
@@ -1346,7 +1348,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 quality =  getattr(attr_value,'quality',PyTango.AttrQuality.ATTR_VALID)
             self.debug('\t%s.quality = %s'%(aname,quality))
             return quality
-        except Exception,e:
+        except Exception as e:
             self.error('Unable to generate quality for attribute %s: %s\n%s'%(aname,formula,traceback.format_exc()))
             return PyTango.AttrQuality.ATTR_VALID
 
@@ -1365,7 +1367,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else: value=argin[1]
         aname = argin[0]
 
-        if aname not in self.dyn_values.keys(): raise Exception('Unknown State or Attribute : ', aname)
+        if aname not in list(self.dyn_values.keys()): raise Exception('Unknown State or Attribute : ', aname)
         elif value is not None:
             self.dyn_values[aname].forced=value
             if self.simulationMode:
@@ -1431,8 +1433,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             if push and self.check_attribute_events('state'): 
                 self.info('DynamicDS(%s.set_state(): pushing new state event'%(self.get_name()))
                 try: self.push_change_event('State',state,time.time(),PyTango.AttrQuality.ATTR_VALID)
-                except Exception,e: self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
-        except Exception,e: 
+                except Exception as e: self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
+        except Exception as e: 
             self.warning('DynamicDS.check_attribute_events(State=%s) failed!: %s'%(state,e))
         DynamicDS.get_parent_class(self).set_state(self,state)
 
@@ -1452,13 +1454,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 ## @remarks: the device state is not changed if none of the DynamicStates evaluates to True
                 #self.set_state(PyTango.DevState.UNKNOWN)
                 self.last_state_exception = ''
-                for state,value in self.dyn_states.items():
+                for state,value in list(self.dyn_states.items()):
                     nstate,formula,code=state,value['formula'],value['compiled']
                     if nstate not in self.TangoStates: continue
                     result=None
                     try: 
                         result=self.evalState(code) #Use of self.evalState allows to overload it
-                    except Exception,e:
+                    except Exception as e:
                         self.error('DynamicDS(%s).check_state(): Exception in evalState(%s): %s'%(self.get_name(),formula,str(traceback.format_exc())))
                         self.last_state_exception += '\n'+time.ctime()+': '+str(traceback.format_exc())
                     self.info('In DynamicDS.check_state(): %s : %s ==> %s' % (state,value['formula'],result))
@@ -1469,8 +1471,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                             self.info('DynamicDS(%s.check_state(): New State is %s := %s'%(self.get_name(),nstate,formula))
                             if set_state:self.set_state(new_state,push=True)
                         break
-        except Exception,e:
-            print(traceback.format_exc())
+        except Exception as e:
+            print((traceback.format_exc()))
             raise e
         finally:
             if self.state_lock.locked(): self.state_lock.release()
@@ -1500,10 +1502,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     try:
                         t = s and self.evaluateFormula(s) or ''
                         status += t+'\n'
-                    except Exception,x:
+                    except Exception as x:
                         self.warning('\tevaluateStatus(%s) failed: %s'%(s,traceback.format_exc()))
                 if set: self.set_status(status,save=False)
-            except Exception,e:
+            except Exception as e:
                 self.warning('Unable to generate DynamicStatus:\n%s'%traceback.format_exc())
         return status.strip()
 
@@ -1542,7 +1544,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 self.warning('DynamicDS.updateDynamicAttributes(): Removing Attribute!: %sn not in [%s]' % (a,attrs_list))
                 try:
                     self.remove_attribute(a)
-                except Exception,e:
+                except Exception as e:
                     self.error('Unable to remove attribute %s: %s' % (a,str(e)))
         DynamicDS.dyn_attr(self)
         
@@ -1550,7 +1552,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try: 
             CreateDynamicCommands(type(self),type(self.get_device_class()))
         except: 
-            print('CreateDynamicCommands failed: %s'%traceback.format_exc())
+            print(('CreateDynamicCommands failed: %s'%traceback.format_exc()))
 
     #------------------------------------------------------------------
     #    EvaluateFormula command:
@@ -1794,11 +1796,11 @@ class DynamicDSClass(PyTango.DeviceClass):
         """
         Adding own Properties/Commands to subclasses
         """
-        print('In DynamicDSClass.__new__(%s): updating properties'%(cls,))
+        print(('In DynamicDSClass.__new__(%s): updating properties'%(cls,)))
         dicts = ('class_property_list','device_property_list','cmd_list','attr_list')
         for d in dicts:
             dct = getattr(cls,d)
-            for p,v in getattr(DynamicDSClass,d).items():
+            for p,v in list(getattr(DynamicDSClass,d).items()):
                 if p not in dct: 
                     dct[p] = v
         #cls = cls if cls is not DynamicDSClass else PyTango.DeviceClass
@@ -1806,7 +1808,7 @@ class DynamicDSClass(PyTango.DeviceClass):
         return instance
 
     def dyn_attr(self,dev_list):
-        print('In DynamicDSClass.dyn_attr(%s)'%(dev_list,))
+        print(('In DynamicDSClass.dyn_attr(%s)'%(dev_list,)))
         for dev in dev_list:
             DynamicDS.dyn_attr(dev)
             
@@ -1859,7 +1861,7 @@ DynamicDSTypes={
             #Labels will be matched at the beginning of formulas using re.match(label+'[(,]',formula)
             'DevState':DynamicDSType(PyTango.ArgType.DevState,['DevState',],int),
             'DevLong':DynamicDSType(PyTango.ArgType.DevLong,['DevLong','DevULong','int','SCALAR(int','DYN(int'],int),
-            'DevLong64':DynamicDSType(PyTango.ArgType.DevLong,['DevLong64','DevULong64','long','SCALAR(long'],long),
+            'DevLong64':DynamicDSType(PyTango.ArgType.DevLong,['DevLong64','DevULong64','long','SCALAR(long'],int),
             'DevShort':DynamicDSType(PyTango.ArgType.DevShort,['DevShort','DevUShort','short'],int),
             'DevString':DynamicDSType(PyTango.ArgType.DevString,['DevString','str','SCALAR(str'],lambda x:str(x or '')),
             'DevBoolean':DynamicDSType(PyTango.ArgType.DevBoolean,['DevBoolean','bit','bool','Bit','Flag','SCALAR(bool'],lambda x:False if str(x).strip().lower() in ('','0','none','false','no') else bool(x)),
@@ -1871,11 +1873,11 @@ DynamicDSTypes={
             'DevVarBooleanArray':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanArray','SPECTRUM(bool','list(bool','[bool'],lambda l:[bool(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             'DevVarDoubleArray':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleArray','SPECTRUM(float','DevVarFloatArray','list(double','[double','list(float','[float'],lambda l:[float(i) for i in ([],l)[hasattr(l,'__iter__')]],4096,1),
             
-            'DevVarLongImage':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongImage','IMAGE(int,'],lambda l:[map(int,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
-            'DevVarShortImage':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortImage',],lambda l:[map(int,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
-            'DevVarStringImage':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringImage','IMAGE(str,'],lambda l:[map(str,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
-            'DevVarBooleanImage':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanImage','IMAGE(bool,'],lambda l:[map(bool,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
-            'DevVarDoubleImage':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleImage','IMAGE(float,'],lambda l:[map(float,i) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarLongImage':DynamicDSType(PyTango.ArgType.DevLong,['DevVarLongImage','IMAGE(int,'],lambda l:[list(map(int,i)) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarShortImage':DynamicDSType(PyTango.ArgType.DevShort,['DevVarShortImage',],lambda l:[list(map(int,i)) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarStringImage':DynamicDSType(PyTango.ArgType.DevString,['DevVarStringImage','IMAGE(str,'],lambda l:[list(map(str,i)) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarBooleanImage':DynamicDSType(PyTango.ArgType.DevShort,['DevVarBooleanImage','IMAGE(bool,'],lambda l:[list(map(bool,i)) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
+            'DevVarDoubleImage':DynamicDSType(PyTango.ArgType.DevDouble,['DevVarDoubleImage','IMAGE(float,'],lambda l:[list(map(float,i)) for i in ([],l)[hasattr(l,'__iter__')]],4096,4096),
             }
 DynamicDSTypes['DevVarFloatArray'] = DynamicDSTypes['DevVarDoubleArray']
 DynamicDSTypes['DevULong'] = DynamicDSTypes['DevLong']
@@ -1886,7 +1888,7 @@ DynamicDSTypes['DevDouble64'] = DynamicDSTypes['DevDouble']
 def isTypeSupported(ttype,n_dim=None):
     if n_dim is not None and n_dim not in (0,1): return False
     ttype = getattr(ttype,'name',str(ttype))
-    return any(ttype in t.labels for t in DynamicDSTypes.values())
+    return any(ttype in t.labels for t in list(DynamicDSTypes.values()))
 
 def castDynamicType(dims,klass,value):
     t = {(0,int):'DevLong',(0,float):'DevDouble',(0,bool):'DevBoolean',(0,str):'DevString',
@@ -1907,28 +1909,28 @@ def CreateDynamicCommands(ds,ds_class):
     """
     U = PyTango.Util.instance()
     server = U.get_ds_name()
-    print('In DynamicDS.CreateDynamicCommands(%s)'%(server,))
+    print(('In DynamicDS.CreateDynamicCommands(%s)'%(server,)))
     db = U.get_database()
     #devices = DynamicDSClass('DynamicDS').get_devs_in_server()    
     classes = list(db.get_device_class_list(server))
-    print('class = %s; classes = %s' % (ds.__name__,classes))
+    print(('class = %s; classes = %s' % (ds.__name__,classes)))
     devs = [classes[i] for i in range(len(classes)-1) if classes[i+1]==ds.__name__]    
-    print('devs = %s'%(devs,))
+    print(('devs = %s'%(devs,)))
     if not hasattr(ds,'dyn_comms'): ds.dyn_comms = CaselessDict()
     
     for dev in devs:
         prop = db.get_device_property(dev,['DynamicCommands'])['DynamicCommands']
-        print('In DynamicDS.CreateDynamicCommands(%s.%s): %s'%(server,dev,prop))
+        print(('In DynamicDS.CreateDynamicCommands(%s.%s): %s'%(server,dev,prop)))
         prop = DynamicDS.check_property_extensions('DynamicCommands',prop)
         lines = [(dev+'/'+l.split('=',1)[0].strip(),l.split('=',1)[1].strip()) for l in [d.split('#')[0].strip() for d in prop if d] if l]
         ds.dyn_comms.update(lines)
         for name,formula in lines: #ds.dyn_comms.items():
             name = name.rsplit('/',1)[-1]
             if name.lower() in [s.lower() for s in dir(ds)]:
-                print('Dynamic Command %s.%s Already Exists, skipping!!!'%(type(ds),name))
+                print(('Dynamic Command %s.%s Already Exists, skipping!!!'%(type(ds),name)))
                 continue
 
-            name = ([n for n in ds_class.cmd_list.keys() if n.lower()==name.lower()] or [name])[0]
+            name = ([n for n in list(ds_class.cmd_list.keys()) if n.lower()==name.lower()] or [name])[0]
             return_type = PyTango.CmdArgType.names.get(formula.split('(')[0],PyTango.DevString)
             itype = ('SCALAR(int,ARGS)' in formula and PyTango.DevLong or
                      'SCALAR(float,ARGS)' in formula and PyTango.DevDouble or
@@ -1944,7 +1946,7 @@ def CreateDynamicCommands(ds,ds_class):
             #USING STATIC METHODS; THIS PART MAY BE SENSIBLE TO PyTANGO UPGRADES
             setattr(ds,name,lambda obj,argin=None,cmd_name=name:obj.evalCommand(cmd_name,argin))
             #lambda obj,argin=None,cmd_name=name: (obj._locals.update((('ARGS',argin),)),obj.evalAttr(ds.dyn_comms[obj.get_name()+'/'+cmd_name]))[-1])
-    print('Out of DynamicDS.CreateDynamicCommands(%s)'%(server,))
+    print(('Out of DynamicDS.CreateDynamicCommands(%s)'%(server,)))
     return
     
 class DynamicAttribute(object):
@@ -1976,7 +1978,7 @@ class DynamicAttribute(object):
         elif not index:
             return value
         else:
-            raise Exception,'InvalidIndex%sFor%s'%(str(index),str(value))
+            raise Exception('InvalidIndex%sFor%s'%(str(index),str(value)))
 
     def update(self,value,date,quality):
         self.value=value
@@ -2035,7 +2037,7 @@ class DynamicAttribute(object):
         #elif op_name in value.__class__.__base__.__dict__:
         #    method = value.__class__.__base__.__dict__[op_name]
         else:
-            raise Exception,'DynamicAttribute_WrongMethod%sFor%sType==(%s)'% (op_name,str(type(value)),value)
+            raise Exception('DynamicAttribute_WrongMethod%sFor%sType==(%s)'% (op_name,str(type(value)),value))
 
         if unary:
             if value is None and op_name in ['__nonzero__','__int__','__float__','__long__','__complex__']: 
@@ -2082,7 +2084,7 @@ class DynamicAttribute(object):
     def __float__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
     def __int__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
     def __long__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
-    def __nonzero__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
+    def __bool__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
     def __len__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
     def __str__(self): return self.operator(inspect.currentframe().f_code.co_name,unary=True)
 
@@ -2153,14 +2155,14 @@ class DynamicServer(object):
         else:
             self.name,server,instance,logs = name,name.split('/')[0],name.split('/')[-1],log
         self.args = [server,instance,logs]+orb
-        print('In DynamicServer(%s)'%(self.args,))
-        self.util = PyTango.Util(filter(bool,self.args))
+        print(('In DynamicServer(%s)'%(self.args,)))
+        self.util = PyTango.Util(list(filter(bool,self.args)))
         self.instance = self.util.instance()
         self.db = self.instance.get_database()
         class_list = self.db.get_device_class_list(self.instance.get_ds_name()) #Device,Class object list
         self.classes = fandango.dicts.defaultdict(list)
         [self.classes[c].append(d) for d,c in zip(class_list[::2],class_list[1::2]) if c.lower()!='dserver']
-        for C,devs in classes.items():
+        for C,devs in list(classes.items()):
             for d in devs:
                 if C not in self.classes or d not in self.classes[C]:
                     fandango.tango.add_new_device(self.name,C,d)
@@ -2169,7 +2171,7 @@ class DynamicServer(object):
         if self.path: sys.path.append(self.path)
         self.modules = {}
         [self.load_class(c) for c in self.classes]
-        print('\nDynamicDS: %d classes loaded: %s'%(len(self.classes),','.join(self.classes)))
+        print(('\nDynamicDS: %d classes loaded: %s'%(len(self.classes),','.join(self.classes))))
         if add_debug and 'DDebug' not in self.classes:
             from fandango.device import DDebug
             DDebug.addToServer(self.util,*(self.name.split('/')))
@@ -2198,7 +2200,7 @@ class DynamicServer(object):
             if c in locals():
                 return locals[c]
             p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
-            print('\nLoading %s from %s' % (c,p or self.path))
+            print(('\nLoading %s from %s' % (c,p or self.path)))
             if p:
                 self.modules[c] = fandango.objects.loadModule(p)
             elif c in dir(fandango.device):
@@ -2211,7 +2213,7 @@ class DynamicServer(object):
                     assert getattr(self.modules[c],c+'Class')
                 except:
                     m = self.path+'/%s/%s.py'%(c,c)
-                    print('\nLoading %s from %s' % (c,m))
+                    print(('\nLoading %s from %s' % (c,m)))
                     self.modules[c] = fandango.objects.loadModule(m)
             self.util.add_TgClass(getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c)
         except:
@@ -2220,7 +2222,7 @@ class DynamicServer(object):
         
     def main(self,args=None):
         #Args argument has no effect! @TODO
-        print('DynamicDS.main(%s)'%(args or sys.argv,))
+        print(('DynamicDS.main(%s)'%(args or sys.argv,)))
         U = self.util.instance()
         U.server_init()
         U.server_run()
@@ -2228,7 +2230,7 @@ class DynamicServer(object):
 __doc__ = fandango.doc.get_fn_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
         
 if __name__ == '__main__':
-    print('.'*80)
+    print(('.'*80))
     pyds = DynamicServer(add_debug=True)
     print('loaded ...')
     pyds.main()

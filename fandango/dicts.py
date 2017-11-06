@@ -70,11 +70,11 @@ def dict2json(dct,filename=None,throw=False,recursive=True,
     import json
 
     result = {}
-    for k,v in dct.items():
+    for k,v in list(dct.items()):
         try:
             json.dumps(v,encoding=encoding)
             result[k] = v
-        except Exception,e:
+        except Exception as e:
             if throw: raise e
             if isString(v): result[k] = ''
             elif isSequence(v):
@@ -95,13 +95,13 @@ def dict2json(dct,filename=None,throw=False,recursive=True,
 def dec(s,encoding=ENC):
     #dec = lambda s: str(s.decode(encoding) if isinstance(s,unicode) else s)
     try:
-        if isinstance(s,unicode):
+        if isinstance(s,str):
             s = s.encode(encoding)
             return str(s)
         else:
             return str(s)
-    except Exception,e:
-        print('dec(%s) failed!'%(s))
+    except Exception as e:
+        print(('dec(%s) failed!'%(s)))
         traceback.print_exc()
         raise e
             
@@ -124,13 +124,13 @@ def json2dict(jstr,encoding=ENC):
     
     d = {}
 
-    for k,v in jstr.items():
+    for k,v in list(jstr.items()):
         k = dec(k)
-        if isinstance(v,basestring):
+        if isinstance(v,str):
             d[k] = dec(v)
         elif isinstance(v,(list,tuple)):
             d[k] = [(dec(i)
-                    if isinstance(i,basestring) else i)
+                    if isinstance(i,str) else i)
                     for i in v]
         elif hasattr(v,'items'):
             d[k] = json2dict(v,encoding=encoding)
@@ -185,17 +185,17 @@ class ThreadDict(dict):
     
     def tracer(self,text,level=0): 
         #if isinstance(self.trace,int) and level<self.trace: 
-        print text
+        print(text)
         
     #@self_locked
     def start(self):
         if not self.threaded:
-            print 'ThreadDict.start(): This Dict has no Thread!'
+            print('ThreadDict.start(): This Dict has no Thread!')
             return
         if hasattr(self,'_Thread') and self._Thread and self._Thread.isAlive():
-            print 'ThreadDict.start(): ThreadDict.stop() must be executed first!'
+            print('ThreadDict.start(): ThreadDict.stop() must be executed first!')
             return
-        print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()        
+        print(('In ThreadDict.start(), keys are: %s' % self.threadkeys()))        
         import threading
         self.event = threading.Event()
         self.event.clear()
@@ -206,10 +206,10 @@ class ThreadDict(dict):
         
     #@self_locked        
     def stop(self):
-        print 'Stopping ThreadDict ...'
+        print('Stopping ThreadDict ...')
         if self.threaded and hasattr(self,'event'): self.event.set()
         if hasattr(self,'_Thread'): self._Thread.join()
-        print 'ThreadDict Stopped'
+        print('ThreadDict Stopped')
 
     def alive(self):
         if not hasattr(self,'_Thread') or not self._Thread: return False
@@ -229,9 +229,9 @@ class ThreadDict(dict):
                     if (time.time()-self._updates.get(k,0))>self._periods.get(k,0):
                         #if period=0 or if not updated the condition applies
                         self.__getitem__(k,hw=True)
-                except Exception,e:
+                except Exception as e:
                     if self.trace:
-                        print('!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:1000])
+                        print(('!!! ThreadDict Exception !!!'+'\n'+'%s ...'%str(traceback.format_exc())[:1000]))
                     self.__setitem__(k,e,hw=False)
                 finally:
                     self._last_read = k
@@ -279,7 +279,7 @@ class ThreadDict(dict):
         
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
-        if self.trace: print 'In ThreadDict.__getitem__(%s,%s)'%(key,hw)
+        if self.trace: print(('In ThreadDict.__getitem__(%s,%s)'%(key,hw)))
         if (hw or not self.threaded): #HW ACCESS MUST NOT BE DONE WITHOUT ASKING EXPLICITLY! (Use __setitem__(k,None) instead)
             self._updates[key] = time.time()
             if self.read_method: 
@@ -290,7 +290,7 @@ class ThreadDict(dict):
 
     def __setitem__(self,key,value,hw=True):
         ''' This method launches a write_method execution if the hw flag is not explicitly set to False. '''
-        if self.trace: print 'In ThreadDict.__setitem__(%s,...,%s)'%(key,hw)
+        if self.trace: print(('In ThreadDict.__setitem__(%s,...,%s)'%(key,hw)))
         if hw and self.write_method: 
             #It implies that a key will not be added here to read thread!
             nvalue = self.write_method(*[key,value])
@@ -340,7 +340,7 @@ class defaultdict_fromkey(defaultdict):
         if self.default_factory is None: raise KeyError(key)
         try:
           self[key] = value = self.default_factory(key)
-        except Exception,e:
+        except Exception as e:
           try:
             self[key] = value = self.default_factory()
           except:
@@ -378,13 +378,13 @@ class CaselessDict(dict):
             try:
                 # Doesn't do keyword args
                 if hasattr(other,'items'):
-                    for k,v in other.items():
+                    for k,v in list(other.items()):
                         dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
                 else:
                     for k,v in other:
                         dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
-            except Exception,e:
-                print 'CaselessDict(%s): failed!\n%s'%(type(other),e)
+            except Exception as e:
+                print(('CaselessDict(%s): failed!\n%s'%(type(other),e)))
                 raise e
 
     def __getitem__(self, key):
@@ -414,7 +414,7 @@ class CaselessDict(dict):
         return dict.setdefault(self, key.lower() if hasattr(key,'lower') else key, def_val)
 
     def update(self, other):
-        for k,v in other.items():
+        for k,v in list(other.items()):
             k = str(k)
             dict.__setitem__(self, k.lower() if hasattr(k,'lower') else k, v)
 
@@ -475,7 +475,7 @@ class SortedDict(dict):
                     or a callable providing a sorting key algorithm.
         """
         import operator
-        if operator.isCallable(key):
+        if hasattr(key, '__call__'):
             self._keys = sorted(self._keys,key=key)
         else:
             for k in self._keys:
@@ -490,7 +490,7 @@ class SortedDict(dict):
         
     def update(self,other):
         if hasattr(other,'items'):
-            other = other.items()
+            other = list(other.items())
         for k,v in other:
             self.__setitem__(k,v)
     
@@ -559,7 +559,7 @@ class CaselessSortedDict(SortedDict,CaselessDict):
                     or a callable providing a sorting key algorithm.
         """
         import operator
-        if operator.isCallable(key):
+        if hasattr(key, '__call__'):
             self._keys = sorted(self._keys,key=key)
         else:
             for k in self._keys:
@@ -575,13 +575,13 @@ class CaselessSortedDict(SortedDict,CaselessDict):
         
     def update(self,other):
         if hasattr(other,'items'):
-            other = other.items()
+            other = list(other.items())
         for k,v in other:
             self.__setitem__(k,v)
     
     @staticmethod
     def fromkeys(S,v=None):
-        S = map(self.caseless,S)
+        S = list(map(self.caseless,S))
         return SortedDict((s,v) for s in S)
             
     def pop(self,k,d=None):
@@ -596,8 +596,8 @@ class CaselessSortedDict(SortedDict,CaselessDict):
 
 def reversedict(dct,key=None,default=None):
     #it just exchanges keys/values in a dictionary
-    if key is None: return dict((v,k) for k,v in dct.items())
-    for k,v in dct.items():
+    if key is None: return dict((v,k) for k,v in list(dct.items()))
+    for k,v in list(dct.items()):
         if v == key: return k
     return default
 
@@ -632,7 +632,7 @@ class ReversibleDict(object):#dict):
         """
         table,subset,index = table or [], subset or (), index or [] #There are strange problems if persistent types are used as __init__ arguments!?!
         if isinstance(table,ReversibleDict): table = table.data()
-        elif hasattr(table,'items'): table = [t for t in table.items()] #Updating from a dictionary
+        elif hasattr(table,'items'): table = [t for t in list(table.items())] #Updating from a dictionary
         #Attributes persistent
         self._depth = table and len(table[0]) or 0
         self._table = table or []
@@ -647,7 +647,7 @@ class ReversibleDict(object):#dict):
     def update(self, other):
         if not other: return
         if hasattr(other,'iteritems'):
-            [self.set(*t) for t in other.iteritems()]
+            [self.set(*t) for t in list(other.items())]
         else:
             [self.set(*t) for t in other]
         
@@ -659,10 +659,10 @@ class ReversibleDict(object):#dict):
         return len(self._subset or self._table) 
     def range(self,full=True):
         """ And appropiated iterator to check all lines in the table """
-        return self._subset or range(full and -len(self._table) or 0,len(self._table))
+        return self._subset or list(range(full and -len(self._table) or 0,len(self._table)))
     
     def __repr__(self):
-        return '{'+',\n'.join('\t%s%s:%s'%(k,'',v) for k,v in self.iteritems())+'}'
+        return '{'+',\n'.join('\t%s%s:%s'%(k,'',v) for k,v in list(self.items()))+'}'
     def __str__(self):
         return  self.__repr__()
     
@@ -686,7 +686,7 @@ class ReversibleDict(object):#dict):
                 
     def prune(self,filters=[]):
         """ This method should do a cleanup of all repeated key-chains in both directions (or delete anything matched by filters) """
-        raise Exception,'NotImplemented'
+        raise Exception('NotImplemented')
         
     def depth(self):
         return self._depth
@@ -758,12 +758,12 @@ class ReversibleDict(object):#dict):
             for i in self.range():
                 yield self._table[i][self.level(i)]
         else:
-            for ks in self.keysets().values():
+            for ks in list(self.keysets().values()):
                 yield ReversibleDict(table=self._table,index=self._index,subset=ks,level=self.nextlevel(),trace=self._trace)
         pass
             
     def values(self):
-        return [v for v in self.itervalues()]
+        return [v for v in list(self.values())]
     
     def iteritems(self):
         """ returns key,value pairs at self.level() """
@@ -771,12 +771,12 @@ class ReversibleDict(object):#dict):
             for i in self.range():
                 yield self._table[i][self.level(i)],self._table[i][self.nextlevel(i)]        #Last key,value pair
         else:
-            for k,ks in self.keysets().items():
+            for k,ks in list(self.keysets().items()):
                 yield k,ReversibleDict(table=self._table,index=self._index,subset=ks,level=self.nextlevel(),trace=self._trace)
         pass
             
     def items(self):
-        return [t for t in self.iteritems()]
+        return [t for t in list(self.items())]
     
     def line(self,i):
         """ It returns an arranged tuple slice of the selected index of the table 
@@ -808,7 +808,7 @@ class ReversibleDict(object):#dict):
         return False
             
     def __contains__(self, key):
-        return self.has_key(key)
+        return key in self
 
     def get(self, *keys):
         """Arguments are keys separated by commas, it is a recursive call to __getitem__ """
@@ -825,7 +825,7 @@ class ReversibleDict(object):#dict):
         """ It scans the dict table in both directions, returning value or a ReversibleDict instance """
         ks = self.keysets(key=key)
         if not ks.get(key,[]): 
-            raise Exception,'KeyNotFound(%s)'%str(key)
+            raise Exception('KeyNotFound(%s)'%str(key))
         if self.nextlevel() == self.depth()-1:
             i = ks[key].pop()
             return self._table[i][self.nextlevel(i)] #Returning a first/last element of tuple
@@ -849,19 +849,19 @@ class ReversibleDict(object):#dict):
         #Checking all the conditions for the arguments
         if not hasattr(value,'__iter__') or isinstance(value,str): value = (value,)
         elif not isinstance(value,tuple): value = tuple(value)
-        if not len(value): raise Exception,'EmptyTuple!'
-        elif self._table and (len(value))!=self.depth()-self.level()-1: raise Exception,'WrongTupleSize(%s!=%s)' % (len(value),self.depth()-self.level()-1)
+        if not len(value): raise Exception('EmptyTuple!')
+        elif self._table and (len(value))!=self.depth()-self.level()-1: raise Exception('WrongTupleSize(%s!=%s)' % (len(value),self.depth()-self.level()-1))
         
-        if self._trace: print 'In ReversibleDict[%s] = %s' % (key,value)
+        if self._trace: print(('In ReversibleDict[%s] = %s' % (key,value)))
         #Creating a new table if the dict was empty
         if not self._table:
             self._table.append((key,)+value)
             self._depth = 1+len(value)
-            if self._trace: print 'Creating a table ...'
+            if self._trace: print('Creating a table ...')
         #Check if the key already exist
-        elif self.has_key(key): 
-            if self._trace: print 'Updating a key ...'
-            i = iter(self.keysets(key)[key]).next()
+        elif key in self: 
+            if self._trace: print('Updating a key ...')
+            i = next(iter(self.keysets(key)[key]))
             if self.last(): #If it's a final leaf the value is overriden
                 self._table[i] = (self._table[i][:self.nextlevel(i)]+value) if i>=0 else (value+self._table[i][self.level(i):])
             else: #If not the tuple is passed to the next dictionary
@@ -870,30 +870,30 @@ class ReversibleDict(object):#dict):
                 #else: return self[key].__setitem__(value[-1],value[:-1])
                 
         #The key exists but in reversed order (only for root dictionary)
-        elif self.level() in (0,-1) and self.has_key(value[-1]): 
-            if self._trace: print 'Inserting reversed key ...'
+        elif self.level() in (0,-1) and value[-1] in self: 
+            if self._trace: print('Inserting reversed key ...')
             self[value[-1]]=tuple(reversed(value[:-1]))+(key,)
             
         #Adding new keys
         elif self.level(): 
-            i = iter(self._subset).next()
+            i = next(iter(self._subset))
             #print 'adding new key %s at level %s, i = %s' % (key,self.level(i),i)
             if i>=0: self._table.append(self._table[i][:self.level(i)]+(key,)+value)
             else: self._table.append(tuple(reversed(value))+(key,)+ self._table[i][self.level(i)+1:] ) #+1 because slices are not symmetric!
-            if self._trace: print 'Adding a new key ...'
+            if self._trace: print('Adding a new key ...')
         else: 
-            if self._trace: print 'Adding a new line ...'
+            if self._trace: print('Adding a new line ...')
             self._table.append((key,)+value)
 
     def __del__(self):
         del self._table
         
     def __delitem__(self, k):
-        raise Exception,'NotImplemented!'
+        raise Exception('NotImplemented!')
         
-    def setdefault(self, key, def_val=None): raise Exception,'NotImplemented!'
-    def fromkeys(self, iterable, value=None): raise Exception,'NotImplemented!'
-    def pop(self, key, def_val=None): raise Exception,'NotImplemented!'        
+    def setdefault(self, key, def_val=None): raise Exception('NotImplemented!')
+    def fromkeys(self, iterable, value=None): raise Exception('NotImplemented!')
+    def pop(self, key, def_val=None): raise Exception('NotImplemented!')        
     
     
 ##################################################################################################
@@ -950,26 +950,26 @@ class Enumeration:
         self._uniqueValues = uniqueValues = [ ]
         self._uniqueId = 0
         for x in enumList:
-            if type(x) == types.TupleType:
+            if type(x) == tuple:
                 x, i = x
-                if type(x) != types.StringType:
+                if not isString(x): #type(x) != bytes:
                     raise EnumException("enum name is not a string: %s" % str(x))
-                if type(i) != types.IntType:
+                if type(i) != int:
                     raise EnumException("enum value is not an integer: %s" % str(i))
                 if x in uniqueNames:
-                    raise EnumException("enum name is not unique: " % str(x))
+                    raise EnumException("enum name is not unique: %s" % str(x))
                 if i in uniqueValues:
-                    raise EnumException("enum value is not unique for " % str(x))
+                    raise EnumException("enum value is not unique for %s" % str(x))
                 uniqueNames.append(x)
                 uniqueValues.append(i)
                 lookup[x] = i
                 reverseLookup[i] = x
         for x in enumList:
-            if type(x) != types.TupleType:
-                if type(x) != types.StringType:
-                    raise EnumException("enum name is not a string: " % str(x))
+            if type(x) != tuple:
+                if not isString(x): #type(x) != bytes:
+                    raise EnumException("enum name is not a string: %s" % str(x))
                 if x in uniqueNames:
-                    raise EnumException("enum name is not unique: " % str(x))
+                    raise EnumException("enum name is not unique: %s" % str(x))
                 uniqueNames.append(x)
                 i = self.generateUniqueId()
                 uniqueValues.append(i)
@@ -986,13 +986,13 @@ class Enumeration:
         return n
     
     def __getitem__(self, i):
-        if type(i) == types.IntType:
+        if type(i) == int:
             return self.whatis(i)
-        elif type(i) == types.StringType:
+        elif isString(type(i)): # == bytes:
             return self.lookup[i]
     
     def __getattr__(self, attr):
-        if not self.lookup.has_key(attr):
+        if attr not in self.lookup:
             raise AttributeError
         return self.lookup[attr]
     

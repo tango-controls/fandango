@@ -83,7 +83,7 @@ def getDeviceClassObjects(classname,path=''):
     """
     import imp
     desc = imp.find_module(classname)
-    print('getDeviceClassObjects(%s) from %s'%(classname,desc))
+    print(('getDeviceClassObjects(%s) from %s'%(classname,desc)))
     module = imp.load_module(classname,*desc)
     return getattr(module,classname),getattr(module,classname+'Class')
 
@@ -104,7 +104,7 @@ def addAllClasses(obj,servername='',db=None,classes=None):
         classes = db.get_server_class_list(servername)
     for c in classes:
         dev,devclass = getDeviceClassObjects(c)
-        print('Adding %s,%s to %s'%(dev,devclass,obj))
+        print(('Adding %s,%s to %s'%(dev,devclass,obj)))
         obj.add_TgClass(devclass,dev,c)
     return obj
         
@@ -117,7 +117,7 @@ def updateChildClassDicts(Child,Parent,Exclude=[]):
             pattr = getattr(Parent,attribute)
             if isinstance(pattr,dict): 
                 #print 'Updating %s.%s from %s'%(Child.__name__,attribute,Parent.__name__)
-                cattr.update((k,v) for k,v in pattr.items() if k not in Exclude and k not in cattr)
+                cattr.update((k,v) for k,v in list(pattr.items()) if k not in Exclude and k not in cattr)
 #updateChildClassDicts(AlbaPLCClass,PyPLCClass)        
         
 def NewTypeInheritance(name,klass,parent,dikt={}):
@@ -158,7 +158,7 @@ def DeviceClassInheritance(ChildClass):
     for b in ChildClass.__bases__:
         for p in ('class_property_list','device_property_list','cmd_list','attr_list'):
             d = getattr(b,p,{})
-            d and getattr(ChildClass,p).update((k,v) for k,v in d.items() if k not in getattr(ChildClass,p))
+            d and getattr(ChildClass,p).update((k,v) for k,v in list(d.items()) if k not in getattr(ChildClass,p))
     return ChildClass
     
 def addTangoInterfaces(device,interfaces):
@@ -172,7 +172,7 @@ def addTangoInterfaces(device,interfaces):
         py.add_TgClass(PySignalSimulatorClass,PySignalSimulator,'PySignalSimulator')    
     """
     if any(type(p) is not tuple for p in ([device]+interfaces)):
-        raise Exception,'TangoInterface_ArgumentIsNotTuple'
+        raise Exception('TangoInterface_ArgumentIsNotTuple')
     device,deviceclass = device
     for interface,interfaceclass in interfaces:
         device,deviceclass = FullTangoInheritance(device.__name__, \

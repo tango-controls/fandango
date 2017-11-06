@@ -2,7 +2,7 @@
 from PyQt4 import Qt
 import fandango as fn
 import fandango.qt as fqt
-from FolderDS import FolderAPI
+from .FolderDS import FolderAPI
 
 class FolderGUI(Qt.QSplitter):
   

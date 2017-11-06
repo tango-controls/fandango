@@ -53,7 +53,7 @@ __test__ = {}
 def add_new_device(server,klass,device):
     for c in (server+klass+device):
       if re.match('[^a-zA-Z0-9\-\/_]',c):
-        raise Exception,"CharacterNotAllowed('%s')"%c
+        raise Exception("CharacterNotAllowed('%s')"%c)
     dev_info = PyTango.DbDevInfo()
     dev_info.name = device
     dev_info.klass = klass
@@ -77,18 +77,18 @@ def delete_device(device,server=True):
           props = db.get_device_attribute_property(device,a)
           db.delete_device_attribute_property(device,props)
       adm = dp.adm_name()
-      print('Kill %s'%adm)
+      print(('Kill %s'%adm))
       get_device(adm).kill()
     
     props = get_matching_device_properties(device,'*')
-    print('Removing %d properties'%len(props))
+    print(('Removing %d properties'%len(props)))
     db.delete_device_property(device,props)
-    print('Delete %s'%device)
+    print(('Delete %s'%device))
     db.delete_device(device)
     if server:
       others = list(db.get_server_class_list(server))
       if all(d in ('DDebug','DServer') for d in others):
-        print('Delete %s'%server)
+        print(('Delete %s'%server))
         db.delete_server(server)
     
     return True
@@ -134,7 +134,7 @@ def get_device_started(target):
 def get_device_for_alias(alias):
     """ returns the device name for a given alias """
     try: return get_database().get_device_alias(alias)
-    except Exception,e:
+    except Exception as e:
         if 'no device found' in str(e).lower(): return None
         return None #raise e
 
@@ -143,7 +143,7 @@ def get_alias_for_device(dev):
     try: 
         return get_database().get_alias(dev) 
         #.get_database_device().DbGetDeviceAlias(dev)
-    except Exception,e:
+    except Exception as e:
         if 'no alias found' in str(e).lower(): return None
         return None #raise e
 
@@ -204,7 +204,7 @@ def get_device_attributes(dev,expressions='*'):
     Given a device name it returns the attributes matching any of 
     the given expressions 
     """
-    expressions = map(toRegexp,toList(expressions))
+    expressions = list(map(toRegexp,toList(expressions)))
     al = (get_device(dev) if isString(dev) else dev).get_attribute_list()
     result = [a for a in al for expr in expressions 
               if matchCl(expr,a,terminate=True)]
@@ -252,7 +252,7 @@ def get_matching_device_attribute_labels(device,attribute):
     """
     devs = get_matching_devices(device)
     return dict((t+'/'+a,l) for t in devs 
-                for a,l in get_device_labels(t,attribute).items() 
+                for a,l in list(get_device_labels(t,attribute).items()) 
                 if check_device(t))
 
 def get_attribute_info(device,attribute):
@@ -291,8 +291,8 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
     device may be a DeviceProxy object
     config may be a dictionary
     """
-    print('fandango.tango.set_attribute_config(%s,%s,%s)'
-          %(device,attribute,config))
+    print(('fandango.tango.set_attribute_config(%s,%s,%s)'
+          %(device,attribute,config)))
     dp = get_device(device) if isString(device) else device
     name,a,v = dp.name(),attribute,config    
     polling = None
@@ -305,7 +305,7 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
         
         if a.lower() not in ('state','status'):           
             ac = dp.get_attribute_config(a)
-            for c,vv in v.items():
+            for c,vv in list(v.items()):
                 try:
                     if c not in AC_PARAMS:
                         continue                    
@@ -313,39 +313,39 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
                         if not events:
                             continue                
                         elif verbose:
-                            print('parsing events: %s'%vv)
+                            print(('parsing events: %s'%vv))
                     if not hasattr(ac,c):
                         continue
                     
                     if verbose:
-                        print('%s.%s.%s'%(name,a,c))
+                        print(('%s.%s.%s'%(name,a,c)))
                     
                     if isinstance(vv,dict):
-                        for cc,vvv in vv.items():
+                        for cc,vvv in list(vv.items()):
                             if cc not in AC_PARAMS:
                                 continue
                             acc = getattr(ac,c)
                             if not hasattr(acc,cc):
                                 continue
                             elif isinstance(vvv,dict):
-                                for e,p in vvv.items():
+                                for e,p in list(vvv.items()):
                                     if e not in AC_PARAMS:
                                         continue
                                     ae = getattr(acc,cc)
                                     if not hasattr(ae,e):
                                         continue
                                     elif getattr(ae,e)!=p:
-                                        print('%s.%s.%s.%s = %s'%(a,c,cc,e,p))
+                                        print(('%s.%s.%s.%s = %s'%(a,c,cc,e,p)))
                                         setattr(ae,e,p)                                        
                             elif getattr(acc,cc)!=vvv:
-                                print('%s.%s.%s = %s'%(a,c,cc,vvv))
+                                print(('%s.%s.%s = %s'%(a,c,cc,vvv)))
                                 setattr(acc,cc,vvv)
                                 
                     elif getattr(ac,c)!=vv:
-                        print('%s.%s = %s'%(a,c,vv))
+                        print(('%s.%s = %s'%(a,c,vv)))
                         setattr(ac,c,vv)
                 except:
-                    print('%s/%s.%s=%s failed!'%(device,a,c,vv))
+                    print(('%s/%s.%s=%s failed!'%(device,a,c,vv)))
                     traceback.print_exc()
                                                    
             config = ac
@@ -354,7 +354,7 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
     if polling is not None:
         p = polling
         try:
-            print('%s.poll_attribute(%s,%s)'%(name,a,p))
+            print(('%s.poll_attribute(%s,%s)'%(name,a,p)))
             if not p and dp.get_attribute_poll_period(a):
                 dp.stop_poll_attribute(a)
             else:
@@ -386,7 +386,7 @@ def get_attribute_events(target,polled=True,throw=False):
           except: pass #print(k,i,p,v)
         if not any(r[k]): r.pop(k)
       return r
-    except Exception,e:
+    except Exception as e:
       if throw: raise e
       return None
 
@@ -467,7 +467,7 @@ def put_free_property(name,prop,value=None,db=None):
             value = list(value)
         prop = {prop:value}
     else:
-        for p,v in prop.items():          
+        for p,v in list(prop.items()):          
             if isSequence(v):
                 if len(v)==1:
                     prop[p] = v[0]
@@ -496,7 +496,7 @@ def put_class_property(klass,property,value=None,db=None):
             value = list(value)
         property = {property:value}
     else:
-        for p,v in property.items():          
+        for p,v in list(property.items()):          
             if isSequence(v):
                 if len(v)==1:
                     property[p] = v[0]
@@ -524,7 +524,7 @@ def put_device_property(device,property,value=None,db=None):
             value = list(value)
         property = {property:value}
     else:
-        for p,v in property.items():          
+        for p,v in list(property.items()):          
             if isSequence(v):
                 if len(v)==1:
                     property[p] = v[0]
@@ -557,7 +557,7 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
     else: tango_dbs = {get_tango_host():get_database()}
     return dict(('/'.join((host,d) if hosts else (d,)),
                  db.get_device_property(d,properties))
-                 for host,db in tango_dbs.items() for d in get_devs(db,expr))
+                 for host,db in list(tango_dbs.items()) for d in get_devs(db,expr))
     
 def property_undo(dev,prop,epoch):
     db = get_database()
@@ -565,14 +565,14 @@ def property_undo(dev,prop,epoch):
     valids = [h for h in his if str2time(h.get_date())<epoch]
     news = [h for h in his if str2time(h.get_date())>epoch]
     if valids and news:
-        print('Restoring property %s/%s=%s'%(dev,prop,valids[-1].get_date()))
+        print(('Restoring property %s/%s=%s'%(dev,prop,valids[-1].get_date())))
         db.put_device_property(dev,{prop:valids[-1].get_value().value_string})
     elif not valids:
-        print('No property values found for %s/%s before %s'
-              %(dev,prop,time2str(epoch)))
+        print(('No property values found for %s/%s before %s'
+              %(dev,prop,time2str(epoch))))
     elif not news: 
-        print('Property %s/%s not modified after %s'
-              %(dev,prop,time2str(epoch)))
+        print(('Property %s/%s not modified after %s'
+              %(dev,prop,time2str(epoch))))
     
 def get_property_history(dev,prop):
     db = get_database()
@@ -626,7 +626,7 @@ def _attr_extension(prop,row,db=None):
       r = "%s=%s(%s,%s)"%(a,f,t,s)
       return [r]
     except:
-      print('fandango.tango._attr_extension(%s,%s) failed!'%(prop,row))
+      print(('fandango.tango._attr_extension(%s,%s) failed!'%(prop,row)))
       traceback.print_exc()
       return []
       
@@ -647,13 +647,13 @@ def check_property_extensions(prop,value,db=None,
                     #parsed.extend(DynamicDS._copy_extension(prop,v))
                 #elif v.startswith('@FILE:'): 
                     #parsed.extend(DynamicDS._file_extension(prop,v))
-                ext,f = first([(e,f) for e,f in extensions.items() 
+                ext,f = first([(e,f) for e,f in list(extensions.items()) 
                                if v.startswith(e)] or [(None,None)])
                 if ext: parsed.extend(f(prop,v))
                 else: parsed.append(v)
             except: 
-                print('check_property_extensions(%s,%s): %s'
-                      %(prop,value,traceback.format_exc()))
+                print(('check_property_extensions(%s,%s): %s'
+                      %(prop,value,traceback.format_exc())))
         return parsed
     return value
 
@@ -678,7 +678,7 @@ def check_host(host):
     Pings a hostname, returns False if unreachable
     """
     import fandango.linos
-    print('Checking host %s'%host)
+    print(('Checking host %s'%host))
     return fandango.linos.ping(host)[host]
 
 def check_starter(host):
@@ -709,7 +709,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
         dp = DeviceProxy(dev)
         dp.set_timeout_millis(int(timeout))
         dp.ping()
-    except Exception,e:
+    except Exception as e:
         return e if throw else False
     try:
         if attribute: dp.read_attribute(attribute)
@@ -720,7 +720,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
             assert s not in bad_state and str(s) not in bad_state
           return str(s) #True
         return True
-    except Exception,e:
+    except Exception as e:
         return e if throw else None
 
 @Cached(depth=1000,expire=10)
@@ -760,7 +760,7 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 else:
                   return (getattr(attvalue,'value',
                                   getattr(attvalue,'rvalue',None)))
-        except Exception,e: 
+        except Exception as e: 
             if trace: traceback.print_exc()
             return None if readable or brief else e
     except:
@@ -785,16 +785,16 @@ def check_device_list(devices,attribute=None,command=None):
             hosts[info.host][info.server].append(dev)
         else:
             result[dev] = False
-    for host,servs in hosts.items():
+    for host,servs in list(hosts.items()):
         if not check_host(host):
-            print('Host %s failed, discarding %d devices'
-                  %(host,sum(len(s) for s in servs.values())))
-            result.update((d,False) for s in servs.values() for d in s)
+            print(('Host %s failed, discarding %d devices'
+                  %(host,sum(len(s) for s in list(servs.values())))))
+            result.update((d,False) for s in list(servs.values()) for d in s)
         else:
-            for server,devs in servs.items():
+            for server,devs in list(servs.items()):
                 if not check_device('dserver/%s'%server,full=False):
-                    print('Server %s failed, discarding %d devices'
-                          %(server,len(devs)))
+                    print(('Server %s failed, discarding %d devices'
+                          %(server,len(devs))))
                     result.update((d,False) for d in devs)
                 else:
                     for d in devs:
@@ -812,7 +812,7 @@ def cast_tango_type(value_type):
     elif value_type in (PyTango.DevDouble,PyTango.DevFloat): 
         return float
     elif value_type in (PyTango.DevLong64,PyTango.DevULong64):
-        return long
+        return int
     elif value_type in (PyTango.DevState,PyTango.DevShort,PyTango.DevInt,
         PyTango.DevLong,PyTango.DevULong,PyTango.DevUShort,PyTango.DevUChar): 
         return int
@@ -840,10 +840,10 @@ def get_device_help(self,str_format='text'):
         ('Commands','cmd_list'),
         ('Attributes','attr_list')):
         c = self.get_device_class()
-        d = getattr(c,o).keys()
+        d = list(getattr(c,o).keys())
         if d:
           docs.append(t+linesep+linesep+linesep.join(item%k for k in d))
-    except Exception,e:
+    except Exception as e:
       traceback.print_exc()
       raise e
     return docsep.join(docs)
@@ -875,7 +875,7 @@ def read_internal_attribute(device,attribute):
     if the device is not internal this method will connect to a PyTango Proxy
     the method will return a fakeAttributeValue object
     """
-    print('read_internal_attribute(%s,%s)'%(device,attribute))
+    print(('read_internal_attribute(%s,%s)'%(device,attribute)))
     import fandango.dynamic as dynamic
     
     if isString(device):
@@ -893,13 +893,13 @@ def read_internal_attribute(device,attribute):
         if isProxy: attr.set_value(device.state())
         elif hasattr(device,'last_state'): attr.set_value(device.last_state)
         else: attr.set_value(device.get_state())
-        print('%s = %s' % (attr.name,attr.value))
+        print(('%s = %s' % (attr.name,attr.value)))
         attr.error = ''
     else: 
         if isProxy:
-            print('fandango.read_internal_attribute(): '
+            print(('fandango.read_internal_attribute(): '
                     'calling DeviceProxy(%s).read_attribute(%s)'
-                    %(attr.device,attr.name))
+                    %(attr.device,attr.name)))
             val = device.read_attribute(attr.name)
             attr.set_value_date_quality(val.value,val.time,val.quality)
         else:
@@ -907,8 +907,8 @@ def read_internal_attribute(device,attribute):
             for s in dir(device):
                 if s.lower()=='is_%s_allowed'%aname: allow_method = s
                 if s.lower()=='read_%s'%aname: read_method = s
-            print('fandango.read_internal_attribute():'
-                    ' calling %s.is_%s_allowed()'%(attr.device,attr.name))
+            print(('fandango.read_internal_attribute():'
+                    ' calling %s.is_%s_allowed()'%(attr.device,attr.name)))
             is_allowed = ((not allow_method) 
                           or getattr(device,allow_method)(AttReqType.READ_REQ))
             if not is_allowed:
@@ -916,9 +916,9 @@ def read_internal_attribute(device,attribute):
                                      %(device,aname))
             elif not read_method:
                 if isDyn: 
-                    print('fandango.read_internal_attribute():'
+                    print(('fandango.read_internal_attribute():'
                             ' calling %s(%s).read_dyn_attr(%s)'
-                            %(device.myClass,attr.device,attr.name))
+                            %(device.myClass,attr.device,attr.name)))
                     if not device.myClass:
                         attr.throw_exception('\t%s is a dynamic device '
                                         'not initialized yet.'%attr.device)
@@ -930,7 +930,7 @@ def read_internal_attribute(device,attribute):
                                 device.read_dyn_attr(device,attr)
                             else: 
                                 device.read_dyn_attr(attr)
-                            print('%s = %s' % (attr.name,attr.value))
+                            print(('%s = %s' % (attr.name,attr.value)))
                             attr.error = ''
                         except:
                             attr.throw_exception()
@@ -944,7 +944,7 @@ def read_internal_attribute(device,attribute):
                 print(msg)
                 try:
                     getattr(device,read_method)(attr)
-                    print('%s = %s' % (attr.name,attr.value))
+                    print(('%s = %s' % (attr.name,attr.value)))
                     attr.error = ''
                 except:
                     attr.throw_exception()
@@ -959,8 +959,8 @@ def get_polled_attrs(device,others=None):
     e.g others = ['polled_cmd'] would append the polled commands to the list
     """
     if isSequence(device):
-        return CaselessDict(zip(map(str.lower,device[::2]),
-                                map(float,device[1::2])))
+        return CaselessDict(list(zip(list(map(str.lower,device[::2])),
+                                list(map(float,device[1::2])))))
     elif isinstance(device,DeviceProxy):
         attrs = device.get_attribute_list()
         periods = [(a.lower(),int(dp.get_attribute_poll_period(a))) 
@@ -987,7 +987,7 @@ def get_polled_attrs(device,others=None):
         return d
         
 def __test_method__(args=None):
-    print(__name__,'test',args)
+    print((__name__,'test',args))
     if args:
       if args and args[0] == 'help':
           help(globals().get(args[1]))
@@ -997,7 +997,7 @@ def __test_method__(args=None):
               if callable(f):
                   args = [fandango.trial(lambda:eval(a) if isString(a) else a,
                                          excepts=a) for a in args[1:]]
-                  print(f(*args))
+                  print((f(*args)))
               return 0
           except:
               traceback.print_exc()

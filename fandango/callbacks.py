@@ -45,14 +45,14 @@ import sys,os,time,re
 import threading,weakref
 from copy import *
 
-from excepts import getLastException,exc2str
-from objects import *
-from functional import *
-from dicts import *
-from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
-from tango import get_full_name,get_attribute_events, check_device_cached
-from threads import ThreadedObject,Queue,timed_range,wait,threading
-from log import Logger,printf,tracer
+from .excepts import getLastException,exc2str
+from .objects import *
+from .functional import *
+from .dicts import *
+from .tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
+from .tango import get_full_name,get_attribute_events, check_device_cached
+from .threads import ThreadedObject,Queue,timed_range,wait,threading
+from .log import Logger,printf,tracer
 
 """
 @package callbacks
@@ -119,12 +119,12 @@ class AttrCallback(Logger,Object):
   
   def attr_read(self,*args,**kwargs):
     try:
-      print('Callback at %s'%time2str())
-      print('Received %d arguments'%len(args))
+      print(('Callback at %s'%time2str()))
+      print(('Received %d arguments'%len(args)))
       for a in args:
-          print('\t%s'%str(a)[:80])
-          for k,v in a.__dict__.items():
-            print('\t%s: %s'%(k,v))
+          print(('\t%s'%str(a)[:80]))
+          for k,v in list(a.__dict__.items()):
+            print(('\t%s: %s'%(k,v)))
           return
     except:
       traceback.print_exc()
@@ -346,11 +346,11 @@ class EventThread(Logger,ThreadedObject):
                 if name not in queue: queue[name] = []
                 queue[name].append((source,args))
 
-            except Queue.Empty,e:
+            except Queue.Empty as e:
                 WAS_EMPTY = True
                 break
 
-            except Exception,e:
+            except Exception as e:
                 #The queue is empty, long period attributes can be processed
                 if 'empty' not in str(e).lower():
                     self.error(traceback.format_exc())
@@ -433,7 +433,7 @@ class EventThread(Logger,ThreadedObject):
         for source in randomize(asynch_hw):
             try: 
               source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
-            except Exception,e:
+            except Exception as e:
               traceback.print_exc()
             #@TODO: DO NOT UPDATE THAT HERE; DO IT ON ASYNCH()
             source.last_read_time = now() 
@@ -459,7 +459,7 @@ class EventThread(Logger,ThreadedObject):
             if hasattr(source,'fireEvent'):
                 source.fireEvent(*args)  ## Event types are filtered at EventSource.fireEvent
             elif hasattr(source,'listeners'):
-                listeners = source.listeners.keys()
+                listeners = list(source.listeners.keys())
                 for l in listeners:
                     try: getattr(l,'eventReceived',l)(*([source]+list(args))) 
                     except: traceback.print_exc()
@@ -619,7 +619,7 @@ class EventSource(Logger,SingletonMap):
         listeners = toList(kw.get('listeners',[]))
         if kw.get('persistent',False):
             listeners.append(EventSource.DUMMY)
-        map(self.addListener,listeners)
+        list(map(self.addListener,listeners))
             
     def __del__(self): 
         self.cleanUp()
@@ -671,7 +671,7 @@ class EventSource(Logger,SingletonMap):
         try:
           state = self.STATES.get(state,state)
           if self.state != state:
-            for k,v in self.STATES.items():
+            for k,v in list(self.STATES.items()):
               if v==self.state: o = k
               if v==state: n = k
             self.state = state
@@ -766,7 +766,7 @@ class EventSource(Logger,SingletonMap):
     def _listenerDied(self, weak_listener):
         try:
             self.listeners.pop(weak_listener)
-        except Exception, e:
+        except Exception as e:
             pass
 
     def addListener(self, listener,use_events=True,use_polling=False):
@@ -818,10 +818,10 @@ class EventSource(Logger,SingletonMap):
             
         if listener == '*':
             self.warning('Removing all listeners')
-            listener = [k for k in self.listeners.keys() if not k().name==exclude]
+            listener = [k for k in list(self.listeners.keys()) if not k().name==exclude]
 
         elif isString(listener):
-            listener = [k for k in self.listeners.keys() if k().name==listener]
+            listener = [k for k in list(self.listeners.keys()) if k().name==listener]
 
         if isSequence(listener):
             while listener:
@@ -833,7 +833,7 @@ class EventSource(Logger,SingletonMap):
             
         try:
             self.listeners.pop(listener)
-        except Exception, e:
+        except Exception as e:
             return False
         if not self.listeners:
             self.unsubscribeEvents()
@@ -859,7 +859,7 @@ class EventSource(Logger,SingletonMap):
                        (event_type,pending))
         self.stats['fired']+=1
 
-        listeners = listeners or self.listeners.keys()
+        listeners = listeners or list(self.listeners.keys())
         for l in listeners:
             try:
                 #event filter will allow poll() events to pass through
@@ -914,7 +914,7 @@ class EventSource(Logger,SingletonMap):
               ##self.get_thread().stop() #DONT DO THIS WITHIN THE LOOP HOOK!
 
               try:
-                for k,type_ in EventType.names.items():
+                for k,type_ in list(EventType.names.items()):
                   if any(e==type_ or clmatch(e,k) for e in self.use_events):
                     try:
                         if self.event_ids.get(type_) is not None:
@@ -1014,11 +1014,11 @@ class EventSource(Logger,SingletonMap):
     def unsubscribeEvents(self):
         self.info('unsubscribeEvents(...)')
         self.use_events = []
-        for type_,ID in  self.event_ids.items():
+        for type_,ID in  list(self.event_ids.items()):
             try:
                 self.proxy.unsubscribe_event(ID)
                 self.event_ids.pop(type_)
-            except Exception,e:
+            except Exception as e:
                 self.debug('Error unsubscribing %s events: %s'%(type_,e))
         if not self.hasListeners() and not self.isPollingForced():
             self.deactivatePolling()
@@ -1121,7 +1121,7 @@ class EventSource(Logger,SingletonMap):
                     %(getattr(self.attr_value,'value','null'),
                         shortstr(self.attr_value,256)))
                     
-        except Exception,e:
+        except Exception as e:
             # fakeAttributeValue initialized with full_name
             self.info('EventSource.read(%s) failed!,'
               ' polling will be deactivated:\n%s'%(self.full_name,exc2str(e)))
@@ -1141,7 +1141,7 @@ class EventSource(Logger,SingletonMap):
             self.attr_value = self.proxy.read_attribute_reply(self.pending_request[0])
             self.pending_request = None
             return self.attr_value
-        except PyTango.AsynReplyNotArrived,e:
+        except PyTango.AsynReplyNotArrived as e:
             return None
         #except PyTango.CommunicationFailed,e:
             ##Device killed or restarted
@@ -1151,7 +1151,7 @@ class EventSource(Logger,SingletonMap):
             ##raise Exception,'CHECK HERE FOR EXPIRED REQUEST OR REQUEST NO VALID ANYMORE (e.g. DEVICE RESTARTED)'
             #self.pending_request = None
             #return None
-        except Exception, e:
+        except Exception as e:
             self.pending_request = None
             self.attr_value = e
         return None
@@ -1182,7 +1182,7 @@ class EventSource(Logger,SingletonMap):
             if diff and self.isUsingEvents(): 
               self.info('Polled a subscribed attribute; diff: %s!=%s'%(prev,av))
               
-        except Exception,e:
+        except Exception as e:
             self.debug('poll(%s) exception: %s'%(self.full_name,exc2str(e)))
             
         ##FIRE EVENT IS ALREADY DONE IN read() METHOD!
@@ -1398,23 +1398,23 @@ class EventCallback():
             #Pruning tango:$TANGO_HOST and other tags
             attr_name = '/'.join(event.attr_name.split('/')[-4:])
             dev_name = hasattr(event.device,'name') and event.device.name() or event.device
-            print "in EventCallback.push_event(",dev_name,": ",attr_name,")"
+            print("in EventCallback.push_event(",dev_name,": ",attr_name,")")
             if not event.err and event.attr_value is not None:
-                print "in EventCallback.push_event(...): ",attr_name,"=", event.attr_value.value
+                print("in EventCallback.push_event(...): ",attr_name,"=", event.attr_value.value)
                 self.TimeOutErrors=0
                 _EventsList[attr_name.lower()].set(event)
                 if attr_name.lower().endswith('/state'):
                     _StatesList[dev_name.lower()]=event.attr_value.value
                 _AttributesList[event.attr_name.lower()]=event.attr_value
             else:
-                print 'in EventCallback.push_event(...): Received an Error Event!: ',event.errors
+                print('in EventCallback.push_event(...): Received an Error Event!: ',event.errors)
                 _EventsList[attr_name.lower()].set(event)
                 #if 'OutOfSync' in event.errors[0]['reason']: or 'API_EventTimeout' in event.errors[0]['reason']:
                 #if [e for e in event.errors if hasattr(e,'keys') and 'reason' in e.keys() and any(re.search(exp,e['reason']) for exp in self.NotifdExceptions)]:
                 reasons = [getattr(e,'reason',e.get('reason',str(e)) if hasattr(e,'get') else str(e)) for e in event.errors] #Needed to catch both PyTango3 and PyTango7 exceptions
                 if any(n in r for n in self.NotifdExceptions for r in reasons):
-                    print 'callbacks=> DISCARDED EVENT FOR NOTIFD REASONS!!! %s(%s)' \
-                        %(dev_name,reasons)
+                    print('callbacks=> DISCARDED EVENT FOR NOTIFD REASONS!!! %s(%s)' \
+                        %(dev_name,reasons))
                     self.TimeOutErrors+=1
                     self.lock.release()
                     return
@@ -1425,13 +1425,13 @@ class EventCallback():
                     _AttributesList[attr_name.lower()]=None
             #Launching Device.push_event()                
             for rec in _EventsList[attr_name].receivers:
-                if rec in _EventReceivers.keys(): _EventReceivers[rec].push_event(event)
+                if rec in list(_EventReceivers.keys()): _EventReceivers[rec].push_event(event)
                 elif hasattr(rec,'push_event'): rec.push_event(_event)
                 elif isinstance(rec,threading.Event): rec.set()
                 elif callable(rec): rec()
                 else: raise 'UnknownEventReceiverType'
-        except Exception,e:
-            print 'exception in EventCallback.push_event(): ',e, ";", getLastException()
+        except Exception as e:
+            print('exception in EventCallback.push_event(): ',e, ";", getLastException())
         self.lock.release()
 
 ###############################################################################
@@ -1478,29 +1478,29 @@ GlobalCallback = EventCallback()
 # OLD API, DEPRECATED
 
 def inStatesList(devname):
-    print 'In callbacks.inStatesList ...'
+    print('In callbacks.inStatesList ...')
     GlobalCallback.lock.acquire()
-    print 'Checking if %s in %s.'%(devname,str(_StatesList.keys()))
-    value=bool(devname.lower() in _StatesList.keys())
+    print('Checking if %s in %s.'%(devname,str(list(_StatesList.keys()))))
+    value=bool(devname.lower() in list(_StatesList.keys()))
     GlobalCallback.lock.release()
     return bool
         
 def getStateFor(devname):
-    print 'In callbacks.getStateFor     ...'
+    print('In callbacks.getStateFor     ...')
     GlobalCallback.lock.acquire()
-    state = _StatesList[devname.lower()] if devname.lower() in _StatesList.keys() else None
+    state = _StatesList[devname.lower()] if devname.lower() in list(_StatesList.keys()) else None
     GlobalCallback.lock.release()
     return state
 
 def setStateFor(devname,state):
-    print 'In callbacks.setStateFor     ...'
+    print('In callbacks.setStateFor     ...')
     GlobalCallback.lock.acquire()
     _StatesList[devname.lower()]=state
     GlobalCallback.lock.release()
     return state
 
 def setAttributeValue(attr_name,attr_value):
-    print 'In callbacks.setAttributeValue(%s)'%attr_name
+    print('In callbacks.setAttributeValue(%s)'%attr_name)
     GlobalCallback.lock.acquire()
     _AttributesList[attr_name.lower()]=attr_value
     GlobalCallback.lock.release()
@@ -1508,7 +1508,7 @@ def setAttributeValue(attr_name,attr_value):
 
 def inAttributesList(attname):
     GlobalCallback.lock.acquire()
-    value=bool(attname.lower() in _AttributesList.keys())
+    value=bool(attname.lower() in list(_AttributesList.keys()))
     GlobalCallback.lock.release()
     return bool
 
@@ -1520,7 +1520,7 @@ def getAttrValueFor(attname):
 
 def inEventsList(attname):
     GlobalCallback.lock.acquire()
-    value=bool(attname.lower() in _EventsList.keys())
+    value=bool(attname.lower() in list(_EventsList.keys()))
     GlobalCallback.lock.release()
     return value
 
@@ -1532,7 +1532,7 @@ def getEventFor(attname):
 
 def getEventItems():
     GlobalCallback.lock.acquire()
-    result = _EventsList.items()
+    result = list(_EventsList.items())
     GlobalCallback.lock.release()
     return result
 
@@ -1540,7 +1540,7 @@ def getSubscribedItems(receiver):
     '''It returns a list with all devices managed by callbacks to which this receiver is effectively subscribed'''
     GlobalCallback.lock.acquire()
     result = []
-    for ev in _EventsList.values():
+    for ev in list(_EventsList.values()):
         if receiver in ev.receivers:
             result.append (ev.dev_name)
     GlobalCallback.lock.release()
@@ -1558,7 +1558,7 @@ def addTAttr(tattr):
         _AttributesList[att_name]=None
         if att_name.endswith=='/state':
             _StatesList[tattr.dev_name.lower()]=None
-    except: print traceback.format_exc()    
+    except: print(traceback.format_exc())    
     finally: GlobalCallback.lock.release()
     return
     
@@ -1567,7 +1567,7 @@ def addReceiver(attribute,receiver):
         GlobalCallback.lock.acquire()        
         if not receiver.lower() in _EventsList[attribute.lower()].receivers:
             _EventsList[attribute.lower()].receivers.append(receiver.lower())
-    except: print traceback.format_exc()
+    except: print(traceback.format_exc())
     finally: GlobalCallback.lock.release()
     return
 
@@ -1594,7 +1594,7 @@ def subscribeDeviceAttributes(self,dev_name,attrs):
         #cb = self 
         cb = GlobalCallback
         
-        if not att_name in callbacks._EventsList.keys():
+        if not att_name in list(callbacks._EventsList.keys()):
             callbacks._EventsList[att_name] = self.TAttr(att_name)
             callbacks._EventsList[att_name].receivers.append(self.get_name())
             self.info('AddDevice: subscribing event for %s'  % att_name)
@@ -1603,8 +1603,8 @@ def subscribeDeviceAttributes(self,dev_name,attrs):
             callbacks._EventsList[att_name].dp = dev
             callbacks._EventsList[att_name].event_id = event_id
             callbacks._EventsList[att_name].dev_name = dev_name
-            print "In ", self.get_name(), "::AddDevice()", ": Listing Device/Attributes in _EventsList:"
-            for a,t in callbacks._EventsList.items(): print "\tAttribute: ",a,"\tDevice: ",t.dev_name,"\n"
+            print("In ", self.get_name(), "::AddDevice()", ": Listing Device/Attributes in _EventsList:")
+            for a,t in list(callbacks._EventsList.items()): print("\tAttribute: ",a,"\tDevice: ",t.dev_name,"\n")
         else:
             self.warning("::AddDevice(%s): This attribute is already in the list, adding composer to receivers list." % att_name)
             if not dev_name in callbacks._EventsList[att_name].receivers:

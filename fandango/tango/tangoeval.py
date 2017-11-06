@@ -116,7 +116,7 @@ def getTangoValue(obj,device=None):
         o.set_quality_flags()
         return o
     except:
-        print traceback.format_exc()
+        print(traceback.format_exc())
         return obj
             
     def __repr__(self):
@@ -228,8 +228,8 @@ class TangoEval(object):
         
         self._trace = trace
         self._defaults = dict(
-            [(str(v),v) for v in DevState.values.values()]+
-            [(str(q),q) for q in AttrQuality.values.values()]
+            [(str(v),v) for v in list(DevState.values.values())]+
+            [(str(q),q) for q in list(AttrQuality.values.values())]
             )
         self._defaults['T'] = str2time
         self._defaults['str2time'] = str2time
@@ -245,11 +245,11 @@ class TangoEval(object):
         self._defaults['READ'] = self._defaults['ATTR'] = \
                 self._defaults['XATTR'] = self.read_attribute
         #self._locals['now'] = time.time() #Updated at execution time
-        self._defaults.update((k,v) for k,v in {'get_domain':get_domain,
+        self._defaults.update((k,v) for k,v in list({'get_domain':get_domain,
                                           'get_family':get_family,
                                           'get_member':get_member,
                                           'parse':parse_tango_model
-                                          }.items())
+                                          }.items()))
         
         #Updating Not allowed models
         #self._defaults.update((k,None) for k in ('os','sys',)) 
@@ -260,11 +260,11 @@ class TangoEval(object):
         if self.formula and launch: 
             self.eval()
             if not self._trace: 
-                print('TangoEval: result = %s' % self.result)
+                print(('TangoEval: result = %s' % self.result))
         return
             
     def trace(self,msg):
-        if self._trace: print('TangoEval: %s'%str(msg))
+        if self._trace: print(('TangoEval: %s'%str(msg)))
         
     def set_timeout(self,timeout):
         self.timeout = int(timeout)
@@ -306,7 +306,7 @@ class TangoEval(object):
             tag,formula = formula.split(':',1)
         #explicit replacement of env variables if $() used            
         if _locals and '$(' in formula: 
-            for l,v in _locals.items():
+            for l,v in list(_locals.items()):
                 formula = formula.replace('$(%s)'%str(l),str(v))
         for macro_name,macro_exp,macro_fun in self.macros:
             matches = re.findall(macro_exp,formula)
@@ -376,7 +376,7 @@ class TangoEval(object):
             elif what == 'delta': value = self.get_delta(aname)
             else: value = getattr(value,what)
             self.trace('read_attribute(%s/%s.%s) => %s'%(device,attribute,what,value))
-        except Exception,e:
+        except Exception as e:
             if isinstance(e,PyTango.DevFailed) and what=='exception':
                 return e
             elif _raise and not isNaN(_raise):
@@ -390,7 +390,7 @@ class TangoEval(object):
         if dct:
             if not hasattr(dct,'keys'): dct = dict(dct)
             self._locals.update(dct)
-            self.trace('update_locals(%s)'%shortstr(dct.keys()))
+            self.trace('update_locals(%s)'%shortstr(list(dct.keys())))
         self._locals['now'] = self._locals['t'] = time.time()
         self._locals['formula'] = self.formula
         return self._locals
@@ -475,12 +475,12 @@ class TangoEval(object):
                 self.source = self.source.replace(target,var_name,1) 
                 #Used from alarm messages
                 self.last[target] = self.previous[var_name] 
-            except Exception,e:
+            except Exception as e:
                 self.trace('eval(r=%s): Unable to obtain %s values'%(r,target))
                 self.last[target] = e
                 raise e
         self.trace('formula = %s' % (self.source))
-        self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in self.previous.items()))
+        self.trace('previous.items():\n'+'\n'.join(str((str(k),str(i))) for k,i in list(self.previous.items())))
         self.result = eval(self.source,dict(self.previous),self._locals)
         self.trace('result = %s' % str(self.result))
         return self.result
@@ -522,7 +522,7 @@ class DeprecatedCachedAttributeProxy(PyTango.AttributeProxy):
             self.last_read_time = now
             try:
                 self.last_read_value = None if self.fake else PyTango.AttributeProxy.read(self)
-            except Exception,e:
+            except Exception as e:
                 self.last_read_value = e
         if isinstance(self.last_read_value,Exception): raise self.last_read_value
         else: return self.last_read_value

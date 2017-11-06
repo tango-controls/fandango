@@ -84,9 +84,9 @@ class FriendlyDB(log.Logger):
         try:
             self.db.autocommit(autocommit)
             self.autocommit = autocommit
-        except Exception,e:
+        except Exception as e:
             self.error('Unable to set MySQLdb.connection.autocommit to %s'%autocommit)
-            raise Exception,e
+            raise Exception(e)
         
         
     def renewMySQLconnection(self):
@@ -96,9 +96,9 @@ class FriendlyDB(log.Logger):
                 del self.db
             self.db=MySQLdb.connect(db=self.db_name,host=self.host,user=self.user,passwd=self.passwd)
             self.db.autocommit(self.autocommit)
-        except Exception,e:
+        except Exception as e:
             self.error( 'Unable to create a MySQLdb connection to "%s"@%s.%s: %s'%(self.user,self.host,self.db_name,str(e)))
-            raise Exception,e
+            raise Exception(e)
    
     def getCursor(self,renew=True,klass=None):
         ''' 
@@ -118,7 +118,7 @@ class FriendlyDB(log.Logger):
                 self._cursor = self.db.cursor(self.default_cursor) if klass is None else self.db.cursor(cursorclass=klass)
             return self._cursor
         except:
-            print traceback.format_exc()
+            print(traceback.format_exc())
             self.renewMySQLconnection()
             self._recursion += 1
             return self.getCursor(renew=True,klass=klass)
@@ -166,7 +166,7 @@ class FriendlyDB(log.Logger):
                 q=self.getCursor(klass = dict if asDict else None)
                 q.execute(query)
         except:
-            print('Query(%s) failed!'%query)
+            print(('Query(%s) failed!'%query))
             raise
             
         if not export:
@@ -188,7 +188,7 @@ class FriendlyDB(log.Logger):
         elif type(clause) is dict:
             clause1=''
             for i in range(len(clause)):
-                k,v = clause.items()[i]
+                k,v = list(clause.items())[i]
                 clause1+= "%s like '%s'"%(k,v) if type(v) is str else '%s=%s'%(k,str(v))
                 if (i+1)<len(clause): clause1+=" and "
             #' and '.join

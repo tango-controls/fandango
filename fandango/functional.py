@@ -47,11 +47,10 @@ import random
 import math
 import time,datetime
 
-from operator import isCallable
 from functools import partial
 from collections import Hashable
-from itertools import count,cycle,repeat,chain,groupby,islice,imap,starmap
-from itertools import dropwhile,takewhile,ifilter,ifilterfalse,izip
+from itertools import count,cycle,repeat,chain,groupby,islice,starmap
+from itertools import dropwhile,takewhile,filterfalse
 try: from itertools import combinations,permutations,product
 except: pass
 
@@ -75,10 +74,10 @@ def first(seq,default=Exception):
     """Returns first element of sequence"""
     try: 
         return seq[0]
-    except Exception,e:
+    except Exception as e:
         try: 
-            return seq.next()
-        except Exception,d:
+            return next(seq)
+        except Exception as d:
             if default is not Exception:
                 return default
             else:
@@ -90,9 +89,9 @@ def last(seq,MAX=1000,default=Exception):
     """Returns last element of sequence"""
     try:
         return seq[-1]
-    except Exception,e:
+    except Exception as e:
         try: 
-            n = seq.next()
+            n = next(seq)
         except: 
             if default is not Exception:
                 return default
@@ -100,10 +99,10 @@ def last(seq,MAX=1000,default=Exception):
                 raise e #if .next() also doesn't work throw unsubscriptable exception
         try:
             for i in range(1,MAX):
-                n = seq.next()
+                n = next(seq)
             if i>(MAX-1):
                 raise IndexError('len(seq)>%d'%MAX)
-        except StopIteration,e: #It catches generators end
+        except StopIteration as e: #It catches generators end
             return n
     return
         
@@ -197,7 +196,7 @@ def djoin(a,b):
     other,dct = sorted((a,b),key=isDictionary) 
     if not isDictionary(other): 
         other = dict.fromkeys(other if isSequence(other) else [other,])
-    for k,v in other.items():
+    for k,v in list(other.items()):
         dct[k] = v if not k in dct else djoin(dct[k],v)
     return dct
   
@@ -274,7 +273,7 @@ def matchMap(mapping,key,regexp=True,default=Exception):
       if default is not Exception:
         return default
       raise ValueError('mapping')    
-    if hasattr(mapping,'items'): mapping = mapping.items()
+    if hasattr(mapping,'items'): mapping = list(mapping.items())
     if not isSequence(mapping) or not isSequence(mapping[0]): raise TypeError('dict or tuplelist required')
     if not isString(key): key = str(key)
     
@@ -379,9 +378,9 @@ def sortedRe(iterator,order):
     rorder = [re.compile(c) for c in order]
     def sorter(k,ks=rorder):
         k = str(k[0] if isinstance(k,tuple) else k).lower()
-        return str((i for i,r in enumerate(ks) if r.match(k)).next())+k
+        return str(next((i for i,r in enumerate(ks) if r.match(k))))+k
     for i in sorted(iterator,key=sorter):
-        print '%s:%s' % (i,sorter(i))
+        print(('%s:%s' % (i,sorter(i))))
     return sorted(iterator,key=sorter)
 
 def toCl(exp,terminate=False,wildcards=('*',' '),lower=True):
@@ -453,7 +452,7 @@ class Piped:
     def __init__(self,method,*args,**kwargs):
         self.process=partial(method,*args,**kwargs)
     def __ror__(self,input):
-        return imap(self.process,input)
+        return list(map(self.process,input))
         
 class iPiped:
     """ Used to pipe methods that already return iterators 
@@ -480,9 +479,9 @@ pdict = iPiped(dict)
 ptuple = iPiped(tuple)
 pindex = lambda i: Piped(lambda x:x[i])
 pslice = lambda i,j: Piped(lambda x:x[i,j])
-penum = iPiped(lambda input: izip(count(),input) )
-pzip = iPiped(lambda i:izip(*i))
-ptext = iPiped(lambda input: '\n'.join(imap(str,input)))
+penum = iPiped(lambda input: list(zip(count(),input)) )
+pzip = iPiped(lambda i:list(zip(*i)))
+ptext = iPiped(lambda input: '\n'.join(map(str,input)))
 
 ########################################################################
 ## Methods for identifying types        
@@ -490,6 +489,15 @@ ptext = iPiped(lambda input: '\n'.join(imap(str,input)))
 """ Note of the author:
  This methods are not intended to be universal, are just practical for general Tango application purposes.
 """
+
+try:
+    from operator import isCallable,isSequenceType
+except Exception as e:
+    import collections
+    isCallable = lambda o: isinstance(o,collections.Callable)
+    isSequenceType = lambda o: isinstance(o,collections.Sequence)
+        #hasattr(o,'__call__') or hasattr(o,'__new__')
+
 
 reint = '[0-9]+'
 refloat = '[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?'
@@ -501,7 +509,7 @@ def isString(seq):
     @TODO: repleace by this code: 
       import types;isinstance(seq,types.StringTypes)
     """
-    if isinstance(seq,basestring): return True # It matches most python str-like classes
+    if isinstance(seq,str): return True # It matches most python str-like classes
     if any(s in str(type(seq)).lower() for s in ('vector','array','list',)): return False
     if 'qstring' == str(type(seq)).lower(): return True # It matches QString
     return False
@@ -581,7 +589,7 @@ def isIterable(seq):
 def isNested(seq,strict=False):
     if not isIterable(seq) or not len(seq): 
         return False
-    child = seq[0] if isSequence(seq) else seq.values()[0]
+    child = seq[0] if isSequence(seq) else list(seq.values())[0]
     if not strict and isIterable(child): 
         return True
     if any(all(map(f,(seq,child))) for f in (isSequence,isDictionary)): 
@@ -632,7 +640,7 @@ def str2bool(seq):
   
 def str2bytes(seq):
     """ Converts an string to a list of integers """
-    return map(ord,str(seq))
+    return list(map(ord,str(seq)))
 
 def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     """ 
@@ -675,7 +683,7 @@ def unicode2str(obj):
     nested python primitives (map,list,str)
     """
     if isMapping(obj,strict=True):
-        n = dict(unicode2python(t) for t in obj.items())
+        n = dict(unicode2python(t) for t in list(obj.items()))
     elif isSequence(obj):
         n = list(unicode2python(t) for t in obj)
     elif isString(obj):
@@ -707,7 +715,7 @@ def toString(*val):
         return str(val)
 
 def toStringList(seq):
-    return map(toString,seq)
+    return list(map(toString,seq))
 
 def str2list(s,separator='',regexp=False,sep_offset=0): 
     """ Arguments allow to split by regexp and to keep or not the separator character 
@@ -716,11 +724,11 @@ def str2list(s,separator='',regexp=False,sep_offset=0):
     sep_offset = 1 : keep with precedent
     """
     if not regexp:
-      return map(str.strip,
-          s.split(separator) if separator else s.split())
+      return list(map(str.strip,
+          s.split(separator) if separator else s.split()))
     elif not sep_offset:
-      return map(str.strip,
-          re.split(separator,s) if separator else re.split('[\ \\n]',s))
+      return list(map(str.strip,
+          re.split(separator,s) if separator else re.split('[\ \\n]',s)))
     else:
       r,seps,m = [],[],1
       while m:
@@ -740,22 +748,22 @@ def code2atoms(code):
     end = '[\]\)\}]'
     #ops = '[,]'
     l0 = str2list(code,begin,1,1)
-    l0 = filter(bool,map(str.strip,l0))
+    l0 = list(filter(bool,list(map(str.strip,l0))))
     l1 = [a for l in l0 for a in str2list(l,end,1,-1)]
-    l1 = filter(bool,map(str.strip,l1))
+    l1 = list(filter(bool,list(map(str.strip,l1))))
     #l2 = [a for l in l1 for a in str2list(l,ops,1,-1)]
     return l1
     
 def shortstr(s,max_len=144,replace={'\n':';'}):
     s = str(s)
-    for k,v in replace.items():
+    for k,v in list(replace.items()):
         s = s.replace(k,v)
     if max_len>0 and len(s) > max_len:
         s = s[:max_len-4]+' ...'
     return s
 
 def text2list(s,separator='\n'):
-    return filter(bool,str2list(s,separator))
+    return list(filter(bool,str2list(s,separator)))
 
 def str2lines(s,length=80,separator='\n'):
     return separator.join(s[i:i+length] for i in range(0,len(s),length))
@@ -775,7 +783,7 @@ def tuples2text(s,separator='\t',lineseparator='\n'):
 def dict2str(s,sep=':\t',linesep='\n',listsep='\n\t'):
     return linesep.join(sorted(
       sep.join((str(k),list2str(toList(v),listsep,0))) 
-      for k,v in s.items()))
+      for k,v in list(s.items())))
   
 def str2dict(s,ksep='',vsep=''):
     """ 
@@ -817,7 +825,7 @@ def char2int(c):
     return ord(c)
 def int2char(n): 
     """unichr(n)"""
-    return unichr(n)
+    return chr(n)
 def int2hex(n): return hex(n)
 def int2bin(n): return bin(n)
 def hex2int(c): return int(c,16)
@@ -847,7 +855,7 @@ def int2bool(dec,N=16):
 
 def bool2int(seq):
     """ Converts a boolean array to an unsigned integer """
-    return fandango.bin2unsigned(''.join(map(str,map(int,reversed(seq)))))
+    return fandango.bin2unsigned(''.join(map(str,list(map(int,reversed(seq))))))
 
 ########################################################################
 ## Time conversion
@@ -874,7 +882,7 @@ def date2time(date,us=True):
       us = us and getattr(date,'microsecond',0)
       if us: t+=us*1e-6
       return t
-    except Exception,e:
+    except Exception as e:
       try:
         return date.total_seconds()
       except:
@@ -1011,7 +1019,7 @@ def retry(callable,retries=3,pause=0,args=[],kwargs={}):
         try:
             r = callable(*args,**kwargs)
             break
-        except Exception,e:
+        except Exception as e:
             if i==(retries-1): raise e
             elif pause: time.sleep(pause)
     return r
@@ -1063,7 +1071,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
          - list if list[0] is callable: value = list[0](*list[1:]) 
          - callable: value = callable()
     """
-    import imp,__builtin__
+    import imp,builtins
     
     # Only if immutable types are passed as arguments these dictionaries will be preserved.
     _locals = notNone(_locals,{})
@@ -1078,14 +1086,14 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
                 modules[module] = imp.load_module(module,*imp.find_module(module))
             else:
                 parent,child = module.rsplit('.',1)
-                print parent
+                print(parent)
                 mparent = import_module(parent)
                 setattr(mparent,child,imp.load_module(module,*imp.find_module(child,mparent.__path__)))
                 modules[module] = getattr(mparent,child)
             if alias: 
                 modules[alias] = modules[module] 
                 _locals[alias] = modules[alias]
-        print '%s(%s) : %s' % (alias,module,modules[alias])
+        print(('%s(%s) : %s' % (alias,module,modules[alias])))
         return modules[alias]
         
     def get_instance(_module,_klass,_klass_args):
@@ -1098,7 +1106,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
     if isDictionary(target):
         model = target
         keywords = ['__args__','__target__','__class__','__module__','__class_args__']
-        args = model['__args__'] if '__args__' in model else dict((k,v) for k,v in model.items() if k not in keywords)
+        args = model['__args__'] if '__args__' in model else dict((k,v) for k,v in list(model.items()) if k not in keywords)
         target = model.get('__target__',None)
         module = model.get('__module__',None)
         klass = model.get('__class__',None)
@@ -1109,24 +1117,24 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             if module:
                 #module,subs = module.split('.',1)
                 if klass: 
-                    if _trace: print('evalX: %s.%s(%s).%s(%s)'%(module,klass,klass_args,target,args))
+                    if _trace: print(('evalX: %s.%s(%s).%s(%s)'%(module,klass,klass_args,target,args)))
                     target = getattr(get_instance(module,klass,klass_args),target)
                 else:
-                    if _trace: print('evalX: %s.%s(%s)'%(module,target,args))
+                    if _trace: print(('evalX: %s.%s(%s)'%(module,target,args)))
                     target = getattr(import_module(module),target)
             elif klass and klass in dir(__builtin__):
-                if _trace: print('evalX: %s(%s).%s(%s)'%(klass,klass_args,target,args))
+                if _trace: print(('evalX: %s(%s).%s(%s)'%(klass,klass_args,target,args)))
                 instance = getattr(__builtin__,klass)(*klass_args)
                 target = getattr(instance,target)
             elif target in dir(__builtin__): 
-                if _trace: print('evalX: %s(%s)'%(target,args))
+                if _trace: print(('evalX: %s(%s)'%(target,args)))
                 target = getattr(__builtin__,target)
             else:
                 raise _exception('%s()_MethodNotFound'%target)
         else:
             raise _exception('%s()_NotCallable'%target)
         value = target(**args) if isDictionary(args) else target(*args)
-        if _trace: print('%s: %s'%(model,value))
+        if _trace: print(('%s: %s'%(model,value)))
         return value
     else:
         #Parse: method[0](*method[1:])
@@ -1136,7 +1144,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
         elif isCallable(target):
             value = target()
         elif isString(target):
-            if _trace: print('evalX("%s")'%target)
+            if _trace: print(('evalX("%s")'%target))
             #Parse: import $MODULE
             if target.startswith('import ') or ' import ' in target: 
                 import_module(target) #Modules dictionary is updated here
@@ -1154,7 +1162,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
                 value = eval(target,modules,_locals)
         else:
             raise _exception('targetMustBeCallable, not %s(%s)'%(type(target),target))
-        if _trace: print('Out of evalX(%s): %s'%(target,value))
+        if _trace: print(('Out of evalX(%s): %s'%(target,value)))
     return value
 
 from . import doc

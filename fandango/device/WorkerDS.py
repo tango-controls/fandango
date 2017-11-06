@@ -55,7 +55,7 @@ from fandango.interface import FullTangoInheritance
 from fandango.threads import wait
 
 def get_module_dict(module,ks=None):
-    return dict((k,v) for k,v in module.__dict__.items() if (not ks or k in ks) and not k.startswith('__'))
+    return dict((k,v) for k,v in list(module.__dict__.items()) if (not ks or k in ks) and not k.startswith('__'))
 
 
 #==================================================================
@@ -108,7 +108,7 @@ class WorkerDS(PyTango.Device_4Impl):
         self.info('-'*70)
         self.last_check = time.time()
         self._state = (PyTango.DevState.RUNNING)
-        for task,commands in self.tasks.items():
+        for task,commands in list(self.tasks.items()):
           if task not in self.conditions:
             self.warning('\t%s not scheduled!'%task)
             continue
@@ -128,7 +128,7 @@ class WorkerDS(PyTango.Device_4Impl):
                 self.warning('In WorkerDS::updateTasks(%s): still running since %s!!!'%(task,fandango.time2str(self.sends[task])))
               else:
                 self.info( 'In WorkerDS::updateTasks(%s)'%task)
-                map(self.worker.put,commands)
+                list(map(self.worker.put,commands))
                 self.sends[task] = time.time()
           except:
             self.error(traceback.format_exc())
@@ -141,7 +141,7 @@ class WorkerDS(PyTango.Device_4Impl):
     def get_task_conditions(self,prop=None):
        prop = prop or self.TaskConditions
        prop = [p.split('#')[0].strip() for p in prop]
-       prop = filter(bool,prop)
+       prop = list(filter(bool,prop))
        return CaselessDict(p.split(':',1) for p in prop)
       
     def update_locals(self,_locals=None,update=False,task=None):
@@ -155,10 +155,10 @@ class WorkerDS(PyTango.Device_4Impl):
             _locals['weekday']=date.weekday()
             _locals['CURRENT'] = task
             _locals['LAST'] = self.dones[task]
-            _locals.update(dict(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/'))))
+            _locals.update(dict(list(zip('DOMAIN FAMILY MEMBER'.split(),self.get_name().split('/')))))
             _locals.update({'DEVICE':self.get_name(),'SELF':self}) #,'ALARMS':self.Alarms.keys(),'PANIC':self.Panic,'SELF':self})
             self._locals.update(_locals)
-            self.worker._locals.update([(k,v) for k,v in self._locals.items()
+            self.worker._locals.update([(k,v) for k,v in list(self._locals.items())
               if (k in _locals or k in self.extra_modules) 
                 and k not in self.tasks])
 
@@ -185,7 +185,7 @@ class WorkerDS(PyTango.Device_4Impl):
     #    Device destructor
     #------------------------------------------------------------------
     def delete_device(self):
-        print "[Device delete_device method] for device",self.get_name()
+        print("[Device delete_device method] for device",self.get_name())
         try:
           self.event.set()
           self.waiter.set()
@@ -194,13 +194,13 @@ class WorkerDS(PyTango.Device_4Impl):
         except:
           traceback.print_exc()
         self.worker = None
-        print 'done ...'
+        print('done ...')
 
     #------------------------------------------------------------------
     #    Device initialization
     #------------------------------------------------------------------
     def init_device(self):
-        print "In ", self.get_name(), "::init_device{}(%s)"%self.get_init_count()
+        print("In ", self.get_name(), "::init_device{}(%s)"%self.get_init_count())
         try: 
             DynamicDS.init_device(self) #New in Fandango 11.1
         except:
@@ -208,19 +208,19 @@ class WorkerDS(PyTango.Device_4Impl):
         try:[sys.path.insert(0,p) for p in self.PYTHONPATH if p not in sys.path]
         except: traceback.print_exc()
         self.setLogLevel('INFO')
-        default_props = dict((k,v[-1]) for k,v in WorkerDSClass.device_property_list.items())
+        default_props = dict((k,v[-1]) for k,v in list(WorkerDSClass.device_property_list.items()))
         all_props = (tango.get_matching_device_properties(self.get_name(),'*'))
 
-        missing = [k for k,v in default_props.items() if v and k.lower() not in map(str.lower,all_props)]
+        missing = [k for k,v in list(default_props.items()) if v and k.lower() not in list(map(str.lower,all_props))]
         if missing:
           print('Updating default property values')
-          print default_props.keys()
-          print all_props.keys()
-          print missing
+          print(list(default_props.keys()))
+          print(list(all_props.keys()))
+          print(missing)
           self.get_db().put_device_property(self.get_name(),dict((k,default_props[k]) for k in missing))
         
         #TASKS IS NOT CASELESS TO KEEP THE ORIGINAL NAME OF THE TASK
-        self.tasks = dict((k,v) for k,v in all_props.items() if k.lower() not in map(str.lower,default_props))
+        self.tasks = dict((k,v) for k,v in list(all_props.items()) if k.lower() not in list(map(str.lower,default_props)))
         self.sends = CaselessDefaultDict(int)
         self.dones = CaselessDefaultDict(int)
         self.conditions = self.get_task_conditions()
@@ -228,7 +228,7 @@ class WorkerDS(PyTango.Device_4Impl):
         self.StaticAttributes = ['%s = str(TASK("%s") or "")'%(t,t) for t in self.tasks]
         self.StaticAttributes += ['LastCheck = self.last_check']
         self.parseStaticAttributes()
-        self.info('Loaded %d tasks: %s'%(len(self.tasks),self.tasks.keys()))
+        self.info('Loaded %d tasks: %s'%(len(self.tasks),list(self.tasks.keys())))
 
         for m in self.ExtraModules:
             self.extra_modules = {}
@@ -241,7 +241,7 @@ class WorkerDS(PyTango.Device_4Impl):
               if k not in self._locals: 
                 if m[0] in ('sys','os'): 
                   raise Exception('%s not allowed'%str(m))
-                print '%s.init_device(): loading %s as %s' % (self.get_name(),m,k)
+                print('%s.init_device(): loading %s as %s' % (self.get_name(),m,k))
                 l = imp.load_module(m[0],*imp.find_module(m[0]))
                 if len(m)==1:
                   self._locals[k or m[0]] = l
@@ -254,7 +254,7 @@ class WorkerDS(PyTango.Device_4Impl):
             
         self.set_state(PyTango.DevState.INIT)
         self.Start()
-        print "Out of ", self.get_name(), "::init_device()"
+        print("Out of ", self.get_name(), "::init_device()")
 
     #------------------------------------------------------------------
     #    Always excuted hook method
@@ -383,7 +383,7 @@ class WorkerDSClass(PyTango.DeviceClass):
     def __init__(self, name):
         PyTango.DeviceClass.__init__(self, name)
         self.set_type(name);
-        print "In WorkerDSClass  constructor"
+        print("In WorkerDSClass  constructor")
         
 #==================================================================
 #
@@ -405,10 +405,10 @@ def main(args=None):
         U.server_init()
         U.server_run()
 
-    except PyTango.DevFailed,e:
-        print '-------> Received a DevFailed exception:',e
-    except Exception,e:
-        print '-------> An unforeseen exception occured....',e  
+    except PyTango.DevFailed as e:
+        print('-------> Received a DevFailed exception:',e)
+    except Exception as e:
+        print('-------> An unforeseen exception occured....',e)  
 
 if __name__ == '__main__':
     main()

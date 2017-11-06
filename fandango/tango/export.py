@@ -80,7 +80,7 @@ def export_attribute_to_dict(model,attribute=None,value=None,
       try: return str(attr.format)%(v)
       except: return str(v)
     def cleandict(d):
-      for k,v in d.items():
+      for k,v in list(d.items()):
         if v in ('Not specified','No %s'%k):
           d[k] = ''
       return d
@@ -113,10 +113,10 @@ def export_attribute_to_dict(model,attribute=None,value=None,
                 attr.value = list(v.value 
                     if v.value is not None and v.dim_x else [])
                 sep = '\n' if attr.data_type == 'DevString' else ','
-                svalue = map(vrepr,attr.value)
+                svalue = list(map(vrepr,attr.value))
                 attr.string = sep.join(svalue)
                 if 'numpy' in str(type(v.value)): 
-                  attr.value = map(fandango.str2type,svalue)
+                  attr.value = list(map(fandango.str2type,svalue))
             else:
               if attr.data_type in ('DevState','DevBoolean'):
                   attr.value = int(v.value)
@@ -144,8 +144,8 @@ def export_attribute_to_dict(model,attribute=None,value=None,
         elif 'INVALID' in attr.quality:
             attr.color = TANGO_STATE_COLORS['OFF']
             
-    except Exception,e:
-        print(str((attr,traceback.format_exc())))
+    except Exception as e:
+        print((str((attr,traceback.format_exc()))))
         raise(e)
 
     if as_struct:
@@ -176,7 +176,7 @@ def export_properties_to_dict(device,target='*'):
         props = [p for p in db.get_class_property_list(device) 
                  if fandango.matchCl(target,p)]
         return dict((k,v if isString(v) else list(v)) for k,v in
-                    db.get_class_property(device,props).items())
+                    list(db.get_class_property(device,props).items()))
     
 def export_device_to_dict(device,commands=True,properties=True):
     """
@@ -224,12 +224,12 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
     server = server or dct['server']
     if name not in get_all_devices():
         assert create,'Device %s does not exist!'%name  
-        print('Creating %s at %s ...'%(name,server))
+        print(('Creating %s at %s ...'%(name,server)))
         add_new_device(server,dct['dev_class'],name)
     
     properties = '*' if properties is True else properties
     if properties:
-        props = dict((k,v) for k,v in dct['properties'].items() 
+        props = dict((k,v) for k,v in list(dct['properties'].items()) 
                      if clmatch(properties,k))
         put_device_property(name,props)
         
@@ -241,7 +241,7 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
             print('Device must be running to import attributes!')
             return
         from fandango import ServersDict
-        print('Starting %s ...'%server)
+        print(('Starting %s ...'%server))
         sd = ServersDict(name)
         sd.start_servers(host=host)
         time.sleep(5.)
@@ -251,16 +251,16 @@ def import_device_from_dict(dct,device=None,server=None,create=True,
     if attributes is True:
         attributes = '*'
         
-    attrs = dict((k,v) for k,v in dct['attributes'].items()
+    attrs = dict((k,v) for k,v in list(dct['attributes'].items())
                  if clmatch(attributes,k))
     dp = get_device(name)
     alist = dp.get_attribute_list()
-    alist = map(str.lower,alist)
+    alist = list(map(str.lower,alist))
     
-    print('Loading %d attributes'%len(attrs))
-    for a,v in attrs.items():
+    print(('Loading %d attributes'%len(attrs)))
+    for a,v in list(attrs.items()):
         if a.lower() not in alist:
-            print('Attribute %s does not exist yet!'%a)
+            print(('Attribute %s does not exist yet!'%a))
             continue
         
         #set attribute config implemented in .methods
@@ -301,7 +301,7 @@ def tango2table(filters,opts=[]):
             d[v['name']] = {'properties':v['properties']}
             
             da = d[v['name']]['attributes'] = fd.defaultdict(dict)
-            for a,t in v['attributes'].items():
+            for a,t in list(v['attributes'].items()):
                 da[a] = dict((i,t.get(i)) for i in attr_info)
                 
         else:

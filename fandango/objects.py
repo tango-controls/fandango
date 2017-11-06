@@ -47,14 +47,13 @@ and Singleton (by Marc Santiago)
 Enum classes are borrowed from taurus.core.utils (by Tiago Coutinho)
 
 """
-import __builtin__
-from __builtin__ import object
+import builtins
+from builtins import object
 
 from fandango.functional import *
-from operator import isCallable, isSequenceType
 from collections import Hashable
 from types import MethodType
-import Queue
+import queue
 import functools
 
 try: from collections import namedtuple #Only available since python 2.6
@@ -63,7 +62,7 @@ except: pass
 ## Inspection methods
 
 def dirModule(module):
-    return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
+    return [a for a,v in list(module.__dict__.items()) if getattr(v,'__module__','') == module.__name__]
 
 def findModule(module):
     from imp import find_module
@@ -78,7 +77,7 @@ def loadModule(source,modulename=None):
         return load_module(source,*find_module(source))
 
 def dirClasses(module,owned=False):
-    v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
+    v = [a for a,v in list(module.__dict__.items()) if isinstance(v,type)]
     if owned: return [a for a in dirModule(module) if a in v]
     else: return v
   
@@ -114,13 +113,13 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
                     try: 
                         if type(attr).__name__ not in dir(__builtin__):
                             if isinstance(attr,dict):
-                                attr = dict((k,v) for k,v in attr.items())
+                                attr = dict((k,v) for k,v in list(attr.items()))
                             else:
                                 attr = str(attr)
                     except: 
                         continue
                 dct[name] = attr
-            except Exception,e:
+            except Exception as e:
                 print(e)
 
         if class_check:
@@ -128,7 +127,7 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
             if '__class__' not in dct: dct['__class__'] = klass.__name__
             if '__bases__' not in dct: dct['__bases__'] = [b.__name__ for b in klass.__bases__]
             if '__base__' not in dct: dct['__base__'] = klass.__base__.__name__
-    except Exception,e:
+    except Exception as e:
         print(e)
     return(dct)
 
@@ -151,13 +150,13 @@ class Struct(object):
     def load(self,*args,**kwargs):
         dct = args[0] if len(args)==1 else (args or kwargs)
         if isSequence(dct) and not isDictionary(dct): dct = dict.fromkeys(dct) #isDictionary also matches items lists
-        [setattr(self,k,v) for k,v in (dct.items() if hasattr(dct,'items') else dct)]
+        [setattr(self,k,v) for k,v in (list(dct.items()) if hasattr(dct,'items') else dct)]
         
     #Overriding dictionary methods
     def update(self,*args,**kwargs): return self.load(*args,**kwargs)
-    def keys(self): return self.__dict__.keys()
-    def values(self): return self.__dict__.values()
-    def items(self): return self.__dict__.items()
+    def keys(self): return list(self.__dict__.keys())
+    def values(self): return list(self.__dict__.values())
+    def items(self): return list(self.__dict__.items())
     def dict(self): return self.__dict__
   
     def get(self,k,default=None): 
@@ -168,7 +167,7 @@ class Struct(object):
       
     def get_key(self,value):
       """ Reverse lookup """
-      for k,v in self.items():
+      for k,v in list(self.items()):
         if v == value:
           return k
       raise Exception('%s_NotFound!'%value)
@@ -176,7 +175,7 @@ class Struct(object):
     def set(self,k,v): return setattr(self,k,v)
     def setdefault(self,v): self.dict().setdefault(v)
     def pop(self,k): return self.__dict__.pop(k)
-    def has_key(self,k): return self.__dict__.has_key(k)
+    def has_key(self,k): return k in self.__dict__
     def __getitem__(self,k): return getattr(self,k)
     def __setitem__(self,k,v): return setattr(self,k,v)
     def __contains__(self,k): return hasattr(self,k)
@@ -188,7 +187,7 @@ class Struct(object):
         elif len(args)==1 and isString(args[0]): return getattr(self,args[0])
         else: self.load(*args,**kwargs)
     def __repr__(self):
-        return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) for k,v in self.__dict__.items())+'\n\t})'
+        return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) for k,v in list(self.__dict__.items()))+'\n\t})'
     def __str__(self):
         return self.__repr__().replace('\n','').replace('\t','')
     def to_str(self,order=None,sep=','):
@@ -201,7 +200,7 @@ class Struct(object):
         If it is, it will return value as an evaluable string.
         If it is not, then it will do same action on the passed value.
         """
-        if key not in self.keys() and not value:
+        if key not in list(self.keys()) and not value:
           key,value = None,key #defaults to single argument mode
         value = notNone(value,key and self.get(key))
         if not isString(value): 
@@ -221,8 +220,8 @@ class Struct(object):
         """
         The cast() method is used to convert an struct to a pickable/json object.
         """
-        items = items or self.items()
-        items = [(k,self.cast(value=v)) for k,v in self.items()]
+        items = items or list(self.items())
+        items = [(k,self.cast(value=v)) for k,v in list(self.items())]
         if update:
           [self.set(k,v) for k,v in items]
         return items
@@ -276,8 +275,8 @@ def locked(f,*args,**kwargs):
     try:
         _lock.acquire()
         return f(*args,**kwargs)
-    except Exception,e:
-        print 'Exception in%s(*%s,**%s): %s' % (f.__name__,args,kwargs,e)
+    except Exception as e:
+        print('Exception in%s(*%s,**%s): %s' % (f.__name__,args,kwargs,e))
     finally:
         _lock.release()
             
@@ -329,7 +328,7 @@ class ReleaseNumber(object):
     def __init__(self,*args):
         assert args
         if len(args)==1:
-            if isinstance(args[0],basestring):
+            if isinstance(args[0],str):
                 args = args[0].split('.')
             elif isSequenceType(args[0]):
                 args = args[0]
@@ -470,9 +469,9 @@ class Object(object):
                             nkw[arg], i = _args[i], i+1
                     self.call_all__init__(base,*_args,**_kw)
                     self.call__init__(base,**nkw)
-                except Exception,e:
-                    print('Unable to execute %s.__init__!: %s' 
-                          % (base.__name__,str(e)))
+                except Exception as e:
+                    print(('Unable to execute %s.__init__!: %s' 
+                          % (base.__name__,str(e))))
         return
             
     def getAttrDict(self):
@@ -702,7 +701,7 @@ class Cached(Decorator):
         """
         klass = obj if isinstance(obj,type) else type(obj)
         if not methods:
-            methods = [k for k,f in klass.__dict__.items() if isCallable(f)]
+            methods = [k for k,f in list(klass.__dict__.items()) if isCallable(f)]
         for k in methods:
             try:
                 m = Cached(getattr(klass,k),depth,expire,catched=catched)
@@ -756,14 +755,14 @@ class Cached(Decorator):
             else:
                 try:
                     v = self.f(*args,**kwargs)
-                except Exception,e:
+                except Exception as e:
                     v = e
                 self._log('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
                 try:
                     self.cache[key] = v
                 except:
-                    print('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
-                    print('cache[%s] = %s'%(key,v))
+                    print(('%s(%s,%s) = %s'%(self.f,args,kwargs,v)))
+                    print(('cache[%s] = %s'%(key,v)))
                     raise
             
         if isinstance(v,Exception):
@@ -772,7 +771,7 @@ class Cached(Decorator):
                     self._log(traceback.format_exc())
                 return v
             else:
-                print(str(self.f),str(e))
+                print((str(self.f),str(e)))
                 traceback.print_exc()
                 raise v
         else:
@@ -831,7 +830,7 @@ class BoundDecorator(Decorator):
             self._trace = False
         def __get__(self,obj,type=None):return self
         def __set__(self,obj,value):self._trace = value
-        def __nonzero__(self): return self._trace
+        def __bool__(self): return self._trace
         def __call__(self,msg):
             if self: print(msg)
     tracer = _Tracer() #NOTE: Giving a value to Tracer only works with instances; not from the class
