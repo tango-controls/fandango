@@ -82,7 +82,7 @@ def main(args = []):
           print('Stopping : %s'%running)
           astor.stop_servers(running)
       if action in ('restart',):
-          time.sleep(5)
+          time.sleep(15.)
       if action in ('start','restart'):
           print('Starting : %s'%matched)
           astor.start_servers(matched,**(host and {'host':host} or {}))
