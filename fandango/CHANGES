@@ -1,5 +1,4 @@
-RELEASE = (13,2,5)
-RELEASE_NOTE = "Cached tango database methods"
+RELEASE_NOTE = "Fandango 13.2.*; Cached tango database methods"
 
 """
 IMPORTANT:
@@ -11,6 +10,17 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
+
+13.2.7 - October 2017
+-----------------------
+
+Solve performance and cpu issues on EventListeners
+Solve bugs on SimulatorDS configuration/startup
+
+13.2.6 - October 2017
+----------------------
+
+Improve decorators, csv/json/unicode conversion
 
 -----------------------
 13.2.5 - September 2017
