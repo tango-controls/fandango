@@ -2148,11 +2148,13 @@ class DynamicServer(object):
     
     def __init__(self,name='',classes={},add_debug=False,log='-v2',orb=[]):
         if not name:
-            server,instance,logs,orb = self.parse_args()
+            server,instance,logs,orb = self.parse_args(log=log)
             self.name = server+'/'+instance
         else:
-            self.name,server,instance,logs = name,name.split('/')[0],name.split('/')[-1],log
+            self.name,server,instance,logs = \
+                name,name.split('/')[0],name.split('/')[-1],log
         self.args = [server,instance,logs]+orb
+        
         print('In DynamicServer(%s)'%(self.args,))
         self.util = PyTango.Util(filter(bool,self.args))
         self.instance = self.util.instance()
@@ -2174,14 +2176,14 @@ class DynamicServer(object):
             from fandango.device import DDebug
             DDebug.addToServer(self.util,*(self.name.split('/')))
         
-    def parse_args(self,args=[]):
+    def parse_args(self,args=[],log='-v2'):
         import sys
         if not args:args = sys.argv
         assert len(args)>=2,'1 argument required!:\n\tpython dynamic.py instance [-vX]'
         print(args)
         server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
         instance = args[1]
-        logs,orb = '-v2' if instance!='-?' else '',[]
+        logs,orb = log if instance!='-?' else '',[]
         for i in (2,3):
             if args[i:]:
                 if args[i].startswith('-v'):
