@@ -126,6 +126,7 @@ if __name__ == '__main__':
       if not target: 
         r = __doc__+'\n\nAvailable methods:\n\n'+r
       
+    ###########################################################################  
     else:
       assert comms
       
@@ -143,9 +144,11 @@ if __name__ == '__main__':
           cmd = c
           r = evalX(c,_locals=_locals)
           
+    ###########################################################################
       else:
         ## MULTIPLE ARGS COMMAND
-        args = ','.join((str(c) if isNumber(c) else "'%s'"%c) for c in comms[1:])
+        args = ','.join((str(c) if isNumber(c) else 
+            ("'%s'" if "'" not in c else '"%s"')%c) for c in comms[1:])
         cmd = '%s(*[%s])'%(comms[0],args)
         r = evalX(cmd,_locals=locals())
         
