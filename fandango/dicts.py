@@ -79,7 +79,7 @@ def dict2json(dct,filename=None,throw=False,recursive=True,
             if isString(v): result[k] = ''
             elif isSequence(v):
                 try:
-                    result[k] = toList(v)
+                    result[k] = list(v)
                     json.dumps(result[k])
                 except:
                     result[k] = []
