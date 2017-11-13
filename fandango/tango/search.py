@@ -89,15 +89,28 @@ def parse_tango_model(name,use_tau=False,use_host=False):
     {'attributename': 'state',
     'attribute': 'state',
     'devicename': 'bo01/vc/ipct-01', #Always short name
-    'device': 'cts:10000/bo01/vc/ipct-01', #Will contain host if use_host or host!=TANGO_HOST
+    'device': 'cts:10000/bo01/vc/ipct-01', #Will contain host \
+        if use_host or host!=TANGO_HOST
+    'fqdn': 'tango://cts:10000/bo01/vc/ipct-01/state' #With scheme name
     'host': 'cts',
     'port': '10000',
     'scheme': 'tango'}
+    
+    In taurus it is translated as:
+    
+    In [4]: ta.getFullName() ~ model
+    Out[4]: 'alba03:10000/sys/tg_test/1/state'
+    In [5]: ta.getSimpleName() ~ attributename
+    Out[5]: 'state'
+    In [6]: ta.getNormalName() ~ name
+    Out[6]: 'sys/tg_test/1/state'
+    
+    
     """
     values = {'scheme':'tango'}
     values['host'],values['port'] = defhost = get_tango_host().split(':',1)
     try:
-        if not use_tau or not TAU: raise Exception('NotTau')
+        assert (use_tau and TAU)
         from taurus.core import tango as tctango
         from taurus.core import AttributeNameValidator,DeviceNameValidator
         validator = {tctango.TangoDevice:DeviceNameValidator,
@@ -108,7 +121,9 @@ def parse_tango_model(name,use_tau=False,use_host=False):
     except:
         name = str(name).replace('tango://','')
         m = re.match(fandango.tango.retango,name)
-        if m:
+
+        if m and '/' not in name[m.end():]: #Name should end at attribute
+            
             gd = m.groupdict()
             values['device'] = '/'.join([s for s in gd['device'].split('/') 
                                          if ':' not in s])
@@ -116,16 +131,26 @@ def parse_tango_model(name,use_tau=False,use_host=False):
                 values['attribute'] = gd['attribute']
             if gd.get('host'): 
                 values['host'],values['port'] = gd['host'].split(':',1)
+            if name[m.end():]:
+                values['query'] = name[m.end():]
+
     if 'device' not in values: 
         return None
+
     else:
-        values['devicename'] = values['device']
-        values['model'] = '%s:%s/%s'%(values['host'],values['port'],values['device'])
+        values['devicename'] = values['device']        
+        values['devicemodel'] = values['model'] = '%s:%s/%s'%(
+                values['host'],values['port'],values['device'])
+        values['tango_host'] = '%s:%s'%(values['host'],values['port'])
+        
         if use_host or tuple(defhost) != (values['host'],values['port']): 
-            values['device'] = values['model']
+            values['device'] = values['devicemodel']
         if 'attribute' in values: 
             values['attributename'] = values['attribute']
             values['model'] = values['model']+'/'+values['attribute']
+            values['normalname'] = values['devicename']+'/'+values['attribute']
+
+        values['fqdn'] = 'tango://'+values['model']
 
     return Struct(values)
 
