@@ -51,13 +51,27 @@ def getQt(full=False):
         taurus.setLogLevel(taurus.Warning)
         from taurus.external.qt import Qt,QtCore,QtGui
     except:
-        from PyQt4 import Qt,QtCore,QtGui
+        try: #Taurus3
+            from taurus.qt import Qt,QtCore,QtGui
+        except:
+            from PyQt4 import Qt,QtCore,QtGui
     if full:
         return Qt,QtCore,QtGui
     else:
         return Qt
     
 Qt,QtCore,QtGui = getQt(True)
+
+try:
+    from taurus.external.qt import Qwt5
+except:
+    try:
+        from taurus.qt import Qwt5
+    except:
+        try:
+            from PyQt4 import Qwt5
+        except:
+            Qwt5 = None
 
 ###############################################################################
 
@@ -96,7 +110,6 @@ def execApplication():
     getApplication().exec_()
    
 def getQwtTimeScaleDraw():
-    from PyQt4 import Qt,Qwt5
     from PyQt4.Qwt5 import qplt,QwtScaleDraw,QwtText
     class QwtTimeScale(QwtScaleDraw):
         def label(self,v):
@@ -118,7 +131,6 @@ def getRandomColor(i=None):
 def getQwtPlot(series,xIsTime=False):
     """ Series would be a {Label:[(time,value)]} dictionary """
     app = getApplication()
-    from PyQt4 import Qt,Qwt5
     from PyQt4.Qwt5 import qplt,QwtScaleDraw
     qpt = qplt.Plot(*[qplt.Curve(
             [x[0] for x in t[1]],
