@@ -11,6 +11,18 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+13.4.0 - November 2017
+-----------------------
+
+Bugfix release for PyTangoArchiving 7.7
+Qwt5 added to fandango.qt
+Added waits to reduce worker cpu usage
+Added -l/-v arguments to fandango shell
+Add fqdn and tango_host to parse_tango_model
+Increase server restart sleeps
+Solve bugs on DynamicDS launchers
+Json/Unicode bugfixes
+
 13.2.7 - October 2017
 -----------------------
 
