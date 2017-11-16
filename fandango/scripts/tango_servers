@@ -54,7 +54,7 @@ def main(args = []):
       if action in ('status','states','info','list'):
           if targets:
               for k,v in sorted(astor.items()):
-                print('%s:\t%s'%(k,str(sts[k])))
+                print('%s (%s):\t%s'%(k,v.host,str(sts[k])))
                 try:
                   for d,s in sorted(v.get_all_states().items()):
                     print('\t%s:\t%s'%(d,str(s)))
