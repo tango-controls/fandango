@@ -52,7 +52,7 @@ __test__ = {}
 
 def add_new_device(server,klass,device):
     for c in (server+klass+device):
-      if re.match('[^a-zA-Z0-9\-\/_]',c):
+      if re.match('[^a-zA-Z0-9\-\/_\+]',c):
         raise Exception,"CharacterNotAllowed('%s')"%c
     dev_info = PyTango.DbDevInfo()
     dev_info.name = device
