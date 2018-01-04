@@ -51,8 +51,15 @@ from functional import *
 from dicts import *
 from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
 from tango import get_full_name,get_attribute_events, check_device_cached
-from threads import ThreadedObject,Queue,timed_range,wait,threading
+from threads import ThreadedObject,timed_range,wait,threading
 from log import Logger,printf,tracer
+
+try:
+    import queue
+    import queue as Queue
+except:
+    import Queue
+    import Queue as queue
 
 """
 @package callbacks
@@ -158,12 +165,12 @@ class EventListener(Logger,Object): #Logger,
         hooks = [o for o in (parent,source) if source and hasattr(o,'addListener')]
         if hooks: hooks[0].addListener(self)
 
-    def set_event_hook(self,callable=None): 
-        self.event_hook = callable or getattr(self,'event_hook',None)
-    def set_error_hook(self,callable=None): 
-        self.error_hook = callable or getattr(self,'error_hook',None)
-    def set_value_hook(self,callable=None): 
-        self.value_hook = callable or getattr(self,'value_hook',None)
+    def set_event_hook(self,callback=None): 
+        self.event_hook = callback or getattr(self,'event_hook',None)
+    def set_error_hook(self,callback=None): 
+        self.error_hook = callback or getattr(self,'error_hook',None)
+    def set_value_hook(self,callback=None): 
+        self.value_hook = callback or getattr(self,'value_hook',None)
 
     def eventReceived(self, src, type_, value):
         """ 
@@ -209,6 +216,61 @@ class EventListener(Logger,Object): #Logger,
             try: self.event_hook(src,type_,value)
             except: self.error(' %s:%s'%(src,traceback.format_exc()))
         self.last_event_time = t0
+        
+class BufferedEventListener(EventListener,ThreadedObject):
+    """
+    This class will buffer events received in a buffer.
+    
+    Use size,period(s) to configure the events queue.
+    
+    Use .set_event_hook(callback) to assign a callback method
+    """
+    
+    def __init__(self, name, parent=None,source=False,
+                 callback=None,size=100,period=3.,
+                 filtered=False):
+        """
+        This EventListener subclass will buffer {size} events and 
+        will process them every {period}
+        """
+        self.size = size
+        self.period = period
+        self.queue = queue.LifoQueue()
+        self.filtered = True
+        self.event_hook = self.storeEvent
+        self.lasts = []
+        self.set_event_hook(callback)
+        EventListener.__init__(self,name,parent,source)
+        ThreadedObject.__init__(self,target=self.process,period=period)        
+        
+    def set_event_hook(self,callback=None): 
+        self.buffer_hook = callback or getattr(self,'buffer_hook',None)
+        
+    def storeEvent(self, src, type_, value):
+        """ Method to implement the event buffering """
+        self.queue.put((src,type_,value))
+        if not self.get_started() or self.queue.qsize() >= self.size:
+            self.start()
+            
+    def eventBufferReceived(self,events):
+        """ This method can be reimplemented on subclasses """
+        self.info('eventBufferReceived([%d])'%len(events))
+        
+    def process(self):
+        self.lasts = []
+        while True:
+            try:
+                e = self.queue.get(block=False)
+                if not self.filtered or (
+                        e[0] not in [l[0] for l in self.lasts]):
+                    self.lasts.insert(0,e)
+            except Queue.Empty as e:
+                break
+        if self.lasts:
+            self.eventBufferReceived(self.lasts)
+            if self.buffer_hook:
+                self.buffer_hook(self.lasts)            
+            
     
 class EventThread(Logger,ThreadedObject):
     """
@@ -231,8 +293,11 @@ class EventThread(Logger,ThreadedObject):
     
     """
     
-    MinWait = 0.0001 
-    #Event processing limited to 10KHz maximum (rest are queued)
+    MinWait = 0.01
+    #Event processing limited to 100Hz maximum (rest are queued)
+    #Changing this limit will increase event processing frequency
+    DEFAULT_PERIOD_ms = 50.
+    #Event queue check done at 20Hz
     EVENT_POLLING_RATIO = 1000 
     #How many events to process before checking polled attributes
     SHOW_ALIVE = 10000
@@ -248,7 +313,7 @@ class EventThread(Logger,ThreadedObject):
         self.queue = Queue.Queue()
         self.sources = set()
         self.event = threading.Event()
-        period = max((1e-3*(period_ms or 0),self.MinWait))
+        period = max((1e-3*(period_ms or self.DEFAULT_PERIOD_ms),self.MinWait))
         ThreadedObject.__init__(self,target=self.process,period=period)
         Logger.__init__(self,type(self).__name__)
         self.filtered,self.latency = filtered,latency
@@ -394,6 +459,7 @@ class EventThread(Logger,ThreadedObject):
 
         self.wait(0) #breathing
        
+        #Process pollings and keep alive
         t0 = now()
         pollings = []
         for s in self.sources.copy():
@@ -457,7 +523,8 @@ class EventThread(Logger,ThreadedObject):
         """
         try:
             if hasattr(source,'fireEvent'):
-                source.fireEvent(*args)  ## Event types are filtered at EventSource.fireEvent
+                ## Event types are filtered at EventSource.fireEvent
+                source.fireEvent(*args)  
             elif hasattr(source,'listeners'):
                 listeners = source.listeners.keys()
                 for l in listeners:
@@ -1071,7 +1138,8 @@ class EventSource(Logger,SingletonMap):
             else:
                 cache = True
        
-        self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
+        self.debug('read(cache=%s,asynch=%s,threaded=%s)'
+           %(cache,asynch,self.get_thread().is_alive()))
         self.asynch_hook() # Check for pending asynchronous results
         
         if not cache or self.attr_value is None:

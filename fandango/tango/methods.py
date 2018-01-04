@@ -513,12 +513,15 @@ def get_device_property(device,property,db=None):
                                     device,[property])[property]
     return prop if len(prop)!=1 else prop[0]
 
-def put_device_property(device,property,value=None,db=None):
+def put_device_property(device,property,*value,**db):
+                        #value=None,db=None):
     """
     Two syntax are possible:
      - put_device_property(device,{property:value})
      - put_device_property(device,property,value)
     """
+    value = value[0] if len(value)==1 else value
+    db = db.get('db',None)
     if not isMapping(property):
         if isSequence(value) and not isinstance(value,list):
             value = list(value)

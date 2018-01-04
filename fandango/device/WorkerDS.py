@@ -62,6 +62,8 @@ def get_module_dict(module,ks=None):
 #   WorkerDS Class Description:
 #   
 #   Device Server that processes attributes. Based on the code of PySignalSimulator by srubio
+#   Tasks are defined as properties containing python code
+#   Then should be added to TaskConditions property to be executed
 #
 #==================================================================
 if __name__ == '__main__': print('WorkerDS 13.0')
@@ -88,6 +90,8 @@ class WorkerDS(PyTango.Device_4Impl):
           status = ['Worker DS waiting %s s for next cycle ..'%self.PollingSeconds]
           status.append('Last check was at %s'%fandango.time2str(self.last_check))
           status.append('')
+          self.info('Checking %d tasks: %s'%(len(self.tasks),self.tasks.keys()))
+          
           for task,commands in sorted(self.tasks.items()):
             if not commands[-1].startswith(task) and ' = ' not in commands[-1]:
               commands[-1] = commands[-1].replace('return ','')
@@ -101,6 +105,8 @@ class WorkerDS(PyTango.Device_4Impl):
               status.append('%s: Finished at %s'%(task,fandango.time2str(self.dones[task])))
             elif self.sends[task]>self.dones[task]:
               status.append('%s: Launched at %s'%(task,fandango.time2str(self.sends[task])))
+            wait(.1)
+            
           self._status = ('\n'.join(status))
           wait(1.,self.waiter)
         #self.waiter.clear()
@@ -133,9 +139,10 @@ class WorkerDS(PyTango.Device_4Impl):
           except:
             self.error(traceback.format_exc())
           wait(.1,self.event)
-      
-      #print '#'*80
-      #print '#'*80
+       
+        wait(.1) 
+        #print '#'*80
+        #print '#'*80
           
         
     def get_task_conditions(self,prop=None):
@@ -145,6 +152,7 @@ class WorkerDS(PyTango.Device_4Impl):
        return CaselessDict(p.split(':',1) for p in prop)
       
     def update_locals(self,_locals=None,update=False,task=None):
+        self.debug('update_locals')
         if _locals is None: _locals = {}
         try:
             date = fandango.time2date()
@@ -219,11 +227,16 @@ class WorkerDS(PyTango.Device_4Impl):
           print missing
           self.get_db().put_device_property(self.get_name(),dict((k,default_props[k]) for k in missing))
         
-        #TASKS IS NOT CASELESS TO KEEP THE ORIGINAL NAME OF THE TASK
-        self.tasks = dict((k,v) for k,v in all_props.items() if k.lower() not in map(str.lower,default_props))
         self.sends = CaselessDefaultDict(int)
         self.dones = CaselessDefaultDict(int)
         self.conditions = self.get_task_conditions()
+        
+        #TASKS IS NOT CASELESS TO KEEP THE ORIGINAL NAME OF THE TASK
+        self.tasks = dict((k,v) for k,v in all_props.items() 
+            if k.lower() in self.conditions
+            #k.lower() not in map(str.lower,default_props)
+            )
+        
         self.TStarted = time.time()
         self.StaticAttributes = ['%s = str(TASK("%s") or "")'%(t,t) for t in self.tasks]
         self.StaticAttributes += ['LastCheck = self.last_check']
@@ -304,7 +317,7 @@ class WorkerDS(PyTango.Device_4Impl):
       
     def Start(self):
         if not getattr(self,'worker',None):
-          self.worker = fandango.SingletonWorker()
+          self.worker = fandango.SingletonWorker(wait=.1)
           self.worker._locals = self.locals()
           self.worker.start()
           import threading

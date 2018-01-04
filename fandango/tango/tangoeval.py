@@ -88,6 +88,7 @@ def getTangoValue(obj,device=None):
         
         if hasattr(obj,'quality'):
             value = obj.value
+            w_value = getattr(obj,'w_value',None)
             quality = obj.quality
             t = get_attribute_time(obj)
             name = obj.name
@@ -99,6 +100,7 @@ def getTangoValue(obj,device=None):
         else:
             value,quality = obj,AttrQuality.ATTR_VALID
             t,name,ty = time.time(),'',type(obj)
+            w_value = None
             
         try: domain,family,member = device.split('/')[-3:]
         except: domain,family,member = '','',''
@@ -110,7 +112,7 @@ def getTangoValue(obj,device=None):
         o = nt(value or 0)
         [setattr(o,k,v) for k,v in (('name',name),('type',ty),
             ('value',value),('quality',quality),('time',t),
-            ('device',device),('host',host),
+            ('device',device),('host',host),('w_value',w_value),
             ('domain',domain),('family',family),('member',member),
             )]
         o.set_quality_flags()
@@ -371,6 +373,7 @@ class TangoEval(object):
                 setattr(value,'exception',isinstance(getattr(value,'value',None),PyTango.DevFailed))
             elif what in ('value',''): 
                 value = getTangoValue(value,device=device)
+            elif what == 'w_value': value = getattr(value,'w_value',None)
             elif what == 'time': value = get_attribute_time(value)
             elif what == 'exception': value = isinstance(getattr(value,'value',None),PyTango.DevFailed)
             elif what == 'delta': value = self.get_delta(aname)

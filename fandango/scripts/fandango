@@ -34,11 +34,13 @@ __doc__ = """
 
 Usage:
 
-  fandango [qt] [-h/--help] [-x/--extra] [-n/--new-line] [fandango_method_0] [fandango_method_1/argument_0] [...]
+  fandango [qt] [-l] [-v] [-h/--help] [-x/--extra] [-n/--new-line] \
+     [fandango_method_0] [fandango_method_1/argument_0] [...]
   
   Execute python and fandango methods from shell
 
-  Objects and Generators will not be allowed as arguments, only python primitives, lists and tuples
+  Objects and Generators will not be allowed as arguments, \
+     only python primitives, lists and tuples
   
   The --extra option will load PyTangoArchiving and Panic methods
   
@@ -64,15 +66,16 @@ Examples:
   
   fandango read_attribute "tango/admin/pctest/status"
   
-  for attr in $(fandango get_matching_attributes "tango/admin/pctest/*"); do echo "$attr : $(fandango read_attribute ${attr})" ; done
+  for attr in $(fandango get_matching_attributes "tango/admin/pctest/*"); \
+    do echo "$attr : $(fandango read_attribute ${attr})" ; done
   
 """
 
 """
-A launcher like this can't be created as a function, because generic imports with 
-wildcards are allowed only at module level.
+A launcher like this can't be created as a function, because generic imports 
+with wildcards are allowed only at module level.
 
-If it is problem is solved in the future, then it will be moved to fandango.linos
+If it is problem is solved in the future, then will be moved to fandango.linos
 """
 
 if __name__ == '__main__':
@@ -115,7 +118,8 @@ if __name__ == '__main__':
         cmd = 'inspect.getsource(%s)'%target
         
       else:
-        cmd = "sorted([('%s.%s'%(get_module_name(o),k)).strip('.') for k,o in locals().items() if not k.startswith('_')])"
+        cmd = ("sorted([('%s.%s'%(get_module_name(o),k)).strip('.') "
+               " for k,o in locals().items() if not k.startswith('_')])")
         
       r = evalX(cmd,_locals=_locals)
       if isSequence(r):
@@ -126,6 +130,7 @@ if __name__ == '__main__':
       if not target: 
         r = __doc__+'\n\nAvailable methods:\n\n'+r
       
+    ###########################################################################  
     else:
       assert comms
       
@@ -143,15 +148,17 @@ if __name__ == '__main__':
           cmd = c
           r = evalX(c,_locals=_locals)
           
+    ###########################################################################
       else:
         ## MULTIPLE ARGS COMMAND
-        args = ','.join((str(c) if isNumber(c) else "'%s'"%c) for c in comms[1:])
+        args = ','.join((str(c) if isNumber(c) else 
+            ("'%s'" if "'" not in c else '"%s"')%c) for c in comms[1:])
         cmd = '%s(*[%s])'%(comms[0],args)
         r = evalX(cmd,_locals=locals())
         
-    if opts.get('l'): print(cmd)
+    if opts.get('v'): print(cmd)
     s = obj2str(r,sep=' ')
-    if opts.get('n'):
+    if opts.get('l'):
       s = '\n'.join(s.split())
     print(s)
  

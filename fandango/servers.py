@@ -723,7 +723,7 @@ class ServersDict(CaselessDict,Object):
     def stop_all_servers(self): 
         return self.stop_servers(sorted(self.keys(),key=(lambda s: s in self and (-self[s].level) or 0)))    
             
-    def restart_servers(self,servers_list=None,wait=5.):
+    def restart_servers(self,servers_list=None,wait=15.):
         '''Performs stop_servers followed by start_servers.'''
         if servers_list is None: servers_list = self.keys()
         self.stop_servers(servers_list)
