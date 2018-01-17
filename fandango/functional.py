@@ -1061,21 +1061,31 @@ def testF(f,args=[],t=5.):
         ct+=1
     return ct
 
-def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exception=Exception):
+def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
+          _exception=Exception):
     """
-    evalX is an enhanced eval function capable of evaluating multiple types and import modules if needed.
-    The _locals/modules/instances dictionaries WILL BE UPDATED with the result of the code! (if '=' or import are used)
-    It is used by some fandango classes to send python code to remote threads; that will evaluate and return the values as pickle objects.
+    evalX is an enhanced eval function capable of evaluating multiple types 
+    and import modules if needed.
+    
+    The _locals/modules/instances dictionaries WILL BE UPDATED with the result
+    of the code! (if '=' or import are used)
+    
+    It is used by some fandango classes to send python code to remote threads;
+    that will evaluate and return the values as pickle objects.
     
     target may be:
-         - dictionary of built-in types (pickable): {'__target__':callable or method_name,'__args__':[],'__class_':'','__module':'','__class_args__':[]}
+         - dictionary of built-in types (pickable): 
+                {'__target__':callable or method_name,
+                '__args__':[],'__class_':'',
+                '__module':'','__class_args__':[]}
          - string to eval: eval('import $MODULE' or '$VAR=code()' or 'code()')
          - list if list[0] is callable: value = list[0](*list[1:]) 
          - callable: value = callable()
     """
     import imp,__builtin__
     
-    # Only if immutable types are passed as arguments these dictionaries will be preserved.
+    # Only if immutable types are passed as arguments these dictionaries will 
+    # be preserved.
     _locals = notNone(_locals,{})
     modules = notNone(modules,{})
     instances = notNone(instances,{})
@@ -1085,30 +1095,36 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
         module = module.split('import ',1)[-1].strip().split()[0]
         if reload or alias not in modules:
             if '.' not in module:
-                modules[module] = imp.load_module(module,*imp.find_module(module))
+                modules[module] = imp.load_module(module,
+                                            *imp.find_module(module))
             else:
                 parent,child = module.rsplit('.',1)
-                print parent
                 mparent = import_module(parent)
-                setattr(mparent,child,imp.load_module(module,*imp.find_module(child,mparent.__path__)))
+                setattr(mparent,child,imp.load_module(module,
+                                    *imp.find_module(child,mparent.__path__)))
                 modules[module] = getattr(mparent,child)
             if alias: 
                 modules[alias] = modules[module] 
                 _locals[alias] = modules[alias]
-        print '%s(%s) : %s' % (alias,module,modules[alias])
+        if _trace: 
+            print('%s(%s) : %s' % (alias,module,modules[alias]))
         return modules[alias]
         
     def get_instance(_module,_klass,_klass_args):
         if (_module,_klass,_klass_args) not in instances:
-            instances[(_module,_klass,_klass_args)] = getattr(import_module(_module),klass)(*klass_args)
+            instances[(_module,_klass,_klass_args)] = \
+                getattr(import_module(_module),klass)(*klass_args)
         return instances[(_module,_klass,_klass_args)]
     
-    if 'import_module' not in _locals: _locals['import_module'] = lambda m: import_module(m,reload=True)
+    if 'import_module' not in _locals: 
+        _locals['import_module'] = lambda m: import_module(m,reload=True)
         
     if isDictionary(target):
         model = target
-        keywords = ['__args__','__target__','__class__','__module__','__class_args__']
-        args = model['__args__'] if '__args__' in model else dict((k,v) for k,v in model.items() if k not in keywords)
+        keywords = ['__args__','__target__','__class__',
+                    '__module__','__class_args__']
+        args = model['__args__'] if '__args__' in model \
+            else dict((k,v) for k,v in model.items() if k not in keywords)
         target = model.get('__target__',None)
         module = model.get('__module__',None)
         klass = model.get('__class__',None)
@@ -1119,15 +1135,22 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             if module:
                 #module,subs = module.split('.',1)
                 if klass: 
-                    if _trace: print('evalX: %s.%s(%s).%s(%s)'%(module,klass,klass_args,target,args))
-                    target = getattr(get_instance(module,klass,klass_args),target)
+                    if _trace: 
+                        print('evalX: %s.%s(%s).%s(%s)'
+                              %(module,klass,klass_args,target,args))
+                    target = getattr(get_instance(module,klass,klass_args),
+                                     target)
                 else:
                     if _trace: print('evalX: %s.%s(%s)'%(module,target,args))
                     target = getattr(import_module(module),target)
+                    
             elif klass and klass in dir(__builtin__):
-                if _trace: print('evalX: %s(%s).%s(%s)'%(klass,klass_args,target,args))
+                if _trace: 
+                    print('evalX: %s(%s).%s(%s)' 
+                          % (klass,klass_args,target,args))
                 instance = getattr(__builtin__,klass)(*klass_args)
                 target = getattr(instance,target)
+                
             elif target in dir(__builtin__): 
                 if _trace: print('evalX: %s(%s)'%(target,args))
                 target = getattr(__builtin__,target)
@@ -1137,6 +1160,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             raise _exception('%s()_NotCallable'%target)
         value = target(**args) if isDictionary(args) else target(*args)
         if _trace: print('%s: %s'%(model,value))
+        
         return value
     else:
         #Parse: method[0](*method[1:])
@@ -1154,16 +1178,19 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,_exceptio
             #Parse: $VAR = #code
             elif (  '=' in target and 
                     '='!=target.split('=',1)[1][0] and 
-                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]*$',target.split('=',1)[0].strip())
+                    re.match('[A-Za-z\._]+[A-Za-z0-9\._]*$',
+                             target.split('=',1)[0].strip())
                 ):
                 var = target.split('=',1)[0].strip()
-                _locals[var]=eval(target.split('=',1)[1].strip(),modules,_locals)
+                _locals[var]=eval(target.split('=',1)[1].strip(),
+                                  modules,_locals)
                 value = var
             #Parse: #code
             else:
                 value = eval(target,modules,_locals)
         else:
-            raise _exception('targetMustBeCallable, not %s(%s)'%(type(target),target))
+            raise _exception('targetMustBeCallable, not %s(%s)'
+                             %(type(target),target))
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
 
