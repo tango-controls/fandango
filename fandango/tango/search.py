@@ -84,7 +84,7 @@ def get_model_name(model):
             print traceback.format_exc()
     return str(model).lower()
         
-def parse_tango_model(name,use_tau=False,use_host=False):
+def parse_tango_model(name, use_tau=False, use_host=False, fqdn=None):
     """
     {'attributename': 'state',
     'attribute': 'state',
@@ -107,7 +107,9 @@ def parse_tango_model(name,use_tau=False,use_host=False):
     
     
     """
-    values = {'scheme':'tango'}
+    if fqdn is None: fqdn = fandango.tango.defaults.USE_FQDN
+    use_host = use_host or fqdn
+    values = {'authority':'tango'}
     values['host'],values['port'] = defhost = get_tango_host().split(':',1)
     try:
         assert (use_tau and TAU)
@@ -138,19 +140,28 @@ def parse_tango_model(name,use_tau=False,use_host=False):
         return None
 
     else:
-        values['devicename'] = values['device']        
-        values['devicemodel'] = values['model'] = '%s:%s/%s'%(
-                values['host'],values['port'],values['device'])
+        if tuple(defhost) != (values['host'],values['port']): 
+            use_host = True
+            
+        if fqdn and '.' not in values['host']:
+            import socket
+            values['host'] = socket.getfqdn(values['host'])
+            
+        values['simplename'] = values['devicename'] = values['device']
+        values['normalname'] = values['model'] = (
+            '%s:%s/%s'%(values['host'],values['port'],values['device']))
         values['tango_host'] = '%s:%s'%(values['host'],values['port'])
         
-        if use_host or tuple(defhost) != (values['host'],values['port']): 
-            values['device'] = values['devicemodel']
-        if 'attribute' in values: 
-            values['attributename'] = values['attribute']
-            values['model'] = values['model']+'/'+values['attribute']
-            values['normalname'] = values['devicename']+'/'+values['attribute']
+        values['devicemodel'] = values['model']
+        values['device'] = (values['device'],values['model'])[use_host]
 
-        values['fqdn'] = 'tango://'+values['model']
+        if 'attribute' in values: 
+            values['attributename'] = values['attribute'] #taurus compatibility
+            values['model'] = values['model']+'/'+values['attribute']
+            values['simplename'] += '/'+values['attribute']
+            values['normalname'] += '/'+values['attribute']
+
+        values['fullname'] = 'tango://'+values['normalname'] #aka uri
 
     return Struct(values)
 

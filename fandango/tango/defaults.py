@@ -86,6 +86,8 @@ def loadTaurus():
         TAU_LOGGER = Logger
     return bool(TAU)
 
+global USE_FQDN
+USE_FQDN = False
 
 TANGO_STATES = \
   'ON OFF CLOSE OPEN INSERT EXTRACT MOVING STANDBY FAULT INIT RUNNING ALARM '\
