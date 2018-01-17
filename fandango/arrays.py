@@ -462,10 +462,13 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                 ndata.append((t,nx))
                 #print 'post: %s'%str(ndata[-1])
     except Exception,e:
-        print i0,'-',i,'/',ilast,':',filling,':',data[i0:i]
-        print ndata and ndata[-1] 
-        print ndata and ndata[-1] and ndata[-1][-1]
-        raise Exception(traceback.format_exc())
+        print('Error in filter_array(): %s' % e)
+        print('\t %s - %s / %s : %s : %s ' 
+              % (i0,i,ilast,filling,data[i0:i]))
+        print('\t %s' % str(ndata and ndata[-1]))
+        print('\t %s'  % str(ndata and ndata[-1] and ndata[-1][-1]))
+        raise Exception(e) #traceback.format_exc())
+    
     return ndata
     
 ###############################################################################
@@ -1114,11 +1117,10 @@ class CSVArray(object):
             for i,r in enumerate(rows): 
                 rows[i] = r[:ncols]
             
-            if 1: #self.trace: 
-                print('Longer line is %d: %s'
-                      % (ncols,longer))
-                print('Header line is %d: %s' 
-                      % (len(rows[header]),rows[header]))
+            if self.trace: 
+                print('Longer line is %d: %s' % (ncols,longer))
+                print('Header line is %d: %s' % (
+                    len(rows[header]),rows[header]))
                 
             #ncols = max(len(row) for row in rows) if rows else 0
             
