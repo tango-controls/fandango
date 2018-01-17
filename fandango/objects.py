@@ -64,7 +64,8 @@ except: pass
 ## Inspection methods
 
 def dirModule(module):
-    return [a for a,v in module.__dict__.items() if getattr(v,'__module__','') == module.__name__]
+    return [a for a,v in module.__dict__.items() 
+        if getattr(v,'__module__','') == module.__name__]
 
 def findModule(module):
     from imp import find_module
@@ -74,7 +75,9 @@ def loadModule(source,modulename=None):
     #Loads a python module either from source file or from module
     from imp import load_source,find_module,load_module
     if modulename or '/' in source or '.' in source:
-        return load_source(modulename or replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),source)
+        return load_source(modulename or 
+            replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),
+            source)
     else:
         return load_module(source,*find_module(source))
 
@@ -86,7 +89,8 @@ def dirClasses(module,owned=False):
 def copy(obj):
     """ 
     This method will return a copy for a python primitive object.
-    It will not work for class objects unless they implement the __init__(other) constructor
+    It will not work for class objects unless they implement the 
+    __init__(other) constructor
     """
     if hasattr(obj,'copy'):
       o = obj.copy()
@@ -98,9 +102,12 @@ def copy(obj):
     return o
     
 def obj2dict(obj,type_check=True,class_check=False,fltr=None):
-    """ Converts a python object to a dictionary with all its members as python primitives 
+    """ 
+    Converts a python object to a dictionary with all its members 
+    as python primitives 
     
-    :param fltr: a callable(name):bool method"""
+    :param fltr: a callable(name):bool method
+    """
     dct = {}
     try:
         for name in dir(obj):
@@ -126,9 +133,13 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
 
         if class_check:
             klass = obj.__class__
-            if '__class__' not in dct: dct['__class__'] = klass.__name__
-            if '__bases__' not in dct: dct['__bases__'] = [b.__name__ for b in klass.__bases__]
-            if '__base__' not in dct: dct['__base__'] = klass.__base__.__name__
+            if '__class__' not in dct: 
+                dct['__class__'] = klass.__name__
+            if '__bases__' not in dct: 
+                dct['__bases__'] = [b.__name__ for b in klass.__bases__]
+            if '__base__' not in dct: 
+                dct['__base__'] = klass.__base__.__name__
+                
     except Exception,e:
         print(e)
     return(dct)
@@ -151,8 +162,10 @@ class Struct(object):
         self.load(*args,**kwargs)
     def load(self,*args,**kwargs):
         dct = args[0] if len(args)==1 else (args or kwargs)
-        if isSequence(dct) and not isDictionary(dct): dct = dict.fromkeys(dct) #isDictionary also matches items lists
-        [setattr(self,k,v) for k,v in (dct.items() if hasattr(dct,'items') else dct)]
+        if isSequence(dct) and not isDictionary(dct): 
+            dct = dict.fromkeys(dct) #isDictionary also matches items lists
+        [setattr(self,k,v) for k,v in (dct.items() 
+                                       if hasattr(dct,'items') else dct)]
         
     #Overriding dictionary methods
     def update(self,*args,**kwargs): return self.load(*args,**kwargs)
@@ -189,12 +202,14 @@ class Struct(object):
         elif len(args)==1 and isString(args[0]): return getattr(self,args[0])
         else: self.load(*args,**kwargs)
     def __repr__(self):
-        return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) for k,v in self.__dict__.items())+'\n\t})'
+        return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) 
+                                for k,v in self.__dict__.items())+'\n\t})'
     def __str__(self):
         return self.__repr__().replace('\n','').replace('\t','')
     def to_str(self,order=None,sep=','):
         """ This method provides a formatable string for sorting""" 
-        return self.__str__() if order is None else (sep.join('%s'%self[k] for k in order))
+        return self.__str__() if order is None else (
+                                        sep.join('%s'%self[k] for k in order))
       
     def default_cast(self,key=None,value=None):
         """
@@ -212,7 +227,7 @@ class Struct(object):
         
     def cast(self,key=None,value=None,method=None):
         """
-        The cast() method is used to convert an struct to a pickable/json object.
+        The cast() method is used to convert an struct to a pickable/json obj
         Use set_cast_method(f) to override this call.
         The cast method must accept both key and value keyword arguments.
         """      
@@ -220,7 +235,7 @@ class Struct(object):
         
     def cast_items(self,items=[],update=True):
         """
-        The cast() method is used to convert an struct to a pickable/json object.
+        The cast() method is used to convert an struct to a pickable/json obj
         """
         items = items or self.items()
         items = [(k,self.cast(value=v)) for k,v in self.items()]
@@ -236,7 +251,8 @@ def _fdel(self,var):
     delattr(self,var)
 def make_property(var,fget=_fget,fset=_fset,fdel=_fdel):
     """ This Class is in Beta, not fully implemented yet"""
-    return property(partial(fget,var=var),partial(fset,var=var),partial(fdel,var=var),doc='%s property'%var)
+    return property(partial(fget,var=var),partial(fset,var=var),
+                    partial(fdel,var=var),doc='%s property'%var)
 
 #class NamedProperty(property):
     #"""
@@ -253,7 +269,8 @@ def NamedProperty(name,fget=None,fset=None,fdel=None):#,doc=None):
     """ 
     This Class is in Beta, not fully implemented yet
     
-    It makes easier to declare name independent property's (descriptors) by using template methods like:
+    It makes easier to declare name independent property's (descriptors) by 
+    using template methods like:
     
     def fget(self,var): # var is the identifier of the variable
         return getattr(self,var)    
@@ -264,7 +281,9 @@ def NamedProperty(name,fget=None,fset=None,fdel=None):#,doc=None):
         
     MyObject.X = Property(fget,fset,fdel,'X')        
     """
-    return property(partial(fget,var=name) if fget else None,partial(fset,var=name) if fset else None,partial(fdel,var=name) if fdel else None,doc=name)
+    return property(partial(fget,var=name) if fget else None,
+                    partial(fset,var=name) if fset else None,
+                    partial(fdel,var=name) if fdel else None,doc=name)
     
 import threading
 __lock__ = threading.RLock()
@@ -288,14 +307,17 @@ def self_locked(func,reentrant=True):
     @note see in tau.core.utils.containers
     Decorator to create thread-safe objects.
     reentrant: CRITICAL:
-        With Lock() this decorator should not be used to decorate nested functions; it will cause Deadlock!
-        With RLock this problem is avoided ... but you should rely more on python threading.
+        With Lock() this decorator should not be used to decorate nested 
+            functions; it will cause Deadlock!
+        With RLock this problem is avoided ... but you should rely more 
+            on python threading.
     '''
     @functools.wraps(func)
     def lock_fun(self,*args,**kwargs):
         #self,args = args[0],args[1:]
         if not hasattr(self,'lock'):
-            setattr(self,'lock',threading.RLock() if reentrant else threading.Lock())
+            setattr(self,'lock',threading.RLock() if reentrant 
+                                    else threading.Lock())
         if not hasattr(self,'trace'):
             setattr(self,'trace',False)
         self.lock.acquire()
@@ -316,9 +338,12 @@ def self_locked(func,reentrant=True):
 def NewClass(classname,classparent=None,classdict=None):
     """ 
     Creates a new class on demand:
-     ReleaseNumber = NewClass('ReleaseNumber',tuple,{'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
+     ReleaseNumber = NewClass('ReleaseNumber',tuple,
+            {'__repr__':(lambda self:'.'.join(('%02d'%i for i in self)))})
     """
-    if classparent and not isSequence(classparent): classparent = (classparent,)
+    if classparent and not isSequence(classparent): 
+        classparent = (classparent,)
+        
     return type(classname,classparent or (object,),classdict or {})
 
 class ReleaseNumber(object):
@@ -398,8 +423,8 @@ class ReleaseNumber(object):
 
 class Object(object):
     """
-    This class solves some problems when an object inherits from multiple classes
-    and some of them inherit from the same 'grandparent' class
+    This class solves some problems when an object inherits from multiple 
+    classes and some of them inherit from the same 'grandparent' class
     """ 
 
     def __init__(self):
@@ -451,7 +476,8 @@ class Object(object):
                     print 'D.__init__',d
             D(a=1,b=2,c=3,d=4)
         '''
-        #if _args: raise Exception,'__init_all_Object_withUnnamedArgumentsException'
+        #if _args: 
+        #   raise Exception,'__init_all_Object_withUnnamedArgumentsException'
         from inspect import getargspec
         #print '%s.call_all__init__(%s,%s)' % (klass.__name__,_args,_kw)
         for base in klass.__bases__:
@@ -487,12 +513,19 @@ class Object(object):
 ###############################################################################
 
 class Singleton(object):
-    """This class allows Singleton objects overriding __new__ and renaming __init__ to init_single
-    The __new__ method is overriden to force Singleton behaviour, the Singleton is created for the lowest subClass.
-    @warning although __new__ is overriden __init__ is still being called for each instance=Singleton(), this is way we replace it by __dub_init
+    """
+    This class allows Singleton objects overriding __new__ and renaming 
+    __init__ to init_single
+    
+    The __new__ method is overriden to force Singleton behaviour, 
+    the Singleton is created for the lowest subClass.
+    
+    @warning although __new__ is overriden __init__ is still being called 
+    for each instance=Singleton(), this is way we replace it by __dub_init
     """   
     ## Singleton object
-    __instance = None     # the one, true Singleton, private members cannot be read directly
+    # the one, true Singleton, private members cannot be read directly
+    __instance = None 
     __dumb_init = (lambda self,*p,**k:None)
     
     def __new__(cls, *p, **k):
@@ -501,10 +534,15 @@ class Singleton(object):
             #srubio: added init_single check to prevent redundant __init__ calls
             if hasattr(cls,'__init__') and cls.__init__ != cls.__dumb_init:
                 setattr(cls,'init_single',cls.__init__)
-                setattr(cls,'__init__',cls.__dumb_init)  #Needed to avoid parent __init__ methods to be called
+                #Needed to avoid parent __init__ methods to be called
+                setattr(cls,'__init__',cls.__dumb_init)  
             if hasattr(cls,'init_single'): 
-                cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
-            cls.__instance = __instance #Done at the end to prevent failed __init__ to create singletons
+                #If no __init__ or init_single has been defined it may trigger 
+                #an object.__init__ warning!
+                cls.init_single(__instance,*p,**k) 
+                
+            #Done at the end to prevent failed __init__ to create singletons
+            cls.__instance = __instance 
         return cls.__instance
     
     @classmethod
@@ -516,13 +554,18 @@ class Singleton(object):
         cls.__instance = None
 
 class SingletonMap(object):
-    """This class allows distinct Singleton objects for each args combination.
-    The __new__ method is overriden to force Singleton behaviour, the Singleton is created for the lowest subClass.
-    @warning although __new__ is overriden __init__ is still being called for each instance=Singleton(), this is way we replace it by __dub_init
+    """
+    This class allows distinct Singleton objects for each args combination.
+    The __new__ method is overriden to force Singleton behaviour, the Singleton
+    is created for the lowest subClass.
+    
+    @warning although __new__ is overriden __init__ is still being called 
+    for each instance=Singleton(), this is way we replace it by __dub_init
     """
     
     ## Singleton object
-    __instances = {} # the one, true Singleton, private members cannot be read directly
+    # the one, true Singleton, private members cannot be read directly
+    __instances = {} 
     __dumb_init = (lambda self,*p,**k:None)    
     
     def __new__(cls, *p, **k):
@@ -530,14 +573,23 @@ class SingletonMap(object):
         if cls != type(cls.__instances.get(key)):
             __instance = object.__new__(cls)
             __instance.__instance_key = key
-            #srubio: added init_single check to prevent redundant __init__ calls
+            #srubio:added init_single check to prevent redundant __init__ calls
+
             if hasattr(cls,'__init__') and cls.__init__ != cls.__dumb_init:
                 setattr(cls,'init_single',cls.__init__)
-                setattr(cls,'__init__',cls.__dumb_init) #Needed to avoid parent __init__ methods to be called
+                #Needed to avoid parent __init__ methods to be called
+                setattr(cls,'__init__',cls.__dumb_init) 
+
             if hasattr(cls,'init_single'): 
-                cls.init_single(__instance,*p,**k) #If no __init__ or init_single has been defined it may trigger an object.__init__ warning!
+                #If no __init__ or init_single has been defined it may trigger 
+                #an object.__init__ warning!
+                cls.init_single(__instance,*p,**k) 
+
             cls.__instances[key] = __instance
-            #print '#'*80+'\n'+'%s.__instances[%s] = %s'%(str(cls),key,str(__instance))
+
+            #print('#'*80+'\n'+'%s.__instances[%s] = %s'
+            #   %(str(cls),key,str(__instance))
+
         return cls.__instances[key]
             
     @classmethod
@@ -581,13 +633,17 @@ def decorator_with_args(decorator):
     Decorator with Arguments must be used with parenthesis: @decorated() 
     , even when arguments are not used!!!
     
-    This method gets an d(f,args,kwargs) decorator and returns a new single-argument decorator that embeds the new call inside.
+    This method gets an d(f,args,kwargs) decorator and returns a new 
+    single-argument decorator that embeds the new call inside.
     
     But, this decorator disturbed stdout!!!! 
     
-    There are some issues when calling nested decorators; it is clearly better to use Decorator classes instead.
+    There are some issues when calling nested decorators; it is clearly 
+    better to use Decorator classes instead.
     '''
-    # decorator_with_args = lambda decorator: lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
+    # decorator_with_args = lambda decorator: \
+    #    lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
+
     return lambda *args, **kwargs: lambda func: decorator(func, *args, **kwargs)
 
 class Decorated(object): 
@@ -838,11 +894,14 @@ class BoundDecorator(Decorator):
         def __nonzero__(self): return self._trace
         def __call__(self,msg):
             if self: print(msg)
-    tracer = _Tracer() #NOTE: Giving a value to Tracer only works with instances; not from the class
+            
+    #NOTE: Giving a value to Tracer only works with instances; not from class            
+    tracer = _Tracer() 
     
     def __call__(this,f=None):
         class _Descriptor(BoundDecorator):
-            #Inherits to get the wrapper from the BoundDecorator class and be able to exist "onDemand"
+            # Inherits to get the wrapper from the BoundDecorator class 
+            # and be able to exist "onDemand"
             def __init__(self, f):
                 self.f = f
             def __get__(self, instance, klass):
@@ -853,23 +912,26 @@ class BoundDecorator(Decorator):
                 return self.make_bound(instance)
             def make_unbound(self, klass):
                 BoundDecorator.tracer('make_unbound(%s)'%klass)
+                
                 @functools.wraps(self.f)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)
                     This method may work well only without arguments
                     '''
-                    #raise TypeError('unbound method %s() must be called with %s class '
-                        #'as first argument (got nothing instead)'%(self.f.__name__,klass.__name__))
-                    #return self.f(instance, *args, **kwargs)
-                    BoundDecorator.tracer("Called the unbound method %s of %s"%(self.f.__name__, klass.__name__))
-                    return partial(this.wrapper,f=f)(*args,**kwargs)
+                    BoundDecorator.tracer(
+                        "Called the unbound method %s of %s"
+                        %(self.f.__name__, klass.__name__))
+                    return partial(this.wrapper,f=f)(*args,**kwargs)    
                 return wrapper
+            
             def make_bound(self, instance):
                 BoundDecorator.tracer('make_bound(%s)'%instance)
                 @functools.wraps(self.f)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)'''
-                    BoundDecorator.tracer("Called the decorated method %s of %s"%(self.f.__name__, instance))
+                    BoundDecorator.tracer(
+                        "Called the decorated method %s of %s"
+                        %(self.f.__name__, instance))
                     #return self.f(instance, *args, **kwargs)
                     return this.wrapper(instance,f,*args,**kwargs)
                 #wrapper = self.wrapper #wraps(self.f)(self.wrapper)
@@ -877,6 +939,7 @@ class BoundDecorator(Decorator):
                 # let it find the wrapper directly next time:
                 setattr(instance, self.f.__name__, wrapper)
                 return wrapper
+            W
         return _Descriptor(f)
 
 
