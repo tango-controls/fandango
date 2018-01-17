@@ -939,7 +939,7 @@ class BoundDecorator(Decorator):
                 # let it find the wrapper directly next time:
                 setattr(instance, self.f.__name__, wrapper)
                 return wrapper
-            W
+
         return _Descriptor(f)
 
 
