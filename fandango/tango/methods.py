@@ -365,30 +365,41 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
     return config
   
 def get_attribute_events(target,polled=True,throw=False):
+    """
+    Get current attribute events configuration 
+    TODO: it uses Tango Device Proxy, should be Tango Database instead
+    """
     try:
-      d,a = target.rsplit('/',1)
-      dp = get_device(d)
-      polling = dp.get_attribute_poll_period(a)
-      if polled and not polling:
-        return None
-      aei = dp.get_attribute_config(a).events
-      r = {'polling':polling}
-      for k,t in (
-        ('arch_event',('archive_abs_change','archive_rel_change',
-                       'archive_period')),
-        ('ch_event',('abs_change','rel_change')),
-        ('per_event',('period',))):
-        r[k],v = [None]*len(t),None
-        for i,p in enumerate(t):
-          try: 
-            v = str2float(getattr(getattr(aei,k),p))
-            r[k][i] = v
-          except: pass #print(k,i,p,v)
-        if not any(r[k]): r.pop(k)
-      return r
+        d,a = target.rsplit('/',1)
+        dp = get_device(d)
+        aei = dp.get_attribute_config(a).events
+        r = {} 
+        for k,t in (
+            ('arch_event',('archive_abs_change','archive_rel_change',
+                        'archive_period')),
+            ('ch_event',('abs_change','rel_change')),
+            ('per_event',('period',))
+            ):
+            r[k],v = [None]*len(t),None
+            for i,p in enumerate(t):
+                try: 
+                    v = str2float(getattr(getattr(aei,k),p))
+                    r[k][i] = v
+                except: 
+                    pass #print(k,i,p,v)
+            if not any(r[k]): 
+                r.pop(k)
+            
+        if r: # check polling only if something else is active
+            polling = dp.get_attribute_poll_period(a)
+            #if polled and not polling:
+                #return None
+            r['polling'] = polling
+        return r
+  
     except Exception,e:
-      if throw: raise e
-      return None
+        if throw: raise e
+        return None
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
@@ -422,7 +433,7 @@ def parse_db_command_array(data,keys=1,depth=2):
         parse_db_command_array(dbd.DbGetDeviceAttributeProperty2([dev,attr]).,
         keys=1,depth=2)[dev][attr]['label'][0]
     """
-    dict = {}
+    dct = {}
 
     for x in range(keys):
         key = data.pop(0)
@@ -439,8 +450,55 @@ def parse_db_command_array(data,keys=1,depth=2):
             except:
                 k,v = key,[length]
 
-        dict.update([(k,v)])
-    return dict
+        dct.update([(k,v)])
+    return dct
+
+def parse_black_box_row(row):
+    alnum = '[0-9a-zA-Z]+'
+    rip = '('+alnum+'\.'+alnum+'\.'+alnum+'(P:'+'\.'+alnum+')?)'
+    pid = '(?:PID[\ =])([0-9]+)'
+    date,cmd = map(str.strip,row.split(' : ',1))
+    if date.count(':') == 3 and '.' not in date:
+        date = '.'.join(date.rsplit(':',1))
+    result = {'date':date, 'command':cmd, 'row':row, 'load':0}
+    try:
+        result['time'] = str2time(date)
+    except:
+        result['time'] = None
+    
+    for k,r in (('pid',pid),('host',rip)):
+        try:
+            result[k] = re.search(r,cmd).groups()[0]
+        except:
+            result[k] = ''
+    result['proc'] = result['host']+':'+result['pid']
+    result['cmd'] = cmd.replace(result['host'],'?').replace(result['pid'],'?')
+    return result
+
+def parse_black_box(device, n=100):
+    """
+    This method can be used to inspect all the clients accessing a device
+    
+    data = fandango.tango.methods.parse_black_box('sys/database/2')
+    hosts = fn.dicts.defaultdict(list)
+    for r in data.values(): hosts[r['host']].append(r)
+    procs = fn.dicts.defaultdict(list)
+    for r in data.values(): procs[r['proc']].append(r)
+    """
+    if not isinstance(device,PyTango.DeviceProxy):
+        device = get_device(device)
+    bb = device.black_box(100)
+    data = dict(kmap(parse_black_box_row,bb))
+    j,t,l = 0,0,''
+    for i,k in enumerate(sorted(data.keys()[1:])):
+        v = data[k]
+        r = data[k]['time'] - data.values()[i]['time']
+        if r > t: 
+            j,t,l = i,r,k
+        data[k]['load'] = r if r > 0 else 0
+    print('slower command (%f) was %d: %s' % (t,j,l))
+    return data
+        
 
 def get_free_property(name,prop,db=None):
     """
