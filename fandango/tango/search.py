@@ -84,86 +84,87 @@ def get_model_name(model):
             print traceback.format_exc()
     return str(model).lower()
         
-def parse_tango_model(name, use_tau=False, use_host=False, fqdn=None):
+def parse_tango_model(name, use_host=False, fqdn=None, *args, **kwargs):
     """
-    {'attributename': 'state',
-    'attribute': 'state',
-    'devicename': 'bo01/vc/ipct-01', #Always short name
-    'device': 'cts:10000/bo01/vc/ipct-01', #Will contain host \
-        if use_host or host!=TANGO_HOST
-    'fqdn': 'tango://cts:10000/bo01/vc/ipct-01/state' #With scheme name
-    'host': 'cts',
-    'port': '10000',
-    'scheme': 'tango'}
+    parse_tango_model('bt/DI/bpm-01/MaxADC',use_host=False,fqdn=False).items()
+        ('attribute', 'MaxADC')
+        ('attributename', 'maxadc')
+        ('authority', 'alba03:10000')
+        ('device', 'bt/DI/bpm-01')
+        ('devicemodel', 'alba03:10000/bt/di/bpm-01')
+        ('devicename', 'bt/di/bpm-01')
+        ('fullname', 'tango://alba03:10000/bt/di/bpm-01/maxadc')
+        ('host', 'alba03') # will be FQDN if specified
+        ('model', 'alba03:10000/bt/di/bpm-01/maxadc') 
+        ('normalname', 'bt/DI/bpm-01/maxadc') # with host if specified
+        ('port', '10000')
+        ('scheme', 'tango')
+        ('simplename', 'bt/di/bpm-01/maxadc')
+        ('tango_host', 'alba03:10000')
+
     
-    In taurus it is translated as:
+    In taurus it has to be translated; as simplename means different things
+    for a TaurusAttribute and for a TaurusDevice, and taurus no longer supports
+    the host + normalname syntax as fullname:
     
     In [4]: ta.getFullName() ~ model
     Out[4]: 'alba03:10000/sys/tg_test/1/state'
     In [5]: ta.getSimpleName() ~ attributename
     Out[5]: 'state'
-    In [6]: ta.getNormalName() ~ name
+    In [6]: ta.getNormalName() ~ simplename
     Out[6]: 'sys/tg_test/1/state'
     
-    
+    DEPRECATED: use_tau option is now deprecated due to changes in 
+    Device/AttributeNameValidator API in Taurus
     """
     if fqdn is None: fqdn = fandango.tango.defaults.USE_FQDN
     use_host = use_host or fqdn
-    values = {'authority':'tango'}
-    values['host'],values['port'] = defhost = get_tango_host().split(':',1)
-    try:
-        assert (use_tau and TAU)
-        from taurus.core import tango as tctango
-        from taurus.core import AttributeNameValidator,DeviceNameValidator
-        validator = {tctango.TangoDevice:DeviceNameValidator,
-                     tctango.TangoAttribute:AttributeNameValidator}
-        values.update((k,v) for k,v in 
-                      validator[tctango.TangoFactory().findObjectClass(name)
-                                ]().getParams(name).items() if v)
-    except:
-        name = str(name).replace('tango://','')
-        m = re.match(fandango.tango.retango,name)
+    r = Struct({'scheme':'tango'})
+    r.tango_host = defhost = get_tango_host()
+    r.host,r.port = defhost.split(':',1)
 
-        if m and '/' not in name[m.end():]: #Name should end at attribute
-            
-            gd = m.groupdict()
-            values['device'] = '/'.join([s for s in gd['device'].split('/') 
-                                         if ':' not in s])
-            if gd.get('attribute'): 
-                values['attribute'] = gd['attribute']
-            if gd.get('host'): 
-                values['host'],values['port'] = gd['host'].split(':',1)
-            if name[m.end():]:
-                values['query'] = name[m.end():]
+    name = str(name).replace('tango://','')
+    m = re.match(fandango.tango.retango,name)
 
-    if 'device' not in values: 
+    if m and '/' not in name[m.end():]: #Name should end at attribute
+        
+        gd = m.groupdict()
+        r.device = '/'.join([s for s in gd['device'].split('/') 
+                                        if ':' not in s])
+        if gd.get('attribute'): 
+            r.attribute = gd['attribute']
+        if gd.get('host'): 
+            r.authority = r.tango_host = gd['host']
+        if name[m.end():]:
+            r.query = name[m.end():]
+
+    if 'device' not in r: 
         return None
 
     else:
-        if tuple(defhost) != (values['host'],values['port']): 
-            use_host = True
+        r.host,r.port = r.tango_host.split(':',1)
+        use_host = use_host or defhost != r.tango_host
             
-        if fqdn and '.' not in values['host']:
+        if fqdn and '.' not in r['host']:
             import socket
-            values['host'] = socket.getfqdn(values['host'])
-            
-        values['simplename'] = values['devicename'] = values['device']
-        values['normalname'] = values['model'] = (
-            '%s:%s/%s'%(values['host'],values['port'],values['device']))
-        values['tango_host'] = '%s:%s'%(values['host'],values['port'])
+            r.host = socket.getfqdn(r.host)
+            r.tango_host = r.host + ':' + r.port
         
-        values['devicemodel'] = values['model']
-        values['device'] = (values['device'],values['model'])[use_host]
+        r.authority = r.tango_host
+        r.devicename = r.simplename = r.device.lower()
+        r.devicemodel = r.model = ('%s/%s' % (r.tango_host, r.simplename))
+        
+        r.normalname = (r.devicename,r.model)[use_host]
 
-        if 'attribute' in values: 
-            values['attributename'] = values['attribute'] #taurus compatibility
-            values['model'] = values['model']+'/'+values['attribute']
-            values['simplename'] += '/'+values['attribute']
-            values['normalname'] += '/'+values['attribute']
+        if 'attribute' in r: 
+            r.attributename = r.attribute.lower() #taurus-like
+            r.model = r.model+'/'+r.attributename
+            r.simplename += '/'+r.attributename #hostless
+            r.normalname += '/'+r.attributename #hostwith
 
-        values['fullname'] = 'tango://'+values['normalname'] #aka uri
+        r.fullname = 'tango://'+r.model #aka uri
 
-    return Struct(values)
+    return r
 
 #This variable controls how often the Tango Database will be queried
 TANGO_KEEPTIME = 60 
