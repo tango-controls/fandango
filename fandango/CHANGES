@@ -11,6 +11,11 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+13.5.0 - January 2017
+---------------------
+
+Enable Fully Qualified Domain Names in Tango models, model.fullname = URI
+
 13.4.0 - November 2017
 -----------------------
 
