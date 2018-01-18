@@ -788,6 +788,9 @@ class Cached(Decorator):
             
         self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
         return sorted(self.cache.keys())
+    
+    def clear(self):
+        self.cache.clear()
         
     def execute(self,*args,**kwargs):
         self._log('__call__(%s,%s)'%(args,kwargs))
