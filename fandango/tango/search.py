@@ -45,6 +45,7 @@ Methods for Astor-like management will go to fandango.servers
 """
 
 from fandango.objects import Cached
+from fandango.linos import get_fqdn
 from .defaults import * ## Regular expressions defined here!
 from .methods import *
 
@@ -146,8 +147,7 @@ def parse_tango_model(name, use_host=False, fqdn=None, *args, **kwargs):
         use_host = use_host or defhost != r.tango_host
             
         if fqdn and '.' not in r['host']:
-            import socket
-            r.host = socket.getfqdn(r.host)
+            r.host = get_fqdn(r.host)
             r.tango_host = r.host + ':' + r.port
         
         r.authority = r.tango_host
