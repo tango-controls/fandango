@@ -336,6 +336,12 @@ def desktop_switcher(period,event=None,iterations=2):
 ################################################################################3
 # Networking methods
 
+fun.Cached(depth=1000,expire=300.)
+def get_fqdn(hostname):
+    """ Reimplemented to be cached for continuous tango host parsing """
+    import socket
+    return socket.getfqdn(hostname)
+
 def ping(ips,threaded = False, timeout = 1):
     ''' By Noah Gift's, PyCon 2008
     ips =  ['ivc%02d01'%(i+1) for i in range(16)]

@@ -114,7 +114,7 @@ except Exception,e:
     
 try:
     from linos import shell_command,ping,sysargs_to_dict,listdir, \
-        sendmail,MyMachine
+        sendmail,MyMachine,get_fqdn
 except: 
     print('Unable to import linos module: %s\n'%traceback.format_exc())
 
