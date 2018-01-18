@@ -1393,7 +1393,7 @@ class QGridTable(Qt.QFrame):#Qt.QFrame):
         self.setLayout(Qt.QGridLayout())
         self._widgets = []
     def setHorizontalHeaderLabels(self,labels):
-        print 'QGridTable.setHorizontalHeaderLabels(%s)'%labels
+        #print 'QGridTable.setHorizontalHeaderLabels(%s)'%labels
         for i,l in enumerate(labels):
             ql = Qt.QLabel(l)
             f = ql.font()
@@ -1403,7 +1403,7 @@ class QGridTable(Qt.QFrame):#Qt.QFrame):
             self.setCellWidget(0,i,ql)
             if ql not in self._widgets: self._widgets.append(ql)
     def setVerticalHeaderLabels(self,labels):
-        print 'QGridTable.setVerticalHeaderLabels(%s)'%labels
+        #print 'QGridTable.setVerticalHeaderLabels(%s)'%labels
         for i,l in enumerate(labels):
             ql = Qt.QLabel(l)
             f = ql.font()
@@ -1501,10 +1501,10 @@ class QDictToolBar(Qt.QToolBar):
         """        
         if hasattr(toolbar,'items'): toolbar = [(k,v[0],v[1]) for k,v in toolbar.items()]
         for name,icon,action in toolbar:
-            print 'Adding action to toolbar: %s,%s,%s'%(name,icon,action)
+            #print 'Adding action to toolbar: %s,%s,%s'%(name,icon,action)
             if isSequence(action):
                 #Building a sub menu
-                print '\tAdding SubMenu: %s'%action
+                #print '\tAdding SubMenu: %s'%action
                 qaction = Qt.QPushButton(name)
                 qaction.setLayout(Qt.QVBoxLayout())
                 if icon: 
@@ -1520,7 +1520,7 @@ class QDictToolBar(Qt.QToolBar):
             else:
                 self.addSeparator()
         self.setObjectName("ToolBar")
-        print 'Out of set_toolbar()'
+        #print 'Out of set_toolbar()'
         return self
     def add_to_main_window(self,MainWindow,where=Qt.Qt.TopToolBarArea):
         try: MainWindow.addToolBar(where,self)
