@@ -323,16 +323,24 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
                     if isinstance(vv,dict):
                         for cc,vvv in vv.items():
                             if cc not in AC_PARAMS:
+                                if verbose:
+                                    print('cc %s?'%(cc))                                
                                 continue
                             acc = getattr(ac,c)
                             if not hasattr(acc,cc):
+                                if verbose:
+                                    print('%s not in %s acc'%(cc,acc))
                                 continue
                             elif isinstance(vvv,dict):
                                 for e,p in vvv.items():
                                     if e not in AC_PARAMS:
+                                        if verbose:
+                                            print('e %s?'%(e))
                                         continue
                                     ae = getattr(acc,cc)
                                     if not hasattr(ae,e):
+                                        if verbose:
+                                            print('%s not in %s ae'%(e,ae))
                                         continue
                                     elif getattr(ae,e)!=p:
                                         print('%s.%s.%s.%s = %s'%(a,c,cc,e,p))
@@ -400,6 +408,38 @@ def get_attribute_events(target,polled=True,throw=False):
     except Exception,e:
         if throw: raise e
         return None
+    
+def set_attribute_events(target, polling = None, rel_event = None, 
+                        abs_event = None, per_event = None,
+                        arch_rel_event = None, arch_abs_event = None, 
+                        arch_per_event = None,verbose = False):
+
+    cfg = CaselessDefaultDict(dict)
+    if polling is not None: 
+        cfg['polling'] = polling
+        
+    if any(map(notNone,(rel_event, abs_event, ))):
+        d = cfg['events']['ch_event'] = {}
+        if notNone(rel_event): 
+            d['rel_change'] = str(rel_event or 'Not specified')
+        if notNone(abs_event): 
+            d['abs_change'] = str(abs_event or 'Not specified')
+
+    if any(map(notNone,(arch_rel_event, arch_abs_event, arch_per_event))):
+        d = cfg['events']['arch_event'] = {}
+        if notNone(arch_rel_event): 
+            d['archive_rel_change'] = str(arch_rel_event or 'Not specified')
+        if notNone(arch_abs_event): 
+            d['archive_abs_change'] = str(arch_abs_event or 'Not specified')
+        if notNone(arch_per_event): 
+            d['archive_period'] = str(arch_per_event or 'Not specified')
+            
+    if notNone(per_event):
+        cfg['events']['per_event'] = {'period': str(per_event)}
+    
+    dev,attr = target.rsplit('/',1)
+    return set_attribute_config(dev,attr,cfg,True,verbose=verbose)
+        
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)

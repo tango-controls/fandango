@@ -148,7 +148,7 @@ AC_PARAMS = [
     #'extensions',
     'delta_val',
     'min_alarm',
-    'max_warning'
+    'max_warning',
     #EVENTS
     #'extensions',
     'period',
