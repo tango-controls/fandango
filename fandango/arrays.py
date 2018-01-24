@@ -124,9 +124,9 @@ def decimate_custom(seq,cmp=None,pops=None,keeptime=3600*1.1):
 def decimate_array(data,fixed_size=0,keep_nones=True,fixed_inc=0,
                    fixed_rate=0,fixed_time=0,logger=None):
     """ 
-    @NOTE: filter_array provides a better decimation for trends
     Decimates a [(time,numeric value)] buffer by size/rate/increment/time
     Repeated values are always decimated.
+    @NOTE: filter_array provides a better decimation for trends    
     
     keep_nones forces value-to-None steps to be kept
     
@@ -224,29 +224,38 @@ def average(*args):
 def rms_value(*args):
     return fun.rms(args[0])
 
+def pickfirst(*args):
+    """ Just pick first valid value """
+    for v in args[0]:
+        if v is not None:
+            return v
+
 def maxdiff(*args):
     """ Filter that maximizes changes (therefore, noise) """
     seq,ref = args
     if None in seq: return None
-    try:
-        return sorted((fun.absdiff(s,ref),s) for s in seq)[-1][-1]
-    except Exception,e:
-        print args
-        raise e
+    return sorted((fun.absdiff(s,ref,0),s) for s in seq)[-1][-1]
+    
+def mindiff(*args):
+    """ Filter that maximizes changes (therefore, noise) """
+    seq,ref = args
+    return sorted((fun.absdiff(s,ref,0),s) for s in seq
+                    if s is not None)[0][-1]
 
 def notnone(*args):
+    """ This method returns an averaging method applied to all none values
+    in a sequence """
     seq,ref = args[0],fun.first(args[1:] or [0])
     method = fun.first(args[2:] or [average])
-    print 'notnone from %s'%ref
     try:
-      if np: 
-          return method(*((v for v in seq if v is not None 
-                           and not np.isnan(v)),ref))
-      else: 
-          return method(*((v for v in seq if v is not None),ref))
+        if np: 
+            return method(*((v for v in seq if v is not None 
+                            and not np.isnan(v)),ref))
+        else: 
+            return method(*((v for v in seq if v is not None),ref))
     except:
-      traceback.print_exc()
-      return ref
+        traceback.print_exc()
+        return ref
 
 def maxmin(*args):
     """ 
@@ -257,7 +266,7 @@ def maxmin(*args):
     data = args[0]
     t = sorted((v,t) for t,v in data)
     mn,mx = (t[0][1],t[0][0]),(t[-1][1],t[-1][0])
-    return mx,mn
+    return sorted((mx,mn))
 
 ##METHODS OBTAINED FROM PyTangoArchiving READER
 
@@ -371,8 +380,12 @@ def print_histogram(data,n=20):
 def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                  trace=False):
     """
-    The array returned will contain @method applied to @data split 
-        in @window intervals
+    It is assumed that the array is a list of (time,value) tuples.
+    The array returned will contain @method (a function returning 1 value) 
+    applied to @data split in @window intervals.
+        
+    As range() only accept integers the minimum window is 1 second.
+    
     First interval will be floor(data[0][0],window)+window, containing average 
         of data[t0:t0+window]
     If begin,end intervals are passed, cut-off and filling methods are applied
@@ -384,7 +397,11 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     """
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     tfloor = lambda x: int(fun.floor(x,window))
-    begin,end,window = map(int,((begin,end,window)))
+    begin,end,window = map(float,((begin,end,window)))
+    
+    if window < 1.:
+        # ranges only accept integers, so the minimum window is 1
+        window = 1.
     
     #CUT-OFF; removing data out of interval    
     #--------------------------------------------------------------------------
@@ -393,12 +410,16 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     #Using loop instead of list comprehension (50% faster with normally-sorted 
     # data than list comprehensions)
     prev,post = None,None
+
+    # Get first index after interval begin    
     if begin and data and data[0][0]<begin:
         if data[-1][0]<begin: 
             prev,data = data[-1],[]
         else: 
             i = (i for i,v in enumerate(data) if v[0]>=begin).next()-1
             prev,data = data[i],data[i+1:]
+
+    # Get first index after interval end
     if end and data and data[-1][0]>end:
         if data[0][0]>end:
             post,data = data[0],[]
@@ -431,8 +452,9 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     ilast = len(data)-1
     if trace: print 't0: %s' % (window+tfloor(data[0][0]-1))
     try:
-        for t in range(window+tfloor(data[0][0]-1),
-                       1+window+tfloor(max((end,data[-1][0]))),window):
+        for t in range(int(window+tfloor(data[0][0]-1)),
+                       int(1+window+tfloor(max((end,data[-1][0])))),
+                       int(window)):
             if i<=ilast:
                 if data[i][0]>t:
                     #Filling "whitespace" with last data
@@ -451,9 +473,11 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
 
                     a1 = list(v[1] for v in data[i0:i])
                     a2 = ndata and ndata[-1][-1] or 0
+                    ##########################################################
                     val = method(a1,a2)
                     ndata.append((t,val))
                     #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
+                    ##########################################################
             else:
                 # Adding data at the end, it will be applied whenever the size 
                 # of array is smaller than expected value
@@ -467,6 +491,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
               % (i0,i,ilast,filling,data[i0:i]))
         print('\t %s' % str(ndata and ndata[-1]))
         print('\t %s'  % str(ndata and ndata[-1] and ndata[-1][-1]))
+        #traceback.print_exc()
         raise Exception(e) #traceback.format_exc())
     
     return ndata
