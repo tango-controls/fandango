@@ -155,10 +155,9 @@ def absdiff(x,y,floor=0.01):
     Checks absolute difference <floor between x and y
     floor would be a decimal value, e.g. 0.05
     """
-    d = x-y
-    if not d: return 0
-    return d if not floor else (0,d)[abs(d)>=floor]
-    #return 0 if x-r<y<x+r else -1
+    d = abs(x-y)
+    if d < floor: d = 0
+    return d
 
 def seqdiff(x,y,method=reldiff,floor=None):
     """
@@ -532,7 +531,8 @@ def isNumber(seq):
 NaN = float('nan')
     
 def isNaN(seq):
-    return isinstance(seq,(int,float)) and math.isnan(seq) or (isString(seq) and seq.lower().strip() == 'nan')
+    return (isinstance(seq,(int,float)) and math.isnan(seq) or 
+                (isString(seq) and seq.lower().strip() == 'nan'))
     
 def isNone(seq):
     return seq is None or (isString(seq) and seq.lower().strip() in ('none','null','nan',''))
