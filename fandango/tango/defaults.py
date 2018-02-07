@@ -62,6 +62,7 @@ from fandango.functional import *
 
 from fandango.dicts import CaselessDefaultDict,CaselessDict,Enumeration
 from fandango.objects import Object,Struct,Cached
+from fandango.linos import get_fqdn
 from fandango.log import Logger,except2str,printf
 from fandango.excepts import exc2str
 
@@ -172,13 +173,17 @@ AC_PARAMS = [
 global TangoDatabase,TangoDevice,TangoProxies
 TangoDatabase,TangoDevice,TangoProxies = None,None,None
 
-def get_tango_host(dev_name='',use_db=False):
+def get_tango_host(dev_name='',use_db=False, fqdn=None):
     """
     If device is a tango model, it will extract the host from the model URL
     If devicesis none, then environment variable or PyTango.Database are used 
     to extract the host
     If TANGO_HOST is not defined it will always fallback to PyTango.Database()
     """
+    if fqdn is None:
+       global USE_FQDN
+       fqdn = USE_FQDN
+       
     try:
         if dev_name:
             
@@ -187,22 +192,34 @@ def get_tango_host(dev_name='',use_db=False):
               m  = matchCl(rehost,dev_name)
             else: 
               m,use_db = None,dev_name
-              
-            return m.groups()[0] if m else get_tango_host(use_db=use_db)
+            
+            if not m:
+                return get_tango_host(use_db=use_db,fqdn=fqdn)
+            else:
+                host,port = m.groups()[0].split(':')
         
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') \
                             else get_database()
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
-            if (matchCl('.*[a-z].*',host.lower())
-              #and PyTango.__version_number__ < 800):
-              ): #The bug is back!!
-                #Remove domain name
-                host = host.strip().split('.')[0]
-            return "%s:%d"%(host,port)
+            
         else:
-            host = os.getenv('TANGO_HOST') 
-            return host or get_tango_host(use_db=True) 
+            host = os.getenv('TANGO_HOST')
+            if not host:
+                return get_tango_host(use_db=True,fqdn=fqdn)
+            else:
+                host,port = host.split(':',1)
+        
+        if fqdn: 
+            host = get_fqdn(host)
+        elif (matchCl('.*[a-z].*',host.lower())
+            #and PyTango.__version_number__ < 800):
+            ): #The bug is back!!
+            #Remove domain name
+            host = host.strip().split('.')[0]
+        
+        return "%s:%d"%(host,int(port))
+
     except:
         print('ERROR: get_tango_host(): '+traceback.format_exc())
         return 'localhost:10000'
