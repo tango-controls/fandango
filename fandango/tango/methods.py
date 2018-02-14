@@ -103,10 +103,7 @@ def get_device_info(dev,db=None):
     #vals = PyTango.DeviceProxy('sys/database/2').DbGetDeviceInfo(dev)
     vals = None
     if ':' in dev:
-        from fandango.tango.search import parse_tango_model
-        model = fandango.Struct(parse_tango_model(dev))
-        db = get_database(model.host,model.port)
-        dev = '/'.join(model.device.split('/')[-3:])
+        db,dev = get_database(dev),get_normal_name(dev)
   
     try:
         dd = get_database_device(db=db)
@@ -126,6 +123,9 @@ def get_device_host(dev):
     Asks the Database device server about the host of this device 
     """
     return get_device_info(dev).host
+
+def get_device_class(dev):
+    return get_device_info(dev).dev_class
 
 def get_device_started(target):
     """ Returns device started time """
@@ -185,13 +185,120 @@ def get_real_name(dev,attr=None):
     return None
 
 def get_full_name(model):
-    """ Returns full schema name as needed by HDB++ api
+    """ 
+    Returns full schema name as needed by HDB++ api
     """
     if ':' not in model:
       model = get_tango_host()+'/'+model
     if not model.startswith('tango://'):
       model = 'tango://'+model
     return model
+
+def get_normal_name(model):
+    """ 
+    returns simple name without schema/host/port, as needed by TangoDB API
+    """
+    if ':' in model:
+        model = model.split(':')[-1].split('/',1)[-1]
+    return model.split('#')[0].strip('/')
+        
+def get_model_name(model):
+    """
+    DEPRECATED, use parse_tango_model instead
+    """
+    if isString(model): 
+        m = searchCl(retango,str(model).lower())
+        return m.group() if m else str(model).lower()
+    try: 
+        model = model.getFullName()
+    except: 
+        try:
+            model = model.getModelName()
+        except:
+            print traceback.format_exc()
+    return str(model).lower()
+        
+def parse_tango_model(name, use_host=False, fqdn=None, *args, **kwargs):
+    """
+    parse_tango_model('bt/DI/bpm-01/MaxADC',use_host=False,fqdn=False).items()
+        ('attribute', 'MaxADC')
+        ('attributename', 'maxadc')
+        ('authority', 'alba03:10000')
+        ('device', 'bt/DI/bpm-01')
+        ('devicemodel', 'alba03:10000/bt/di/bpm-01')
+        ('devicename', 'bt/di/bpm-01')
+        ('fullname', 'tango://alba03:10000/bt/di/bpm-01/maxadc')
+        ('host', 'alba03') # will be FQDN if specified
+        ('model', 'alba03:10000/bt/di/bpm-01/maxadc') 
+        ('normalname', 'bt/DI/bpm-01/maxadc') # with host if specified
+        ('port', '10000')
+        ('scheme', 'tango')
+        ('simplename', 'bt/di/bpm-01/maxadc')
+        ('tango_host', 'alba03:10000')
+
+    
+    In taurus it has to be translated; as simplename means different things
+    for a TaurusAttribute and for a TaurusDevice, and taurus no longer supports
+    the host + normalname syntax as fullname:
+    
+    In [4]: ta.getFullName() ~ model
+    Out[4]: 'alba03:10000/sys/tg_test/1/state'
+    In [5]: ta.getSimpleName() ~ attributename
+    Out[5]: 'state'
+    In [6]: ta.getNormalName() ~ simplename
+    Out[6]: 'sys/tg_test/1/state'
+    
+    DEPRECATED: use_tau option is now deprecated due to changes in 
+    Device/AttributeNameValidator API in Taurus
+    """
+    if fqdn is None: fqdn = fandango.tango.defaults.USE_FQDN
+    use_host = use_host or fqdn
+    r = Struct({'scheme':'tango'})
+    r.tango_host = defhost = get_tango_host()
+    r.host,r.port = defhost.split(':',1)
+
+    name = str(name).split(';')[0].strip().replace('tango://','')
+    name,r.fragment = name.split('#',1) if '#' in name else (name,'')
+    m = re.match(fandango.tango.retango,name)
+
+    if m and '/' not in name[m.end():]: #Name should end at attribute
+        
+        gd = m.groupdict()
+        r.device = '/'.join([s for s in gd['device'].split('/') 
+                                        if ':' not in s])
+        if gd.get('attribute'): 
+            r.attribute = gd['attribute']
+        if gd.get('host'): 
+            r.authority = r.tango_host = gd['host']
+        if name[m.end():]:
+            r.query = name[m.end():]
+
+    if 'device' not in r: 
+        return None
+
+    else:
+        r.host,r.port = r.tango_host.split(':',1)
+        use_host = use_host or defhost != r.tango_host
+            
+        if fqdn and '.' not in r['host']:
+            r.host = get_fqdn(r.host)
+            r.tango_host = r.host + ':' + r.port
+        
+        r.authority = r.tango_host
+        r.devicename = r.simplename = r.device.lower()
+        r.devicemodel = r.model = ('%s/%s' % (r.tango_host, r.simplename))
+        
+        r.normalname = (r.devicename,r.model)[use_host]
+
+        if 'attribute' in r: 
+            r.attributename = r.attribute.lower() #taurus-like
+            r.model = r.model+'/'+r.attributename
+            r.simplename += '/'+r.attributename #hostless
+            r.normalname += '/'+r.attributename #hostwith
+
+        r.fullname = 'tango://'+r.model #aka uri
+
+    return r
 
 def get_device_commands(dev):
     """
@@ -245,6 +352,23 @@ def set_device_labels(target,labels):
             d.set_attribute_config(ac)
     return labels
 
+def parse_labels(text):
+    if any(text.startswith(c[0]) and text.endswith(c[1]) for c in 
+           [('{','}'),('(',')'),('[',']')]):
+        try:
+            labels = eval(text)
+            return labels
+        except Exception,e:
+            print 'ERROR! Unable to parse labels property: %s'%str(e)
+            return []
+    else:
+        exprs = text.split(',')
+        if all(':' in ex for ex in exprs):
+            labels = [tuple(e.split(':',1)) for e in exprs]
+        else:
+            labels = [(e,e) for e in exprs]  
+        return labels
+
 def get_matching_device_attribute_labels(device,attribute):
     """ 
     To get all gauge port labels: 
@@ -293,6 +417,7 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
     """
     print('fandango.tango.set_attribute_config(%s,%s,%s)'
           %(device,attribute,config))
+    
     dp = get_device(device) if isString(device) else device
     name,a,v = dp.name(),attribute,config    
     polling = None
@@ -409,6 +534,21 @@ def get_attribute_events(target,polled=True,throw=False):
         if throw: raise e
         return None
     
+def check_attribute_events(target,ev_type=PyTango.EventType.CHANGE_EVENT):
+    dev,attr = target.rsplit('/',1)
+    if check_device(dev):
+        try:
+            cb = lambda *args: None
+            dp = get_device(dev)
+            ei = dp.subscribe_event(attr,ev_type,cb)
+            dp.unsubscribe_event(ei)
+            return True
+        except:
+            traceback.print_exc()
+            return False 
+    else:
+        return None
+    
 def set_attribute_events(target, polling = None, rel_event = None, 
                         abs_event = None, per_event = None,
                         arch_rel_event = None, arch_abs_event = None, 
@@ -416,6 +556,7 @@ def set_attribute_events(target, polling = None, rel_event = None,
 
     cfg = CaselessDefaultDict(dict)
     if polling is not None: 
+        #first try if the attribute can be subscribed w/out polling:
         cfg['polling'] = polling
         
     if any(map(notNone,(rel_event, abs_event, ))):
@@ -527,6 +668,7 @@ def parse_black_box(device, n=100):
     """
     if not isinstance(device,PyTango.DeviceProxy):
         device = get_device(device)
+        
     bb = device.black_box(100)
     data = dict(kmap(parse_black_box_row,bb))
     j,t,l = 0,0,''
@@ -607,6 +749,9 @@ def get_device_property(device,property,db=None):
     It returns device property value or just first item 
     if value list has lenght==1
     """
+    if ':' in device:
+        db, device = db or get_database(device), get_normal_name(device)
+        
     prop = (db or get_database()).get_device_property(
                                     device,[property])[property]
     return prop if len(prop)!=1 else prop[0]
@@ -620,6 +765,9 @@ def put_device_property(device,property,*value,**db):
     """
     value = value[0] if len(value)==1 else value
     db = db.get('db',None)
+    if ':' in device:
+        db, device = db or get_database(device), get_normal_name(device)
+        
     if not isMapping(property):
         if isSequence(value) and not isinstance(value,list):
             value = list(value)
@@ -631,6 +779,7 @@ def put_device_property(device,property,*value,**db):
                     property[p] = v[0]
                 elif not isinstance(value,list):
                     property[p] = list(v)
+
     (db or get_database()).put_device_property(device,property)
     return property
 
@@ -639,6 +788,9 @@ def get_attribute_property(device,attribute,prop,db=None):
     It returns attribute property value or just first item 
     if value list has lenght==1
     """    
+    if ':' in device:
+        db, device = db or get_database(device), get_normal_name(device)
+        
     return (db or get_databse()).get_device_attribute_property(
                                             device,attribute,prop)[prop]
     
@@ -647,6 +799,9 @@ def get_attributes_properties(device,attribute='*',db=None):
     For a single device, it returns all matching attribute 
     property values as dict
     """
+    if ':' in device:
+        db, device = db or get_database(device), get_normal_name(device)
+        
     db = db or get_database()
     dbd = get_database_device(db=db)
     attrs = dbd.DbGetDeviceAttributeList([device,attribute])
@@ -679,8 +834,12 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
                  db.get_device_property(d,properties))
                  for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
-def property_undo(dev,prop,epoch):
-    db = get_database()
+def property_undo(dev,prop,epoch,db=None):
+    """ Undo property change in the database """
+    if ':' in dev:
+        db, dev = db or get_database(dev), get_normal_name(dev)
+        
+    db = db or get_database()
     his = db.get_device_property_history(dev,prop)
     valids = [h for h in his if str2time(h.get_date())<epoch]
     news = [h for h in his if str2time(h.get_date())>epoch]
@@ -694,8 +853,12 @@ def property_undo(dev,prop,epoch):
         print('Property %s/%s not modified after %s'
               %(dev,prop,time2str(epoch)))
     
-def get_property_history(dev,prop):
-    db = get_database()
+def get_property_history(dev,prop,db=None):
+    """ Undo property history from the database """
+    if ':' in dev:
+        db, dev = db or get_database(dev), get_normal_name(dev)  
+        
+    db = db or get_database()
     his = db.get_device_property_history(dev,prop)
     return [(str2time(h.get_date()),h.get_value()) for h in his]
   
@@ -818,6 +981,8 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
     and None for unresponsive devices.
     """
     try:
+        import fandango.tango.search as fts
+        dev = fts.parse_tango_model(dev).devicemodel
         if full or admin:
             info = get_device_info(dev)
             if not info.exported:
@@ -1084,7 +1249,7 @@ def get_polled_attrs(device,others=None):
                                 map(float,device[1::2])))
     elif isinstance(device,DeviceProxy):
         attrs = device.get_attribute_list()
-        periods = [(a.lower(),int(dp.get_attribute_poll_period(a))) 
+        periods = [(a.lower(),int(device.get_attribute_poll_period(a))) 
                    for a in attrs]
         return CaselessDict((a,p) for a,p in periods if p)
     else:
