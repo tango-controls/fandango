@@ -33,6 +33,7 @@ import fandango as fn
 import fandango.tango as tango
 from fandango.log import printtest
 from fandango.tango import ProxiesDict
+from fandango.linos import get_memory
 from fandango.servers import ServersDict
 from fandango.dynamic import DynamicDS,DynamicDSClass,DynamicAttribute
 
@@ -50,9 +51,10 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
     Files can be tracked by any host, using get_all_hosts() and get_host_devices() methods.
     """
     
-    def __init__(self,mask=None):
+    def __init__(self,mask=None,char_mode=True):
         #mask = mask or 'FolderDS/*'
         self.mask = mask
+        self.char_mode = char_mode
         ProxiesDict.__init__(self)
         devs = tango.get_class_devices('FolderDS')
         extra = fn.get_database().get_class_property('FolderDS',['ExtraDevices'])
@@ -118,12 +120,29 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
             p,s = (filename.rsplit('.',1)) if '.' in filename else (filename,'')
             filename = '.'.join(filter(bool,(p,t,s)))
         d = self.get_device(device) #
-        if asynch:
-          d.command_inout_asynch('SaveFile',[filename,data],True)
-          r = len(data)
+        assert tango.check_device(d)
+        if fn.isSequence(data): data = '\n'.join(data)
+        
+        if self.char_mode:
+            cmd = 'SaveCharBuffer'
+            argin = filename+'\n'+data
+            #print(argin)
+            argin = map(ord,filename+'\n'+data)
+            #print(argin)
         else:
-          r = d.SaveFile([filename,data])
-        print('%s.SaveFile() : %s)'%(device,r))
+            cmd = 'SaveFile'
+            argin = [filename,data]
+        if asynch:
+            #d.command_inout_asynch('SaveFile',argin,True)
+            d.command_inout_asynch(cmd,argin,True)
+            r = len(data)
+        elif self.char_moode:
+            r = d.SaveCharBuffer(argin).split()[-1]
+        else:
+            r = d.SaveFile(argin)
+
+        print('%s.%s() : %s)'%(device,cmd,r))
+        print('mem: %s' % get_memory())
         return r
 
     def read(self,uri,filename=''):
@@ -181,9 +200,9 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #--------- Add you global variables here --------------------------
 
     def save_text_file(self,filename,data):
-        print('In FolderDS.save_text_file(%s,%d)'%(filename,sys.getsizeof(data)))
         #if self.SaveFolder and not filename.startswith('/'):
         filename = self.SaveFolder + '/' + filename #SAFER TO FORCE  ALWAYS PATH
+        print('In FolderDS.save_text_file(%s,%d)'%(filename,sys.getsizeof(data)))
         f = open(filename,'w')
         f.write(data)
         f.close()
@@ -242,7 +261,7 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #    Always excuted hook method
 #------------------------------------------------------------------
     def always_executed_hook(self):
-        print "In "+self.get_name()+ "::always_excuted_hook()"
+        #print "In "+self.get_name()+ "::always_excuted_hook()"
         DynamicDS.always_executed_hook(self)
 
 #==================================================================
@@ -269,6 +288,29 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
     def SaveFile(self,argin):
         df = getattr(self,self.DefaultMethod)
         return df(argin)
+    
+    def SaveCharBuffer(self,argin):
+        try:
+            print('In SaveCharBuffer([%s])' % len(argin))
+            #print(argin)
+            #print(''.join(map(chr,argin))) 
+            ix = 0
+            for i,c in enumerate(argin):
+                if int(c) in (0,ord('\n'),ord('\r')):
+                    ix = i
+                    break
+
+            assert ix,'filename not specified'
+            assert ix<32,'filename too long: %d'%i
+            filename,data = argin[:ix],argin[ix+1:]
+            filename = ''.join(map(chr,filename))
+            data = ''.join(map(chr,data))
+            print('Saving %d bytes to %s' % (len(data),filename))
+            #filename,data = argin[0],'\n'.join(argin[1:])
+            self.worker.put([self.save_text_file,filename,data])
+            return str(filename)+'\n'+str(len(data))
+        except:
+            traceback.print_exc()
         
     def SaveText(self,argin):
         filename,data = argin[0],'\n'.join(argin[1:])
@@ -324,6 +366,12 @@ class FolderDSClass(DynamicDSClass):
         'SaveFile':
             [[PyTango.DevVarStringArray, "filename,contents"],
             [PyTango.DevVarStringArray, "filename, size"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],           
+        'SaveCharBuffer':
+            [[PyTango.DevVarCharArray, "filename,contents"],
+            [PyTango.DevVarCharArray, "filename\nsize"],
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],        
