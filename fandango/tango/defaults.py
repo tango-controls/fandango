@@ -291,12 +291,18 @@ def get_device(dev,use_tau=False,keep=False):
             if TangoProxies and (dev in TangoProxies or keep):
                 return TangoProxies[dev]
             else: 
+                m = clmatch(retango,dev) 
+                if m and m.groupdict()['attribute']:
+                    dev = dev.rsplit('/',1)[0]
                 return PyTango.DeviceProxy(dev)
     elif isinstance(dev,PyTango.DeviceProxy) \
         or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
         return dev
     else:
         return None
+    
+def get_device_cached(dev):
+    return get_device(dev,keep=True)
 
 def get_database_device(use_tau=False,db=None): 
     global TangoDevice
@@ -324,9 +330,9 @@ def get_database_device(use_tau=False,db=None):
     
 class fakeAttributeValue(object):
     """ 
-    This class simulates a modifiable AttributeValue object 
+    This type simulates a modifiable AttributeValue object 
         (not available in PyTango)
-    It is the class used to read values from Dev4Tango devices 
+    It is the type used to read values from Dev4Tango devices 
         (valves, pseudos, composer, etc ...)
     It also has a read(cache) method to be used as a TaurusAttribute 
         or AttributeProxy (but it returns self if cache is not used)
