@@ -445,6 +445,26 @@ class fakeEvent(object):
         self.err=err
         self.errors=errors
         
+class EventCallback(object):
+    def __init__(self,device,hook=None):
+        self.proxy = get_device(device)
+        self.eid = None
+        self.hook = None
+    def subscribe(self,attribute='State',
+            event_type=PyTango.EventType.CHANGE_EVENT,
+            filters=[],stateless=False):
+        self.eid = self.proxy.subscribe_event(attribute,
+                        event_type,self,filters,stateless)
+        return self
+    def push_event(self,*args,**kwargs):
+        # Reimplement this method in subclasses
+        try:
+            if self.hook is not None:
+                return self.hook(self,*args,**kwargs)        
+        except:
+            print('EventCallback.hook(%s) failed!' % (self.hook))
+            traceback.print_exc()
+        
 ###############################################################################
 ## The ProxiesDict class, to manage DeviceProxy pools
 

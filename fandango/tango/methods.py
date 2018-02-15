@@ -534,18 +534,39 @@ def get_attribute_events(target,polled=True,throw=False):
         if throw: raise e
         return None
     
-def check_attribute_events(target,ev_type=PyTango.EventType.CHANGE_EVENT):
-    dev,attr = target.rsplit('/',1)
-    if check_device(dev):
-        try:
-            cb = lambda *args: None
-            dp = get_device(dev)
-            ei = dp.subscribe_event(attr,ev_type,cb)
-            dp.unsubscribe_event(ei)
-            return True
-        except:
-            traceback.print_exc()
-            return False 
+def check_attribute_events(model,ev_type=None):
+    """
+    This method expects model and a list of event types.
+    If empty, CHANGE and ARCHIVE events are tested.
+    
+    It will return a dictionary with:
+     - keys: available event types
+     - value: True for code-pushed events, int(period) for polled-based
+     
+    """
+    dev,attr = model.rsplit('/',1)
+    dp = get_device(dev)
+    ev_type = ev_type or (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT)
+    result = dict.fromkeys(toSequence(ev_type))
+    
+    if check_device(dp):
+        for ev_type in result.keys():
+            try:
+                def hook(self,*args,**kwargs):
+                    if self.eid is not None:
+                        self.proxy.unsubscribe_event(eid)
+                        
+                cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                period = dp.get_attribute_poll_period(attr) 
+                result[ev_type] = period or True
+            except:
+                #traceback.print_exc()
+                result.pop(ev_type)
+                
+            print('Subscribe(%s,%s): %s' % (
+                        attr,ev_type,result.get(ev_type,False)))
+
+        return result
     else:
         return None
     
@@ -981,17 +1002,21 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
     and None for unresponsive devices.
     """
     try:
-        import fandango.tango.search as fts
-        dev = fts.parse_tango_model(dev).devicemodel
-        if full or admin:
-            info = get_device_info(dev)
-            if not info.exported:
-                return False
-            if full and not check_host(info.host):
-                return False
-            if not check_device('dserver/%s'%info.server,full=False):
-                return False
-        dp = DeviceProxy(dev)
+        if isinstance(dev,DeviceProxy):
+            dp = dev
+        else:
+            import fandango.tango.search as fts
+            dev = fts.parse_tango_model(dev).devicemodel
+            if full or admin:
+                info = get_device_info(dev)
+                if not info.exported:
+                    return False
+                if full and not check_host(info.host):
+                    return False
+                if not check_device('dserver/%s'%info.server,full=False):
+                    return False
+            dp = DeviceProxy(dev)
+            
         dp.set_timeout_millis(int(timeout))
         dp.ping()
     except Exception,e:
