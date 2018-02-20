@@ -835,12 +835,11 @@ class ServersDict(CaselessDict,Object):
         
     def set_server_level(self,server_name,host,level):
         """ It executes a DbPutServerInfo command in dbserver device. """
-        print 'DUE TO export_device ISSUES THIS METHOD IS NOT SUITABLE FOR ADDING NEW SERVERS, USE devs2starter.jy INSTEAD'
         mode = 1 if host or level else 0
         host = host.split('.')[0].strip() or 'localhost' if mode else ''
         level = int(level) if level else 0
         dbserver = self.get_db_device()
-        print 'ServersDict.set_server_level(%s,%s,%s)'%(server_name,host,level)
+        print('ServersDict.set_server_level(%s,%s,%s)'%(server_name,host,level))
         dbserver.DbPutServerInfo([str(s) for s in (server_name,host,mode,level)])
         if server_name in self: self[server_name].update_level(host,level)
         if host: self.get_host_starter(host).UpdateServersInfo()
