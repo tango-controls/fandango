@@ -268,6 +268,15 @@ class TangoEval(object):
     def trace(self,msg):
         if self._trace: print('TangoEval: %s'%str(msg))
         
+    def keys(self):
+        return self._locals.keys()
+    
+    def getter(self,key):
+        return self._locals.get(key,None)
+    
+    def setter(self,key,value):
+        self._locals[key] = value
+        
     def set_timeout(self,timeout):
         self.timeout = int(timeout)
         self.trace('timeout: %s'%timeout)
