@@ -1072,7 +1072,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 print('\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%(formula,),]))
             s = traceback.format_exc()
             self.error(s)
-            raise Exception(s)
+            raise e #Exception(s)
         finally:
             self._locals['ATTRIBUTE'] = ''
 
