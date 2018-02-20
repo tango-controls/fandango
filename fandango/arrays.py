@@ -395,13 +395,22 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     (crosschecked with 1e6 samples against the 
     PyTangoArchiving.utils.decimate_array method using numpy)
     """
+    if 1: #trace: 
+        print('filter_array([%d],w=%f' % (len(data),window))
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
-    tfloor = lambda x: int(fun.floor(x,window))
     begin,end,window = map(float,((begin,end,window)))
-    
-    if window < 1.:
-        # ranges only accept integers, so the minimum window is 1
-        window = 1.
+    try:
+        assert window<1.
+        import numpy
+        ranger = numpy.arange
+        tfloor = lambda x: float(fun.floor(x,window))
+        print('using numpy')
+    except:
+        ranger = range
+        tfloor = lambda x: int(fun.floor(x,window))
+        if window < 1.:
+            print('ranges only accept integers, so the minimum window is 1')
+            window = 1.
     
     #CUT-OFF; removing data out of interval    
     #--------------------------------------------------------------------------
@@ -426,22 +435,22 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         else:
             j = (j for j,v in enumerate(data) if v[0]>end).next()
             post,data = data[j],data[:j]
-    if trace: print 'prev,post: %s,%s'%(prev,post)
+    if trace: print('prev,post: %s,%s'%(prev,post))
     
     if not data:
         if prev or post:
             nx = prev and prev[1] or post[1]
-            return [(t,nx) for t in range(tfloor(begin)+window,end,window)]\
-                +[(tfloor(end)+window,post and post[1] or nx)]
+            return ([(t,nx) for t in ranger(tfloor(begin)+window,end,window)]+
+                    [(tfloor(end)+window,post and post[1] or nx)])
         else: return []
     
     #Filling initial range with data
     #--------------------------------------------------------------------------
     if begin:
         nx =  prev and prev[1] or data[0][1]
-        ndata = [(tt+window,nx) for tt in range(tfloor(begin),
+        ndata = [(tt+window,nx) for tt in ranger(tfloor(begin),
                                                 tfloor(data[0][0]),window)]
-        if trace: print 'prev: %s'%str(ndata and ndata[-1])
+        if trace: print('prev: %s'%str(ndata and ndata[-1]))
     else: 
         ndata =[]
     
@@ -450,11 +459,12 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     i,i0 = 0,0
     next = []
     ilast = len(data)-1
-    if trace: print 't0: %s' % (window+tfloor(data[0][0]-1))
+    if trace: print('t0: %s' % (window+tfloor(data[0][0]-1)))
     try:
-        for t in range(int(window+tfloor(data[0][0]-1)),
-                       int(1+window+tfloor(max((end,data[-1][0])))),
-                       int(window)):
+        rb,re,rs = window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window
+        if ranger == range:
+            rb,re,rs = int(rb),int(re),int(rs)
+        for t in ranger(rb,re,rs):
             if i<=ilast:
                 if data[i][0]>t:
                     #Filling "whitespace" with last data
@@ -491,7 +501,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
               % (i0,i,ilast,filling,data[i0:i]))
         print('\t %s' % str(ndata and ndata[-1]))
         print('\t %s'  % str(ndata and ndata[-1] and ndata[-1][-1]))
-        #traceback.print_exc()
+        traceback.print_exc()
         raise Exception(e) #traceback.format_exc())
     
     return ndata
