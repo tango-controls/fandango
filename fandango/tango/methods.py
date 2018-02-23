@@ -184,12 +184,14 @@ def get_real_name(dev,attr=None):
         if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
     return None
 
-def get_full_name(model):
+def get_full_name(model,fqdn=None):
     """ 
     Returns full schema name as needed by HDB++ api
     """
+    if fqdn is None: 
+        fqdn = fandango.tango.defaults.USE_FQDN
     if ':' not in model:
-      model = get_tango_host()+'/'+model
+      model = get_tango_host(fqdn=fqdn)+'/'+model
     if not model.startswith('tango://'):
       model = 'tango://'+model
     return model
@@ -220,6 +222,8 @@ def get_model_name(model):
         
 def parse_tango_model(name, use_host=False, fqdn=None, *args, **kwargs):
     """
+    THIS METHOD SEEMS QUITE SLOW, USE get_normal/full_name WHEN POSSIBLE
+    
     parse_tango_model('bt/DI/bpm-01/MaxADC',use_host=False,fqdn=False).items()
         ('attribute', 'MaxADC')
         ('attributename', 'maxadc')
