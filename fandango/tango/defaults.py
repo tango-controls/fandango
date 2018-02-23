@@ -173,6 +173,7 @@ AC_PARAMS = [
 global TangoDatabase,TangoDevice,TangoProxies
 TangoDatabase,TangoDevice,TangoProxies = None,None,None
 
+@Cached(depth=100,expire=60)
 def get_tango_host(dev_name='',use_db=False, fqdn=None):
     """
     If device is a tango model, it will extract the host from the model URL
