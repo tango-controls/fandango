@@ -11,6 +11,14 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+13.6.0 - February 2017
+----------------------
+Solve mem leak in FolderDS, add SaveCharBuffer() command
+Add fandango.tango.check_attribute_events()
+Caches added to get_tango_host and get_device
+Add getter/setter methods to TangoEval
+Decimation < 1 s
+
 13.5.2 - January 2017
 ---------------------
 
