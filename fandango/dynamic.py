@@ -1848,8 +1848,10 @@ class DynamicDSType(object):
         self.dimx=dimx
         self.dimy=dimy
     def match(self,expr):
+        expr = expr.strip()
         for l in self.labels:
-            if re.match(l.replace('(','\(').replace('[','\[')+'[\(,]',expr):
+            t = l.replace('(','\(').replace('[','\[')+'[\(,]'
+            if re.match(t,expr) or expr.startswith(l):
                 return True
         return False
 
