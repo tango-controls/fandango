@@ -99,6 +99,7 @@ from objects import self_locked
 from dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
 from log import Logger,shortstr
 import functional as fun
+from functional import clmatch, kmap, isSequence, isCallable, isMapping, isString
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 if getattr(PyTango,'__version_number__',0)<722:
@@ -391,44 +392,61 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         It has to be used as subclasses may not include all Dynamic* properties in their class generation.
         It is used by self.updateDynamicAttributes() and required in PyTango<3.0.4
         """
-        self.info('In get_DynDS_properties(): updating DynamicDS properties from Database')
+        print('#'*80)
+        self.warning('In get_DynDS_properties(): updating DynamicDS properties from Database')
         ## THIS FUNCTION IS USED FROM updateDynamicAttributes
         self.get_device_properties(self.get_device_class()) #It will reload all subclass specific properties (with its own default values)
         self._db = db or self.get_db()
+        
         if self.LogLevel: 
             try: self.setLogLevel(self.LogLevel)
             except: self.warning('Unable to setLogLevel(%s)'%self.LogLevel)
+            
         #Loading DynamicDS specific properties (from Class and Device)
         for method,target,config in (
-            (self._db.get_class_property,self.get_device_class().get_name(),DynamicDSClass.class_property_list),
-            (self._db.get_device_property,self.get_name(),dict(list(DynamicDSClass.device_property_list.items())+[('polled_attr',[PyTango.DevVarStringArray,[]])])),
+                (self._db.get_class_property,self.get_device_class().get_name(),DynamicDSClass.class_property_list),
+                (self._db.get_device_property,self.get_name(),
+                dict(list(DynamicDSClass.device_property_list.items())+[('polled_attr',[PyTango.DevVarStringArray,[]])])),
             ):
             #Default property values already loaded in __init__; here we are just updating
             props = [(prop,value) for prop,value in method(target,list(config)).items() if value]
             for prop,value in props:
+                self.warning('get_DynDS_properties(%s,%s)' % (prop,value))
                 #Type of each property is adapted to python types
                 dstype = DynamicDSTypes.get(str(config[prop][0]),DynamicDSType('','',pytype=list))
-                try: value = dstype.pytype(value if dstype.dimx>1 or dstype.dimy>1 else value[0])
+                try: 
+                    value = dstype.pytype(value if dstype.dimx>1 or dstype.dimy>1 else value[0])
                 except Exception,e:
-                    self.info('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
+                    self.warning('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
                     value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
                     
                 if prop=='polled_attr': 
                   self._polled_attr_ = tango.get_polled_attrs(value)
-                
+                  
+                elif prop.lower() == 'checkdependencies':
+                    if isSequence(value) and len(value)==1:
+                        value = value[0]
+                    if isString(value) and value.lower().strip() in ('no','false',''):
+                        self.CheckDependencies = False
+                    else:
+                        self.CheckDependencies = dict(t.split(':',1) for t in value)
                 else: 
                   #APPLYING @COPY/@FILE property extensions
                   setattr(self,prop,self.check_property_extensions(prop,value))
                   
             self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
             [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
+            
         if self.UseTaurus:
             self.UseTaurus = (tango.TAU or tango.loadTaurus()) and self.UseTaurus
+            
         if self.LoadFromFile:
             DynamicDS.load_from_file(device=self)
+            
         #Adding Static Attributes if defined in the SubClass
         if getattr(self,'StaticAttributes',None):
             self.parseStaticAttributes(add=True,keep=True)
+            
         return
         
     def get_device_property(self,property,update=False):
@@ -635,6 +653,42 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         except: #Needed to prevent fails if attribute_config_3 is not available
             print(traceback.format_exc())
         return False
+    
+    def check_dependencies(self, aname):
+        #Checking attribute dependencies
+        if aname not in self.dyn_values:
+            aname,formula,compiled = self.get_attr_formula(aname,full=True)
+            
+        if self.CheckDependencies and aname in self.dyn_values:
+            
+            if self.dyn_values[aname].dependencies is None:
+                self.debug("In evalAttr ... setting dependencies")
+                self.dyn_values[aname].dependencies = set()
+                a = aname.lower().strip()
+                formula = self.dyn_values[aname].formula
+                fs = (formula+'\n'+self.dyn_qualities.get(a,'')).lower()
+
+                # Get dependencies from existing attributes
+                for k,v in self.dyn_values.items():
+                    ks = k.lower().strip()
+                    if a==ks: 
+                        continue
+                    if ks in fun.re.split("[^'\"_0-9a-zA-Z]",fs): 
+                        #fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula):
+                        self.dyn_values[aname].dependencies.add(k) 
+                        #Dependencies are case sensitive
+                        self.dyn_values[k].keep = True
+                        
+                if isMapping(self.CheckDependencies):
+                    for k,v in self.CheckDependencies.items():
+                        if clmatch(k,aname) or clmatch(k,formula):
+                            self.dyn_values[aname].dependencies.add(v)
+            
+            r = self.dyn_values[aname].dependencies
+        else:
+            r = None
+        self.info('check_dependencies(%s): %s' % (aname,r))
+        return r
         
     #------------------------------------------------------------------------------------------------------
     #   Attribute creators and read_/write_ related methods
@@ -704,7 +758,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if aname not in self.dyn_values:
                     create = True
                     self.dyn_values[aname]=DynamicAttribute()
-                    self.dyn_values[aname].keep = self.KeepAttributes and (not 'no' in self.KeepAttributes) and any(q.lower() in self.KeepAttributes for q in [aname,'*','yes','true'])
+                    self.dyn_values[aname].keep = (self.KeepAttributes and 
+                        (not 'no' in self.KeepAttributes) and any(q.lower() 
+                        in self.KeepAttributes for q in [aname,'*','yes','true']))
                     self.dyn_types[aname]=None
                 else: 
                     self.info('\tAttribute %s already exists'%(aname,))
@@ -724,25 +780,35 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                   setattr(self,is_allowed.__name__,is_allowed)
                 
                 max_size = hasattr(self,'DynamicSpectrumSize') and self.DynamicSpectrumSize
-                AttrType = PyTango.AttrWriteType.READ_WRITE if 'WRITE' in fun.re.split('[\[\(\]\)\ =,\+]',formula) else PyTango.AttrWriteType.READ
+                AttrType = (PyTango.AttrWriteType.READ_WRITE 
+                                if 'WRITE' in fun.re.split('[\[\(\]\)\ =,\+]',formula) 
+                                else PyTango.AttrWriteType.READ)
+                
                 for typename,dyntype in DynamicDSTypes.items():
                     if dyntype.match(formula):
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
                         if formula.startswith(typename+'('): #DevULong should not match DevULong64
                             formula=formula.lstrip(typename)
                         self.debug('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
+                        
                         if dyntype.dimx==1:
-                            if (create): self.add_attribute(PyTango.Attr(aname,dyntype.tangotype, AttrType), \
-                                self.read_dyn_attr,self.write_dyn_attr,is_allowed)
-                                #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
+                            if (create): 
+                                self.add_attribute(PyTango.Attr(aname,dyntype.tangotype, AttrType),
+                                    self.read_dyn_attr,self.write_dyn_attr,is_allowed)
+                                    #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
                         elif dyntype.dimy==1:
-                            if (create): self.add_attribute(PyTango.SpectrumAttr(aname,dyntype.tangotype, AttrType,max_size or dyntype.dimx), \
-                                self.read_dyn_attr,self.write_dyn_attr,is_allowed)
-                                #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
+                            if (create): 
+                                self.add_attribute(PyTango.SpectrumAttr(aname,dyntype.tangotype, 
+                                                            AttrType,max_size or dyntype.dimx),
+                                    self.read_dyn_attr,self.write_dyn_attr,is_allowed)
+                                    #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
                         else:
-                            if (create): self.add_attribute(PyTango.ImageAttr(aname,dyntype.tangotype, AttrType,max_size or dyntype.dimx,max_size or dyntype.dimy), \
-                                self.read_dyn_attr,self.write_dyn_attr,is_allowed)
-                                #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
+                            if (create): 
+                                self.add_attribute(PyTango.ImageAttr(aname,dyntype.tangotype, AttrType,
+                                                    max_size or dyntype.dimx,max_size or dyntype.dimy),
+                                    self.read_dyn_attr,self.write_dyn_attr,is_allowed)
+                                    #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
+                        
                         self.dyn_types[aname]=dyntype
                         break
 
@@ -783,6 +849,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     if aname.lower() in new_polled_attrs: 
                       #THIS IS CONFIGURING EVENTS TO BE "MANUAL", pushed and unfiltered by Jive settings
                       self.set_change_event(aname,True,False)
+                      self.set_archive_event(aname,True,False)
                     else: new_polled_attrs.add(aname.lower())
                 elif self.dyn_values[aname].keep:
                     self._locals[aname] = None
@@ -797,7 +864,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if '*' in exp and '.*' not in exp: exp=exp.replace('*','.*')
                 if not exp.endswith('$'): exp+='$'
                 exprs[exp] = value
+                
             for aname in self.dyn_values.keys():
+                
                 for exp,value in exprs.items():
                     try:
                         match = re.match(exp,aname)
@@ -809,6 +878,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     except Exception,e:
                         self.warning('In dyn_attr(qualities), re.match(%s(%s),%s(%s)) failed' % (type(exp),exp,type(aname),aname))
                         print(traceback.format_exc())
+                        
+        if self.CheckDependencies:
+            [self.check_dependencies(aname) for aname in self.dyn_values.keys()]
                         
         #Setting up state events:
         #THESE SETTINGS MAY BE NO LONGER NEEDED IN TANGO >= 7
@@ -965,19 +1037,20 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         aname,formula,compiled = self.get_attr_formula(aname,full=True)
         
         try:
-            #Checking attribute dependencies
+            ##Checking attribute dependencies
             if self.CheckDependencies and aname in self.dyn_values:
-                if self.dyn_values[aname].dependencies is None:
-                    self.debug("In evalAttr ... setting dependencies")
-                    self.dyn_values[aname].dependencies = set()
-                    a = aname.lower().strip()
-                    fs = (formula+'\n'+self.dyn_qualities.get(a,'')).lower()
-                    for k,v in self.dyn_values.items():
-                        ks = k.lower().strip()
-                        if a==ks: continue
-                        if ks in fun.re.split("[^'\"_0-9a-zA-Z]",fs): #fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula):
-                            self.dyn_values[aname].dependencies.add(k) #Dependencies are case sensitive
-                            self.dyn_values[k].keep = True
+                #if self.dyn_values[aname].dependencies is None:
+                    #self.debug("In evalAttr ... setting dependencies")
+                    #self.dyn_values[aname].dependencies = set()
+                    #a = aname.lower().strip()
+                    #fs = (formula+'\n'+self.dyn_qualities.get(a,'')).lower()
+                    #for k,v in self.dyn_values.items():
+                        #ks = k.lower().strip()
+                        #if a==ks: continue
+                        #if ks in fun.re.split("[^'\"_0-9a-zA-Z]",fs): #fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula):
+                            #self.dyn_values[aname].dependencies.add(k) #Dependencies are case sensitive
+                            #self.dyn_values[k].keep = True
+                            
                 #Updating Last Attribute Values
                 if self.dyn_values[aname].dependencies:
                     now = time.time()
@@ -1035,11 +1108,14 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 date = self.get_date_for_attribute(aname,result)
                 has_events = self.check_attribute_events(aname)
                 value = self.dyn_types[aname].pytype(result)
+                
                 #Events must be checked before updating the cache
                 if has_events and self.check_changed_event(aname,result):
                     self.info('>'*80)
                     self.info('Pushing %s event!: %s(%s)'%(aname,type(result),shortstr(result)))
                     self.push_change_event(aname,value,date,quality)
+                    self.push_archive_event(aname,value,date,quality)
+                    
                 #Updating the cache:
                 keep = self.dyn_values[aname].keep or has_events
                 if keep: 
@@ -1249,7 +1325,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                                 #If Attribute has events evalAttr() will be called at every event_received
                                 #If there's no events, then will be not necessary
                                 self.info('\t%s.addListener(%s)'%(full_name,self._locals['ATTRIBUTE']))
-                                if tango.get_model_name(a) not in self._external_listeners: self._external_listeners[tango.get_model_name(a)]=set()
+                                if tango.get_model_name(a) not in self._external_listeners: 
+                                    self._external_listeners[tango.get_model_name(a)]=set()
+                                    
                                 self._external_listeners[tango.get_model_name(a)].add(self._locals['ATTRIBUTE'])
                             self._external_attributes[full_name].addListener(self.event_received)
                         else: 
@@ -1733,9 +1811,9 @@ class DynamicDSClass(PyTango.DeviceClass):
             "The device server will wait this time in milliseconds before starting.",
             [ 1000 ] ],
         'CheckDependencies':
-            [PyTango.DevBoolean,
+            [PyTango.DevVarStringArray,
             "This property manages if dependencies between attributes are used to check readability.",
-            [True] ],
+            ['True'] ],
         'UseEvents':
             [PyTango.DevVarStringArray,
             "Value of this property will be yes/true,no/false or a list of attributes that will trigger push_event (if configured from jive)",
