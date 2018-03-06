@@ -52,6 +52,10 @@ import PyTango
 from PyTango import AttrQuality,EventType,DevState,AttrDataFormat,\
   AttrWriteType,CmdArgType,AttributeProxy,DeviceProxy, AttReqType
 
+try:
+    from PyTango.utils import EventCallBack
+except: pass
+
 if 'Device_4Impl' not in dir(PyTango):
     PyTango.Device_4Impl = PyTango.Device_3Impl
 
