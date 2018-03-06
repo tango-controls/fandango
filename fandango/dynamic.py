@@ -93,18 +93,22 @@ This Module includes several classes:
 import PyTango,sys,threading,time,traceback,re,inspect
 from PyTango import AttrQuality,DevState
 
-import fandango,tango,objects
-from excepts import *
-from objects import self_locked
-from dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
-from log import Logger,shortstr
-import functional as fun
-from functional import clmatch, kmap, isSequence, isCallable, isMapping, isString
+import fandango
+import fandango.tango as tango
+import fandango.objects as objects
+from fandango.excepts import *
+from fandango.objects import self_locked, Cached
+from fandango.dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
+from fandango.log import Logger,shortstr
+import fandango.functional as fun
+from fandango.functional import clmatch, clsearch, clsub, kmap, isSequence, \
+    isCallable, isMapping, isString
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 if getattr(PyTango,'__version_number__',0)<722:
     USE_STATIC_METHODS = True
-    print('PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' % (PyTango.__version__,USE_STATIC_METHODS))
+    print('PyTango Version is %s: fandango.dynamic.USE_STATIC_METHODS = %s' \
+        % (PyTango.__version__,USE_STATIC_METHODS))
 else: 
     USE_STATIC_METHODS = False
 
@@ -183,6 +187,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
         self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
         self.last_state_exception = ''
+        self.last_state_change = 0
         self.last_attr_exception = None
         self._init_count = 0
         self._hook_epoch = 0
@@ -482,7 +487,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     @staticmethod
     def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS):
         return tango.check_property_extensions(prop,value,extensions=DynamicDS.EXTENSIONS,db=DynamicDS.get_db(),filters=DynamicDSClass.device_property_list)
-            
+          
+    @Cached(depth=200,expire=15.)
     def get_polled_attrs(self,load=False):
         #@TODO: Tango8 has its own get_polled_attr method; check for incompatibilities
         if load or not getattr(self,'_polled_attr_',None):
@@ -600,17 +606,26 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.error('DynamicDS.attribute_polling_report() failed!\n%s'%traceback.format_exc())
         self.info('-'*80)
         
+    @Cached(depth=200,expire=15.)
     def check_attribute_events(self,aname,poll=False):
-        self.UseEvents = [u.lower().strip() for u in self.UseEvents]
+        self.UseEvents = [u.strip() for u in self.UseEvents]
         self.debug('check_attribute_events(%s,%s,%s)'%(aname,poll,self.UseEvents))
-        if not len(self.UseEvents): return False
-        elif self.UseEvents[0].lower().strip() in ('','no','false'): return False
+        if not len(self.UseEvents):             
+            return False
+        elif self.UseEvents[0].lower().strip() in ('','no','false'): 
+            return False
         elif aname.lower().strip() == 'state': 
             return True
-        elif any(fun.matchCl(s,aname) for s in self.UseEvents): return True #Attrs explicitly set doesn't need event config
-        elif self.UseEvents[0] in ('yes','true') and any(self.check_events_config(aname)): return True
-        else: return False
+        elif clmatch('(yes|true)$',self.UseEvents[0]) and any(self.check_events_config(aname)): 
+            return True
+        else:
+            for s in self.UseEvents:
+                s,e = s.split(':',1) if ':' in s else (s,'True')
+                if clmatch(s,aname):
+                    return eval(clsub('(true|push|yes)','True',e))
+        return False
     
+    @Cached(depth=200,expire=15.)
     def check_events_config(self,aname):
         cabs,crel = 0,0
         try:
@@ -654,6 +669,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             print(traceback.format_exc())
         return False
     
+    @Cached
     def check_dependencies(self, aname):
         #Checking attribute dependencies
         if aname not in self.dyn_values:
@@ -687,7 +703,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             r = self.dyn_values[aname].dependencies
         else:
             r = None
-        self.info('check_dependencies(%s): %s' % (aname,r))
+        self.debug('check_dependencies(%s): %s' % (aname,r))
         return r
         
     #------------------------------------------------------------------------------------------------------
@@ -734,7 +750,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.debug( self.get_name()+".dyn.attr(): Unknown State: %s"%(line,))
         
         #Attributes may be added to polling if having Events
-        new_polled_attrs = set(self.get_polled_attrs().keys())
+        new_polled_attrs = CaselessDict(self.get_polled_attrs().items())
         self.info('In %s.dyn_attr(): inspecting %d attributes ...' %(self.get_name(),len(self.DynamicAttributes)))
         for line in self.DynamicAttributes:
             if not line.strip() or line.strip().startswith('#'): continue
@@ -844,13 +860,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self.info("DynamicDS.dyn_attr(...): Attribute %s added to attributes queue for State %s"%(aname,k))
                         
                 #Setting up change events:
-                if self.check_attribute_events(aname):
+                c = self.check_attribute_events(aname) 
+                if c :
                     self._locals[aname] = None
-                    if aname.lower() in new_polled_attrs: 
-                      #THIS IS CONFIGURING EVENTS TO BE "MANUAL", pushed and unfiltered by Jive settings
-                      self.set_change_event(aname,True,False)
-                      self.set_archive_event(aname,True,False)
-                    else: new_polled_attrs.add(aname.lower())
+                    if c is True:# or aname.lower() in new_polled_attrs:
+                        #THIS IS CONFIGURING EVENTS TO BE "MANUAL", pushed and unfiltered by Jive settings
+                        self.set_change_event(aname,True,False)
+                        self.set_archive_event(aname,True,False)
+                    elif fun.isNumber(c) and aname not in new_polled_attrs:
+                        new_polled_attrs[aname] = int(c)
                 elif self.dyn_values[aname].keep:
                     self._locals[aname] = None
                 
@@ -866,7 +884,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 exprs[exp] = value
                 
             for aname in self.dyn_values.keys():
-                
                 for exp,value in exprs.items():
                     try:
                         match = re.match(exp,aname)
@@ -882,16 +899,16 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         if self.CheckDependencies:
             [self.check_dependencies(aname) for aname in self.dyn_values.keys()]
                         
-        #Setting up state events:
-        #THESE SETTINGS MAY BE NO LONGER NEEDED IN TANGO >= 7
-        if self.check_attribute_events('State'): 
-            if 'state' in new_polled_attrs: #Already polled
-                self.warning('State events will be managed always by polling') 
-                self.set_change_event('State',True,False) #Implemented, don't check conditions to push
-            else: new_polled_attrs.add('state') #To be added at next restart
+        ##Setting up state events:
+        #THESE SETTINGS ARE STILL NEEDED IN TANGO >= 7
+        c = self.check_attribute_events('State')
+        if c and 'state' not in new_polled_attrs:
+            #To be added at next restart
+            self.warning('State events are always managed by polling (%s)'%c) 
+            new_polled_attrs['state'] = int(c) if fun.isNumber(c) else self.DEFAULT_POLLING_PERIOD
         
         try:
-            self.check_polled_attributes(new_attr=dict.fromkeys(new_polled_attrs,self.DEFAULT_POLLING_PERIOD))
+            self.check_polled_attributes(new_attr=new_polled_attrs)
         except:
             print('DynamicDS.dyn_attr( ... ), unable to set polling for (%s): \n%s'%(new_polled_attrs,traceback.format_exc()))
         
@@ -983,7 +1000,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 
         except Exception, e:           
             now=time.time()
-            self.dyn_values[aname].update(e,now,PyTango.AttrQuality.ATTR_INVALID) #Exceptions always kept!
+            self.dyn_values[aname].update(e,now,AttrQuality.ATTR_INVALID) #Exceptions always kept!
             self._last_period[aname]=now-self._last_read.get(aname,0)
             self._last_read[aname]=now
             self._read_times[aname]=now-self._hook_epoch #Internal debugging
@@ -1418,15 +1435,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         try:
             if aname.lower() in self.dyn_qualities:
                 self._locals['VALUE'] = getattr(attr_value,'value',attr_value)
-                self._locals['DEFAULT'] = getattr(attr_value,'quality',PyTango.AttrQuality.ATTR_VALID)
-                quality = eval(formula,{},self._locals) or PyTango.AttrQuality.ATTR_VALID
+                self._locals['DEFAULT'] = getattr(attr_value,'quality',AttrQuality.ATTR_VALID)
+                quality = eval(formula,{},self._locals) or AttrQuality.ATTR_VALID
             else:
-                quality =  getattr(attr_value,'quality',PyTango.AttrQuality.ATTR_VALID)
+                quality =  getattr(attr_value,'quality',AttrQuality.ATTR_VALID)
             self.debug('\t%s.quality = %s'%(aname,quality))
             return quality
         except Exception,e:
             self.error('Unable to generate quality for attribute %s: %s\n%s'%(aname,formula,traceback.format_exc()))
-            return PyTango.AttrQuality.ATTR_VALID
+            return AttrQuality.ATTR_VALID
 
     def get_date_for_attribute(self,aname,value):
         if type(value) is DynamicAttribute:
@@ -1504,14 +1521,26 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         return state
 
     def set_state(self,state,push=False):
-        self._locals['STATE']=state
+        now = time.time()
+        old,self._locals['STATE'] = self._locals.get('STATE',None),state
+        if self.last_state_change < now-self.DEFAULT_POLLING_PERIOD/1e3:
+            old = None
         try:
-            if push and self.check_attribute_events('state'): 
-                self.info('DynamicDS(%s.set_state(): pushing new state event'%(self.get_name()))
-                try: self.push_change_event('State',state,time.time(),PyTango.AttrQuality.ATTR_VALID)
-                except Exception,e: self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
+            if old!=state:
+                self.last_state_change = now
+                if push and self.check_attribute_events('state'): 
+                    self.info('DynamicDS(%s.set_state(): pushing new state event'%(self.get_name()))
+                    try: 
+                        self.push_change_event('State',state,now,
+                                               AttrQuality.ATTR_VALID)
+                        self.push_archive_event('State',state,now,
+                                                AttrQuality.ATTR_VALID)
+                    except Exception,e: 
+                        self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
         except Exception,e: 
             self.warning('DynamicDS.check_attribute_events(State=%s) failed!: %s'%(state,e))
+        
+            
         DynamicDS.get_parent_class(self).set_state(self,state)
 
     def check_state(self,set_state=True,current=None):
@@ -2031,8 +2060,8 @@ class DynamicAttribute(object):
     ''' This class provides a background for dynamic attribute management and interoperativity
         Future subclasses could override the operands of the class to manage quality and date modifications
     '''
-    qualityOrder = [PyTango.AttrQuality.ATTR_VALID,PyTango.AttrQuality.ATTR_CHANGING,PyTango.AttrQuality.ATTR_WARNING,
-                PyTango.AttrQuality.ATTR_ALARM,PyTango.AttrQuality.ATTR_INVALID]
+    qualityOrder = [AttrQuality.ATTR_VALID, AttrQuality.ATTR_CHANGING, AttrQuality.ATTR_WARNING,
+                AttrQuality.ATTR_ALARM, AttrQuality.ATTR_INVALID]
 
     def __init__(self,value=None,date=0.,quality=AttrQuality.ATTR_VALID):
         self.value=value
