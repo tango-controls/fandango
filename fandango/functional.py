@@ -720,7 +720,10 @@ def toStringList(seq):
     return map(toString,seq)
 
 def str2list(s,separator='',regexp=False,sep_offset=0): 
-    """ Arguments allow to split by regexp and to keep or not the separator character 
+    """ 
+    Convert a single string into a list of strings
+    
+    Arguments allow to split by regexp and to keep or not the separator character 
     sep_offset = 0 : do not keep
     sep_offset = -1 : keep with posterior
     sep_offset = 1 : keep with precedent
@@ -746,6 +749,9 @@ def str2list(s,separator='',regexp=False,sep_offset=0):
       return r
     
 def code2atoms(code):
+    """
+    Obtain individual elements of a python code
+    """
     begin = '[\[\(\{]'
     end = '[\]\)\}]'
     #ops = '[,]'
@@ -757,6 +763,7 @@ def code2atoms(code):
     return l1
     
 def shortstr(s,max_len=144,replace={'\n':';'}):
+    """ Obtain a shorter string """
     s = str(s)
     for k,v in replace.items():
         s = s.replace(k,v)
@@ -765,10 +772,36 @@ def shortstr(s,max_len=144,replace={'\n':';'}):
     return s
 
 def text2list(s,separator='\n'):
+    """ Return only non empty words of a text """
     return filter(bool,str2list(s,separator))
 
-def str2lines(s,length=80,separator='\n'):
-    return separator.join(s[i:i+length] for i in range(0,len(s),length))
+def str2lines(s,length=80,joiner='\n'):
+    """ Convert string into a multiline text of the same length """
+    return joiner.join(s[i:i+length] for i in range(0,len(s),length))
+
+def list2lines(s,multiline='\\',joiner='\n',comment='#'):
+    """ 
+    Joins every element of the list ending in multiline character,
+    if joiner, returns the result as a single string.
+    if comment, it will escape the comments until the end of the line
+    """
+    if not isSequence(s): return s
+    #print('list2lines(%s)'%'\n'.join(s))
+    nl = []
+    for l in s:
+        if comment:
+            l = l.split(comment)[0]
+        l = l.strip()
+        if nl and nl[-1].endswith(multiline):
+            nl[-1] = nl[-1][:-1]+l
+        else:
+            nl.append(l)
+            
+    if joiner:
+        nl = joiner.join(nl)
+    
+    print('list2lines: done')
+    return nl
 
 def list2str(s,separator='\t',MAX_LENGTH=0):
     s = str(separator).join(str(t) for t in s)
