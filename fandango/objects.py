@@ -772,7 +772,7 @@ class Cached(Decorator):
     
     def decorate(self,target):
         if isCallable(target):
-            self._log('decorate(%s)'%str(target))
+            #self._log('decorate(%s)'%str(target))
             self.f = target
             #self.call = wraps(self.f)(self.__call__) #Not for methods!!
             functools.update_wrapper(self,self.f)
@@ -784,7 +784,8 @@ class Cached(Decorator):
         expire = time.time()-notNone(expire,self.expire)
         cache = sorted(k for k in self.cache if k[0]>expire)
         if (len(cache)!=len(self.cache) or len(cache)>self.depth):
-            self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
+            #self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
+            pass
             
         self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
         return sorted(self.cache.keys())
@@ -793,7 +794,7 @@ class Cached(Decorator):
         self.cache.clear()
         
     def execute(self,*args,**kwargs):
-        self._log('__call__(%s,%s)'%(args,kwargs))
+        #self._log('__call__(%s,%s)'%(args,kwargs))
         v,match,expire = None,None,self.expire
         
         try:
@@ -815,13 +816,13 @@ class Cached(Decorator):
             
             if match:
                 v = self.cache[match]
-                self._log('(%s,%s) was in cache: %s'%(args,kwargs,v))
+                #self._log('(%s,%s) was in cache: %s'%(args,kwargs,v))
             else:
                 try:
                     v = self.f(*args,**kwargs)
                 except Exception,e:
                     v = e
-                self._log('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
+                #self._log('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
                 try:
                     self.cache[key] = v
                 except:
