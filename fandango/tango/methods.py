@@ -944,8 +944,20 @@ EXTENSIONS = {'@COPY:':_copy_extension,
               '@ATTR:':_attr_extension}
 
 def check_property_extensions(prop,value,db=None,
-                              extensions=EXTENSIONS,filters=[]):
+        extensions=EXTENSIONS,filters=[],multiline='\\',
+        compact=False):
+    """
+    This method is intended to allow multiline properties and 
+    apply @COPY, @FILE, @ATTR macros in properties declaration, 
+    to obtain property values from the database or stored files.
+    
+    DynamicDS adds its own extensions
+    """
     db = db or get_database()
+    if multiline and isSequence(value) and len(value) and isString(value[0]): 
+        value = list2lines(value,multiline=multiline,comment='#',joiner=False)
+        #print('\n'.join(value))
+        
     if ((not filters or prop in filters) and fandango.isSequence(value) 
         and any(str(s).startswith(e) for e in extensions for s in value)):
         parsed,get_arg = [],(lambda x:x.split(':',1)[-1].split('#')[0])
@@ -962,9 +974,11 @@ def check_property_extensions(prop,value,db=None,
             except: 
                 print('check_property_extensions(%s,%s): %s'
                       %(prop,value,traceback.format_exc()))
-        return parsed
+        value = parsed
+    
+    if compact and isSequence(value) and len(value)==1:
+        value = value[0]
     return value
-
 
     
 ###############################################################################
