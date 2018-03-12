@@ -102,7 +102,7 @@ from fandango.dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDi
 from fandango.log import Logger,shortstr
 import fandango.functional as fun
 from fandango.functional import clmatch, clsearch, clsub, kmap, isSequence, \
-    isCallable, isMapping, isString
+    isCallable, isMapping, isString, list2lines
 
 #The methods for reading/writing dynamic attributes must be Static for PyTango versions prior to 7.2.2
 if getattr(PyTango,'__version_number__',0)<722:
@@ -131,6 +131,8 @@ if GARBAGE_COLLECTION:
 if 'Device_4Impl' not in dir(PyTango): PyTango.Device_4Impl = PyTango.Device_3Impl
 if 'DeviceClass' not in dir(PyTango): PyTango.DeviceClass = PyTango.PyDeviceClass
 
+MAX_ARRAY_SIZE = 8192
+
 class DynamicDS(PyTango.Device_4Impl,Logger):
     ''' Check fandango.dynamic.__doc__ for more information ...'''
 
@@ -142,9 +144,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
 
     def __init__(self,cl=None,name=None,_globals=None,_locals=None, useDynStates=True):
         print('> '+'~'*78)
-        self.call__init__('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
+        self.call__init__('Device_4Impl' in dir(PyTango) 
+                and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
         # Logger must be called after init to use Tango logs properly
-        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s',level='INFO')
+        self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s'
+                                        ' %(name)s: %(message)s',level='INFO')
         self.warning( ' in DynamicDS(%s).__init__ ...'%str(name))
         self.trace=False
 
@@ -163,13 +167,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.state_lock = threading.Lock()
         self.DEFAULT_POLLING_PERIOD = 3000.
         
-        #Setting default values for Class/Device properties
-        for d in (DynamicDSClass.class_property_list,DynamicDSClass.device_property_list):
-            for prop,value in d.items():
-                if not hasattr(self,prop): 
-                    setattr(self,prop,(value[-1] if 'Array' in str(value[0]) else 
-                        (value[-1][0] if (value and fun.isSequence(value[-1])) else value and value[-1]))
-                        )
+        self.get_default_properties(update=True)
+                        
         print('UseTaurus = %s'%getattr(self,'UseTaurus',False))
         if getattr(self,'UseTaurus',False): self.UseTaurus = bool(tango.loadTaurus())
         
@@ -390,17 +389,41 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def get_db():
         DynamicDS._db = getattr(DynamicDS,'_db',None) or PyTango.Util.instance().get_database()
         return DynamicDS._db
+    
+    def get_default_properties(self,update=False):        
+        """ Setting default values for Class/Device properties """
+        dct = {}
+        for d in (DynamicDSClass.class_property_list,
+                  DynamicDSClass.device_property_list):
+            
+            for prop,value in d.items():
+                if not hasattr(self,prop): 
+                    if 'Array' in str(value[0]): 
+                        value = value[-1]
+                    elif (value and fun.isSequence(value[-1])): 
+                        value = value[-1][0]
+                    else:
+                        value = value and value[-1]
+                    dct[prop] = value
+                    
+        if update:
+            for k,v in dct.items():
+                setattr(self,prop,value)
+            
+        return dct
 
     def get_DynDS_properties(self,db=None):
         """
+        ## THIS FUNCTION IS USED FROM updateDynamicAttributes
         It forces DynamicDevice properties reading using the Database device.
         It has to be used as subclasses may not include all Dynamic* properties in their class generation.
         It is used by self.updateDynamicAttributes() and required in PyTango<3.0.4
         """
         print('#'*80)
         self.warning('In get_DynDS_properties(): updating DynamicDS properties from Database')
-        ## THIS FUNCTION IS USED FROM updateDynamicAttributes
-        self.get_device_properties(self.get_device_class()) #It will reload all subclass specific properties (with its own default values)
+        
+        #It will reload all subclass specific properties (with its own default values)
+        self.get_device_properties(self.get_device_class()) 
         self._db = db or self.get_db()
         
         if self.LogLevel: 
@@ -409,14 +432,21 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
         #Loading DynamicDS specific properties (from Class and Device)
         for method,target,config in (
-                (self._db.get_class_property,self.get_device_class().get_name(),DynamicDSClass.class_property_list),
+                (self._db.get_class_property,
+                    self.get_device_class().get_name(),
+                    DynamicDSClass.class_property_list),
                 (self._db.get_device_property,self.get_name(),
-                dict(list(DynamicDSClass.device_property_list.items())+[('polled_attr',[PyTango.DevVarStringArray,[]])])),
+                    dict(list(DynamicDSClass.device_property_list.items())
+                     +[('polled_attr',[PyTango.DevVarStringArray,[]])])),
             ):
-            #Default property values already loaded in __init__; here we are just updating
-            props = [(prop,value) for prop,value in method(target,list(config)).items() if value]
+            # Default property values already loaded in __init__; 
+            # here we are just updating
+            props = [(prop,value) for prop,value in 
+                     method(target,list(config)).items() if value]
+            
             for prop,value in props:
                 self.warning('get_DynDS_properties(%s,%s)' % (prop,value))
+                
                 #Type of each property is adapted to python types
                 dstype = DynamicDSTypes.get(str(config[prop][0]),DynamicDSType('','',pytype=list))
                 try: 
@@ -428,19 +458,22 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 if prop=='polled_attr': 
                   self._polled_attr_ = tango.get_polled_attrs(value)
                   
-                elif prop.lower() == 'checkdependencies':
-                    if isSequence(value) and len(value)==1:
-                        value = value[0]
-                    if isString(value) and value.lower().strip() in ('no','false',''):
-                        self.CheckDependencies = False
-                    else:
-                        self.CheckDependencies = dict(t.split(':',1) for t in value)
-                else: 
-                  #APPLYING @COPY/@FILE property extensions
-                  setattr(self,prop,self.check_property_extensions(prop,value))
+                else:
+                    #APPLYING @COPY/@FILE property extensions
+                    value = self.check_property_extensions(prop,value)
+                    if prop.lower() == 'checkdependencies':
+                        if isSequence(value) and len(value)==1:
+                            value = value[0]
+                        if isSequence(value):
+                            value = dict(t.split(':',1) for t in value)
+                        elif str(value).lower().strip() in ('no','false',''):
+                            value = False
+                    setattr(self,prop,value)
                   
-            self.info('In get_DynDS_properties: %s(%s) properties updated were: %s' % (type(self),self.get_name(),[t[0] for t in props]))
-            [self.info('\t'+self.get_name()+'.'+str(p)+'='+str(getattr(self,p,None))) for p in config]
+            self.info('In get_DynDS_properties: %s(%s) properties are: %s' 
+                      % (type(self),self.get_name(),[t[0] for t in props]))
+            [self.info('\t'+self.get_name()+'.'+str(p)+'='
+                       +str(getattr(self,p,None))) for p in config]
             
         if self.UseTaurus:
             self.UseTaurus = (tango.TAU or tango.loadTaurus()) and self.UseTaurus
@@ -454,11 +487,22 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
         return
         
-    def get_device_property(self,property,update=False):
-        if update or not hasattr(self,property):
-            setattr(self,property,self._db.get_device_property(self.get_name(),[property])[property])
-        value = getattr(self,property) 
-        return value[0] if fandango.isSequence(value) and len(value)==1 else value
+    def get_device_property(self,prop,update=False,value=None,compact=True):
+        """
+        Method used by PROPERTY command within formulas to obtain
+        values of own properties stored in the database.
+        """
+        if update or not hasattr(self,prop) or value is not None:
+            if value is None:
+                value = self._db.get_device_property(self.get_name(),[prop])
+                value = self.check_property_extensions(prop,value[prop])
+            setattr(self,prop,value)
+            
+        value = getattr(self,prop)
+        if compact and fandango.isSequence(value) and len(value)==1:
+            return value[0]
+        else:
+            return value
         
     @staticmethod
     def open_file(filename,device=None):
@@ -486,7 +530,10 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     
     @staticmethod
     def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS):
-        return tango.check_property_extensions(prop,value,extensions=DynamicDS.EXTENSIONS,db=DynamicDS.get_db(),filters=DynamicDSClass.device_property_list)
+        #THIS METHOD PROVIDES EXTENSIONS AND MULTILINE PARSING!
+        return tango.check_property_extensions(prop,value,
+            extensions=DynamicDS.EXTENSIONS,db=DynamicDS.get_db(),
+            filters=DynamicDSClass.device_property_list)
           
     @Cached(depth=200,expire=15.)
     def get_polled_attrs(self,load=False):
@@ -621,8 +668,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else:
             for s in self.UseEvents:
                 s,e = s.split(':',1) if ':' in s else (s,'True')
-                if clmatch(s,aname):
-                    return eval(clsub('(true|push|yes)','True',e))
+                if clmatch(s,aname)and eval(clsub('(true|push|yes)','True',e)):
+                    return e
         return False
     
     @Cached(depth=200,expire=15.)
@@ -863,10 +910,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 c = self.check_attribute_events(aname) 
                 if c :
                     self._locals[aname] = None
-                    if c is True:# or aname.lower() in new_polled_attrs:
-                        #THIS IS CONFIGURING EVENTS TO BE "MANUAL", pushed and unfiltered by Jive settings
-                        self.set_change_event(aname,True,False)
-                        self.set_archive_event(aname,True,False)
+                    if str(c).lower().strip() in ('true','push'): # or aname.lower() in new_polled_attrs:
+                        # THIS IS CONFIGURING EVENTS TO BE "MANUAL", 
+                        # pushed and unfiltered by Jive settings
+                        print(aname,'#'*40)
+                        self.set_change_event(aname.lower(),True,False)
+                        self.set_archive_event(aname.lower(),True,False)
                     elif fun.isNumber(c) and aname not in new_polled_attrs:
                         new_polled_attrs[aname] = int(c)
                 elif self.dyn_values[aname].keep:
@@ -956,7 +1005,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         #if not USE_STATIC_METHODS: self = self.myClass.DynDev
         aname = attr.get_name()
         tstart=time.time()
-        keep = aname in self.dyn_values and self.dyn_values[aname].keep or self.check_attribute_events(aname)
+        events = self.check_attribute_events(aname)
+        keep = aname in self.dyn_values and self.dyn_values[aname].keep or events
         self.debug('>'*80)
         self.debug("DynamicDS("+self.get_name()+")::read_dyn_atr("+attr.get_name()+"), entering at "+time.ctime()+"="+str(tstart)+"...")
         try:
@@ -1127,11 +1177,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 value = self.dyn_types[aname].pytype(result)
                 
                 #Events must be checked before updating the cache
-                if has_events and self.check_changed_event(aname,result):
+                if has_events and ('push' in str(has_events.lower()) or 
+                        self.check_changed_event(aname,result)):
                     self.info('>'*80)
-                    self.info('Pushing %s event!: %s(%s)'%(aname,type(result),shortstr(result)))
-                    self.push_change_event(aname,value,date,quality)
-                    self.push_archive_event(aname,value,date,quality)
+                    self.info('Pushing %s event!: %s(%s)'%(aname,type(value),shortstr(value)))
+                    self.push_change_event(aname.lower(),value,date,quality)
+                    self.push_archive_event(aname.lower(),value,date,quality)
                     
                 #Updating the cache:
                 keep = self.dyn_values[aname].keep or has_events
@@ -1139,7 +1190,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     old = self.dyn_values[aname].value
                     self.dyn_values[aname].update(value,date,quality)
                     self._locals[aname] = value
-                    (self.debug if self.KeepAttributes[0] in ('yes','true') else self.info)('evalAttr(%s): Value will be kept for later reuse' % (aname,))
+                    self.debug('evalAttr(%s):Value kept for reuse' % (aname,))
                     #Updating state if needed:
                     try:
                         if old!=value and self.dyn_values.get(aname).states_queue:
@@ -1786,7 +1837,7 @@ class DynamicDSClass(PyTango.DeviceClass):
         'DynamicSpectrumSize':
             [PyTango.DevLong,
             "It will fix the maximum size for all Dynamic Attributes.",
-            [ 4096 ] ],    
+            [ MAX_ARRAY_SIZE ] ],    
         }
 
     #    Device Properties
@@ -2029,7 +2080,18 @@ def CreateDynamicCommands(ds,ds_class):
         prop = db.get_device_property(dev,['DynamicCommands'])['DynamicCommands']
         print('In DynamicDS.CreateDynamicCommands(%s.%s): %s'%(server,dev,prop))
         prop = DynamicDS.check_property_extensions('DynamicCommands',prop)
-        lines = [(dev+'/'+l.split('=',1)[0].strip(),l.split('=',1)[1].strip()) for l in [d.split('#')[0].strip() for d in prop if d] if l]
+        #lines = [(dev+'/'+l.split('=',1)[0].strip(),l.split('=',1)[1].strip()) 
+                 #for l in [d.split('#')[0].strip() for d in prop if d] if l]
+        lines = []
+        for i,d in enumerate(prop):
+            if d:
+                l = dd = d.split('#')[0].strip()
+                if l:
+                    l0 = dev+'/'+l.split('=',1)[0].strip()
+                    l1 = l.split('=',1)[1].strip()
+                    l = (l0,l1)
+                    lines.append(l)
+                        
         ds.dyn_comms.update(lines)
         for name,formula in lines: #ds.dyn_comms.items():
             name = name.rsplit('/',1)[-1]
