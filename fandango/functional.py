@@ -844,7 +844,7 @@ def obj2str(obj,sep=',',linesep='\n',MAX_LENGTH=0):
     if isMapping(obj,strict=True): s = dict2str(obj,sep,linesep)
     elif isSequence(obj): s = list2str(obj,sep)
     else: s = toString(obj)
-    s = shortstr(s,MAX_LENGTH)
+    s = shortstr(s,MAX_LENGTH,replace={})
     return s
 
 ########################################################################
@@ -903,10 +903,13 @@ RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g
 def now():
     return time.time()
 
-def time2tuple(epoch=None):
+def time2tuple(epoch=None, utc=False):
     if epoch is None: epoch = now()
     elif epoch<0: epoch = now()-epoch
-    return time.localtime(epoch)
+    if utc:
+        return time.gmtime(epoch)
+    else:
+        return time.localtime(epoch)
     
 def tuple2time(tup):
     return time.mktime(tup)
@@ -935,10 +938,13 @@ def time2date(epoch=None):
     elif epoch<0: epoch = now()-epoch
     return datetime.datetime.fromtimestamp(epoch)
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True):
+def utcdiff(t=None):
+    return now() - date2time(datetime.datetime.utcnow())  
+
+def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True,utc=False):
     if epoch is None: epoch = now() 
     elif bt and epoch<0: epoch = now()+epoch
-    t = time.strftime(cad,time2tuple(epoch))
+    t = time.strftime(cad,time2tuple(epoch,utc=utc))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
     return t
