@@ -1130,6 +1130,8 @@ class EventSource(Logger,SingletonMap):
         # If it was just updated, return cache
         if cache is None:
             vtime = ctime2time(getattr(self.attr_value,'time',None))
+            if vtime>t0: vtime = t0 #correct "future" data
+            self.debug(str([t0,vtime,self.keep_time*1e-3]))
             if self.fake or (t0 < (vtime + self.keep_time*1e-3)):
                 cache = True
             # If not polled, force HW reading
@@ -1189,6 +1191,18 @@ class EventSource(Logger,SingletonMap):
                 self.debug('read_hw(asynch=False):\n\tvalue:%s\n\tdata:%s'
                     %(getattr(self.attr_value,'value','null'),
                         shortstr(self.attr_value,256)))
+                    
+            #Correct wrong timestamps
+            try:
+                t0 = now()
+                vtime = ctime2time( getattr(self.attr_value,'time',None) )
+                
+                if vtime > t0:
+                    self.info('Forcing %s to local timestamp!'%self.simple_name)
+                    self.attr_value.time.tv_sec = int(t0)
+                    self.attr_value.time.tv_usec = int((t0-int(t0))*1e6)
+            except:
+                self.debug(traceback.format_exc())
                     
         except Exception,e:
             # fakeAttributeValue initialized with full_name
