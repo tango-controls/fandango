@@ -11,7 +11,23 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
-13.6.0 - February 2017
+13.7.0 - Abril 2018
+-------------------
+Add get_attr_name, get_dev_name methods
+Enable unconditional event pushing in DynDS
+print log exceptions
+Enable multi-line properties as extensions
+Add list2lines for multiline properties
+Implement events pushed by code,
+dont force polling unless explicitly said
+Implement pushing of dyn attributes by code,
+    use polling only if set explicitly
+    solve bugs
+Add archive event and regexp-based dependencies
+solve bug parsing IMAGE( attributes
+
+
+13.6.0 - February 2018
 ----------------------
 Solve mem leak in FolderDS, add SaveCharBuffer() command
 Add fandango.tango.check_attribute_events()
@@ -19,7 +35,7 @@ Caches added to get_tango_host and get_device
 Add getter/setter methods to TangoEval
 Decimation < 1 s
 
-13.5.2 - January 2017
+13.5.2 - January 2018
 ---------------------
 
 Enable Fully Qualified Domain Names in Tango models, model.fullname = URI
