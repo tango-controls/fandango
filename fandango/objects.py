@@ -149,7 +149,7 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
 
 class Struct(object):
     """
-    Metamorphic class to pass/retrieve data objects as object or dictionary
+    Metamorphic type to pass/retrieve data objects as object or dictionary
     
     s = Struct(name='obj1',value=3.0)
     s.setCastMethod(lambda k,v: str2type)

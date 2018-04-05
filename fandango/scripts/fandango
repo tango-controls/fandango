@@ -157,8 +157,9 @@ if __name__ == '__main__':
         r = evalX(cmd,_locals=locals())
         
     if opts.get('v'): print(cmd)
-    s = obj2str(r,sep=' ')
-    if opts.get('l'):
+    linesep = '\n' if opts.get('l') else ';'
+    s = obj2str(r,sep=' ',linesep=linesep)
+    if opts.get('l') and '\n' not in s:
       s = '\n'.join(s.split())
     print(s)
  
