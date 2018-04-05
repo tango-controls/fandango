@@ -48,7 +48,7 @@ from fandango.objects import Object
 from fandango.dicts import CaselessDefaultDict,CaselessDict
 from fandango.log import Logger
 from fandango.tango import ProxiesDict,get_device_info,get_database,\
-    get_tango_host,get_class_devices
+    get_tango_host,get_class_devices, get_normal_name
 from fandango.excepts import trial
     
 ####################################################################################################################
@@ -340,6 +340,7 @@ class ServersDict(CaselessDict,Object):
         servers_list=set()
         for d in devs_list:
             devs = self.get_devs_from_db(d) if '*' in d else [d] 
+            devs = [get_normal_name(d) for d in devs]
             [servers_list.add(self.get_device_server(dev)) for dev in devs if dev]
         self.log.info('Loading %d servers matching %s devices'%(len(servers_list),len(devs_list)))
         self.load_from_servers_list([s for s in servers_list if s])

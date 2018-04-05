@@ -198,11 +198,35 @@ def get_full_name(model,fqdn=None):
 
 def get_normal_name(model):
     """ 
-    returns simple name without schema/host/port, as needed by TangoDB API
+    returns simple name as just domain/family/member,
+    without schema/host/port, as needed by TangoDB API
     """
     if ':' in model:
         model = model.split(':')[-1].split('/',1)[-1]
     return model.split('#')[0].strip('/')
+
+def get_attr_name(model,default='state'):
+    """
+    gets just the attribute part of a Tango URI
+    """
+    if not model: return ''
+    model = get_normal_name(model)
+    if model.count('/')==3:
+        return model.split('/')[-1]
+    else:
+        return default
+    
+def get_dev_name(model,full=True,fqdn=None):
+    """
+    gets just the device part of a Tango URI
+    """
+    norm = get_normal_name(model)
+    if model.count('/')>2: 
+        model = model.rsplit('/',1)[0]
+    if not full:
+        return get_normal_name(model)
+    else:
+        return get_full_name(model,fqdn=fqdn)
         
 def get_model_name(model):
     """
@@ -538,7 +562,7 @@ def get_attribute_events(target,polled=True,throw=False):
         if throw: raise e
         return None
     
-def check_attribute_events(model,ev_type=None):
+def check_attribute_events(model,ev_type=None,verbose=False):
     """
     This method expects model and a list of event types.
     If empty, CHANGE and ARCHIVE events are tested.
@@ -564,10 +588,12 @@ def check_attribute_events(model,ev_type=None):
                 period = dp.get_attribute_poll_period(attr) 
                 result[ev_type] = period or True
             except:
-                #traceback.print_exc()
+                if verbose:
+                    traceback.print_exc()
                 result.pop(ev_type)
-                
-            print('Subscribe(%s,%s): %s' % (
+
+            if verbose:
+                print('Subscribe(%s,%s): %s' % (
                         attr,ev_type,result.get(ev_type,False)))
 
         return result
