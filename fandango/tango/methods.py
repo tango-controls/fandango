@@ -344,7 +344,67 @@ def get_device_attributes(dev,expressions='*'):
     result = [a for a in al for expr in expressions 
               if matchCl(expr,a,terminate=True)]
     return result
+
+def get_polled_attrs(device,others=None):
+    """ 
+    @TODO: Tango8 has own get_polled_attr method; check for incompatibilities
+    if a device is passed, it returns the polled_attr property as a dictionary
+    if a list of values is passed, it converts to dictionary
+    others argument allows to get extra property values in a single DB call; 
+    e.g others = ['polled_cmd'] would append the polled commands to the list
+    """
+    if isSequence(device):
+        return CaselessDict(zip(map(str.lower,device[::2]),
+                                map(float,device[1::2])))
+    elif isinstance(device,DeviceProxy):
+        attrs = device.get_attribute_list()
+        periods = [(a.lower(),int(device.get_attribute_poll_period(a))) 
+                   for a in attrs]
+        return CaselessDict((a,p) for a,p in periods if p)
+    else:
+        others = others or []
+        if isinstance(device,PyTango.DeviceImpl):
+            db = PyTango.Util.instance().get_database()
+            #polled_attrs = {}
+            #lst = self.get_admin_device().DevPollStatus(device.get_name())
+            #for st in lst:
+                #lines = st.split('\n')
+                #try: polled_attrs[lines[0].split()[-1]]=lines[1].split()[-1]
+                #except: pass
+            #return polled_attrs
+            device = device.get_name()
+        else:
+            db = fandango.get_database()
+        props = db.get_device_property(device,
+                                       ['polled_attr']+toSequence(others))
+        d = get_polled_attrs(props.pop('polled_attr'))
+        if others: d.update(props)
+        return d
+
+def get_polling_stats(device,brief = False):
+    """
+    Returns a dictionary of {attribute:(period,time,lasts)}
+    
+    If brief is True, returns usage (sum(times)/min(periods))
+    """
+    dp = get_device(device)
+    stats = {}
+    pst = dp.polling_status()
+    for st in pst:
+        st = [s.rsplit('=',1) for s in st.split('\n')]
+        name = st[0][-1].strip()
+        period = [float(s[-1]) for s in st if s[0].startswith('Polling period')][0]
+        times = [float(s[-1]) for s in st if s[0].startswith('Time needed')][0]
+        deltas = [map(float,s[-1].split(',')) for s in st if 'last records' in s[0]][0]
+        stats[name] = period,times,deltas
         
+    if brief:
+        p = min(t[0] for t in stats.values())
+        s = sum(t[1] for t in stats.values())
+        return s/p
+        
+    return stats
+
 def get_device_labels(target,filters='*',brief=True):
     """
     Returns an {attr:label} dict for all attributes of this device 
@@ -1304,42 +1364,6 @@ def read_internal_attribute(device,attribute):
                 except:
                     attr.throw_exception()
     return attr
-
-def get_polled_attrs(device,others=None):
-    """ 
-    @TODO: Tango8 has own get_polled_attr method; check for incompatibilities
-    if a device is passed, it returns the polled_attr property as a dictionary
-    if a list of values is passed, it converts to dictionary
-    others argument allows to get extra property values in a single DB call; 
-    e.g others = ['polled_cmd'] would append the polled commands to the list
-    """
-    if isSequence(device):
-        return CaselessDict(zip(map(str.lower,device[::2]),
-                                map(float,device[1::2])))
-    elif isinstance(device,DeviceProxy):
-        attrs = device.get_attribute_list()
-        periods = [(a.lower(),int(device.get_attribute_poll_period(a))) 
-                   for a in attrs]
-        return CaselessDict((a,p) for a,p in periods if p)
-    else:
-        others = others or []
-        if isinstance(device,PyTango.DeviceImpl):
-            db = PyTango.Util.instance().get_database()
-            #polled_attrs = {}
-            #lst = self.get_admin_device().DevPollStatus(device.get_name())
-            #for st in lst:
-                #lines = st.split('\n')
-                #try: polled_attrs[lines[0].split()[-1]]=lines[1].split()[-1]
-                #except: pass
-            #return polled_attrs
-            device = device.get_name()
-        else:
-            db = fandango.get_database()
-        props = db.get_device_property(device,
-                                       ['polled_attr']+toSequence(others))
-        d = get_polled_attrs(props.pop('polled_attr'))
-        if others: d.update(props)
-        return d
         
 def __test_method__(args=None):
     print(__name__,'test',args)

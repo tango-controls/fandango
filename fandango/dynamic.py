@@ -848,7 +848,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                                 else PyTango.AttrWriteType.READ)
                 
                 for typename,dyntype in DynamicDSTypes.items():
+                    
                     if dyntype.match(formula):
+                        
                         self.debug(self.get_name()+".dyn_attr():  '"+line+ "' matches " + typename + "=" + str(dyntype.labels))
                         if formula.startswith(typename+'('): #DevULong should not match DevULong64
                             formula=formula.lstrip(typename)
