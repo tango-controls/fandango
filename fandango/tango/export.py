@@ -95,20 +95,28 @@ def export_attribute_to_dict(model,attribute=None,value=None,
                 if ac.description!='No description' else '')
             
             attr.data_format = str(ac.data_format)
+            attr.max_dim_x = ac.max_dim_x
+            attr.max_dim_y = ac.max_dim_y
             attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
+            attr.enum_labels = ac.enum_labels
             attr.writable = str(ac.writable)
-            attr.label,attr.min_alarm,attr.max_alarm = \
-                ac.label,ac.min_alarm,ac.max_alarm
-            attr.unit,attr.format = ac.unit,ac.format
-            attr.standard_unit,attr.display_unit = \
-                ac.standard_unit,ac.display_unit
+            attr.label = ac.label
+            attr.min_alarm = ac.min_alarm
+            attr.max_alarm = ac.max_alarm
+            attr.unit = ac.unit
+            attr.format = ac.format
+            attr.standard_unit = ac.standard_unit
+            attr.display_unit = ac.display_unit
+            attr.min_value = ac.min_value
+            attr.max_value = ac.max_value
+
             attr.events.ch_event = fandango.obj2dict(ac.events.ch_event)
             attr.events.arch_event = fandango.obj2dict(ac.events.arch_event)
             attr.events.per_event = fandango.obj2dict(ac.events.per_event)
             attr.alarms = fandango.obj2dict(ac.alarms)
             attr.quality = str(v.quality)
             attr.time = ctime2time(v.time)
-              
+
             if attr.data_format!='SCALAR': 
                 attr.value = list(v.value 
                     if v.value is not None and v.dim_x else [])
