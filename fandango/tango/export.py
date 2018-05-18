@@ -98,7 +98,7 @@ def export_attribute_to_dict(model,attribute=None,value=None,
             attr.max_dim_x = ac.max_dim_x
             attr.max_dim_y = ac.max_dim_y
             attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
-            attr.enum_labels = ac.enum_labels
+            attr.enum_labels = list(ac.enum_labels)
             attr.writable = str(ac.writable)
             attr.label = ac.label
             attr.min_alarm = ac.min_alarm
