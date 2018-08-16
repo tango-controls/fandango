@@ -38,7 +38,7 @@ import Queue,traceback,time,sys,os
 from functools import partial
 import fandango
 from fandango.functional import *
-from fandango.log import Logger,shortstr
+from fandango.log import Logger,shortstr,tracer
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton,Decorated,Decorator,ClassDecorator,BoundDecorator
 
@@ -1038,12 +1038,14 @@ def Draggable(QtKlass):
     
     class DraggableQtKlass(QtKlass): #,Decorated):
         __doc__ = Draggable.__doc__
+        _qt_klass__ = QtKlass
         
         def setDragEventCallback(self,hook,Mimetype=None):
             self._drageventcallback = hook
             self.Mimetype = Mimetype 
 
         def getDragEventCallback(self):
+            tracer('In Draggable(%s).getDragEventCallback()'%self._qt_klass__)
             if not getattr(self,'_drageventcallback',None):
                 self.setDragEventCallback(lambda s=self:str(s.text() if hasattr(s,'text') else ''))
             return self._drageventcallback
@@ -1052,26 +1054,45 @@ def Draggable(QtKlass):
             '''reimplemented to provide drag events'''
             #QtKlass.mousePressEvent(self, event)
             QtKlass.mousePressEvent(self,event)
-            print 'In Draggable(%s).mousePressEvent'%type(self)
-            if event.button() == Qt.Qt.LeftButton: self.dragStartPosition = event.pos()
+            name = self.objectName()
+            tracer('In Draggable(%s,%s).mousePressEvent'%(name,self._qt_klass__.__name__))
+
+            if event.button() == Qt.Qt.LeftButton: 
+                self.dragStartPosition = event.pos()
+            elif event.buttons() & Qt.Qt.RightButton:
+                tracer('\t right button pressed')
+                
+            tracer('Out of Draggable(%s).mousePressEvent'%self._qt_klass__)
+            
+        def mouseReleaseEvent(self, event):
+            '''reimplemented to provide drag events'''
+            tracer('In Draggable(%s).mouseReleaseEvent'%self._qt_klass__)
+            QtKlass.mouseReleaseEvent(self,event)
                 
         def mouseMoveEvent(self, event):
             '''reimplemented to provide drag events'''
+            #tracer('In Draggable(%s).mouseMoveEvent'%self._qt_klass__)
             QtKlass.mouseMoveEvent(self,event)
             if not event.buttons() & Qt.Qt.LeftButton:
+                #tracer('Out of Draggable(%s).mouseMoveEvent'%self._qt_klass__)
                 return
+            
             call_back = self.getDragEventCallback()
             mimeData = call_back()
+            
             if not isinstance(mimeData,Qt.QMimeData):
                 txt = str(mimeData)
                 mimeData = Qt.QMimeData()
                 if getattr(self,'Mimetype',None):
                     mimeData.setData(self.Mimetype, txt)
                 mimeData.setText(txt) #Order is not trivial, preferred must go first
+                
             drag = Qt.QDrag(self)
             drag.setMimeData(mimeData)
             drag.setHotSpot(event.pos() - self.rect().topLeft())
             dropAction = drag.start(Qt.Qt.CopyAction)
+            #tracer('Out of Draggable(%s).mouseMoveEvent'%self._qt_klass__)
+            
     return DraggableQtKlass
 
 QDraggable = Draggable(object)
