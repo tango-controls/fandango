@@ -917,7 +917,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         # pushed and unfiltered by Jive settings
                         print(aname,'#'*40)
                         self.set_change_event(aname.lower(),True,False)
-                        self.set_archive_event(aname.lower(),True,False)
+                        if 'archive' in str(self.UseEvents).lower():
+                            self.set_archive_event(aname.lower(),True,False)
                     elif fun.isNumber(c) and aname not in new_polled_attrs:
                         new_polled_attrs[aname] = int(c)
                 elif self.dyn_values[aname].keep:
@@ -1184,7 +1185,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     self.info('>'*80)
                     self.info('Pushing %s event!: %s(%s)'%(aname,type(value),shortstr(value)))
                     self.push_change_event(aname.lower(),value,date,quality)
-                    self.push_archive_event(aname.lower(),value,date,quality)
+                    if 'archive' in str(self.UseEvents).lower():
+                        self.push_archive_event(aname.lower(),value,date,quality)
                     
                 #Updating the cache:
                 keep = self.dyn_values[aname].keep or has_events
@@ -1588,7 +1590,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     try: 
                         self.push_change_event('State',state,now,
                                                AttrQuality.ATTR_VALID)
-                        self.push_archive_event('State',state,now,
+                        if 'archive' in str(self.UseEvents).lower():
+                            self.push_archive_event('State',state,now,
                                                 AttrQuality.ATTR_VALID)
                     except Exception,e: 
                         self.warning('DynamicDS.push_event(State=%s) failed!: %s'%(state,e))
