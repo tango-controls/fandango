@@ -709,6 +709,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 elif crel>0 and not v*(1-crel/100.)<new_value<v*(1+crel/100.): 
                     self.info('In check_changed_event(%s,%s): relative change!'%(aname,shortstr(new_value)))
                     return True
+                elif v != new_value:
+                    self.info('In check_changed_event(%s,%s): push on any change'%(aname,shortstr(new_value)))
+                    return True
                 else: 
                     self.debug('In check_changed_event(%s,%s): nothing changed'%(aname,shortstr(new_value)))
                     return False
