@@ -317,7 +317,7 @@ def matchCl(exp,seq,terminate=False,extend=False):
                         for e in exp.split('&'))
             if re.match('^[!~]',exp):
                 return not matchCl(exp[1:],seq,terminate,extend=True) 
-        return re.match(toRegexp(exp.lower(),terminate=terminate),seq.lower())
+        return re.match(toRegexp(exp,terminate=terminate,lower=True),seq.lower())
     except:
         print('matchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
         raise
@@ -406,9 +406,9 @@ def toCl(exp,terminate=False,wildcards=('*',' '),lower=True):
     exp = exp.replace('(?p<','(?P<') #Preventing missing P<name> clausses
     return exp
     
-def toRegexp(exp,terminate=False):
+def toRegexp(exp,terminate=False,lower=False):
     """ Case sensitive version of the previous one, for backwards compatibility """
-    return toCl(exp,terminate,wildcards=('*',),lower=False)
+    return toCl(exp,terminate,wildcards=('*',),lower=lower)
     
 def filtersmart(seq,filters):
     """
