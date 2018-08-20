@@ -407,7 +407,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                     dct[prop] = value
                     
         if update:
-            for k,v in dct.items():
+            for prop,value in dct.items():
                 setattr(self,prop,value)
             
         return dct
