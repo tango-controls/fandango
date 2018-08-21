@@ -162,6 +162,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.dyn_types = {}
         self.dyn_states = SortedDict()
         self.dyn_values = {} #<- That's the main cache used for attribute management
+            #Should it be caseless?
         self.dyn_qualities = {} #<- It keeps the dynamic qualities variables
         self.variables = {}
         self.state_lock = threading.Lock()
@@ -685,6 +686,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         return cabs,crel
     
     def check_changed_event(self,aname,new_value):
+        aname = self.get_attr_name(aname)
         if aname not in self.dyn_values: return False
         try:
             v = self.dyn_values[aname].value
@@ -820,7 +822,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                 # dyn_attr() will create the attributes only if they don't exist.
                 if aname not in self.dyn_values:
                     create = True
-                    self.dyn_values[aname]=DynamicAttribute()
+                    self.dyn_values[aname]=DynamicAttribute(name=aname)
                     self.dyn_values[aname].keep = (self.KeepAttributes and 
                         (not 'no' in self.KeepAttributes) and any(q.lower() 
                         in self.KeepAttributes for q in [aname,'*','yes','true']))
@@ -972,6 +974,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def get_dyn_attr_list(self):
         """Gets all dynamic attribute names."""
         return self.dyn_attrs.keys()
+    
+    def get_attr_name(self,aname):
+        for k in self.dyn_values:
+            if k.lower() == str(aname).strip().lower().split('/')[-1]:
+                return k
+        return None
+    
+    def get_attr_date(self,aname,value):
+        if type(value) is DynamicAttribute:
+            return value.date
+        return time.time()    
       
     def get_attr_formula(self,aname,full=False):
         """
@@ -998,6 +1011,32 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else:
           #If no attribute is matching, attribute name is returned
           return formula
+      
+    def get_attr_models(self,attribute):
+        """
+        Given a dynamic attribute name or formula, it will return a 
+        list of tango models appearing on it
+        """
+        formula = self.get_attr_formula(attribute)
+        matches = re.findall(tango.retango,formula)
+        #Matches are models split in parts, need to be joined
+        return ['/'.join(filter(bool,s)) for s in matches]   
+    
+    def get_attr_quality(self,aname,attr_value):
+        self.debug('In get_attr_quality(%s,%s)' % (aname,shortstr(attr_value,15)[:10]))
+        formula = self.dyn_qualities.get(aname.lower()) or 'Not specified'
+        try:
+            if aname.lower() in self.dyn_qualities:
+                self._locals['VALUE'] = getattr(attr_value,'value',attr_value)
+                self._locals['DEFAULT'] = getattr(attr_value,'quality',AttrQuality.ATTR_VALID)
+                quality = eval(formula,{},self._locals) or AttrQuality.ATTR_VALID
+            else:
+                quality =  getattr(attr_value,'quality',AttrQuality.ATTR_VALID)
+            self.debug('\t%s.quality = %s'%(aname,quality))
+            return quality
+        except Exception,e:
+            self.error('Unable to generate quality for attribute %s: %s\n%s'%(aname,formula,traceback.format_exc()))
+            return AttrQuality.ATTR_VALID
         
     def is_dyn_allowed(self,req_type,attr_name=''):
         return (time.time()-self.time0) > 1e-3*self.StartupDelay
@@ -1005,6 +1044,11 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     #@Catched #Catched decorator is not compatible with PyTango_Throw_Exception
     @self_locked
     def read_dyn_attr(self,attr,fire_event=True):
+        """
+        Method to evaluate attributes from external clients.
+        
+        Internally, evalAttr its used instead, triggering push_event if needed
+        """
         #if not USE_STATIC_METHODS: self = self.myClass.DynDev
         aname = attr.get_name()
         tstart=time.time()
@@ -1021,8 +1065,8 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.warning('Unable to reload %s kept values, %s'%(aname,str(e)))
         try:
             result = self.evalAttr(aname)
-            quality = getattr(result,'quality',self.get_quality_for_attribute(aname,result))
-            date = self.get_date_for_attribute(aname,result)
+            quality = getattr(result,'quality',self.get_attr_quality(aname,result))
+            date = self.get_attr_date(aname,result)
             result = self.dyn_types[aname].pytype(result)
 
             if hasattr(attr,'set_value_date_quality'):
@@ -1101,25 +1145,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         ''' SPECIFIC METHODS DEFINITION DONE IN self._locals!!! 
         @remark Generators don't work  inside eval!, use lists instead
         '''
-        self.debug("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"%shortstr(getattr(self.dyn_values.get(aname,None),'value',None)))
+        aname = self.get_attr_name(aname)
+        self.info("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"
+            % shortstr(getattr(self.dyn_values.get(aname,None),'value',None)))
         tstart = time.time()
 
         aname,formula,compiled = self.get_attr_formula(aname,full=True)
         
         try:
             ##Checking attribute dependencies
+            # dependencies assigned at dyn_attr by self.check_dependencies()
             if self.CheckDependencies and aname in self.dyn_values:
-                #if self.dyn_values[aname].dependencies is None:
-                    #self.debug("In evalAttr ... setting dependencies")
-                    #self.dyn_values[aname].dependencies = set()
-                    #a = aname.lower().strip()
-                    #fs = (formula+'\n'+self.dyn_qualities.get(a,'')).lower()
-                    #for k,v in self.dyn_values.items():
-                        #ks = k.lower().strip()
-                        #if a==ks: continue
-                        #if ks in fun.re.split("[^'\"_0-9a-zA-Z]",fs): #fun.searchCl("(^|[^'\"_0-9a-z])%s($|[^'\"_0-9a-z])"%k,formula):
-                            #self.dyn_values[aname].dependencies.add(k) #Dependencies are case sensitive
-                            #self.dyn_values[k].keep = True
                             
                 #Updating Last Attribute Values
                 if self.dyn_values[aname].dependencies:
@@ -1173,15 +1209,15 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
             #Push/Keep Read Attributes
             if not WRITE and aname in self.dyn_values:
-                quality = self.get_quality_for_attribute(aname,result)
+                quality = self.get_attr_quality(aname,result)
                 if hasattr(result,'quality'): result.quality = quality
-                date = self.get_date_for_attribute(aname,result)
+                date = self.get_attr_date(aname,result)
                 has_events = self.check_attribute_events(aname)
                 value = self.dyn_types[aname].pytype(result)
-                
+                check = self.check_changed_event(aname,result)
+                self.info('has_events = %s, check = %s' % (has_events,check))
                 #Events must be checked before updating the cache
-                if has_events and ('push' in str(has_events.lower()) or 
-                        self.check_changed_event(aname,result)):
+                if has_events and ('push' in str(has_events.lower()) or check):
                     self.info('>'*80)
                     self.info('Pushing %s event!: %s(%s)'%(aname,type(value),shortstr(value)))
                     self.push_change_event(aname.lower(),value,date,quality)
@@ -1330,16 +1366,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             except:
                 print(traceback.format_exc())
         return
-      
-    def get_attr_models(self,attribute):
-        """
-        Given a dynamic attribute name or formula, it will return a 
-        list of tango models appearing on it
-        """
-        formula = self.get_attr_formula(attribute)
-        matches = re.findall(tango.retango,formula)
-        #Matches are models split in parts, need to be joined
-        return ['/'.join(filter(bool,s)) for s in matches]
         
     def getXDevice(self,dname):
         """
@@ -1363,8 +1389,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         else: 
             device,aname = aname.rsplit('/',1) if '/' in aname else '',aname
         
-        (self.info if write else self.debug)("DynamicDS.getXAttr(%s,%s,write=%s): ..."%(device or self.get_name(),aname,write and '%s(%s)'%(type(wvalue),wvalue)))
-        result = default #Returning an empty list because it is a False iterable value that can be converted to boolean (and False or None cannot be converted to iterable)
+        (self.info if write else self.debug)("DynamicDS.getXAttr(%s,%s,write=%s): ..."
+            %(device or self.get_name(),aname,write and '%s(%s)'%(type(wvalue),wvalue)))
+        
+        # Returning an empty list because it is a False iterable value that can be converted 
+        # to boolean (and False or None cannot be converted to iterable)
+        result = default 
         try:
             if not device:
                 self.info('getXAttr accessing to device itself ... using getAttr instead')
@@ -1486,27 +1516,6 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             if fun.isString(feedback) and '/' not in feedback: feedback = device+'/'+feedback
             return tango.TangoCommand(command=cmd,device=device,feedback=feedback,timeout=10.,wait=10.).execute(args,expected=expected)
 
-    def get_quality_for_attribute(self,aname,attr_value):
-        self.debug('In get_quality_for_attribute(%s,%s)' % (aname,shortstr(attr_value,15)[:10]))
-        formula = self.dyn_qualities.get(aname.lower()) or 'Not specified'
-        try:
-            if aname.lower() in self.dyn_qualities:
-                self._locals['VALUE'] = getattr(attr_value,'value',attr_value)
-                self._locals['DEFAULT'] = getattr(attr_value,'quality',AttrQuality.ATTR_VALID)
-                quality = eval(formula,{},self._locals) or AttrQuality.ATTR_VALID
-            else:
-                quality =  getattr(attr_value,'quality',AttrQuality.ATTR_VALID)
-            self.debug('\t%s.quality = %s'%(aname,quality))
-            return quality
-        except Exception,e:
-            self.error('Unable to generate quality for attribute %s: %s\n%s'%(aname,formula,traceback.format_exc()))
-            return AttrQuality.ATTR_VALID
-
-    def get_date_for_attribute(self,aname,value):
-        if type(value) is DynamicAttribute:
-            return value.date
-        return time.time()
-
     def ForceAttr(self,argin,VALUE=None):
         ''' Description: The arguments are AttributeName and an optional Value.<br>
             This command will force the value of the Attribute or will return the last forced value
@@ -1580,13 +1589,13 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     def set_state(self,state,push=False):
         now = time.time()
         old,self._locals['STATE'] = self._locals.get('STATE',None),state
-        if self.last_state_change < now-self.DEFAULT_POLLING_PERIOD/1e3:
-            old = None
+        last = now - self.last_state_change
+        diff = (state,(last > self.DEFAULT_POLLING_PERIOD/1e3 and last))
         try:
-            if old!=state:
+            if diff != (old,False):
                 self.last_state_change = now
                 if push and self.check_attribute_events('state'): 
-                    self.info('DynamicDS(%s.set_state(): pushing new state event'%(self.get_name()))
+                    self.info('DynamicDS(%s.set_state(): pushing new state event: %s'%(self.get_name(),diff))
                     try: 
                         self.push_change_event('State',state,now,
                                                AttrQuality.ATTR_VALID)
@@ -2132,7 +2141,8 @@ class DynamicAttribute(object):
     qualityOrder = [AttrQuality.ATTR_VALID, AttrQuality.ATTR_CHANGING, AttrQuality.ATTR_WARNING,
                 AttrQuality.ATTR_ALARM, AttrQuality.ATTR_INVALID]
 
-    def __init__(self,value=None,date=0.,quality=AttrQuality.ATTR_VALID):
+    def __init__(self,value=None,date=0.,quality=AttrQuality.ATTR_VALID,name=''):
+        self.name = name
         self.value=value
         self.max_peak=(value if not hasattr(value,'__len__') else None,0)
         self.min_peak=(value if not hasattr(value,'__len__') else None,0)
