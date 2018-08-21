@@ -52,12 +52,15 @@ __test__ = {}
 
 def add_new_device(server,klass,device):
     for c in (server+klass+device):
-      if re.match('[^a-zA-Z0-9\-\/_\+]',c):
+      if re.match('[^a-zA-Z0-9\-\/_\+\.]',c):
         raise Exception,"CharacterNotAllowed('%s')"%c
+    assert server.count('/')==1
+    assert clmatch(alnum,klass)
+    assert clmatch(retango,device)
     dev_info = PyTango.DbDevInfo()
-    dev_info.name = device
-    dev_info.klass = klass
-    dev_info.server = server
+    dev_info.name = device.strip()
+    dev_info.klass = klass.strip()
+    dev_info.server = server.strip()
     get_database().add_device(dev_info)
     
 def delete_device(device,server=True):
