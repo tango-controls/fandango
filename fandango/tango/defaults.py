@@ -111,7 +111,7 @@ ATTR_INVALID = AttrQuality.ATTR_INVALID
 #Regular Expressions
 metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 #alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
-alnum = '(?:[a-zA-Z0-9-_\*]|(?:\.\*))(?:[a-zA-Z0-9-_\*]|(?:\.\*))*'
+alnum = '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
