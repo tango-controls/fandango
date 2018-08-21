@@ -295,11 +295,17 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                    self._locals.update({k:
                         (lambda argin,cmd=k:self.evalCommand(cmd,argin))})
             for i in self.InitDevice:
-                try:
-                    self.evalAttr(i)
-                except Exception,e:
-                    print('Unable to execute InitDevice(%s)'%i)
-                    raise e
+                if str(i).strip().lower() in ('','false'):
+                    continue
+                elif i not in self.dyn_comms:
+                    self.warning('Unknown %s cmd at init, ignored' % str(i))
+                else:
+                    try:
+                        self.evalAttr(i)
+                    except Exception,e:
+                        self.error('Unable to execute InitDevice(%s)' % str(i))
+                        traceback.print_exc()
+                        raise e
         except: 
             print(traceback.format_exc()) #self.warning(traceback.format_exc())
         self._init_count +=1
@@ -1140,14 +1146,16 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     #   Attributes and State Evaluation Methods
     #------------------------------------------------------------------------------------------------------
 
-    # DYNAMIC ATTRIBUTE EVALUATION ... Copy it to your device and add any method you will need
+    ## DYNAMIC ATTRIBUTE EVALUATION ... 
+    # Copy it to your device and add any method you will need
     def evalAttr(self,aname,WRITE=False,VALUE=None,_locals=None):
         ''' SPECIFIC METHODS DEFINITION DONE IN self._locals!!! 
         @remark Generators don't work  inside eval!, use lists instead
         '''
         aname = self.get_attr_name(aname)
-        self.info("DynamicDS("+self.get_name()+ ")::evalAttr("+aname+"): ... last value was %s"
-            % shortstr(getattr(self.dyn_values.get(aname,None),'value',None)))
+        self.info("DynamicDS(%s)::evalAttr(%s): ... last value was %s"
+            % (self.get_name(), aname, shortstr(
+                getattr(self.dyn_values.get(aname,None),'value',None))))
         tstart = time.time()
 
         aname,formula,compiled = self.get_attr_formula(aname,full=True)
