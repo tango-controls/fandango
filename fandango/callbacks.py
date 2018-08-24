@@ -610,6 +610,14 @@ class EventSource(Logger,SingletonMap):
         Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, 
         enablePolling, use_events 
         """
+        ##Set logging
+        #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
+        Logger.__init__(self,name) #self.full_name) #This must be done early
+        
+        self.setLogLevel(kw.get('loglevel',kw.get('log_level',
+            kw.get('logLevel',self.DEFAULT_LOG))))
+        self.info('Init(%s)'%str(kw))
+        
         #@TODO: All this mangling to be replaced by fandango.parse_tango_model
         if 0 < name.replace('//','/').count('/') < name.count(':')+3:
             name += '/state'
@@ -637,14 +645,7 @@ class EventSource(Logger,SingletonMap):
         self.normal_name = '/'.join(self.device.split('/')[-3:]
                         +[self.simple_name])
         assert self.fake or self.proxy,\
-            '%s,%s: A valid device name is needed'%(name,parent)
-        
-        ##Set logging
-        #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
-        Logger.__init__(self,self.full_name)
-        self.setLogLevel(kw.get('loglevel',kw.get('log_level',
-            kw.get('logLevel',self.DEFAULT_LOG))))
-        self.info('Init(%s)'%str(kw))
+            '%s: A valid and existing device is needed'%(name)
         
         self.listeners = defaultdict(set) #[]       
         self.event_ids = dict() # An {EventType:ID} dict      
@@ -706,6 +707,8 @@ class EventSource(Logger,SingletonMap):
         
     def cleanUp(self):
         self.debug("cleanUp")
+        if not hasattr(self,'listeners'):
+            return
         while self.listeners:
           self.removeListener(self.listeners.popitem(),exclude='')
         if self.isPollingEnabled():

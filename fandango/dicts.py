@@ -207,8 +207,12 @@ class ThreadDict(dict):
     #@self_locked        
     def stop(self):
         print 'Stopping ThreadDict ...'
-        if self.threaded and hasattr(self,'event'): self.event.set()
-        if hasattr(self,'_Thread'): self._Thread.join()
+        if self.threaded and hasattr(self,'event'): 
+            print('event set')
+            self.event.set()
+        if hasattr(self,'_Thread'): 
+            print('thread join')
+            self._Thread.join()
         print 'ThreadDict Stopped'
 
     def alive(self):

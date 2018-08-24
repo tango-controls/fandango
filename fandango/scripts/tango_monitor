@@ -1,33 +1,58 @@
 #!/usr/bin/python
 
-"""
-usage: devicemonitor <device name> [ <attr name> ]*
+__doc__ = """
+usage: 
+  tango_monitor <device name> [ <attr regexp> ]*
 """
 
 import sys
 import time
 import PyTango
+import fandango as fn
 
-def main():
-  m = PyTango.DeviceProxy(sys.argv[1])
-
+def monitor(d, args=[], events = []):
+  """
+  monitor(device,[attributes])
+  """
+    
+  dp = PyTango.DeviceProxy(d)
   cb = PyTango.utils.EventCallBack()
 
-  if len(sys.argv) == 2:
-      attrs = "state",
-  else:
-      attrs = map(str.strip, sys.argv[2:])
+  args = map(str.strip, args) if args else ["state"]
+  attrs = [a for a in dp.get_attribute_list()
+           if any(fn.clmatch(r,a) for r in args)]
+  events = events or [PyTango.EventType.CHANGE_EVENT]
+    
+  print('%s matched %d attributes' % (d,len(attrs)))
 
-  attrs = map(str.strip, attrs)
+  eis,worked,failed = [],[],[]
+  for a in attrs:
+    try:
+      for e in events:
+        eis.append(dp.subscribe_event(a,e,cb))
+      worked.append(a)
+    except:
+      failed.append(a)
 
-  eids = [m.subscribe_event(attr, PyTango.EventType.CHANGE_EVENT, cb) for attr in attrs]
-
+  print('%d attributes NOT provide events: %s' % (len(failed),failed))      
+  print('%d attributes provide events: %s' % (len(worked),worked))
+  print('-'*80 + '\n' + '-'*80)
   try:
       while True:
           time.sleep(1)
-  except KeyboardInterrupt:
-      print "Finsihed monitoring"
+  except: #KeyboardInterrupt
+      print(fn.excep2str())
+      print('-'*80)
+      print "Finished monitoring"
+      
+  [dp.unsubscribe_event(ei) for ei in eis];
     
 if __name__ == '__main__':
-  main()    
+  import sys
+  try:
+    monitor(sys.argv[1],sys.argv[2:])
+  except:
+    print(fn.except2str())
+    print(__doc__)
+    
 

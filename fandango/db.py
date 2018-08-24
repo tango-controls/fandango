@@ -40,8 +40,26 @@ This package implements a simplified acces to MySQL using FriendlyDB object.
 Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 """
 
-import time,datetime,log,traceback,sys
+import os,time,datetime,log,traceback,sys
+
 import MySQLdb
+"""
+Instead of using the outdated MySQL-python package or Oracle's mysql.connector, 
+try to install mysqlclient instead:
+
+https://pypi.org/project/mysqlclient/#description
+https://github.com/PyMySQL/mysqlclient-python
+https://mysqlclient.readthedocs.io
+
+To install it on Debian:
+  
+  sudo aptitude remove python-mysqldb
+  sudo aptitude install python-pip
+  sudo aptitude install libmariadbclient-dev
+  sudo pip install mysqlclient
+
+"""
+
 
 class FriendlyDB(log.Logger):
     """ 
