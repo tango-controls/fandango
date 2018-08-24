@@ -229,6 +229,16 @@ class TangoEval(object):
         self.macros = [('FIND(%s)',self.FIND_EXP,self.find_macro)]
         
         self._trace = trace
+        
+        self.init_locals()
+        
+        if self.formula and launch: 
+            self.eval()
+            if not self._trace: 
+                print('TangoEval: result = %s' % self.result)
+        return
+    
+    def init_locals(self):
         self._defaults = dict(
             [(str(v),v) for v in DevState.values.values()]+
             [(str(q),q) for q in AttrQuality.values.values()]
@@ -257,13 +267,7 @@ class TangoEval(object):
         #self._defaults.update((k,None) for k in ('os','sys',)) 
         
         #Having 2 dictionaries to reload defaults when needed
-        self._locals = dict(self._defaults) 
-        
-        if self.formula and launch: 
-            self.eval()
-            if not self._trace: 
-                print('TangoEval: result = %s' % self.result)
-        return
+        self._locals = dict(self._defaults)    
             
     def trace(self,msg):
         if self._trace: print('TangoEval: %s'%str(msg))
