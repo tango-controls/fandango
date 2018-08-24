@@ -1,4 +1,4 @@
-RELEASE_NOTE = "Fandango 13.2.*; Cached tango database methods"
+RELEASE_NOTE = "Fandango 13.*; Cached tango database methods"
 
 """
 IMPORTANT:
@@ -10,6 +10,25 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
+
+13.9.0 - August 2018
+--------------------
+
+DynamicDS: 
+  solves critical bug in get_default_properties
+  Enable events on raw attribute change
+  Solve bugs on array events and qualities
+
+  tango_monitor refactored
+  fixed bugs on EventSource init/del
+  allow dots on device names (req by Philal)
+  better event check
+  set archive event as optional on DynamicDS
+  export devices: vector/list bug solved by kmadisa
+  export more attribute properties (by kmadisa)
+  critical bug solved on XATTR (long uris)
+
+
 
 13.7.0 - Abril 2018
 -------------------
