@@ -184,6 +184,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self._external_attributes = CaselessDict()
         self._external_listeners = CaselessDict() #CaselessDefaultDict(set)
         self._external_commands = CaselessDict()
+        self._events_paused = False
 
         self.time0 = time.time() #<< Used by child devices to check startup time
         self.simulationMode = False #If it is enabled the ForceAttr command overwrites the values of dyn_values
@@ -672,7 +673,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             self.error('DynamicDS.attribute_polling_report() failed!\n%s'%traceback.format_exc())
         self.info('-'*80)
         
-    @Cached(depth=200,expire=15.)
+    @Cached(depth=1024,expire=15.)
     def check_attribute_events(self,aname,poll=False):
         
         self.UseEvents = filter(bool,
@@ -680,6 +681,9 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.debug('check_attribute_events(%s,%s,%s)'
                    %(aname,poll,self.UseEvents))
 
+        if self._events_paused:
+            self.warning('Events paused externally!')
+            return False
         if not len(self.UseEvents) or self.UseEvents[0] in ('no','false'):
             return ''
         elif clmatch('state$',aname) or clmatch(EVENT_TYPES,self.UseEvents[0]):
@@ -692,7 +696,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             
         return ''
     
-    @Cached(depth=200,expire=15.)
+    @Cached(depth=1024,expire=15.)
     def check_events_config(self,aname):
         cabs,crel = 0,0
         try:
@@ -706,7 +710,12 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
     
     def check_changed_event(self,aname,new_value):
         aname = self.get_attr_name(aname)
-        if aname not in self.dyn_values: return False
+        if aname not in self.dyn_values: 
+            self.warning('Unknown %s attribute!'%aname)
+            return False
+        if self._events_paused:
+            self.warning('Events paused externally!')
+            return False    
         try:
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
@@ -1892,6 +1901,22 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         self.debug('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout
     
+    def setPauseEvents(self,argin):
+        ov = self._events_paused
+        self._events_paused = bool(fun.clmatch('yes|true',argin))
+        if not self._events_paused and ov:
+            for a,v in self.dyn_values.items():
+                events = self.check_attribute_events(a)
+                if v.keep and events:
+                    aname,value,date,quality = a,v.value,v.date,v.quality
+                    self.info('Pushing %s event!: %s(%s)\n%s'
+                            %(aname,type(value),shortstr(value),'<'*80))
+                    self.push_change_event(aname,value,date,quality)
+                    if fun.clsearch('archive',events):
+                        self.push_archive_event(aname,value,date,quality)
+                
+        return str(self.check_attribute_events('state'))
+    
     #------------------------------------------------------------------
     #    GetDynamicConfig command:
     #
@@ -2087,6 +2112,12 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
+        'setPauseEvents':
+            [[PyTango.DevString, "Enable/Disable events"],
+            [PyTango.DevString, "Enable/Disable events"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],            
         'Help':
             [[PyTango.DevVoid, ""],
             [PyTango.DevString, "python docstring"],],
