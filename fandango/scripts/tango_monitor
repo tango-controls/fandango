@@ -10,13 +10,37 @@ import time
 import PyTango
 import fandango as fn
 
+class MyCallback():
+    
+    def __init__(self):
+        self.t0 = time.time()
+        self.counters = fn.dicts.defaultdict(int)
+        self.values = fn.dicts.defaultdict(str)
+        self.dups = fn.dicts.defaultdict(int)
+        self.ratios = fn.dicts.defaultdict(float)
+
+    def push_event(self,event):
+        aname = fn.tango.get_normal_name(event.attr_name)
+        self.counters[aname] = self.counters[aname] + 1
+        self.ratios[aname] = self.counters[aname] / (time.time()-self.t0)
+        
+        value = fn.shortstr(event.attr_value.value)
+        if self.values[aname] == value:
+            self.dups[aname] += 1
+            
+        self.values[aname] = value
+        print('%s:%s = %s; ct=%d, e/s=%2.2f, dups=%d' %
+                (fn.time2str(),aname,value,self.counters[aname],
+                self.ratios[aname],self.dups[aname]))
+        
+
 def monitor(d, args=[], events = []):
   """
   monitor(device,[attributes])
   """
     
   dp = PyTango.DeviceProxy(d)
-  cb = PyTango.utils.EventCallBack()
+  cb = MyCallback() #PyTango.utils.EventCallBack()
 
   args = map(str.strip, args) if args else ["state"]
   attrs = [a for a in dp.get_attribute_list()
