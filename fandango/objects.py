@@ -56,6 +56,7 @@ from operator import isCallable, isSequenceType
 from collections import Hashable
 from types import MethodType
 import Queue
+import threading
 import functools
 
 try: from collections import namedtuple #Only available since python 2.6
@@ -735,6 +736,7 @@ class Cached(Decorator):
         self.expire = expire
         self.catched = catched
         self.decorate(target)
+        self.lock = threading.Lock()
           
     def __call__(self,*args,**kwargs):
         """
@@ -780,15 +782,19 @@ class Cached(Decorator):
             self.f = None
             
     def prune(self,expire=None,depth=None):
-        depth = notNone(depth,self.depth)
-        expire = time.time()-notNone(expire,self.expire)
-        cache = sorted(k for k in self.cache if k[0]>expire)
-        if (len(cache)!=len(self.cache) or len(cache)>self.depth):
-            #self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
-            pass
-            
-        self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
-        return sorted(self.cache.keys())
+        try:
+            self.lock.acquire()
+            depth = notNone(depth,self.depth)
+            expire = time.time()-notNone(expire,self.expire)
+            cache = sorted(k for k in self.cache.keys() if k[0]>expire)
+            if (len(cache)!=len(self.cache) or len(cache)>self.depth):
+                #self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
+                pass
+                
+            self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
+            return sorted(self.cache.keys())
+        finally:
+            self.lock.release()
     
     def clear(self):
         self.cache.clear()
