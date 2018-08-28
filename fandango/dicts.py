@@ -208,10 +208,11 @@ class ThreadDict(dict):
     def stop(self):
         print 'Stopping ThreadDict ...'
         if self.threaded and hasattr(self,'event'): 
-            print('event set')
+            #print('event set')
             self.event.set()
+        self.event.wait(5.e-3)
         if hasattr(self,'_Thread'): 
-            print('thread join')
+            #print('thread join')
             self._Thread.join()
         print 'ThreadDict Stopped'
 

@@ -978,7 +978,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
                         self.set_archive_event(aname.lower(),True,False)
                         
                 if fun.isNumber(events) and aname not in new_polled_attrs:
-                    new_polled_attrs[aname] = int(c)
+                    new_polled_attrs[aname] = int(events)
                     
             elif self.dyn_values[aname].keep:
                 self._locals[aname] = None
@@ -1025,7 +1025,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             events = self.check_attribute_events(x)
             if events and x not in new_polled_attrs:
                 #To be added at next restart
-                self.warning('%s events are managed by polling (%s)'%(x,c))
+                self.warning('%s events will be polled (%s)'%(x,events))
                 new_polled_attrs[x] = int(events) if fun.isNumber(events) \
                     else self.DEFAULT_POLLING_PERIOD
             if x!='state': 
@@ -1280,7 +1280,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
         @remark Generators don't work  inside eval!, use lists instead
         '''
         aname = self.get_attr_name(aname)
-        self.info("DynamicDS(%s)::evalAttr(%s): ... last value was %s"
+        self.debug("DynamicDS(%s)::evalAttr(%s): ... last value was %s"
             % (self.get_name(), aname, shortstr(
                 getattr(self.dyn_values.get(aname,None),'value',None))))
         tstart = time.time()
@@ -1360,7 +1360,7 @@ class DynamicDS(PyTango.Device_4Impl,Logger):
             events = self.check_attribute_events(aname)
             check = events and self.check_changed_event(aname,result)
 
-            self.info('events = %s, check = %s' % (events,check))
+            self.debug('events = %s, check = %s' % (events,check))
             #Events must be checked before updating the cache
             if events and (check or fun.clsearch('push',events)):
                 self.info('Pushing %s event!: %s(%s)\n%s'
