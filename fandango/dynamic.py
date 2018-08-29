@@ -525,15 +525,19 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self.warning('In updateDynamicAttributes(): reloading DynamicDS properties from Database')
         self.get_DynDS_properties()
         
-        ##All attributes managed with dyn_attr() that does not appear in DynamicAttributes or StaticAttributes list will be removed!
-        attrs_list = [name.split('=',1)[0].strip() for name in (self.DynamicAttributes + (getattr(self,'StaticAttributes',None) or []))]
+        ##All attributes managed with dyn_attr() that does not appear 
+        # in DynamicAttributes or StaticAttributes list will be removed!
+        attrs_list = [name.split('=',1)[0].strip() for name in 
+            (self.DynamicAttributes + (getattr(self,'StaticAttributes',None) 
+                                       or []))]
         for a in self.dyn_attrs:
             if a not in attrs_list:
-                self.warning('DynamicDS.updateDynamicAttributes(): Removing Attribute!: %sn not in [%s]' % (a,attrs_list))
+                self.warning('DynamicDS.updateDynamicAttributes(): '
+                    'Removing Attribute!: %sn not in [%s]' % (a,attrs_list))
                 try:
                     self.remove_attribute(a)
                 except Exception,e:
-                    self.error('Unable to remove attribute %s: %s' % (a,str(e)))
+                    self.error('Unable to remove attribute %s: %s'%(a,str(e)))
         DynamicDS.dyn_attr(self)
         
         #Updating DynamicCommands (just update of formulas)
@@ -711,7 +715,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                 in self.KeepAttributes for q in [aname,'*','yes','true']))            
             if events:
                 self._locals[aname] = None
-                if events:
+                if create and events:
                     # THIS IS CONFIGURING EVENTS TO BE "MANUAL", 
                     # pushed and unfiltered by Jive settings
                     self.set_change_event(aname.lower(),True,False)
@@ -802,7 +806,7 @@ class DynamicDSAttrs(DynamicDSImpl):
 
         if self._events_paused:
             self.warning('Events paused externally!')
-            return False
+            return '' #False
         if not len(self.UseEvents) or self.UseEvents[0] in ('no','false'):
             return ''
         elif clmatch('state$',aname) or clmatch(EVENT_TYPES,self.UseEvents[0]):
@@ -1063,6 +1067,36 @@ class DynamicDSAttrs(DynamicDSImpl):
     
     ##This hook has been used to force self to be passed always as argument and avoid dynattr missmatching
     if USE_STATIC_METHODS: write_dyn_attr=staticmethod(write_dyn_attr)
+    
+    def push_dyn_attr(self,aname,value=None,events=None,
+                      changed=None,queued=False):
+        
+        if fun.clmatch('state$',aname):
+            value = value if value is not None else self.get_state()
+            date,quality = time.time(),AttrQuality.ATTR_VALID
+        else:
+            t = self.dyn_values.get(aname)
+            if t is not None:
+                value,date,quality = notNone(value,t.value),t.date,t.quality
+            else:
+                value,date,quality = value,time.time(),AttrQuality.ATTR_VALID
+            
+        if events is None:
+            events = self.check_attribute_events(aname)
+        if changed is None:
+            changed = self.check_changed_event(aname,value)
+        if not events and not changed:
+            return            
+            
+        self.info('push_dyn_attr(%s) %s: %s(%s))\n%s'%(aname,
+            ['pushed','queued'][queued],type(value),shortstr(value),'<'*80))
+        
+        if 0: #queued:
+            pass
+        else:
+            self.push_change_event(aname,value,date,quality)
+            if fun.clsearch('archive',events):
+                self.push_archive_event(aname,value,date,quality)  
 
     #------------------------------------------------------------------------------------------------------
     #   Attributes and State Evaluation Methods
@@ -1153,19 +1187,11 @@ class DynamicDSAttrs(DynamicDSImpl):
             date = self.get_attr_date(aname,result)
             value = self.dyn_types[aname].pytype(result)
             events = self.check_attribute_events(aname)
-            check = events and self.check_changed_event(aname,result)
-
-            self.debug('events = %s, check = %s' % (events,check))
             #Events must be checked before updating the cache
-            if events and (check or fun.clsearch('push',events)):
-                self.info('Pushing %s event!: %s(%s)\n%s'
-                            %(aname,type(value),shortstr(value),'<'*80))
-                self.push_change_event(aname,value,date,quality)
-                if fun.clsearch('archive',events):
-                    self.push_archive_event(aname,value,date,quality)
-                
+            check = events and self.check_changed_event(aname,result)
+            
             #Updating the cache:
-            if self.dyn_values[aname].keep: 
+            if events or self.dyn_values[aname].keep: 
                 old = self.dyn_values[aname].value
                 self.dyn_values[aname].update(value,date,quality)
                 self._locals[aname] = value
@@ -1176,7 +1202,11 @@ class DynamicDSAttrs(DynamicDSImpl):
                         self.check_state()
                 except:
                     self.warning('Unable to check state!')
-                    self.warning(traceback.format_exc())
+                    self.warning(traceback.format_exc())            
+
+            self.debug('events = %s, check = %s' % (events,check))
+            if events and (check or fun.clsearch('push',events)):
+                self.push_dyn_attr(aname,None,events,True,True)
 
             return result
 
@@ -1196,7 +1226,8 @@ class DynamicDSAttrs(DynamicDSImpl):
             if 1:
                 print('\n'.join(['DynamicDS_evalAttr_WrongFormulaException','%s is not a valid expression!'%(formula,),]))
             s = traceback.format_exc()
-            self.error(s)
+            #self.error(s)
+            print(s)
             raise e #Exception(s)
         
         finally:
@@ -1300,7 +1331,11 @@ class DynamicDSAttrs(DynamicDSImpl):
                 self.warning('Unable to generate DynamicStatus:\n%s'%traceback.format_exc())
         return status.strip()    
 
-
+    def processEvents(self):
+        """
+        Polled command to process the internal event queue
+        """
+        pass
             
 ######################################################################################################
 # INTERNAL DYNAMIC DEVICE SERVER METHODS
@@ -1791,13 +1826,7 @@ class DynamicDS(DynamicDSHelpers):
                 self.last_state_change = now
                 events = self.check_attribute_events('state')
                 if push and events: 
-                    self.info('DynamicDS(%s.set_state(): '
-                        'pushing new state event: %s'%(self.get_name(),diff))
-                    self.push_change_event('State',state,now,
-                                            AttrQuality.ATTR_VALID)
-                    if fun.clsearch('archive',str(self.UseEvents)):
-                        self.push_archive_event('State',state,now,
-                                            AttrQuality.ATTR_VALID)
+                    self.push_dyn_attr('State',state,events,True,True)
         except Exception,e: 
             self.warning('DynamicDS.set_state(%s) failed!: %s'%(state,e))
             
@@ -1851,13 +1880,7 @@ class DynamicDS(DynamicDSHelpers):
         if not self._events_paused and ov:
             for a,v in self.dyn_values.items():
                 events = self.check_attribute_events(a)
-                if v.keep and events:
-                    aname,value,date,quality = a,v.value,v.date,v.quality
-                    self.info('Pushing %s event!: %s(%s)\n%s'
-                            %(aname,type(value),shortstr(value),'<'*80))
-                    self.push_change_event(aname,value,date,quality)
-                    if fun.clsearch('archive',events):
-                        self.push_archive_event(aname,value,date,quality)
+                self.push_dyn_attr(aname,None,events,True,False)
                 
         return str(self.check_attribute_events('state'))
     
@@ -2104,6 +2127,14 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],
+        'processEvents':
+            [[PyTango.DevVoid, "process the event queue"],
+            [PyTango.DevLong, "number of events processed"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+                'Polling period': 10000,
+            } ],
+
         }
 
     #    Attribute definitions
