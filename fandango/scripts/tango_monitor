@@ -24,7 +24,7 @@ class MyCallback():
         self.counters[aname] = self.counters[aname] + 1
         self.ratios[aname] = self.counters[aname] / (time.time()-self.t0)
         
-        value = fn.shortstr(event.attr_value.value)
+        value = fn.shortstr(event.attr_value and event.attr_value.value)
         if self.values[aname] == value:
             self.dups[aname] += 1
             
