@@ -225,6 +225,7 @@ class ThreadDict(dict):
     def run(self):
         self.tracer('In ThreadDict.run()')
         while not self.event.isSet():
+            self.set_last_cycle_start(time.time())
             keys = sorted(self.threadkeys())
             if self._last_read and self._last_read!=keys[-1]: #Thread stopped before finishing the cycle!
                 keys = keys[keys.index(self._last_read)+1:]
