@@ -54,13 +54,6 @@ from tango import get_full_name,get_attribute_events, check_device_cached
 from threads import ThreadedObject,timed_range,wait,threading
 from log import Logger,printf,tracer
 
-try:
-    import queue
-    import queue as Queue
-except:
-    import Queue
-    import Queue as queue
-
 """
 @package callbacks
 

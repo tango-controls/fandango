@@ -42,17 +42,12 @@ import time,threading,multiprocessing,traceback
 import imp,__builtin__,pickle,re
 from threading import Event,Lock,RLock,Thread
 
-try: import Queue
-except: import queue as Queue
-
 from log import except2str,shortstr,tracer
 from functional import *
 from excepts import trial,Catched,CatchedArgs
 from operator import isCallable
-from objects import Singleton,Object,SingletonMap
+from objects import Queue, Singleton, Object, SingletonMap
 
-try: from collections import namedtuple #Only available since python 2.6
-except: pass
 
 ###############################################################################
 
@@ -1062,7 +1057,10 @@ class Pool(object):
             self._myThread = multiprocessing.Process
             self._myQueue = multiprocessing.Queue
         else:
-            import Queue
+            try:
+                import Queue
+            except:
+                import queue as Queue
             self._myThread = threading.Thread
             self._myQueue = Queue.Queue
         self._action = action

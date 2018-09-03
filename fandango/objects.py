@@ -55,12 +55,21 @@ from fandango.functional import *
 from operator import isCallable, isSequenceType
 from collections import Hashable
 from types import MethodType
-import Queue
 import threading
 import functools
 
-try: from collections import namedtuple #Only available since python 2.6
-except: pass
+#Python 2-3 conundrum
+try:
+    import queue
+    import queue as Queue
+except:
+    import Queue
+    import Queue as queue
+
+try: 
+    from collections import namedtuple #Only available since python 2.6
+except: 
+    namedtuple = None
 
 ## Inspection methods
 

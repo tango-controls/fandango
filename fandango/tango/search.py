@@ -135,7 +135,7 @@ def get_matching_devices(expressions,limit=0,exported=False,
         if host in (None,defhost):
             db_devs = get_all_devices(exported)
         else:
-            print('get_matching_devices(*%s)'%host)
+            #print('get_matching_devices(*%s)'%host)
             odb = PyTango.Database(*host.split(':'))
             db_devs = odb.get_device_exported('*') if exported \
                         else odb.get_device_name('*','*')
