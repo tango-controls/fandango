@@ -14,7 +14,7 @@ fi
 
 DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property('ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
 if [ "$DSORB" ] ; then
- DSORB="-ORBendPoint $DSORB"
+ DSORB="--ORBendPoint $DSORB"
 fi
 
 DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
