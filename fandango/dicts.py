@@ -180,6 +180,8 @@ class ThreadDict(dict):
         self.last_update = 0
         self._last_read = ''
         self.last_cycle_start = 0
+        self.cycle_count = 0
+        self.cycle_average = 0
         self.parent = type(self).mro()[1] #equals to self.__class__.__base__ or type(self).__bases__[0]
         if other: dict.update(self,other)
     
@@ -208,10 +210,11 @@ class ThreadDict(dict):
     def stop(self):
         print 'Stopping ThreadDict ...'
         if self.threaded and hasattr(self,'event'): 
-            print('event set')
+            #print('event set')
             self.event.set()
+        self.event.wait(5.e-3)
         if hasattr(self,'_Thread'): 
-            print('thread join')
+            #print('thread join')
             self._Thread.join()
         print 'ThreadDict Stopped'
 
@@ -224,6 +227,7 @@ class ThreadDict(dict):
     def run(self):
         self.tracer('In ThreadDict.run()')
         while not self.event.isSet():
+            self.set_last_cycle_start(time.time())
             keys = sorted(self.threadkeys())
             if self._last_read and self._last_read!=keys[-1]: #Thread stopped before finishing the cycle!
                 keys = keys[keys.index(self._last_read)+1:]
@@ -242,8 +246,14 @@ class ThreadDict(dict):
                     if self.event.isSet(): break
                     else: self.event.wait(self.timewait)
                 if self.event.isSet(): break
-            timewait = self.get_timewait()
-            self.event.wait(timewait)
+
+            try:
+                self.cycle_average = (((self.cycle_average*self.cycle_count) + 
+                    (time.time()-self.last_cycle_start)) / (self.cycle_count+1))
+                self.cycle_count += 1
+            except:
+                traceback.print_exc()
+            self.event.wait(self.get_timewait())
         self.tracer('End of ThreadDict')
         
     @self_locked

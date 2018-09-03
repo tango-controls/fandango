@@ -11,6 +11,44 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+14.1.0 - August 2018
+--------------------
+
+Queued events in DynamicDS
+
+DynamicDS:
+    Queued event sending using processEvents() and MaxEventStream
+    Added EventQueueSize attribute
+    Bug solved on DynamicDS (ORBEndPoint)
+    Change in CopyCatDS ORBendPoint args
+    solve bug on received exception
+    Add ThreadDict cycle time measures
+    Solved bug on dyn_attr when called on running devices
+    Attribute pushing moved to push_dyn_attr method
+
+    Solve queue/Queue imports in several modules
+
+Fandango 14.0: Refactoring of fandango.dynamic
+
+    DynamicAttribute moved to tango.dynattr
+    Properties, Attributes, Helpers divided in 3 classes
+    traces cleanup
+    add stats to monitored events
+    allow named args on shell
+    increase cache sizes, add setPauseEvents
+    add locks to Cached.prune
+
+    refactored Keep/Events management
+    refactored init_locals()
+    refactored get_attr_name
+    refactored evalAttr
+    KeepTime/cache moved to evalAttr
+    simplified event check
+    unused code commented
+    added DynamicAttribute.updated
+    Added init_locals method
+
+
 13.9.0 - August 2018
 --------------------
 

@@ -96,7 +96,7 @@ if __name__ == '__main__':
         import PyTangoArchiving
         from PyTangoArchiving import Reader
         from PyTangoArchiving.files import LoadArchivingConfiguration
-        locals()['pta'] = PyTangoArchiving
+        locals()['pta'] = locals()['PyTangoArchiving'] = PyTangoArchiving
       except: pass
       try: 
         import panic
@@ -151,9 +151,15 @@ if __name__ == '__main__':
     ###########################################################################
       else:
         ## MULTIPLE ARGS COMMAND
-        args = ','.join((str(c) if isNumber(c) else 
-            ("'%s'" if "'" not in c else '"%s"')%c) for c in comms[1:])
-        cmd = '%s(*[%s])'%(comms[0],args)
+        str2evalstr = lambda c: (
+            str(c) if isNumber(c) else ("'%s'" if "'" not in c else '"%s"')%c)
+        kwargs = [c for c in comms[1:] if c.count('=')==1]
+        args = [c for c in comms[1:] if c not in kwargs]
+        
+        kwargs = ','.join("'%s':%s"%(k,str2evalstr(v)) for k,v in 
+                          (c.split('=') for c in kwargs))
+        args = ','.join(str2evalstr(c) for c in args)
+        cmd = '%s(*[%s],**{%s})'%(comms[0],args,kwargs)
         r = evalX(cmd,_locals=locals())
         
     if opts.get('v'): print(cmd)
