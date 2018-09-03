@@ -28,6 +28,26 @@ DynamicDS:
 
     Solve queue/Queue imports in several modules
 
+Fandango 14.0: Refactoring of fandango.dynamic
+
+    DynamicAttribute moved to tango.dynattr
+    Properties, Attributes, Helpers divided in 3 classes
+    traces cleanup
+    add stats to monitored events
+    allow named args on shell
+    increase cache sizes, add setPauseEvents
+    add locks to Cached.prune
+
+    refactored Keep/Events management
+    refactored init_locals()
+    refactored get_attr_name
+    refactored evalAttr
+    KeepTime/cache moved to evalAttr
+    simplified event check
+    unused code commented
+    added DynamicAttribute.updated
+    Added init_locals method
+
 
 13.9.0 - August 2018
 --------------------
