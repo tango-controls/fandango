@@ -1355,16 +1355,17 @@ class DynamicDSAttrs(DynamicDSImpl):
         try:
             c = 0
             t0 = fun.now()
-            if not self.MaxEventStream:
+            if (not self.MaxEventStream or 
+                    not self.check_attribute_events('state')):
                 self.debug('Events not queued ...')
-                return
+                return 0
             self._events_lock.acquire()
             self.info('*'*80)
             self.info('In processEvents(%d/%d)'
                 % (self.MaxEventStream,self._events_queue.qsize()))
             self.info('*'*80)
             if self._events_queue.empty():
-                return
+                return 0
             for i in range(self.MaxEventStream):
                 try:
                     a,v,d,q,e = self._events_queue.get(False)
@@ -1372,6 +1373,9 @@ class DynamicDSAttrs(DynamicDSImpl):
                     c+=1
                 except objects.Queue.Empty:
                     break
+                except Exception as e:
+                    self.warning('push(%s) failed!' % str((a,v,d,q,e)))
+                    traceback.print_exc()
         except:
             self.warning(traceback.format_exc())
         finally:
