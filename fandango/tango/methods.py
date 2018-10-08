@@ -1140,7 +1140,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
     except Exception,e:
         return e if throw else None
 
-@Cached(depth=1000,expire=10)
+@Cached(depth=1000,expire=10,catched=True)
 def check_device_cached(*args,**kwargs):
     """ 
     Cached implementation of check_device method
@@ -1150,6 +1150,10 @@ def check_device_cached(*args,**kwargs):
 
 def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
     """ checks if attribute is available.
+    
+    Returns None if attribute does not exist, Exception if unreadable, 
+    an AttrValue object if brief is False, just the value or None if True
+    
     :param readable: Whether if it's mandatory that the attribute returns 
             a value or if it must simply exist.
     :param timeout: Checks if the attribute value have been effectively 
@@ -1173,16 +1177,24 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 return None
             else:
                 if not brief:
-                  return attvalue
+                    return attvalue
                 else:
-                  return (getattr(attvalue,'value',
-                                  getattr(attvalue,'rvalue',None)))
+                    return (getattr(attvalue,'value',
+                        getattr(attvalue,'rvalue',None)))
         except Exception,e: 
             if trace: traceback.print_exc()
             return None if readable or brief else e
     except:
         if trace: traceback.print_exc()
         return None
+    
+@Cached(depth=10000,expire=300,catched=True)
+def check_attribute_cached(*args,**kwargs):
+    """ 
+    Cached implementation of check_attribute method
+    @Cached(depth=10000,expire=300,catched=True)
+    """
+    return check_attribute(*args,**kwargs)    
     
 def read_attribute(attr,timeout=0,full=False):
     """ Alias to check_attribute(attr,brief=True)"""

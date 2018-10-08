@@ -12,6 +12,8 @@ import fandango as fn
 
 class MyCallback():
     
+    counter = 0
+    
     def __init__(self):
         self.t0 = time.time()
         self.counters = fn.dicts.defaultdict(int)
@@ -20,6 +22,8 @@ class MyCallback():
         self.ratios = fn.dicts.defaultdict(float)
 
     def push_event(self,event):
+
+        MyCallback.counter+=1
         aname = fn.tango.get_normal_name(event.attr_name)
         self.counters[aname] = self.counters[aname] + 1
         self.ratios[aname] = self.counters[aname] / (time.time()-self.t0)
@@ -29,9 +33,9 @@ class MyCallback():
             self.dups[aname] += 1
             
         self.values[aname] = value
-        print('%s:%s = %s; ct=%d, e/s=%2.2f, dups=%d' %
+        print('%s:%s = %s; ct=%d/%d, e/s=%2.2f, dups=%d' %
                 (fn.time2str(),aname,value,self.counters[aname],
-                self.ratios[aname],self.dups[aname]))
+                MyCallback.counter,self.ratios[aname],self.dups[aname]))
         
 
 def monitor(d, args=[], events = []):
