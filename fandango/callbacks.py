@@ -42,7 +42,7 @@
 ###########################################################################
 """
 import sys,os,time,re
-import threading,weakref
+import threading,weakref,types
 from copy import *
 
 from excepts import getLastException,exc2str
@@ -343,8 +343,9 @@ class EventThread(Logger,ThreadedObject):
         self.info('EventThread.register(%s)'%source)
         if not self.get_started():
             self.start()
-        if source not in self.sources:
-            #self.sources[source.full_name] = source
+        if source in self.sources:
+            self.debug('\t%s already registered'%source)
+        else:
             source.full_name = str(source.full_name).lower()
             self.sources.add(source)
             # sources to not be refreshed in the first keepalive cycle
@@ -517,13 +518,16 @@ class EventThread(Logger,ThreadedObject):
         try:
             if hasattr(source,'fireEvent'):
                 ## Event types are filtered at EventSource.fireEvent
-                source.fireEvent(*args)  
+                source.fireEvent(event_type=args[0],event_value=args[1])  
             elif hasattr(source,'listeners'):
                 listeners = source.listeners.keys()
                 for l in listeners:
-                    try: getattr(l,'eventReceived',l)(*([source]+list(args))) 
-                    except: traceback.print_exc()
-                    finally: self.event.wait(self.MinWait/len(source.listeners))
+                    try: 
+                        getattr(l,'eventReceived',l)(*([source]+list(args))) 
+                    except: 
+                        traceback.print_exc()
+                    finally: 
+                        self.event.wait(self.MinWait/len(source.listeners))
             elif isCallable(source):
                 source(*data[1:0])        
         except:
@@ -640,7 +644,8 @@ class EventSource(Logger,SingletonMap):
         assert self.fake or self.proxy,\
             '%s: A valid and existing device is needed'%(name)
         
-        self.listeners = defaultdict(set) #[]       
+        self.listeners = defaultdict(set) #[]    
+        self._hard_refs = [] #Needed to keep instance method refs @TODO
         self.event_ids = dict() # An {EventType:ID} dict      
         self.state = self.STATES.UNSUBSCRIBED
         self.tango_asynch = kw.get('tango_asynch',False)
@@ -699,7 +704,7 @@ class EventSource(Logger,SingletonMap):
     def getNormalName(self): return self.normal_name
         
     def cleanUp(self):
-        self.debug("cleanUp")
+        self.warning("cleanUp")
         if not hasattr(self,'listeners'):
             return
         while self.listeners:
@@ -829,6 +834,7 @@ class EventSource(Logger,SingletonMap):
 
     def _listenerDied(self, weak_listener):
         try:
+            self.warning('_listenerDied(%s)!' % str(weak_listener))
             self.listeners.pop(weak_listener)
         except Exception, e:
             pass
@@ -865,13 +871,22 @@ class EventSource(Logger,SingletonMap):
         if self.forced and not self.polled:
             self.activatePolling()
 
+        if type(listener) == types.MethodType:
+            self.info('keeping hard ref')
+            # Bound methods will die on arrival if not kept (sigh)
+            self._hard_refs.append(listener)
+
         weak = weakref.ref(listener,self._listenerDied)
+            
         if weak not in self.listeners:
             #This line is needed, as listeners may be polling only
             self.listeners[weak] = set()
         for e in use_events:
             self.listeners[weak].add(e)
 
+        self.debug('addListener(%s): %d listeners registered'  
+                   % (listener,len(self.listeners)))
+        print(id(self),self.full_name)
         return True
 
     def removeListener(self, listener, exclude='dummy'):
@@ -879,7 +894,7 @@ class EventSource(Logger,SingletonMap):
         Remove a listener object or callback.
         :listener: can be object, weakref, sequence or '*'
         """
-            
+        self.info('removeListener(%s)' % listener)
         if listener == '*':
             self.warning('Removing all listeners')
             listener = [k for k in self.listeners.keys() if not k().name==exclude]
@@ -893,12 +908,18 @@ class EventSource(Logger,SingletonMap):
             return
         
         elif not isinstance(listener,weakref.ReferenceType):
-            listener = weakref.ref(listener,self._listenerDied)
+            try:
+                if listener in self._hard_refs:
+                    self._hard_refs.remove(listener)
+            except:
+                traceback.print_exc()
+            listener = weakref.ref(listener)
             
         try:
             self.listeners.pop(listener)
         except Exception, e:
             return False
+            
         if not self.listeners:
             self.unsubscribeEvents()
         return True
@@ -917,6 +938,7 @@ class EventSource(Logger,SingletonMap):
         event type filtering is done here
         poll() events will be allowed to pass through
         """
+        self.debug('fireEvent()')
         pending = self.get_thread().get_pending()
         if pending:
           self.warning('fireEvent(%s), %d events still in queue'%
@@ -924,6 +946,8 @@ class EventSource(Logger,SingletonMap):
         self.stats['fired']+=1
 
         listeners = listeners or self.listeners.keys()
+        self.debug('fireEvent(): %d/%d listeners' 
+                   % (len(listeners),len(self.listeners)))
         for l in listeners:
             try:
                 #event filter will allow poll() events to pass through
@@ -939,8 +963,14 @@ class EventSource(Logger,SingletonMap):
                 if hasattr(l,'eventReceived'):
                     self.debug('fireEvent(%s) => %s?' % (event_type,l))
                     l.eventReceived(self, event_type, event_value)
+                elif hasattr(l,'event_received'):
+                    self.debug('fireEvent(%s) => %s?' % (event_type,l))
+                    l.event_received(self, event_type, event_value)
                 elif isCallable(l):
+                    self.debug('fireEvent(%s) => %s()' % (event_type,l))
                     l(self, event_type, event_value)
+                else:
+                    self.debug('fireEvent(%s): %s!?!?!?!?' % (event_type,l))
             except:
                 traceback.print_exc()
         try:
@@ -1283,6 +1313,7 @@ class EventSource(Logger,SingletonMap):
               et = t0
               
             if event.err:
+                # MANAGING ERROR EVENTS
                 self.last_error = event
                 has_evs,is_polled = self.isUsingEvents(),self.isPollingActive()
                 value = event.errors[0]
@@ -1323,12 +1354,14 @@ class EventSource(Logger,SingletonMap):
                     self.last_event_time = et or time.time() 
             
             elif isinstance(event,PyTango.AttrConfEventData):
+                # MANAGING CONF EVENTS
                 self.debug('push_event(%s)'%str(type_))
                 value = event.attr_conf
                 self.decodeAttrInfoEx(value)
                 #(Taurus sends here a read cache=False instead of AttrConf)
                 
             else:
+                # MANAGING VALUE EVENTS
                 (self.debug if self.last_event.get(type_,None) else self.info)(
                   'push_event(%s,err=%s,has_events=%s)'%(type_,event.err,self.isUsingEvents()))
                 
@@ -1370,6 +1403,27 @@ class TangoListener(EventListener):
 class TangoAttribute(EventSource):
     __doc__ = EventSource.__doc__
     pass
+    
+# Taurus <-> Tango event types conversion
+
+def taurusevent2tango(src,type_,value):
+    # Converts (src,type,value) into a fake PyTango.EventData object
+    from fandango import Struct
+    event = Struct()
+    event.source = src
+    event.event = type_
+    event.type = type_
+    #EventData uses only full URL names
+    event.attr_name = getattr(src,'full_name',getattr(src,'attr_name',str(src)))
+    event.device = src.proxy
+    event.attr_value = value
+    event.err = not hasattr(value,'value') or 'err' in str(type_) or isinstance(value,Exception)
+    event.errors = [] if not event.err else [value]
+    event.date = getattr(value,'time',None)
+    event.time = fandango.ctime2time(event.date) if event.date else time.time()
+    #event.get_date = lambda t=event.date:return t
+    event.reception_date = event.date or event.time
+    return event
   
 #For backwards compatibility
 import fandango.tango
