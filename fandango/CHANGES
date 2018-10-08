@@ -11,6 +11,10 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+14.2.0
+
+Bugfixes on callbacks/EventSource and servers/Astor methods
+
 14.1.0 - August 2018
 --------------------
 
