@@ -272,7 +272,12 @@ class ThreadDict(dict):
     def set_timewait(self,value): self.timewait=value
     
     @self_locked
-    def append(self,key,value=None,period=0): #period=0 means that attribute will be updated always
+    def append(self,key,value=None,period=0): 
+        """
+        args: key, value=None, period=0
+        periods shall be specified in seconds
+        period=0 means that attribute will be updated every timewait*length
+        """
         if not dict.has_key(self,key): self.parent.__setitem__(self,key,value)
         if key not in self._threadkeys: 
             self._threadkeys.append(key)
