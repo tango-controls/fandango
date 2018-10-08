@@ -135,9 +135,9 @@ except those with period < keepTime ; thus returning a Cached value.
 Controlling the EventThread
 ---------------------------
 
-The EventThread can be tuned using this call:
+The EventThread can be tuned like::
 
-EventSource.get_thread().setup(period_ms=1000,latency=100,filtered=0.5)
+  EventSource.get_thread().setup(period_ms=1000,latency=100,filtered=0.5)
 
  - period_ms will control how often events are processed
 
