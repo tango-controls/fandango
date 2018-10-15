@@ -694,7 +694,17 @@ def set_attribute_events(target, polling = None, rel_event = None,
     
     dev,attr = target.rsplit('/',1)
     return set_attribute_config(dev,attr,cfg,True,verbose=verbose)
+
+def check_device_events(device):
+    if not check_device(device):
+        return None
+    dp = get_device(device,keep=True)
+    attrs = dict.fromkeys(dp.get_attribute_list())
+    
+    for a in attrs:
+        attrs[a] = check_attribute_events(device+'/'+a)
         
+    return attrs
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)

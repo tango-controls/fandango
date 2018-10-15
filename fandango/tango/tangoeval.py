@@ -243,20 +243,30 @@ class TangoEval(object):
             [(str(v),v) for v in DevState.values.values()]+
             [(str(q),q) for q in AttrQuality.values.values()]
             )
+
         self._defaults['T'] = str2time
         self._defaults['str2time'] = str2time
         self._defaults['time'] = time
         self._defaults['NOW'] = time.time
+        #self._locals['now'] = time.time() #Updated at execution time
+        
+        # Internal objects
         self._defaults['DEVICES'] = self.proxies
         self._defaults['DEV'] = lambda x:self.proxies[x]
-        self._defaults['NAMES'] = lambda x: get_matching_devices(x) \
-                            if x.count('/')<3 else get_matching_attributes(x)
         self._defaults['CACHE'] = self.cache
         self._defaults['PREV'] = self.previous
+        
+        # Tango DB methods
+        self._defaults['NAMES'] = lambda x: get_matching_attributes(x) \
+                        if parse_tango_model(x).get('attribute') \
+                        else get_matching_devices(x)
+        self._defaults['CHECK'] = lambda x: read_attribute(x) \
+                        if parse_tango_model(x).get('attribute') \
+                        else check_device(x)
+        self._defaults['READ'] = self.read_attribute
         #For ComposerDS syntax compatibility
-        self._defaults['READ'] = self._defaults['ATTR'] = \
-                self._defaults['XATTR'] = self.read_attribute
-        #self._locals['now'] = time.time() #Updated at execution time
+        self._defaults['ATTR'] = self._defaults['XATTR'] = self.read_attribute
+            
         self._defaults.update((k,v) for k,v in {'get_domain':get_domain,
                                           'get_family':get_family,
                                           'get_member':get_member,
