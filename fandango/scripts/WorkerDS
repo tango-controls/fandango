@@ -28,9 +28,11 @@ for p in $DSPROPS; do
 done
 
 # DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property('ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
-# if [ "$DSORB" ] ; then
-#  DSORB="-ORBendPoint $DSORB"
-# fi
+
+# MUST
+if [ "$DSORB" ] ; then
+ DSORB="-ORBendPoint $DSORB"
+fi
 
 export PYTHONPATH=$PYTHONPATH:$LcPATH:$DfPATH:$PyPATH:$(pwd)/python/
 # echo $PYTHONPATH
