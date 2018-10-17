@@ -185,7 +185,7 @@ class TangoEval(object):
     #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; 
     #IT IS TAKEN AS PART OF THE DEVICE NAME!!
     #It matches a device name
-    redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
+    redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'(?:\.[0-9]+)?))'
     #Matches attribute and extension
     rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|'\
               'hist|ALARM|WARNING|VALID|INVALID|OK))?'

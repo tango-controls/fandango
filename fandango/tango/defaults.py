@@ -116,7 +116,7 @@ no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
     +'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
-redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
+redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'(?:\.[0-9]+)?))' #It matches a device name
 reattr = '(?:/(?P<attribute>'+alnum\
     +')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)'
     #reattr matches attribute and extension
