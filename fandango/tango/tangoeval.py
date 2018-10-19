@@ -174,18 +174,22 @@ class TangoEval(object):
     eval() will be triggered by events only if event_hook is True or a callable
     
     """
-    #FIND( optional quotes and whatever is not ')' )
+
+    ## FIND( optional quotes and whatever is not ')' )
     FIND_EXP = 'FIND\(((?:[ \'\"])?[^)]*(?:[ \'\"])?)\)' 
     
-    #operators = '[><=][=>]?|and|or|in|not in|not'
-    #l_split = re.split(operators,formula)#.replace(' ',''))
-    alnum = '[a-zA-Z0-9-_]+'
-    no_alnum = '[^a-zA-Z0-9-_]'
-    no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
+    operators = '[><=][=>]?|and|or|in|not in|not'
+
+    # Using regexps as loaded from fandango.tango.defaults
+    alnum = alnum #'[a-zA-Z0-9-_]+'
+    no_alnum = no_alnum
+    no_quotes = no_quotes
+    
     #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; 
     #IT IS TAKEN AS PART OF THE DEVICE NAME!!
     #It matches a device name
-    redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
+    redev = redev
+    
     #Matches attribute and extension
     rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|'\
               'hist|ALARM|WARNING|VALID|INVALID|OK))?'
