@@ -11,7 +11,7 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
-14.2.2
+14.3.0
 
     Enable erasing of events in set_attribute_vents
     use defaults regexp in tango eval, allowing dots and wildcards
