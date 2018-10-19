@@ -3,19 +3,7 @@ Configuring Tango Events
 
 The module fandango.tango provides 4 methods to manage attribute events:
 
-Use them like::
-
-  import fandango as fn
-  curr = 'sr/di/dcct/averagecurrent'
-  fn.tango.get_attribute_events(curr)
-  {'arch_event': [0.05, None, 320.0], 'per_event': [1000.0], 'polling': 0}
-  fn.tango.check_attribute_events('sr/di/dcct/averagecurrent')
-  Out: {tango._tango.EventType.CHANGE_EVENT: True}
-  
-  # True means pushed, so the arch_event can be removed
-  fn.tango.set_attribute_events(curr,arch_abs_event=0,arch_per_event=0)
-  
-  
+.. contents:: 
 
 check_attribute_events
 ----------------------
@@ -80,4 +68,21 @@ set_attribute_events
     Setting any event to 0 or False will erase the current configuration
     
     """
-                        
+               
+               
+Example
+-------
+
+Use them like::
+
+  import fandango as fn
+  curr = 'sr/di/dcct/averagecurrent'
+  fn.tango.get_attribute_events(curr)
+  {'arch_event': [0.05, None, 320.0], 'per_event': [1000.0], 'polling': 0}
+  fn.tango.check_attribute_events('sr/di/dcct/averagecurrent')
+  Out: {tango._tango.EventType.CHANGE_EVENT: True}
+  
+  # True means pushed, so the arch_event can be removed
+  fn.tango.set_attribute_events(curr,arch_abs_event=0,arch_per_event=0)
+  
+  
