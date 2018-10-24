@@ -591,7 +591,13 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
 def get_attribute_events(target,polled=True,throw=False):
     """
     Get current attribute events configuration 
-    TODO: it uses Tango Device Proxy, should be Tango Database instead
+
+    Pushed events will be not show, attributes not polled may not works
+    
+    Use check_attribute_events to verify if events are really working
+    
+    TODO: it uses Tango Device Proxy, should be Tango Database instead to 
+    allow offline checking
     """
     try:
         d,a = target.rsplit('/',1)
@@ -667,34 +673,58 @@ def set_attribute_events(target, polling = None, rel_event = None,
                         abs_event = None, per_event = None,
                         arch_rel_event = None, arch_abs_event = None, 
                         arch_per_event = None,verbose = False):
+    """
+    Allows to set independently each event property of the attribute
+    
+    Event properties should have same type that the attribute to be set    
+    
+    Polling must be integer, in millisecons
+    
+    Setting any event to 0 or False will erase the current configuration
+    
+    """
 
     cfg = CaselessDefaultDict(dict)
     if polling is not None: 
         #first try if the attribute can be subscribed w/out polling:
         cfg['polling'] = polling
         
-    if any(map(notNone,(rel_event, abs_event, ))):
+    if any(e is not None for e in (rel_event, abs_event, )):
         d = cfg['events']['ch_event'] = {}
-        if notNone(rel_event): 
+        if rel_event is not None:
             d['rel_change'] = str(rel_event or 'Not specified')
-        if notNone(abs_event): 
+        if abs_event is not None:
             d['abs_change'] = str(abs_event or 'Not specified')
 
-    if any(map(notNone,(arch_rel_event, arch_abs_event, arch_per_event))):
+    if any(e is not None for e in 
+           (arch_rel_event, arch_abs_event, arch_per_event)):
         d = cfg['events']['arch_event'] = {}
-        if notNone(arch_rel_event): 
+        if arch_rel_event is not None: 
             d['archive_rel_change'] = str(arch_rel_event or 'Not specified')
-        if notNone(arch_abs_event): 
+        if arch_abs_event is not None: 
             d['archive_abs_change'] = str(arch_abs_event or 'Not specified')
-        if notNone(arch_per_event): 
+        if arch_per_event is not None: 
             d['archive_period'] = str(arch_per_event or 'Not specified')
             
-    if notNone(per_event):
+    if per_event is not None:
         cfg['events']['per_event'] = {'period': str(per_event)}
     
     dev,attr = target.rsplit('/',1)
     return set_attribute_config(dev,attr,cfg,True,verbose=verbose)
+
+def check_device_events(device):
+    """
+    apply check_attribute_events to all attributes of the device
+    """
+    if not check_device(device):
+        return None
+    dp = get_device(device,keep=True)
+    attrs = dict.fromkeys(dp.get_attribute_list())
+    
+    for a in attrs:
+        attrs[a] = check_attribute_events(device+'/'+a)
         
+    return attrs
 
 def get_attribute_label(target,use_db=True):
     dev,attr = target.rsplit('/',1)
@@ -1140,7 +1170,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
     except Exception,e:
         return e if throw else None
 
-@Cached(depth=1000,expire=10)
+@Cached(depth=1000,expire=10,catched=True)
 def check_device_cached(*args,**kwargs):
     """ 
     Cached implementation of check_device method
@@ -1150,6 +1180,10 @@ def check_device_cached(*args,**kwargs):
 
 def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
     """ checks if attribute is available.
+    
+    Returns None if attribute does not exist, Exception if unreadable, 
+    an AttrValue object if brief is False, just the value or None if True
+    
     :param readable: Whether if it's mandatory that the attribute returns 
             a value or if it must simply exist.
     :param timeout: Checks if the attribute value have been effectively 
@@ -1173,16 +1207,24 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 return None
             else:
                 if not brief:
-                  return attvalue
+                    return attvalue
                 else:
-                  return (getattr(attvalue,'value',
-                                  getattr(attvalue,'rvalue',None)))
+                    return (getattr(attvalue,'value',
+                        getattr(attvalue,'rvalue',None)))
         except Exception,e: 
             if trace: traceback.print_exc()
             return None if readable or brief else e
     except:
         if trace: traceback.print_exc()
         return None
+    
+@Cached(depth=10000,expire=300,catched=True)
+def check_attribute_cached(*args,**kwargs):
+    """ 
+    Cached implementation of check_attribute method
+    @Cached(depth=10000,expire=300,catched=True)
+    """
+    return check_attribute(*args,**kwargs)    
     
 def read_attribute(attr,timeout=0,full=False):
     """ Alias to check_attribute(attr,brief=True)"""

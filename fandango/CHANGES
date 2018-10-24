@@ -11,6 +11,22 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+14.3.0
+
+    Enable erasing of events in set_attribute_vents
+    use defaults regexp in tango eval, allowing dots and wildcards
+    update dynds scripts (port bug)
+
+14.2.1
+
+    solve DynamicDS bug (ORBEndPoint dashes)
+    add check_device_events and Eval.CHECK methods
+
+
+14.2.0
+
+Bugfixes on callbacks/EventSource and servers/Astor methods
+
 14.1.0 - August 2018
 --------------------
 

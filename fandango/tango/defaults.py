@@ -110,16 +110,24 @@ ATTR_INVALID = AttrQuality.ATTR_INVALID
 
 #Regular Expressions
 metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
-#alnum = '[a-zA-Z_\*][a-zA-Z0-9-_\*]*' #[a-zA-Z0-9-_]+ #Added wildcards
+
+# alnum must match alphanumeric strings, including "-_.*"
 alnum = '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
+
+#redev matches device names, includes fqdn host
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
     +'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
-redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))' #It matches a device name
-reattr = '(?:/(?P<attribute>'+alnum\
-    +')(?:(?:\\.)(?P<what>quality|time|value|exception|history))?)'
-    #reattr matches attribute and extension
+
+# redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
+redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))'
+
+#reattr matches attribute and extension
+rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|history))'
+reattr = '(?:/(?P<attribute>'+alnum+')'+rewhat+'?)'
+
+#retango matches the whole expression
 retango = '(?:tango://)?'+(rehost+'?')+redev+(reattr+'?')+'(?:\$?)' 
 
 AC_PARAMS = [
