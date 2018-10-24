@@ -1030,7 +1030,10 @@ class DynamicDSAttrs(DynamicDSImpl):
                 ").read_dyn_attr("+aname+")="+text_result+
                 ", ellapsed %1.2e"%(self._eval_times[aname])+" seconds.\n")
 
-            if 'debug' in str(self.getLogLevel()) and (time.time()>(self._cycle_start+self.PollingCycle*1e-3) if hasattr(self,'PollingCycle') else aname==sorted(self.dyn_values.keys())[-1]):
+            if 'debug' in str(self.getLogLevel()) and \
+                (time.time()>(self._cycle_start+self.PollingCycle*1e-3) \
+                    if hasattr(self,'PollingCycle') \
+                        else aname==sorted(self.dyn_values.keys())[-1]):
                 self.attribute_polling_report()
                 
         except Exception, e:           
@@ -1354,12 +1357,12 @@ class DynamicDSAttrs(DynamicDSImpl):
         """
         try:
             c = 0
-            t0 = fun.now()
+            self._events_lock.acquire()            
+            t0 = fun.now()            
             if (not self.MaxEventStream or 
                     not self.check_attribute_events('state')):
                 self.debug('Events not queued ...')
                 return 0
-            self._events_lock.acquire()
             self.info('*'*80)
             self.info('In processEvents(%d/%d)'
                 % (self.MaxEventStream,self._events_queue.qsize()))

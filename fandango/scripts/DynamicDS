@@ -31,7 +31,7 @@ done
 
 # MUST
 if [ "$DSORB" ] ; then
- DSORB="--ORBendPoint $DSORB"
+ DSORB="-ORBendPoint $DSORB"
 fi
 
 export PYTHONPATH=$PYTHONPATH:$LcPATH:$DfPATH:$PyPATH:$(pwd)/python/

@@ -836,7 +836,7 @@ class ServersDict(CaselessDict,Object):
         
     def set_server_level(self,server_name,host,level):
         """ It executes a DbPutServerInfo command in dbserver device. """
-        mode = 1 if host or level else 0
+        mode = 1 if level else 0 #host or level else 0
         host = host.split('.')[0].strip() or 'localhost' if mode else ''
         level = int(level) if level else 0
         dbserver = self.get_db_device()
