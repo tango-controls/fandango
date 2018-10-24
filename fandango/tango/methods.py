@@ -191,12 +191,23 @@ def get_full_name(model,fqdn=None):
     """ 
     Returns full schema name as needed by HDB++ api
     """
+    model = model.split('tango://')[-1]
+
     if fqdn is None: 
         fqdn = fandango.tango.defaults.USE_FQDN
-    if ':' not in model:
-      model = get_tango_host(fqdn=fqdn)+'/'+model
-    if not model.startswith('tango://'):
-      model = 'tango://'+model
+
+    if ':' in model:
+        h,m = model.split(':',1)
+        if '.' in h and not fqdn:
+            h = h.split('.')[0]
+        elif '.' not in h and fqdn:
+            h = get_fqdn(h)
+        model = h+':'+m
+        
+    else:
+        model = get_tango_host(fqdn=fqdn)+'/'+model
+    
+    model = 'tango://'+model
     return model
 
 def get_normal_name(model):
@@ -1196,7 +1207,7 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
         else:
           dev,att = attr.lower().rsplit('/',1)
           assert att in [str(s).lower() 
-                for s in DeviceProxy(dev).get_attribute_list()]
+                for s in DeviceProxy(dev).get_attribute_list()],'AttrNotFound'
           proxy = AttributeProxy(attr)
           
         try: 
@@ -1211,12 +1222,12 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 else:
                     return (getattr(attvalue,'value',
                         getattr(attvalue,'rvalue',None)))
-        except Exception,e: 
+        except Exception as e: 
             if trace: traceback.print_exc()
             return None if readable or brief else e
-    except:
+    except Exception as e:
         if trace: traceback.print_exc()
-        return None
+        return None if readable or brief else e
     
 @Cached(depth=10000,expire=300,catched=True)
 def check_attribute_cached(*args,**kwargs):
