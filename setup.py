@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+g!/usr/bin/env python
 # Always prefer setuptools over distutils
 import os, imp, sys
 from setuptools import setup, find_packages
