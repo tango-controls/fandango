@@ -41,17 +41,23 @@ Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 """
 
 import os,time,datetime,log,traceback,sys
+from .objects import Struct
 
-import MySQLdb
 """
+MySQL API's are loaded at import time, but can be modified afterwards.
+
+To do it:
+    fd.mysql_api = fd.MySQLdb = MySQLdb
+
+
 Instead of using the outdated MySQL-python package or Oracle's mysql.connector, 
-try to install mysqlclient instead:
+now Debian uses the new mysqlclient instead, but imported as MySQLdb
 
 https://pypi.org/project/mysqlclient/#description
 https://github.com/PyMySQL/mysqlclient-python
 https://mysqlclient.readthedocs.io
 
-To install it on Debian:
+To test it on Debian (NOT NEEDED AS MYSQLCLIENT IS NOW python-mysqldb):
   
   sudo aptitude remove python-mysqldb
   sudo aptitude install python-pip
@@ -60,14 +66,33 @@ To install it on Debian:
 
 """
 
+try:
+    import mysqlclient
+    import mysqlclient as mysql_api
+    mysql = Struct()
+    mysql.connector = MySQLdb = None
+except:
+    try:
+        import MySQLdb
+        import MySQLdb as mysql_api
+        mysql = Struct()
+        mysqlclient = mysql.connector = None
+    except:
+        import mysql.connector
+        import mysql.connector as mysql_api
+        mysqlclient = MySQLdb = None        
 
 class FriendlyDB(log.Logger):
     """ 
-    Class for managing direct access to MySQL databases using mysql-python module
+    Class for managing direct access to MySQL databases 
+    using mysql-python module
     """   
-    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,loglevel='WARNING',use_tuples=False,default_cursor=None):
+    def __init__(self,db_name,host='',user='',passwd='',autocommit=True,
+                 loglevel='WARNING',use_tuples=False,default_cursor=None):
         """ Initialization of MySQL connection """
-        self.call__init__(log.Logger,self.__class__.__name__,format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
+        print('Using %s as MySQL python API' % mysql_api)
+        self.call__init__(log.Logger,self.__class__.__name__,
+                format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
         #def __init__(self,api,db_name,user='',passwd='', host=''):
         #if not api or not database:
@@ -80,7 +105,10 @@ class FriendlyDB(log.Logger):
         self.setUser(user,passwd)
         self.autocommit = autocommit
         self.renewMySQLconnection()
-        self.default_cursor = default_cursor or MySQLdb.cursors.Cursor
+        self.default_cursor = (default_cursor or 
+            (mysql_api == MySQLdb and MySQLdb.cursors.Cursor) or None
+                #(mysql.connector and mysql.connector.cursor.MySQLCursor)
+                )
         self._cursor=None
         self._recursion = 0
         self.tables={}
@@ -98,13 +126,15 @@ class FriendlyDB(log.Logger):
         self.user=user
         self.passwd=passwd
         
-    def setAutocommit(self,autocommit):
+    def setAutocommit(self,autocommit = None):
         try:
+            if autocommit is None: autocommit = self.autocommit
             self.db.autocommit(autocommit)
             self.autocommit = autocommit
         except Exception,e:
-            self.error('Unable to set MySQLdb.connection.autocommit to %s'%autocommit)
-            raise Exception,e
+            self.error('Unable to set MySQL.connection.autocommit to %s'
+                       % autocommit)
+            #raise Exception,e
         
         
     def renewMySQLconnection(self):
@@ -112,10 +142,17 @@ class FriendlyDB(log.Logger):
             if hasattr(self,'db') and self.db: 
                 self.db.close()
                 del self.db
-            self.db=MySQLdb.connect(db=self.db_name,host=self.host,user=self.user,passwd=self.passwd)
-            self.db.autocommit(self.autocommit)
+            if mysql_api == MySQLdb:
+                self.db = mysql_api.connect(db=self.db_name,
+                    host=self.host, user=self.user, passwd=self.passwd)
+            else: #if mysql_api == mysql.connector:
+                self.db = mysql_api.connect(database=self.db_name,
+                    host=self.host, user=self.user, password=self.passwd)                
+            self.setAutocommit()
         except Exception,e:
-            self.error( 'Unable to create a MySQLdb connection to "%s"@%s.%s: %s'%(self.user,self.host,self.db_name,str(e)))
+            self.error('Unable to create a mysql_api connection to '
+                '"%s"@%s.%s: %s'%(self.user,self.host,self.db_name,str(e)))
+            traceback.print_exc()
             raise Exception,e
    
     def getCursor(self,renew=True,klass=None):
@@ -127,13 +164,17 @@ class FriendlyDB(log.Logger):
         '''
         try:
             if klass in ({},dict):
-                klass = MySQLdb.cursors.DictCursor
+                klass = mysql_api.cursors.DictCursor
             if (renew or klass) and self._cursor: 
                 if not self._recursion:
                     self._cursor.close()
                     del self._cursor
             if renew or klass or not self._cursor:
-                self._cursor = self.db.cursor(self.default_cursor) if klass is None else self.db.cursor(cursorclass=klass)
+                if mysql_api == MySQLdb:
+                    self._cursor = (self.db.cursor(self.default_cursor) 
+                        if klass is None else self.db.cursor(cursorclass=klass))
+                else:
+                    self._cursor = self.db.cursor()
             return self._cursor
         except:
             print traceback.format_exc()
@@ -194,13 +235,16 @@ class FriendlyDB(log.Logger):
         else:
             return self.tuples2lists(self.fetchall(q)) #q.fetchall()
    
-    def Select(self,what,tables,clause='',group='',order='',limit='',distinct=False,asDict=False,trace=False):
+    def Select(self,what,tables,clause='',group='',order='',
+               limit='',distinct=False,asDict=False,trace=False):
         ''' 
         Allows to create and execute Select queries using Lists as arguments
         @return depending on param asDict it returns a list or lists or a list of dictionaries with results
         '''
-        if type(what) is list: what=','.join(what) if len(what)>1 else what[0]
-        if type(tables) is list: tables=','.join(tables) if len(tables)>1 else tables[0]
+        if type(what) is list: 
+            what=','.join(what) if len(what)>1 else what[0]
+        if type(tables) is list: 
+            tables=','.join(tables) if len(tables)>1 else tables[0]
         if type(clause) is list:
             clause=' and '.join('(%s)'%c for c in clause) if len(clause)>1 else clause[0]
         elif type(clause) is dict:
