@@ -590,10 +590,11 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
         p = polling
         try:
             print('%s.poll_attribute(%s,%s)'%(name,a,p))
-            if not p and dp.get_attribute_poll_period(a):
-                dp.stop_poll_attribute(a)
-            else:
+            if p:
                 dp.poll_attribute(a,p)
+            elif not dp.get_attribute_poll_period(a):
+                dp.stop_poll_attribute(a)
+                
         except:
             traceback.print_exc()
             
