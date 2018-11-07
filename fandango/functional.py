@@ -1075,8 +1075,9 @@ def iif(condition,truepart,falsepart=None,forward=False):
 
 def ifThen(condition,callback,falsables=tuple()):
     """
-    This function allows to execute a callable on an object only if it has a valid value.
-    ifThen(value,callable) will return callable(value) only if value is not in falsables.
+    This function allows to execute a callable on an object only if it 
+    has a valid value. ifThen(value,callable) will return callable(value) 
+    only if value is not in falsables.
     
     It is a List-like method, it can be combined with fandango.excepts.trial
     """
@@ -1087,6 +1088,30 @@ def ifThen(condition,callback,falsables=tuple()):
           return ifThen(callback[0](condition),callback[1:],falsables)
     else:
         return condition
+    
+def call(args=None,locals_=None):
+    """
+    Calls a method from local scope parsing a pipe-like argument list
+    """
+    if args is None:
+        import sys
+        args = sys.argv[1:]
+    f,args = args[0],args[1:]
+    if not isCallable(f):
+        locals_ = locals_ or globals()
+        if f=='help':
+            if args and args[0] in locals_:
+                n,o = args[0],locals_[args[0]]
+                if hasattr(o,'func_code'):
+                    n = n+str(o.func_code.co_varnames)
+                return '%s:\n%s' % (n,o.__doc__)
+            else:
+                m = [k for k,v in locals_.items() if isCallable(v)]
+                return ('\n'.join(sorted(m,key=str.lower)))
+        f = locals_.get(f,None) 
+    if all(isString(a) for a in args):
+        args = map(str2type,args)
+    return f(*args)    
 
 def retry(callable,retries=3,pause=0,args=[],kwargs={}):
     r = None
@@ -1267,5 +1292,12 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
 
-from . import doc
-__doc__ = doc.get_fn_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])
+###############################################################################
+
+try:
+    from . import doc
+    __doc__ = doc.get_fn_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])
+except: pass
+
+if __name__ == '__main__':
+    print(call())
