@@ -2169,7 +2169,7 @@ class DynamicDSClass(PyTango.DeviceClass):
         'MaxEventStream':
             [PyTango.DevLong,
             "Max number of events to be pushed by processEvents()",
-            [ 10 ] ],             
+            [ 0 ] ],             
         'UseTaurus':
             [PyTango.DevBoolean,
             "This property manages if Taurus or PyTango will be used to read external attributes.",
