@@ -519,6 +519,25 @@ Finally, go to Jive and create the DynamicAttributes property and put there your
 Tango Events
 ============
 
+There are several Tango artifacts controlling the pushing of events from DynamicDS devices (SimulatorDS, PyAttributeProcessor, PyPLC, etc ...):
+
+ - UseEvents Property: value can be yes/true/no/false, a list of attributes or a dict-like list 
+ - AttributeConfig (in Jive): 
+ - MaxEventStream Property:
+ - ProcessEvents Command:
+
+The Workflow is the following:
+
+ - To push an attribute, its value must have changed (as detected by check_changed_event function).
+ - If it was configured from Jive, this configuration is used to filter the emitted events.
+ - If it wasn't configured; then any change is pushed.
+ - UseEvents can be set as attr1:push to force inconditional pushing (filters ignored).
+ - UseEvents can be set as attr1:archive to push archiving event together with change event.
+ 
+ Apart of that, MaxEventStream > 0 will redirect events to a queue instead of being pushed immediately.
+ 
+ The ProcessEvents command will read the queue and push MaxEventStream events at each call.
+
 The UseEvents property
 ----------------------
 
