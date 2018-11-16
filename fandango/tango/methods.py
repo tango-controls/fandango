@@ -1242,6 +1242,23 @@ def read_attribute(attr,timeout=0,full=False):
     """ Alias to check_attribute(attr,brief=True)"""
     return check_attribute(attr,timeout=timeout,brief=not full)
 
+def write_attribute(attr,value,timeout=0,full=False):
+    """ Write attribute value to device """
+    model = parse_tango_model(attr)
+    dp = get_device(model.device)
+    dp.set_timeout_millis(timeout*1000)
+    return dp.write_attribute(model.attribute,value)
+
+def device_command(attr,args=[],timeout=0,full=False):
+    """ Execute a device command """
+    model = parse_tango_model(attr)
+    dp = get_device(model.device)
+    dp.set_timeout_millis(timeout*1000)
+    if args:
+        return dp.command_inout(model.attribute,args)
+    else:
+        return dp.command_inout(model.attribute)
+
 def check_device_list(devices,attribute=None,command=None):
     """ 
     This method will check a list of devices grouping them by host and server; 
