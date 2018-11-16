@@ -802,7 +802,22 @@ class DynamicDSAttrs(DynamicDSImpl):
     
     @Cached(depth=1024,expire=15.)
     def check_attribute_events(self,aname,poll=False):
+        """
+        It parses the contents of UseEvents property, that can be:
+         - [ 'yes/no/true/false' ]
+         - [  'archive|change' ]
+         - [ 'attr1', 'attr2:push', 'attr3:archive' ]
         
+        In the first two cases, the value specified applies to all attributes.
+        
+        In the last case, each config applies only to the specified attribute.
+        
+        Setting yes/true will enable only change events if configured from Jive.
+        
+        Setting archive will enable both change and archive events.
+        
+        Setting push will also enable the pushing from code.
+        """
         self.UseEvents = filter(bool,
                 (u.split('#')[0].strip().lower() for u in self.UseEvents))
         self.debug('check_attribute_events(%s,%s,%s)'
@@ -866,9 +881,10 @@ class DynamicDSAttrs(DynamicDSImpl):
                     v,new_value = (float(v) if v is not None else None),\
                                     float(new_value)
                 except Exception,e: 
+                    self.debug(str(e))
                     self.info('In check_changed_event(%s): '
-                              'values not evaluable (%s,%s): %s'
-                              %(aname,shortstr(v),shortstr(new_value),e))
+                              'non-numeric, checking raw diff (%s,%s)'
+                              %(aname,shortstr(v),shortstr(new_value)))
                     try:
                         return v!=new_value #and (cabs>0 or crel>0)
                     except:
@@ -1125,7 +1141,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         @remark Generators don't work  inside eval!, use lists instead
         If push=True, any result is considered as change
         '''
-        aname = self.get_attr_name(aname)
+        aname,formula = self.get_attr_name(aname),''
         self.debug("DynamicDS(%s)::evalAttr(%s,%s): ... last value was %s"
             % (self.get_name(), aname, push, shortstr(
                 getattr(self.dyn_values.get(aname,None),'value',None))))
@@ -1196,7 +1212,11 @@ class DynamicDSAttrs(DynamicDSImpl):
             ###################################################################
             result = eval(compiled or formula,self._globals,self._locals)
             self.debug('eval result: '+str(result))
-            if WRITE or aname not in self.dyn_values:
+            if aname not in self.dyn_values:
+                return result
+            elif WRITE:
+                if self.ReadOnWrite:
+                    self.evalAttr(aname,WRITE=False,_locals=_locals,push=push)
                 return result            
 
             ###################################################################
@@ -2137,6 +2157,10 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "This property manages if dependencies between attributes are used to check readability.",
             ['True'] ],
+        'ReadOnWrite':
+            [PyTango.DevBoolean,
+            "When True, this will trigger a read attribute just after writing (e.g. for pushing events on write).",
+            [False] ],            
         'UseEvents':
             [PyTango.DevVarStringArray,
             "Value of this property will be yes/true,no/false or a list of "
