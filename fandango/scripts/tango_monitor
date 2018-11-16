@@ -69,7 +69,7 @@ def monitor(d, args=[], events = []):
       while True:
           time.sleep(1)
   except: #KeyboardInterrupt
-      print(fn.excep2str())
+      print(fn.except2str())
       print('-'*80)
       print "Finished monitoring"
       
