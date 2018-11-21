@@ -720,7 +720,7 @@ class Cached(Decorator):
     """
     This decorator will provide a function that caches up to N different
     executions of a method (for different combinations of arguments) for 
-    a given period.
+    a given period. It is very similar to functools.lru_cache in py3
     
     e.g.: check_device_cached = Cached(check_device,depth=10,keep=3)
     
