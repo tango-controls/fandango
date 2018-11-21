@@ -666,7 +666,8 @@ class Decorated(object):
 class Decorator(object):
     """
     This generic class allows to differentiate decorators from common classes.
-    
+    """
+    __example__ = """
     SEE THE Cached DECORATOR CLASS FOR A REAL EXAMPLE, THIS IS JUST AN
     ABSTRACT CLASS WITHOUT IMPLEMENTATION
     
@@ -692,13 +693,23 @@ class Decorator(object):
       def f(z):
         pass
     """
-    def __init__(self,f):
-        self.f = f
-         #self.call = wraps(self.f)(self.__call__) #Not for methods!!
-        functools.update_wrapper(self,self.f)
+    
+    @classmethod
+    def new_wrapped_instance(cls, *args, **kwargs):
+        """ obtain a better wrapped instance, experimental, doesnt work well on py2 """
+        func = args and args[0] or None
+        i = object.__new__(type(cls.__name__+'_'+func.__name__,(cls,),
+            {'__doc__': func.__doc__}))
+        cls.__init__(i,*args,**kwargs)
+        return i        
+    
+    def __init__(self,func):
+        self.func = func
+         #self.call = wraps(self.func)(self.__call__) #Not for methods!!
+        functools.update_wrapper(self,self.func)
         
     def __call__(self,*args,**kwargs):
-        return self.f(*args,**kwargs)
+        return self.func(*args,**kwargs)
       
     def __get__(self,obj,objtype=None):
         """
@@ -706,6 +717,9 @@ class Decorator(object):
         instance method
         """
         return MethodType(self,obj,objtype)
+    
+    def get_func(self):
+        return self.func
       
 class ClassDecorator(Decorator): 
     """ 
@@ -720,13 +734,15 @@ class Cached(Decorator):
     """
     This decorator will provide a function that caches up to N different
     executions of a method (for different combinations of arguments) for 
-    a given period. It is very similar to functools.lru_cache in py3
+    a given period. It is very similar to functools.lru_cache in py3 
+    """
+    __example__ = """
     
     e.g.: check_device_cached = Cached(check_device,depth=10,keep=3)
     
     It will keep cached for 3 seconds up to 10 different device check results.
     
-    If "target" is not declared, then it can be used as a decorator_with_args
+    If "func" is not declared, then it can be used as a decorator_with_args
     
     @Cached(depth=10,keep=3)
     def check_device(*a,**k): 
@@ -736,7 +752,7 @@ class Cached(Decorator):
     The catched argument will print and return exceptions instead of throwing
     """
   
-    def __init__(self,target=None,depth=10,expire=3.,log=False,catched=False):
+    def __init__(self,func=None,depth=10,expire=3.,log=False,catched=False):
 
         self.log = log
         self._im = None
@@ -744,14 +760,16 @@ class Cached(Decorator):
         self.depth = depth
         self.expire = expire
         self.catched = catched
-        self.decorate(target)
+        self.decorate(func)
+        #self.__code__ = getattr(func,'__code__',None)
+        self.__doc__ = '@Cached:'+str(getattr(func,'__doc__','') or '')
         self.lock = threading.Lock()
           
     def __call__(self,*args,**kwargs):
         """
         This method will either decorate a method (with args) or execute it
         """
-        if self.f is None:
+        if self.func is None:
             # Deferred decorator
             self.decorate(args[0])
             return self
@@ -781,14 +799,14 @@ class Cached(Decorator):
             except:pass
         return obj
     
-    def decorate(self,target):
-        if isCallable(target):
-            #self._log('decorate(%s)'%str(target))
-            self.f = target
-            #self.call = wraps(self.f)(self.__call__) #Not for methods!!
-            functools.update_wrapper(self,self.f)
+    def decorate(self,func):
+        if isCallable(func):
+            #self._log('decorate(%s)'%str(func))
+            self.func = func
+            #self.call = wraps(self.func)(self.__call__) #Not for methods!!
+            functools.update_wrapper(self,self.func)
         else:
-            self.f = None
+            self.func = None
             
     def prune(self,expire=None,depth=None):
         try:
@@ -823,7 +841,7 @@ class Cached(Decorator):
         if not self.depth or not expire:
             self._log('disabling cache ...')
             if not self.depth: self.cache = {}
-            return self.f(*args,**kwargs)
+            return self.func(*args,**kwargs)
         
         else:
             cache = self.prune(expire)
@@ -834,14 +852,14 @@ class Cached(Decorator):
                 #self._log('(%s,%s) was in cache: %s'%(args,kwargs,v))
             else:
                 try:
-                    v = self.f(*args,**kwargs)
+                    v = self.func(*args,**kwargs)
                 except Exception,e:
                     v = e
-                #self._log('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
+                #self._log('%s(%s,%s) = %s'%(self.func,args,kwargs,v))
                 try:
                     self.cache[key] = v
                 except:
-                    print('%s(%s,%s) = %s'%(self.f,args,kwargs,v))
+                    print('%s(%s,%s) = %s'%(self.func,args,kwargs,v))
                     print('cache[%s] = %s'%(key,v))
                     raise
             
@@ -851,7 +869,7 @@ class Cached(Decorator):
                     self._log(traceback.format_exc())
                 return v
             else:
-                self._log(str(self.f))
+                self._log(str(self.func))
                 self._log(traceback.format_exc())
                 raise v
         else:
@@ -922,7 +940,7 @@ class BoundDecorator(Decorator):
             # Inherits to get the wrapper from the BoundDecorator class 
             # and be able to exist "onDemand"
             def __init__(self, f):
-                self.f = f
+                self.func = f
             def __get__(self, instance, klass):
                 BoundDecorator.tracer('__get__(%s,%s)'%(instance,klass))
                 if instance is None:
@@ -932,31 +950,31 @@ class BoundDecorator(Decorator):
             def make_unbound(self, klass):
                 BoundDecorator.tracer('make_unbound(%s)'%klass)
                 
-                @functools.wraps(self.f)
+                @functools.wraps(self.func)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)
                     This method may work well only without arguments
                     '''
                     BoundDecorator.tracer(
                         "Called the unbound method %s of %s"
-                        %(self.f.__name__, klass.__name__))
+                        %(self.func.__name__, klass.__name__))
                     return partial(this.wrapper,f=f)(*args,**kwargs)    
                 return wrapper
             
             def make_bound(self, instance):
                 BoundDecorator.tracer('make_bound(%s)'%instance)
-                @functools.wraps(self.f)
+                @functools.wraps(self.func)
                 def wrapper(*args, **kwargs):
                     '''This documentation will disapear :)'''
                     BoundDecorator.tracer(
                         "Called the decorated method %s of %s"
-                        %(self.f.__name__, instance))
-                    #return self.f(instance, *args, **kwargs)
+                        %(self.func.__name__, instance))
+                    #return self.func(instance, *args, **kwargs)
                     return this.wrapper(instance,f,*args,**kwargs)
-                #wrapper = self.wrapper #wraps(self.f)(self.wrapper)
+                #wrapper = self.wrapper #wraps(self.func)(self.wrapper)
                 # This instance does not need the descriptor anymore,
                 # let it find the wrapper directly next time:
-                setattr(instance, self.f.__name__, wrapper)
+                setattr(instance, self.func.__name__, wrapper)
                 return wrapper
 
         return _Descriptor(f)
