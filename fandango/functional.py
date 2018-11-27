@@ -790,7 +790,6 @@ def list2lines(s,multiline='\\',joiner='\n',comment='#'):
     if comment, it will escape the comments until the end of the line
     """
     if not isSequence(s): return s
-    #print('list2lines(%s)'%'\n'.join(s))
     nl = []
     for l in s:
         if comment:
@@ -803,8 +802,6 @@ def list2lines(s,multiline='\\',joiner='\n',comment='#'):
             
     if joiner:
         nl = joiner.join(nl)
-    
-    print('list2lines: done')
     return nl
 
 def list2str(s,separator='\t',MAX_LENGTH=0):
@@ -901,8 +898,27 @@ def bool2int(seq):
 ########################################################################
 
 END_OF_TIME = 1024*1024*1024*2-1 #Jan 19 04:14:07 2038
-TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
-RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
+TIME_UNITS = { 'ns': 1e-9, 'us': 1e-6, 'ms': 1e-3, '': 1, 's': 1, 'm': 60, 
+    'h': 3600, 'd': 86.4e3, 'w': 604.8e3, 'M': 30*86.4e3, 'y': 31.536e6 }
+TIME_UNITS.update((k.upper(),v) for k,v in TIME_UNITS.items() if k!='m')
+RAW_TIME = ('^(?:P)?([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'
+            % ('|').join(TIME_UNITS)) # e.g. 3600.5 s
+
+global DEFAULT_TIME_FORMAT
+DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+ALT_TIME_FORMATS = [ ('%s%s%s' % (
+    date.replace('-',dash),separator if hour else '',hour)) 
+        for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y',
+                        '%d-%m-%y','%m-%d-%Y','%m-%d-%y')
+        for dash in ('-','/')
+        for separator in (' ','T')
+        for hour in ('%H:%M','%H:%M:%S','%H','')]
+        
+def set_default_time_format(dtf, test = True):
+    if test:
+        str2time(time2str(cad = dtf), cad = dtf)
+    global DEFAULT_TIME_FORMAT
+    DEFAULT_TIME_FORMAT = dtf
 
 def now():
     return time.time()
@@ -930,9 +946,11 @@ def date2time(date,us=True):
       except:
         raise e
 
-def date2str(date,us=False):
+def date2str(date, cad = '', us=False):
     #return time.ctime(date2time(date))
-    t = time.strftime('%Y-%m-%d %H:%M:%S',time2tuple(date2time(date)))
+    global DEFAULT_TIME_FORMAT
+    cad = cad or DEFAULT_TIME_FORMAT
+    t = time.strftime(cad, time2tuple(date2time(date)))
     us = us and getattr(date,'microsecond',0)
     if us: t+='.%06d'%us
     return t
@@ -945,10 +963,16 @@ def time2date(epoch=None):
 def utcdiff(t=None):
     return now() - date2time(datetime.datetime.utcnow())  
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True,utc=False):
+def time2str(epoch=None, cad='', us=False, bt=True,
+             utc=False, iso=False):
     """
-    Use us=True to introduce ms precission
-    ]
+    cad: introduce your own custom format (see below)
+    use DEFAULT_TIME_FORMAT to set a default one
+    us=False; True to introduce ms precission
+    bt=True; negative epochs are considered relative from now
+    utc=False; if True it converts to UTC
+    iso=False; if True, 'T' will be used to separate date and time
+    
     cad accepts the following formats:
     
     %a 	Locale’s abbreviated weekday name. 	 
@@ -978,13 +1002,15 @@ def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True,utc=False):
     """
     if epoch is None: epoch = now() 
     elif bt and epoch<0: epoch = now()+epoch
+    global DEFAULT_TIME_FORMAT
+    cad = cad or DEFAULT_TIME_FORMAT
     t = time.strftime(cad,time2tuple(epoch,utc=utc))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
     return t
   
 epoch2str = time2str
-    
+ 
 def str2time(seq='',cad=''):
     """ 
     :param seq: Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format or -N [d/m/y/s/h]
@@ -995,34 +1021,42 @@ def str2time(seq='',cad=''):
     
     :param cad: You can pass a custom time format
     """
-    if seq in (None,''): return time.time()
-    seq = str(seq).strip()
-    m = re.match(RAW_TIME,seq) 
-    if m:
-        #Converting from a time(unit) format
-        value,unit = m.groups()
-        try: return float(value)*TIME_UNITS[unit]
-        except: raise Exception('PARAMS_ERROR','time format cannot be parsed!: %s'%seq)
-    else:
+    try: 
+        if seq in (None,''): 
+            return time.time()
+        
+        t, seq = None, str(seq).strip()
+        if not cad:
+            m = re.match(RAW_TIME,seq) 
+            if m:
+                #Converting from a time(unit) format
+                value,unit = m.groups()
+                t = float(value)*TIME_UNITS[unit]
+                return t # must return here
+                
         #Converting from a date format
-        t,ms = None,re.match('.*(\.[0-9]+)$',seq) #Splitting the decimal part
-        if ms: ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
-        else: ms = 0
-        time_fmts = ([cad] if cad else [None]+
-            [('%s%s%s'%(date.replace('-',dash),separator if hour else '',hour)) 
-            for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y','%d-%m-%y','%m-%d-%Y','%m-%d-%y')
-            for dash in ('-','/')
-            for separator in (' ','T')
-            for hour in ('%H:%M','%H:%M:%S','')
-            ])
-        for tf in time_fmts:
-            try:
-                tf = (tf,) if tf else () #tf=None will try default system format
-                t = time.strptime(seq,*tf)
-                break
-            except: pass
-        if t is not None: return time.mktime(t)+ms
-        else: raise Exception('PARAMS_ERROR','date format cannot be parsed!: %s'%str(seq))    
+        ms = re.match('.*(\.[0-9]+)$',seq) #Splitting the decimal part
+        if ms: 
+            ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
+
+        if t is None:
+            #tf=None will try default system format
+            global DEFAULT_TIME_FORMAT
+            time_fmts = ([cad] if cad else 
+                         [DEFAULT_TIME_FORMAT,None] + ALT_TIME_FORMATS)
+            for tf in time_fmts:
+                try:
+                    tf = (tf,) if tf else () 
+                    t = time.strptime(seq,*tf)
+                    break
+                except: 
+                    pass
+                
+        return time.mktime(t)+(ms or 0)
+    except: 
+        raise Exception('PARAMS_ERROR','unknown time format: %s' % seq)
+        
+
 str2epoch = str2time
 
 def time2gmt(epoch=None):
