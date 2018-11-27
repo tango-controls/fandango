@@ -11,6 +11,13 @@ BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 threads.wait: exceptions on ipython exit
 threads/WorkerDS: uncatched deadlocks
 
+14.4.2
+    Solved bug in RAW_TIME parsing
+    Add DEFAULT_TIME_FORMAT/set_default_time_format
+    Add Variable class
+    Refactor Decorator func access
+    Set DynamicDS.MaxEventStream = 0 by default
+
 14.4.0
 
     Add ReadOnWrite property to DynamicDS
