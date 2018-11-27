@@ -264,6 +264,31 @@ def make_property(var,fget=_fget,fset=_fset,fdel=_fdel):
     return property(partial(fget,var=var),partial(fset,var=var),
                     partial(fdel,var=var),doc='%s property'%var)
 
+class Variable(object):
+    """
+    This class helps to declare module variables that can share the
+    state when updated from parent modules.
+    
+    e.g. fandango.DEFAULT_TIME_FORMAT <=> functional.DEFAULT_TIME_FORMAT
+    """
+    def __new__(cls, value):
+        print(cls,value)
+        __instance = object.__new__(cls, value)
+        cls.__init__(__instance, value)
+        return __instance.value
+    
+    def __init__(self, value = None):
+        self._value = value
+    
+    @property
+    def value(self):
+        return self._value
+    
+    @value.setter
+    def set_value(self, value):
+        self._value = v
+        
+
 #class NamedProperty(property):
     #"""
     #"""
