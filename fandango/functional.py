@@ -655,18 +655,26 @@ def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     Lines separated by sep_exp will be automatically split
     """
     seq = str(seq).strip()
+    #Parsing a date
+    if clmatch('[P]?[0-9]+[-]',seq) and str2time(seq,throw=False) is not None:
+        return seq
+    #Parsing a list of elements
     m = sep_exp and (seq[0] not in '{[(') and re.search(sep_exp,seq)
     if m:
         return [str2type(s,use_eval) for s in str2list(seq,m.group())]
+    #Bool
     elif isBool(seq,is_zero=False):
         return str2bool(seq)
+    #Python expression
     elif use_eval:
         try:
             return eval(seq)
         except:
             return seq
+    #Number
     elif isNumber(seq):
         return str2float(seq)
+    #Regular string
     else:
         return seq
     
@@ -901,6 +909,8 @@ END_OF_TIME = 1024*1024*1024*2-1 #Jan 19 04:14:07 2038
 TIME_UNITS = { 'ns': 1e-9, 'us': 1e-6, 'ms': 1e-3, '': 1, 's': 1, 'm': 60, 
     'h': 3600, 'd': 86.4e3, 'w': 604.8e3, 'M': 30*86.4e3, 'y': 31.536e6 }
 TIME_UNITS.update((k.upper(),v) for k,v in TIME_UNITS.items() if k!='m')
+
+#@todo: RAW_TIME should be capable to parse durations as of ISO 8601
 RAW_TIME = ('^(?:P)?([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'
             % ('|').join(TIME_UNITS)) # e.g. 3600.5 s
 
@@ -1011,7 +1021,7 @@ def time2str(epoch=None, cad='', us=False, bt=True,
   
 epoch2str = time2str
  
-def str2time(seq='',cad=''):
+def str2time(seq='', cad='', throw=True):
     """ 
     :param seq: Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format or -N [d/m/y/s/h]
     
@@ -1054,7 +1064,10 @@ def str2time(seq='',cad=''):
                 
         return time.mktime(t)+(ms or 0)
     except: 
-        raise Exception('PARAMS_ERROR','unknown time format: %s' % seq)
+        if throw:
+            raise Exception('PARAMS_ERROR','unknown time format: %s' % seq)
+        else:
+            return None
         
 
 str2epoch = str2time
