@@ -91,24 +91,27 @@ def export_attribute_to_dict(model,attribute=None,value=None,
 
         if v and 'DevFailed' not in str(v):
             ac = proxy.get_attribute_config(attr.name)
-            attr.description = (ac.description
-                if ac.description!='No description' else '')
             
-            attr.data_format = str(ac.data_format)
-            attr.max_dim_x = ac.max_dim_x
-            attr.max_dim_y = ac.max_dim_y
-            attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
-            attr.enum_labels = list(ac.enum_labels)
-            attr.writable = str(ac.writable)
-            attr.label = ac.label
-            attr.min_alarm = ac.min_alarm
-            attr.max_alarm = ac.max_alarm
-            attr.unit = ac.unit
-            attr.format = ac.format
-            attr.standard_unit = ac.standard_unit
-            attr.display_unit = ac.display_unit
-            attr.min_value = ac.min_value
-            attr.max_value = ac.max_value
+            try:
+                attr.data_format = str(ac.data_format)
+                attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
+                attr.writable = str(ac.writable)
+                attr.label = ac.label
+                attr.standard_unit = ac.standard_unit
+                attr.display_unit = ac.display_unit
+                attr.unit = ac.unit
+                attr.description = (ac.description
+                    if ac.description!='No description' else '')
+                attr.format = ac.format
+                attr.enum_labels = getattr(ac,'enum_labels',[]) #New in T9
+                attr.min_value = ac.min_value
+                attr.max_value = ac.max_value
+                attr.max_dim_x = ac.max_dim_x
+                attr.max_dim_y = ac.max_dim_y
+                attr.min_alarm = ac.min_alarm
+                attr.max_alarm = ac.max_alarm
+            except:
+                traceback.print_exc()
 
             attr.events.ch_event = fandango.obj2dict(ac.events.ch_event)
             attr.events.arch_event = fandango.obj2dict(ac.events.arch_event)
@@ -195,7 +198,8 @@ def export_device_to_dict(device,commands=True,properties=True):
     
     .. code-block python:
     
-        data = dict((d,fandango.tango.export_device_to_dict(d)) for d in fandango.tango.get_matching_devices('*00/*/*'))
+        data = dict((d,fandango.tango.export_device_to_dict(d)) 
+            for d in fandango.tango.get_matching_devices('*00/*/*'))
         pickle.dump(data,open('bl00_devices.pck','w'))
         
     """
@@ -203,18 +207,25 @@ def export_device_to_dict(device,commands=True,properties=True):
     dct = Struct(fandango.obj2dict(i,
             fltr=lambda n: n in 'dev_class host level name server'.split()))
     dct.attributes,dct.commands = {},{}
+
     if check_device(device):
-      try:
-        proxy = get_device(device)
-        dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) 
-                              for a in proxy.get_attribute_list())
-        if commands:
-          dct.commands = export_commands_to_dict(proxy)
-      except:
-        traceback.print_exc()
+        try:
+            proxy = get_device(device)
+            dct.attributes = dict()
+            for a in proxy.get_attribute_list():
+                try:
+                    dct[a] = export_attribute_to_dict(proxy,a)
+                except:
+                    tracebac.print_exc()
+            if commands:
+                dct.commands = export_commands_to_dict(proxy)
+        except:
+            traceback.print_exc()
+
     if properties:
-      dct.properties = export_properties_to_dict(device)
-      dct.class_properties = export_properties_to_dict(dct.dev_class)
+        dct.properties = export_properties_to_dict(device)
+        dct.class_properties = export_properties_to_dict(dct.dev_class)
+
     return dict(dct)
 
 def import_device_from_dict(dct,device=None,server=None,create=True,
