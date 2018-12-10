@@ -112,7 +112,7 @@ ATTR_INVALID = AttrQuality.ATTR_INVALID
 metachars = re.compile('([.][*])|([.][^*])|([$^+\-?{}\[\]|()])')
 
 # alnum must match alphanumeric strings, including "-_.*"
-alnum = '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))*'
+alnum = '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.\+]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 
