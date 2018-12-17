@@ -86,10 +86,17 @@ if __name__ == '__main__':
     comms,opts = fandango.sysargs_to_dict(split=True,cast=False,lazy=False)
     
     from fandango.functional import *
-    from fandango.tango import *
-    from fandango.servers import *
+    try:
+        from fandango.tango import *
+        from fandango.servers import *
+    except:
+        print('Unable to import Tango modules')
+
     from fandango.linos import *
     from fandango.objects import *
+    
+    if comms[0] == 'help':
+        opts['help'],comms = 1, comms[1:]
     
     if opts.get('x',opts.get('extra',0)):
       try: 
