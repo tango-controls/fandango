@@ -235,7 +235,7 @@ def get_dev_name(model,full=True,fqdn=None):
     gets just the device part of a Tango URI
     """
     norm = get_normal_name(model)
-    if model.count('/')>2: 
+    if norm.count('/')>2: 
         model = model.rsplit('/',1)[0]
     if not full:
         return get_normal_name(model)

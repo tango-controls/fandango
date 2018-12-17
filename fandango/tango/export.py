@@ -47,6 +47,7 @@ Methods for Astor-like management will go to fandango.servers
 from .defaults import *
 from .methods import *
 from .search import *
+from fandango.functional import str2type
 
 ###############################################################################
 ## Methods to export device/attributes/properties to dictionaries
@@ -103,13 +104,16 @@ def export_attribute_to_dict(model,attribute=None,value=None,
                 attr.description = (ac.description
                     if ac.description!='No description' else '')
                 attr.format = ac.format
-                attr.enum_labels = getattr(ac,'enum_labels',[]) #New in T9
+                attr.dim_x = v.dim_x
+                attr.dim_y = v.dim_y                
                 attr.min_value = ac.min_value
                 attr.max_value = ac.max_value
                 attr.max_dim_x = ac.max_dim_x
                 attr.max_dim_y = ac.max_dim_y
                 attr.min_alarm = ac.min_alarm
                 attr.max_alarm = ac.max_alarm
+                attr.enum_labels = list(
+                    getattr(ac,'enum_labels',[])) # New in T9
             except:
                 traceback.print_exc()
 
@@ -119,24 +123,33 @@ def export_attribute_to_dict(model,attribute=None,value=None,
             attr.alarms = fandango.obj2dict(ac.alarms)
             attr.quality = str(v.quality)
             attr.time = ctime2time(v.time)
-
-            if attr.data_format!='SCALAR': 
-                attr.value = list(v.value 
-                    if v.value is not None and v.dim_x else [])
-                sep = '\n' if attr.data_type == 'DevString' else ','
-                svalue = map(vrepr,attr.value)
-                attr.string = sep.join(svalue)
-                if 'numpy' in str(type(v.value)): 
-                  attr.value = map(fandango.str2type,svalue)
+            sep = '\n' if attr.data_type == 'DevString' else ','
+                  
+            if attr.data_format == 'SCALAR':
+                if attr.data_type in ('DevState','DevBoolean'):
+                    attr.value = int(v.value)
+                    attr.string = str(v.value)
+                else:
+                    attr.value = v.value
+                    attr.string = vrepr(v.value)
             else:
-              if attr.data_type in ('DevState','DevBoolean'):
-                  attr.value = int(v.value)
-                  attr.string = str(v.value)
-              else:
-                  attr.value = v.value
-                  attr.string = vrepr(v.value)
+                if v.value is None or not v.dim_x:
+                    attr.value = []
+                    attr.string = '[]'
+                elif attr.data_format == 'SPECTRUM': 
+                    attr.value = list(v.value) 
+                    svalue = map(vrepr,attr.value)
+                    attr.string = sep.join(svalue)
+                elif attr.data_format=='IMAGE': 
+                    attr.value = list(map(list,v.value))
+                    svalue = [[vrepr(w) for w in vv] for vv in attr.value]
+                    attr.string = sep.join('[%s]' % sep.join(vv) 
+                                           for vv in svalue)
+                if 'numpy' in str(type(v.value)): 
+                    attr.value = list(str2type(attr.string))
+                  
             if attr.unit.strip() not in ('','No unit'):
-              attr.string += ' %s'%(attr.unit)
+                attr.string += ' %s'%(attr.unit)
             attr.polling = proxy.get_attribute_poll_period(attr.name)
         else: 
             print((attr.device,attr.name,'unreadable!'))
@@ -156,7 +169,8 @@ def export_attribute_to_dict(model,attribute=None,value=None,
             attr.color = TANGO_STATE_COLORS['OFF']
             
     except Exception,e:
-        print(str((attr,traceback.format_exc())))
+        print(v)
+        traceback.print_exc()
         raise(e)
 
     if as_struct:

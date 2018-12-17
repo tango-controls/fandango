@@ -2016,6 +2016,18 @@ class DynamicDS(DynamicDSHelpers):
         self.debug('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout        
     
+    #------------------------------------------------------------------
+    #    getAttrFormula command:
+    #
+    #    Description: Return DynamicAttribute formula
+    #
+    #    argin:  DevString    PyTango Expression to evaluate
+    #    argout: DevString
+    #------------------------------------------------------------------
+    #Methods started with underscore could be inherited by child device servers for debugging purposes
+    def getAttrFormula(self,argin):
+        return self.dyn_attrs[argin.lower()]
+    
     #------------------------------------------------------------------------------------------------------
     #   Lock/Unlock Methods
     #------------------------------------------------------------------------------------------------------
@@ -2208,7 +2220,13 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevString, "Print current property values"],
             {
                 'Display level':PyTango.DispLevel.EXPERT,
-             } ],            
+             } ],     
+        'getAttrFormula':
+            [[PyTango.DevString, "Get current attribute formula"],
+            [PyTango.DevString, "Get current attribute formula"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],                   
         'getMemUsage':
             [[PyTango.DevVoid, "Returns own process RSS memory usage (Kb)"],
             [PyTango.DevDouble, "Returns own process RSS memory usage (Kb)"],
@@ -2309,13 +2327,16 @@ def CreateDynamicCommands(ds,ds_class):
                  #for l in [d.split('#')[0].strip() for d in prop if d] if l]
         lines = []
         for i,d in enumerate(prop):
-            if d:
-                l = dd = d.split('#')[0].strip()
-                if l:
-                    l0 = dev+'/'+l.split('=',1)[0].strip()
-                    l1 = l.split('=',1)[1].strip()
-                    l = (l0,l1)
-                    lines.append(l)
+            try:
+                if d:
+                    l = dd = d.split('#')[0].strip()
+                    if l:
+                        l0 = dev+'/'+l.split('=',1)[0].strip()
+                        l1 = l.split('=',1)[1].strip()
+                        l = (l0,l1)
+                        lines.append(l)
+            except:
+                print('CreateDynamicCommands(%s): Unable to parse' % d)
                         
         ds.dyn_comms.update(lines)
         for name,formula in lines: #ds.dyn_comms.items():
