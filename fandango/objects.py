@@ -110,11 +110,16 @@ def copy(obj):
       except:
         o = type(obj)(obj)
     return o
+
+##############################################################################
+# Methods for pickling/dumping, passing objects to files/queues
     
 def obj2dict(obj,type_check=True,class_check=False,fltr=None):
     """ 
     Converts a python object to a dictionary with all its members 
     as python primitives 
+    
+    This can be used in Queues or to convert to str using pickle.dumps
     
     :param fltr: a callable(name):bool method
     """
@@ -154,6 +159,38 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
         print(e)
     return(dct)
 
+def pick(filename, keys = []):
+    import pickle
+    try:
+        f = open(filename)
+        v = pickle.load(f)
+        if keys:
+            try:
+                for k in keys:
+                    v = v[k]
+            except:
+                traceback.print_exc()
+        return v
+    except:
+        traceback.print_exc()
+    finally:
+        f.close()
+
+def dump(value, filename, as_dict = False):
+    import pickle
+    try:
+        f = open(filename, 'w')
+        if not as_dict:
+            try:
+                pickle.dump(value, f)
+            except:
+                as_dict = True
+        if as_dict:
+            pickle.dump(obj2dict(value), f)
+    except:
+        traceback.print_exc()
+    finally:
+        f.close()
 
 ## Useful class objects
 
