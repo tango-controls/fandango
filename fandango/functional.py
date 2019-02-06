@@ -914,8 +914,12 @@ TIME_UNITS.update((k.upper(),v) for k,v in TIME_UNITS.items() if k!='m')
 RAW_TIME = ('^(?:P)?([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'
             % ('|').join(TIME_UNITS)) # e.g. 3600.5 s
 
+MYSQL_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+ISO_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+
 global DEFAULT_TIME_FORMAT
-DEFAULT_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+DEFAULT_TIME_FORMAT = MYSQL_TIME_FORMAT
+
 ALT_TIME_FORMATS = [ ('%s%s%s' % (
     date.replace('-',dash),separator if hour else '',hour)) 
         for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y',
@@ -925,6 +929,16 @@ ALT_TIME_FORMATS = [ ('%s%s%s' % (
         for hour in ('%H:%M','%H:%M:%S','%H','')]
         
 def set_default_time_format(dtf, test = True):
+    """
+    Usages:
+    
+        fandango.set_default_time_format('%Y-%m-%d %H:%M:%S')
+        
+        or
+        
+        fandango.set_default_time_format(fandango.ISO_TIME_FORMAT)
+        
+    """
     if test:
         str2time(time2str(cad = dtf), cad = dtf)
     global DEFAULT_TIME_FORMAT
