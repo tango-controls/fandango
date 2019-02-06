@@ -67,6 +67,8 @@ To test it on Debian (NOT NEEDED AS MYSQLCLIENT IS NOW python-mysqldb):
 """
 
 try:
+    # This import will fail in Debian as mysqlclient is loaded as MySQLdb
+    # in other OS, mysqlclient should be used
     import mysqlclient
     import mysqlclient as mysql_api
     mysql = Struct()
@@ -160,7 +162,8 @@ class FriendlyDB(log.Logger):
         returns the Cursor for the database
         renew will force the creation of a new cursor object
         klass may be any of MySQLdb.cursors classes (e.g. DictCursor)
-        MySQLdb.cursors.SSCursor allows to minimize mem usage in clients (although it relies memory cleanup to the server!)
+        MySQLdb.cursors.SSCursor allows to minimize mem usage in clients 
+        (although it relies memory cleanup to the server!)
         '''
         try:
             if klass in ({},dict):
