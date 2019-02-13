@@ -47,7 +47,7 @@ Methods for Astor-like management will go to fandango.servers
 from .defaults import *
 from .methods import *
 from .search import *
-from fandango.functional import str2type
+from fandango.functional import str2type, toSequence
 
 ###############################################################################
 ## Methods to export device/attributes/properties to dictionaries
@@ -146,7 +146,8 @@ def export_attribute_to_dict(model,attribute=None,value=None,
                     attr.string = sep.join('[%s]' % sep.join(vv) 
                                            for vv in svalue)
                 if 'numpy' in str(type(v.value)): 
-                    attr.value = list(str2type(attr.string))
+                    #print('%s("%s") => python' % (type(v.value), attr.string))
+                    attr.value = toSequence(str2type(attr.string))
                   
             if attr.unit.strip() not in ('','No unit'):
                 attr.string += ' %s'%(attr.unit)
@@ -169,7 +170,7 @@ def export_attribute_to_dict(model,attribute=None,value=None,
             attr.color = TANGO_STATE_COLORS['OFF']
             
     except Exception,e:
-        print(v)
+        print('export_attribute_to_dict(%s) failed!: %s' % (model,v))
         traceback.print_exc()
         raise(e)
 
@@ -225,12 +226,11 @@ def export_device_to_dict(device,commands=True,properties=True):
     if check_device(device):
         try:
             proxy = get_device(device)
-            dct.attributes = dict()
             for a in proxy.get_attribute_list():
                 try:
-                    dct[a] = export_attribute_to_dict(proxy,a)
+                    dct.attributes[a] = export_attribute_to_dict(proxy,a)
                 except:
-                    tracebac.print_exc()
+                    traceback.print_exc()
             if commands:
                 dct.commands = export_commands_to_dict(proxy)
         except:
