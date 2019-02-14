@@ -655,18 +655,26 @@ def str2type(seq,use_eval=True,sep_exp='[,;\ ]+'):
     Lines separated by sep_exp will be automatically split
     """
     seq = str(seq).strip()
+    #Parsing a date
+    if clmatch('[P]?[0-9]+[-]',seq) and str2time(seq,throw=False) is not None:
+        return seq
+    #Parsing a list of elements
     m = sep_exp and (seq[0] not in '{[(') and re.search(sep_exp,seq)
     if m:
         return [str2type(s,use_eval) for s in str2list(seq,m.group())]
+    #Bool
     elif isBool(seq,is_zero=False):
         return str2bool(seq)
+    #Python expression
     elif use_eval:
         try:
             return eval(seq)
         except:
             return seq
+    #Number
     elif isNumber(seq):
         return str2float(seq)
+    #Regular string
     else:
         return seq
     
@@ -790,7 +798,6 @@ def list2lines(s,multiline='\\',joiner='\n',comment='#'):
     if comment, it will escape the comments until the end of the line
     """
     if not isSequence(s): return s
-    #print('list2lines(%s)'%'\n'.join(s))
     nl = []
     for l in s:
         if comment:
@@ -803,8 +810,6 @@ def list2lines(s,multiline='\\',joiner='\n',comment='#'):
             
     if joiner:
         nl = joiner.join(nl)
-    
-    print('list2lines: done')
     return nl
 
 def list2str(s,separator='\t',MAX_LENGTH=0):
@@ -901,8 +906,43 @@ def bool2int(seq):
 ########################################################################
 
 END_OF_TIME = 1024*1024*1024*2-1 #Jan 19 04:14:07 2038
-TIME_UNITS = {'ns':1e-9,'us':1e-6,'ms':1e-3,'':1,'s':1,'m':60, 'h':3600,'d':86.4e3,'w':604.8e3,'y':31.536e6}
-RAW_TIME = '^([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'%'|'.join(TIME_UNITS) # e.g. 3600.5 s
+TIME_UNITS = { 'ns': 1e-9, 'us': 1e-6, 'ms': 1e-3, '': 1, 's': 1, 'm': 60, 
+    'h': 3600, 'd': 86.4e3, 'w': 604.8e3, 'M': 30*86.4e3, 'y': 31.536e6 }
+TIME_UNITS.update((k.upper(),v) for k,v in TIME_UNITS.items() if k!='m')
+
+#@todo: RAW_TIME should be capable to parse durations as of ISO 8601
+RAW_TIME = ('^(?:P)?([+-]?[0-9]+[.]?(?:[0-9]+)?)(?: )?(%s)$'
+            % ('|').join(TIME_UNITS)) # e.g. 3600.5 s
+
+MYSQL_TIME_FORMAT = '%Y-%m-%d %H:%M:%S'
+ISO_TIME_FORMAT = '%Y-%m-%dT%H:%M:%S'
+
+global DEFAULT_TIME_FORMAT
+DEFAULT_TIME_FORMAT = MYSQL_TIME_FORMAT
+
+ALT_TIME_FORMATS = [ ('%s%s%s' % (
+    date.replace('-',dash),separator if hour else '',hour)) 
+        for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y',
+                        '%d-%m-%y','%m-%d-%Y','%m-%d-%y')
+        for dash in ('-','/')
+        for separator in (' ','T')
+        for hour in ('%H:%M','%H:%M:%S','%H','')]
+        
+def set_default_time_format(dtf, test = True):
+    """
+    Usages:
+    
+        fandango.set_default_time_format('%Y-%m-%d %H:%M:%S')
+        
+        or
+        
+        fandango.set_default_time_format(fandango.ISO_TIME_FORMAT)
+        
+    """
+    if test:
+        str2time(time2str(cad = dtf), cad = dtf)
+    global DEFAULT_TIME_FORMAT
+    DEFAULT_TIME_FORMAT = dtf
 
 def now():
     return time.time()
@@ -930,9 +970,11 @@ def date2time(date,us=True):
       except:
         raise e
 
-def date2str(date,us=False):
+def date2str(date, cad = '', us=False):
     #return time.ctime(date2time(date))
-    t = time.strftime('%Y-%m-%d %H:%M:%S',time2tuple(date2time(date)))
+    global DEFAULT_TIME_FORMAT
+    cad = cad or DEFAULT_TIME_FORMAT
+    t = time.strftime(cad, time2tuple(date2time(date)))
     us = us and getattr(date,'microsecond',0)
     if us: t+='.%06d'%us
     return t
@@ -945,10 +987,16 @@ def time2date(epoch=None):
 def utcdiff(t=None):
     return now() - date2time(datetime.datetime.utcnow())  
 
-def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True,utc=False):
+def time2str(epoch=None, cad='', us=False, bt=True,
+             utc=False, iso=False):
     """
-    Use us=True to introduce ms precission
-    ]
+    cad: introduce your own custom format (see below)
+    use DEFAULT_TIME_FORMAT to set a default one
+    us=False; True to introduce ms precission
+    bt=True; negative epochs are considered relative from now
+    utc=False; if True it converts to UTC
+    iso=False; if True, 'T' will be used to separate date and time
+    
     cad accepts the following formats:
     
     %a 	Locale’s abbreviated weekday name. 	 
@@ -978,14 +1026,16 @@ def time2str(epoch=None,cad='%Y-%m-%d %H:%M:%S',us=False,bt=True,utc=False):
     """
     if epoch is None: epoch = now() 
     elif bt and epoch<0: epoch = now()+epoch
+    global DEFAULT_TIME_FORMAT
+    cad = cad or DEFAULT_TIME_FORMAT
     t = time.strftime(cad,time2tuple(epoch,utc=utc))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
     return t
   
 epoch2str = time2str
-    
-def str2time(seq='',cad=''):
+ 
+def str2time(seq='', cad='', throw=True):
     """ 
     :param seq: Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format or -N [d/m/y/s/h]
     
@@ -995,34 +1045,45 @@ def str2time(seq='',cad=''):
     
     :param cad: You can pass a custom time format
     """
-    if seq in (None,''): return time.time()
-    seq = str(seq).strip()
-    m = re.match(RAW_TIME,seq) 
-    if m:
-        #Converting from a time(unit) format
-        value,unit = m.groups()
-        try: return float(value)*TIME_UNITS[unit]
-        except: raise Exception('PARAMS_ERROR','time format cannot be parsed!: %s'%seq)
-    else:
+    try: 
+        if seq in (None,''): 
+            return time.time()
+        
+        t, seq = None, str(seq).strip()
+        if not cad:
+            m = re.match(RAW_TIME,seq) 
+            if m:
+                #Converting from a time(unit) format
+                value,unit = m.groups()
+                t = float(value)*TIME_UNITS[unit]
+                return t # must return here
+                
         #Converting from a date format
-        t,ms = None,re.match('.*(\.[0-9]+)$',seq) #Splitting the decimal part
-        if ms: ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
-        else: ms = 0
-        time_fmts = ([cad] if cad else [None]+
-            [('%s%s%s'%(date.replace('-',dash),separator if hour else '',hour)) 
-            for date in ('%Y-%m-%d','%y-%m-%d','%d-%m-%Y','%d-%m-%y','%m-%d-%Y','%m-%d-%y')
-            for dash in ('-','/')
-            for separator in (' ','T')
-            for hour in ('%H:%M','%H:%M:%S','')
-            ])
-        for tf in time_fmts:
-            try:
-                tf = (tf,) if tf else () #tf=None will try default system format
-                t = time.strptime(seq,*tf)
-                break
-            except: pass
-        if t is not None: return time.mktime(t)+ms
-        else: raise Exception('PARAMS_ERROR','date format cannot be parsed!: %s'%str(seq))    
+        ms = re.match('.*(\.[0-9]+)$',seq) #Splitting the decimal part
+        if ms: 
+            ms,seq = float(ms.groups()[0]),seq.replace(ms.groups()[0],'')
+
+        if t is None:
+            #tf=None will try default system format
+            global DEFAULT_TIME_FORMAT
+            time_fmts = ([cad] if cad else 
+                         [DEFAULT_TIME_FORMAT,None] + ALT_TIME_FORMATS)
+            for tf in time_fmts:
+                try:
+                    tf = (tf,) if tf else () 
+                    t = time.strptime(seq,*tf)
+                    break
+                except: 
+                    pass
+                
+        return time.mktime(t)+(ms or 0)
+    except: 
+        if throw:
+            raise Exception('PARAMS_ERROR','unknown time format: %s' % seq)
+        else:
+            return None
+        
+
 str2epoch = str2time
 
 def time2gmt(epoch=None):
@@ -1075,8 +1136,9 @@ def iif(condition,truepart,falsepart=None,forward=False):
 
 def ifThen(condition,callback,falsables=tuple()):
     """
-    This function allows to execute a callable on an object only if it has a valid value.
-    ifThen(value,callable) will return callable(value) only if value is not in falsables.
+    This function allows to execute a callable on an object only if it 
+    has a valid value. ifThen(value,callable) will return callable(value) 
+    only if value is not in falsables.
     
     It is a List-like method, it can be combined with fandango.excepts.trial
     """
@@ -1087,6 +1149,30 @@ def ifThen(condition,callback,falsables=tuple()):
           return ifThen(callback[0](condition),callback[1:],falsables)
     else:
         return condition
+    
+def call(args=None,locals_=None):
+    """
+    Calls a method from local scope parsing a pipe-like argument list
+    """
+    if args is None:
+        import sys
+        args = sys.argv[1:]
+    f,args = args[0],args[1:]
+    if not isCallable(f):
+        locals_ = locals_ or globals()
+        if f=='help':
+            if args and args[0] in locals_:
+                n,o = args[0],locals_[args[0]]
+                if hasattr(o,'func_code'):
+                    n = n+str(o.func_code.co_varnames)
+                return '%s:\n%s' % (n,o.__doc__)
+            else:
+                m = [k for k,v in locals_.items() if isCallable(v)]
+                return ('\n'.join(sorted(m,key=str.lower)))
+        f = locals_.get(f,None) 
+    if all(isString(a) for a in args):
+        args = map(str2type,args)
+    return f(*args)    
 
 def retry(callable,retries=3,pause=0,args=[],kwargs={}):
     r = None
@@ -1267,5 +1353,12 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
 
-from . import doc
-__doc__ = doc.get_fn_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])
+###############################################################################
+
+try:
+    from . import doc
+    __doc__ = doc.get_fn_autodoc(__name__,vars(),module_vars=['END_OF_TIME'])
+except: pass
+
+if __name__ == '__main__':
+    print(call())

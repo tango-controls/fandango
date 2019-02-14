@@ -108,7 +108,7 @@ try:
     from objects import Object,Singleton,SingletonMap,Struct,NamedProperty
     from objects import dirModule,loadModule,dirClasses,obj2dict,copy
     from objects import Decorator,ClassDecorator,Decorated,BoundDecorator
-    from objects import Cached
+    from objects import Cached, Variable
 except Exception,e: 
     print('Unable to import objects module: %s'%traceback.format_exc())
     

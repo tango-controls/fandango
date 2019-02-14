@@ -47,6 +47,7 @@ Methods for Astor-like management will go to fandango.servers
 from .defaults import *
 from .methods import *
 from .search import *
+from fandango.functional import str2type, toSequence
 
 ###############################################################################
 ## Methods to export device/attributes/properties to dictionaries
@@ -91,24 +92,30 @@ def export_attribute_to_dict(model,attribute=None,value=None,
 
         if v and 'DevFailed' not in str(v):
             ac = proxy.get_attribute_config(attr.name)
-            attr.description = (ac.description
-                if ac.description!='No description' else '')
             
-            attr.data_format = str(ac.data_format)
-            attr.max_dim_x = ac.max_dim_x
-            attr.max_dim_y = ac.max_dim_y
-            attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
-            attr.enum_labels = list(ac.enum_labels)
-            attr.writable = str(ac.writable)
-            attr.label = ac.label
-            attr.min_alarm = ac.min_alarm
-            attr.max_alarm = ac.max_alarm
-            attr.unit = ac.unit
-            attr.format = ac.format
-            attr.standard_unit = ac.standard_unit
-            attr.display_unit = ac.display_unit
-            attr.min_value = ac.min_value
-            attr.max_value = ac.max_value
+            try:
+                attr.data_format = str(ac.data_format)
+                attr.data_type = str(PyTango.CmdArgType.values[ac.data_type])
+                attr.writable = str(ac.writable)
+                attr.label = ac.label
+                attr.standard_unit = ac.standard_unit
+                attr.display_unit = ac.display_unit
+                attr.unit = ac.unit
+                attr.description = (ac.description
+                    if ac.description!='No description' else '')
+                attr.format = ac.format
+                attr.dim_x = v.dim_x
+                attr.dim_y = v.dim_y                
+                attr.min_value = ac.min_value
+                attr.max_value = ac.max_value
+                attr.max_dim_x = ac.max_dim_x
+                attr.max_dim_y = ac.max_dim_y
+                attr.min_alarm = ac.min_alarm
+                attr.max_alarm = ac.max_alarm
+                attr.enum_labels = list(
+                    getattr(ac,'enum_labels',[])) # New in T9
+            except:
+                traceback.print_exc()
 
             attr.events.ch_event = fandango.obj2dict(ac.events.ch_event)
             attr.events.arch_event = fandango.obj2dict(ac.events.arch_event)
@@ -116,24 +123,34 @@ def export_attribute_to_dict(model,attribute=None,value=None,
             attr.alarms = fandango.obj2dict(ac.alarms)
             attr.quality = str(v.quality)
             attr.time = ctime2time(v.time)
-
-            if attr.data_format!='SCALAR': 
-                attr.value = list(v.value 
-                    if v.value is not None and v.dim_x else [])
-                sep = '\n' if attr.data_type == 'DevString' else ','
-                svalue = map(vrepr,attr.value)
-                attr.string = sep.join(svalue)
-                if 'numpy' in str(type(v.value)): 
-                  attr.value = map(fandango.str2type,svalue)
+            sep = '\n' if attr.data_type == 'DevString' else ','
+                  
+            if attr.data_format == 'SCALAR':
+                if attr.data_type in ('DevState','DevBoolean'):
+                    attr.value = int(v.value)
+                    attr.string = str(v.value)
+                else:
+                    attr.value = v.value
+                    attr.string = vrepr(v.value)
             else:
-              if attr.data_type in ('DevState','DevBoolean'):
-                  attr.value = int(v.value)
-                  attr.string = str(v.value)
-              else:
-                  attr.value = v.value
-                  attr.string = vrepr(v.value)
+                if v.value is None or not v.dim_x:
+                    attr.value = []
+                    attr.string = '[]'
+                elif attr.data_format == 'SPECTRUM': 
+                    attr.value = list(v.value) 
+                    svalue = map(vrepr,attr.value)
+                    attr.string = sep.join(svalue)
+                elif attr.data_format=='IMAGE': 
+                    attr.value = list(map(list,v.value))
+                    svalue = [[vrepr(w) for w in vv] for vv in attr.value]
+                    attr.string = sep.join('[%s]' % sep.join(vv) 
+                                           for vv in svalue)
+                if 'numpy' in str(type(v.value)): 
+                    #print('%s("%s") => python' % (type(v.value), attr.string))
+                    attr.value = toSequence(str2type(attr.string))
+                  
             if attr.unit.strip() not in ('','No unit'):
-              attr.string += ' %s'%(attr.unit)
+                attr.string += ' %s'%(attr.unit)
             attr.polling = proxy.get_attribute_poll_period(attr.name)
         else: 
             print((attr.device,attr.name,'unreadable!'))
@@ -153,7 +170,8 @@ def export_attribute_to_dict(model,attribute=None,value=None,
             attr.color = TANGO_STATE_COLORS['OFF']
             
     except Exception,e:
-        print(str((attr,traceback.format_exc())))
+        print('export_attribute_to_dict(%s) failed!: %s' % (model,v))
+        traceback.print_exc()
         raise(e)
 
     if as_struct:
@@ -195,7 +213,8 @@ def export_device_to_dict(device,commands=True,properties=True):
     
     .. code-block python:
     
-        data = dict((d,fandango.tango.export_device_to_dict(d)) for d in fandango.tango.get_matching_devices('*00/*/*'))
+        data = dict((d,fandango.tango.export_device_to_dict(d)) 
+            for d in fandango.tango.get_matching_devices('*00/*/*'))
         pickle.dump(data,open('bl00_devices.pck','w'))
         
     """
@@ -203,18 +222,24 @@ def export_device_to_dict(device,commands=True,properties=True):
     dct = Struct(fandango.obj2dict(i,
             fltr=lambda n: n in 'dev_class host level name server'.split()))
     dct.attributes,dct.commands = {},{}
+
     if check_device(device):
-      try:
-        proxy = get_device(device)
-        dct.attributes = dict((a,export_attribute_to_dict(proxy,a)) 
-                              for a in proxy.get_attribute_list())
-        if commands:
-          dct.commands = export_commands_to_dict(proxy)
-      except:
-        traceback.print_exc()
+        try:
+            proxy = get_device(device)
+            for a in proxy.get_attribute_list():
+                try:
+                    dct.attributes[a] = export_attribute_to_dict(proxy,a)
+                except:
+                    traceback.print_exc()
+            if commands:
+                dct.commands = export_commands_to_dict(proxy)
+        except:
+            traceback.print_exc()
+
     if properties:
-      dct.properties = export_properties_to_dict(device)
-      dct.class_properties = export_properties_to_dict(dct.dev_class)
+        dct.properties = export_properties_to_dict(device)
+        dct.class_properties = export_properties_to_dict(dct.dev_class)
+
     return dict(dct)
 
 def import_device_from_dict(dct,device=None,server=None,create=True,

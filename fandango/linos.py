@@ -306,6 +306,13 @@ def findfolders(target='',parent='',filter_=True,printout = False):
             result.append(f)
     return result
 
+def get_disk_usage(folder='.'):
+    cmd = 'df -h '+folder
+    r = shell_command(cmd).strip('\n').split('\n')[-1].split()
+    p = [f for f in r if '%' in f]
+    return p and 1e-2*float(p[0].strip('% ')) or 0
+    
+
 ################################################################################3
 # Kde methods        
         

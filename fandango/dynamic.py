@@ -268,8 +268,15 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
                 self._locals[k] = getattr(fandango.functional,k)
         
         # Methods for getting/writing properties
-        self._locals['PROPERTY'] = lambda property,update=False: self.get_device_property(property,update)
-        self._locals['WPROPERTY'] = lambda property,value: (self._db.put_device_property(self.get_name(),{property:[value]}),setattr(self,property,value))
+        self._locals['PGET'] = (
+            lambda property,update=False: (
+                self.get_device_property(property,update)))
+        self._locals['PSET'] = (
+            lambda property,value: (
+                self._db.put_device_property(self.get_name(),
+                    {property:[value]}),setattr(self,property,value)))
+        self._locals['PROPERTY'] = self._locals['PGET']
+        self._locals['WPROPERTY'] = self._locals['PSET']
         
         # Methods for managing attribute types
         self._locals['DYN'] = DynamicAttribute
@@ -802,7 +809,22 @@ class DynamicDSAttrs(DynamicDSImpl):
     
     @Cached(depth=1024,expire=15.)
     def check_attribute_events(self,aname,poll=False):
+        """
+        It parses the contents of UseEvents property, that can be:
+         - [ 'yes/no/true/false' ]
+         - [  'archive|change' ]
+         - [ 'attr1', 'attr2:push', 'attr3:archive' ]
         
+        In the first two cases, the value specified applies to all attributes.
+        
+        In the last case, each config applies only to the specified attribute.
+        
+        Setting yes/true will enable only change events if configured from Jive.
+        
+        Setting archive will enable both change and archive events.
+        
+        Setting push will also enable the pushing from code.
+        """
         self.UseEvents = filter(bool,
                 (u.split('#')[0].strip().lower() for u in self.UseEvents))
         self.debug('check_attribute_events(%s,%s,%s)'
@@ -866,9 +888,10 @@ class DynamicDSAttrs(DynamicDSImpl):
                     v,new_value = (float(v) if v is not None else None),\
                                     float(new_value)
                 except Exception,e: 
+                    self.debug(str(e))
                     self.info('In check_changed_event(%s): '
-                              'values not evaluable (%s,%s): %s'
-                              %(aname,shortstr(v),shortstr(new_value),e))
+                              'non-numeric, checking raw diff (%s,%s)'
+                              %(aname,shortstr(v),shortstr(new_value)))
                     try:
                         return v!=new_value #and (cabs>0 or crel>0)
                     except:
@@ -1125,7 +1148,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         @remark Generators don't work  inside eval!, use lists instead
         If push=True, any result is considered as change
         '''
-        aname = self.get_attr_name(aname)
+        aname,formula = self.get_attr_name(aname),''
         self.debug("DynamicDS(%s)::evalAttr(%s,%s): ... last value was %s"
             % (self.get_name(), aname, push, shortstr(
                 getattr(self.dyn_values.get(aname,None),'value',None))))
@@ -1171,6 +1194,13 @@ class DynamicDSAttrs(DynamicDSImpl):
                   'FORMULAS':dict((k,v.formula) for k,v in self.dyn_values.items()),                  
                   'XATTRS':self._external_attributes,
                   }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
+               
+              # Redundant but needed
+              [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
+              [self._locals.__setitem__(k,dst.pytype) for k,dst in DynamicDSTypes.items()]
+              #Adding states for convenience evaluation
+              #self.TangoStates = dict((str(v),v) for k,v in PyTango.DevState.values.items())
+              #self._locals.update(self.TangoStates)                  
 
               if _locals is not None: 
                   #High Priority: variables passed as argument
@@ -1196,7 +1226,11 @@ class DynamicDSAttrs(DynamicDSImpl):
             ###################################################################
             result = eval(compiled or formula,self._globals,self._locals)
             self.debug('eval result: '+str(result))
-            if WRITE or aname not in self.dyn_values:
+            if aname not in self.dyn_values:
+                return result
+            elif WRITE:
+                if self.ReadOnWrite:
+                    self.evalAttr(aname,WRITE=False,_locals=_locals,push=push)
                 return result            
 
             ###################################################################
@@ -1996,6 +2030,18 @@ class DynamicDS(DynamicDSHelpers):
         self.debug('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout        
     
+    #------------------------------------------------------------------
+    #    getAttrFormula command:
+    #
+    #    Description: Return DynamicAttribute formula
+    #
+    #    argin:  DevString    PyTango Expression to evaluate
+    #    argout: DevString
+    #------------------------------------------------------------------
+    #Methods started with underscore could be inherited by child device servers for debugging purposes
+    def getAttrFormula(self,argin):
+        return self.dyn_attrs[argin.lower()]
+    
     #------------------------------------------------------------------------------------------------------
     #   Lock/Unlock Methods
     #------------------------------------------------------------------------------------------------------
@@ -2107,11 +2153,15 @@ class DynamicDSClass(PyTango.DeviceClass):
         'DynamicQualities':
             [PyTango.DevVarStringArray,
             "This property will allow to declare formulas for Attribute Qualities.",
-            [] ],
+            [] ],           
         'DynamicStatus':
             [PyTango.DevVarStringArray,
             "Each line generated by this property code will be added to status",
             [] ],
+        'DynamicSpectrumSize':
+            [PyTango.DevLong,
+            "It will fix the maximum size for all Dynamic Attributes.",
+            [ MAX_ARRAY_SIZE ] ],            
         'LoadFromFile':
             [PyTango.DevString,
             "If not empty, a file where additional attribute formulas can be declared. It will be parsed BEFORE DynamicAttributes",
@@ -2137,6 +2187,10 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "This property manages if dependencies between attributes are used to check readability.",
             ['True'] ],
+        'ReadOnWrite':
+            [PyTango.DevBoolean,
+            "When True, this will trigger a read attribute just after writing (e.g. for pushing events on write).",
+            [False] ],            
         'UseEvents':
             [PyTango.DevVarStringArray,
             "Value of this property will be yes/true,no/false or a list of "
@@ -2145,7 +2199,7 @@ class DynamicDSClass(PyTango.DeviceClass):
         'MaxEventStream':
             [PyTango.DevLong,
             "Max number of events to be pushed by processEvents()",
-            [ 10 ] ],             
+            [ 0 ] ],             
         'UseTaurus':
             [PyTango.DevBoolean,
             "This property manages if Taurus or PyTango will be used to read external attributes.",
@@ -2184,7 +2238,13 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevString, "Print current property values"],
             {
                 'Display level':PyTango.DispLevel.EXPERT,
-             } ],            
+             } ],     
+        'getAttrFormula':
+            [[PyTango.DevString, "Get current attribute formula"],
+            [PyTango.DevString, "Get current attribute formula"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],                   
         'getMemUsage':
             [[PyTango.DevVoid, "Returns own process RSS memory usage (Kb)"],
             [PyTango.DevDouble, "Returns own process RSS memory usage (Kb)"],
@@ -2285,13 +2345,16 @@ def CreateDynamicCommands(ds,ds_class):
                  #for l in [d.split('#')[0].strip() for d in prop if d] if l]
         lines = []
         for i,d in enumerate(prop):
-            if d:
-                l = dd = d.split('#')[0].strip()
-                if l:
-                    l0 = dev+'/'+l.split('=',1)[0].strip()
-                    l1 = l.split('=',1)[1].strip()
-                    l = (l0,l1)
-                    lines.append(l)
+            try:
+                if d:
+                    l = dd = d.split('#')[0].strip()
+                    if l:
+                        l0 = dev+'/'+l.split('=',1)[0].strip()
+                        l1 = l.split('=',1)[1].strip()
+                        l = (l0,l1)
+                        lines.append(l)
+            except:
+                print('CreateDynamicCommands(%s): Unable to parse' % d)
                         
         ds.dyn_comms.update(lines)
         for name,formula in lines: #ds.dyn_comms.items():

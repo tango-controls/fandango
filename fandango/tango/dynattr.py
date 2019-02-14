@@ -96,17 +96,21 @@ DynamicDSTypes={
             in ('','0','none','false','no') else bool(x)),
     'DevDouble':
         DynamicDSType(PyTango.ArgType.DevDouble,
-            ['DevDouble','DevDouble64','float','double',
+            ['DevDouble','DevDouble64','double','float',
             'DevFloat','IeeeFloat','SCALAR(float'],float),
-
+            
     'DevVarLongArray':
         DynamicDSType(PyTango.ArgType.DevLong,
             ['DevVarLongArray','DevVarULongArray',
-            'DevVarLong64Array','DevVarULong64Array',
-            'SPECTRUM(int','list(long',
-            '[long','list(int','[int'],
+            'SPECTRUM(int','list(int','[int'],
             lambda l:[int(i) for i in 
                 ([],l)[hasattr(l,'__iter__')]],4096,1),
+    'DevVarLong64Array':
+        DynamicDSType(PyTango.ArgType.DevLong,
+            ['DevVarLong64Array','DevVarULong64Array',
+            'SPECTRUM(long','list(long','[long'],
+            lambda l:[long(i) for i in 
+                ([],l)[hasattr(l,'__iter__')]],4096,1),            
     'DevVarShortArray':
         DynamicDSType(PyTango.ArgType.DevShort,
             ['DevVarShortArray','DevVarUShortArray',
@@ -125,15 +129,21 @@ DynamicDSTypes={
                 ([],l)[hasattr(l,'__iter__')]],4096,1),
     'DevVarDoubleArray':
         DynamicDSType(PyTango.ArgType.DevDouble,
-            ['DevVarDoubleArray','SPECTRUM(float','DevVarFloatArray',
+            ['DevVarDoubleArray','SPECTRUM(float',
             'list(double','[double','list(float','[float'],
             lambda l:[float(i) for i in 
                 ([],l)[hasattr(l,'__iter__')]],4096,1),
+            
     'DevVarLongImage':
         DynamicDSType(PyTango.ArgType.DevLong,
             ['DevVarLongImage','IMAGE(int,'],
             lambda l:[map(int,i) for i in 
                 ([],l)[hasattr(l,'__iter__')]],4096,4096),
+    'DevVarLong64Image':
+        DynamicDSType(PyTango.ArgType.DevLong,
+            ['DevVarLong64Image','IMAGE(long,'],
+            lambda l:[map(long,i) for i in 
+                ([],l)[hasattr(l,'__iter__')]],4096,4096),            
     'DevVarShortImage':
         DynamicDSType(PyTango.ArgType.DevShort,
             ['DevVarShortImage',],
@@ -150,17 +160,25 @@ DynamicDSTypes={
                 ([],l)[hasattr(l,'__iter__')]],4096,4096),
     'DevVarDoubleImage':
         DynamicDSType(PyTango.ArgType.DevDouble,
-            ['DevVarDoubleImage','IMAGE(float,'],
+            ['DevVarDoubleImage','IMAGE(float,',],
             lambda l:[map(float,i) for i in 
-                ([],l)[hasattr(l,'__iter__')]],4096,4096),
+                ([],l)[hasattr(l,'__iter__')]],4096,4096),     
 }
 
-
-DynamicDSTypes['DevVarFloatArray'] = DynamicDSTypes['DevVarDoubleArray']
-DynamicDSTypes['DevULong'] = DynamicDSTypes['DevLong']
-DynamicDSTypes['DevULong64'] = DynamicDSTypes['DevLong64']
-DynamicDSTypes['DevUShort'] = DynamicDSTypes['DevShort']
-DynamicDSTypes['DevDouble64'] = DynamicDSTypes['DevDouble']
+for a,b in [('Float','Double'),('ULong','Long'),('ULong64','Long64'),
+            ('UShort','Short'),('Char','Short'),('UChar','Char'),
+            ('Double64','Double'),]:
+    ta,tb = 'Dev%s'%a,DynamicDSTypes['Dev%s'%b]
+    pt = PyTango.ArgType.names.get(ta)
+    DynamicDSTypes[ta] = DynamicDSType(
+        pt,[ta],tb.pytype,tb.dimx,tb.dimy)
+    ta, tb = 'DevVar%sArray'%a, DynamicDSTypes['DevVar%sArray'%b]
+    DynamicDSTypes[ta] = DynamicDSType(
+        pt,[ta],tb.pytype,tb.dimx,tb.dimy)
+    ta, tb = 'DevVar%sImage'%a, DynamicDSTypes['DevVar%sImage'%b]
+    DynamicDSTypes[ta] = DynamicDSType(
+        pt,[ta],tb.pytype,tb.dimx,tb.dimy)
+    
             
 def isTypeSupported(ttype,n_dim=None):
     if n_dim is not None and n_dim not in (0,1): return False

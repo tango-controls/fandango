@@ -181,26 +181,31 @@ class TangoEval(object):
     operators = '[><=][=>]?|and|or|in|not in|not'
 
     # Using regexps as loaded from fandango.tango.defaults
-    alnum = alnum #'[a-zA-Z0-9-_]+'
+    #alnum = alnum # '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.\+]|(?:\.\*))*'
+    alnumdot = alnum
+    alnum = '[a-zA-Z0-9-_]+'
     no_alnum = no_alnum
     no_quotes = no_quotes
     
     #THIS REGULAR EXPRESSIONS DOES NOT MATCH THE HOST IN THE FORMULA!!!; 
     #IT IS TAKEN AS PART OF THE DEVICE NAME!!
     #It matches a device name
-    redev = redev
+    #redev = redev
+    redev = '(?P<device>(?:'+alnumdot+':[0-9]+/{1,2})?(?:'+'/'.join([alnumdot]*3)+'))' 
     
     #Matches attribute and extension
     rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|delta|all|'\
               'hist|ALARM|WARNING|VALID|INVALID|OK))?'
     reattr = '(?:/(?P<attribute>'+alnum+')'+rewhat+')?' 
-    retango = redev+reattr#+'(?!/)'
+    #retango = '(?:tango://)?'+(rehost+'?')+
+    retango = redev+reattr #+'(?!/)'
     #Excludes attr_names between quotes, accepts value type methods    
-    regexp = no_quotes + retango + no_quotes.replace('\.','').replace(':','=') 
+    regexp = no_quotes + retango + no_quotes.replace('\.','').replace(':','=')
     
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,
               trace=False, proxies=None, attributes=None, cache=0, 
               use_events = False, event_hook = None,**kwargs):
+        print(self.regexp)
         self.formula = formula
         self.source = ''
         self.variables = []
