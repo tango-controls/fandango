@@ -3,6 +3,6 @@
 include AUTHORS
 include LICENSE
 include README.rst
-include fandango/CHANGESLOG
+include fandango/CHANGELOG
 include fandango/VERSION
 
