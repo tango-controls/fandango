@@ -27,7 +27,8 @@ for p in $DSPROPS; do
   export $p;
 done
 
-# DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property('ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
+# DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property(
+#   'ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
 
 # MUST
 if [ "$DSORB" ] ; then

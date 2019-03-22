@@ -10,7 +10,7 @@ import time
 import PyTango
 import fandango as fn
 
-class MyCallback():
+class MyCallback(object):
     
     counter = 0
     
@@ -60,6 +60,7 @@ def monitor(d, args=[], events = []):
         eis.append(dp.subscribe_event(a,e,cb))
       worked.append(a)
     except:
+      #print(fn.except2str())
       failed.append(a)
 
   print('%d attributes NOT provide events: %s' % (len(failed),failed))      
