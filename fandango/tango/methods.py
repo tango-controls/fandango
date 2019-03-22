@@ -631,12 +631,16 @@ def get_attribute_events(target,polled=True,throw=False):
                     pass #print(k,i,p,v)
             if not any(r[k]): 
                 r.pop(k)
+                
+        if len(r)==1 and 'per_event' in r:
+            # remove periodic event if it is the only setting (default)
+            r.pop('per_event')
             
-        if r: # check polling only if something else is active
+        if r or a.lower() in ('state','status'): 
+            # check polling only if something else is active
             polling = dp.get_attribute_poll_period(a)
-            #if polled and not polling:
-                #return None
             r['polling'] = polling
+
         return r
   
     except Exception,e:
