@@ -92,10 +92,10 @@ class FriendlyDB(log.Logger):
     def __init__(self,db_name,host='',user='',passwd='',autocommit=True,
                  loglevel='WARNING',use_tuples=False,default_cursor=None):
         """ Initialization of MySQL connection """
-        print('Using %s as MySQL python API' % mysql_api)
         self.call__init__(log.Logger,self.__class__.__name__,
                 format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
+        self.info('Using %s as MySQL python API' % mysql_api)
         #def __init__(self,api,db_name,user='',passwd='', host=''):
         #if not api or not database:
             #self.error('ArchivingAPI and database are required arguments for ArchivingDB initialization!')
@@ -180,7 +180,7 @@ class FriendlyDB(log.Logger):
                     self._cursor = self.db.cursor()
             return self._cursor
         except:
-            print traceback.format_exc()
+            self.warning(traceback.format_exc())
             self.renewMySQLconnection()
             self._recursion += 1
             return self.getCursor(renew=True,klass=klass)
@@ -219,7 +219,9 @@ class FriendlyDB(log.Logger):
         @param export If it's True, it returns directly the values instead of a cursor
         @return the executed cursor, values can be retrieved by executing cursor.fetchall()
         '''
+        t0 = time.time()
         try:
+            self.debug(query)
             try:
                 q=self.getCursor(klass = dict if asDict else self.default_cursor)
                 q.execute(query)
@@ -228,15 +230,18 @@ class FriendlyDB(log.Logger):
                 q=self.getCursor(klass = dict if asDict else None)
                 q.execute(query)
         except:
-            print('Query(%s) failed!'%query)
+            self.error('Query(%s) failed!'%query)
             raise
             
         if not export:
-            return q
+            r = q
         elif asDict or not self.use_tuples:
-            return self.fetchall(q) #q.fetchall()
+            r = self.fetchall(q) #q.fetchall()
         else:
-            return self.tuples2lists(self.fetchall(q)) #q.fetchall()
+            r = self.tuples2lists(self.fetchall(q)) #q.fetchall()
+            
+        self.debug('Query(): took %f s' % (time.time()-t0))
+        return r
    
     def Select(self,what,tables,clause='',group='',order='',
                limit='',distinct=False,asDict=False,trace=False):
