@@ -111,21 +111,26 @@ max = max
 min = min
         
 def avg(seq):
+    """ returns the average value of the sequence """
     seq = [float(s) for s in seq if s is not None]
     if not bool(seq) or not len(seq): return 0
     return sum(seq)/len(seq)
 
 def rms(seq):
+    """ returns the rms value (sqrt of the squares average) """
     seq = [float(s)**2 for s in seq if s is not None]
     if not bool(seq) or not len(seq): return 0
     return math.sqrt(sum(seq)/float(len(seq)))
     
 def randomize(seq):
+    """ returns a randomized version of the list """
     done,result = list(range(len(seq))),[]
-    while done: result.append(seq[done.pop(random.randrange(len(done)))])
+    while done: 
+        result.append(seq[done.pop(random.randrange(len(done)))])
     return result
     
 def randpop(seq): 
+    """ removes and returns a random item from the sequence """
     return seq.pop(random.randrange(len(seq)))
     
 def floor(x,unit=1):
