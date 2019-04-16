@@ -1,4 +1,4 @@
-RELEASE_NOTE = "Fandango 13.*; Cached tango database methods"
+RELEASE_NOTE = "Fandango 14.5 Improvements for SimulatorDS and Archiving"
 
 """
 IMPORTANT:
@@ -6,10 +6,35 @@ IMPORTANT:
   Due to fandango.device and fandango.tango module refactoring you may need 
   to remove previous package before installing this one
   
-BUGS PENDING for 13.* (to not be released in master until bugs will be solved)
 
-threads.wait: exceptions on ipython exit
-threads/WorkerDS: uncatched deadlocks
+14.5.0 Improvements for SimulatorDS and Taurus Archiving Schema
+---------------------------------------------------------------
+
+    databases:
+        improve traces
+        add note on MySQLdb/mysqlclient migration
+        
+    tango methods
+        clear default settings for per_event and states
+        Solve issues exporting attributes, solve numpy array except
+        allow integer keys on pick
+        add missing tango/array/image types
+        add PGET/PSET for propertis, add DynamicSpectrumSize device property, 
+        avoid problems when commands use reserved names
+        TangoEval: do not allow dots on attribute names
+        allow "+" as intermediate character on device names (for hdb++)
+        solved errors on export attributes to pck, 
+        add DynDS.getAttrFormula() command
+        
+    scripts:
+        Add "states" command and localhost warning
+        solve import issues on fandango script
+        Catch exceptions on attribute/device export    
+        
+    functional:
+        add functional.ISO_TIME_FORMAT definition
+        Add dates as valid format on str2type
+        Add exception catching on str2time
 
 14.4.2
     Solved bug in RAW_TIME parsing
