@@ -207,6 +207,7 @@ class Struct(object):
     """
     def __init__(self,*args,**kwargs):
         self.load(*args,**kwargs)
+        
     def load(self,*args,**kwargs):
         dct = args[0] if len(args)==1 else (args or kwargs)
         if isSequence(dct) and not isDictionary(dct): 
