@@ -7,7 +7,7 @@ IMPORTANT:
   to remove previous package before installing this one
   
 
-14.5.0 Improvements for SimulatorDS and Taurus Archiving Schema
+14.5.1 Improvements for SimulatorDS and Taurus Archiving Schema
 ---------------------------------------------------------------
 
     databases:
@@ -16,6 +16,7 @@ IMPORTANT:
         
     tango methods
         clear default settings for per_event and states
+	assume state/status to always push events
         Solve issues exporting attributes, solve numpy array except
         allow integer keys on pick
         add missing tango/array/image types
@@ -27,6 +28,7 @@ IMPORTANT:
         add DynDS.getAttrFormula() command
         
     scripts:
+        solve bug in tango_monitor
         Add "states" command and localhost warning
         solve import issues on fandango script
         Catch exceptions on attribute/device export    
