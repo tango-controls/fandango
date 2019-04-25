@@ -407,9 +407,12 @@ def get_polling_stats(device,brief = False):
     for st in pst:
         st = [s.rsplit('=',1) for s in st.split('\n')]
         name = st[0][-1].strip()
-        period = [float(s[-1]) for s in st if s[0].startswith('Polling period')][0]
-        times = [float(s[-1]) for s in st if s[0].startswith('Time needed')][0]
-        deltas = [map(float,s[-1].split(',')) for s in st if 'last records' in s[0]][0]
+        period = [float(s[-1]) for s in st 
+                if s[0].startswith('Polling period')][0]
+        times = [float(s[-1]) for s in st 
+                if s[0].startswith('Time needed')][0]
+        deltas = [map(float,s[-1].split(',')) for s in st 
+                if 'last records' in s[0]][0]
         stats[name] = period,times,deltas
         
     if brief:
@@ -657,33 +660,37 @@ def check_attribute_events(model,ev_type=None,verbose=False):
      - value: True for code-pushed events, int(period) for polled-based
      
     """
-    dev,attr = model.rsplit('/',1)
-    dp = get_device(dev)
-    ev_type = ev_type or (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT)
-    result = dict.fromkeys(toSequence(ev_type))
-    
-    if check_device(dp):
-        for ev_type in result.keys():
-            try:
-                def hook(self,*args,**kwargs):
-                    if self.eid is not None:
-                        self.proxy.unsubscribe_event(eid)
-                        
-                cb = EventCallback(dp,hook).subscribe(attr,ev_type)
-                period = dp.get_attribute_poll_period(attr) 
-                result[ev_type] = period or True
-            except:
+    try:
+        dev,attr = model.rsplit('/',1)
+        dp = get_device(dev)
+        ev_type = ev_type or (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT)
+        result = dict.fromkeys(toSequence(ev_type))
+        
+        if check_device(dp):
+            for ev_type in result.keys():
+                try:
+                    def hook(self,*args,**kwargs):
+                        if self.eid is not None:
+                            self.proxy.unsubscribe_event(eid)
+                            
+                    cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                    period = dp.get_attribute_poll_period(attr) 
+                    result[ev_type] = period or True
+                except:
+                    if verbose:
+                        traceback.print_exc()
+                    result.pop(ev_type)
+
                 if verbose:
-                    traceback.print_exc()
-                result.pop(ev_type)
+                    print('Subscribe(%s,%s): %s' % (
+                            attr,ev_type,result.get(ev_type,False)))
 
-            if verbose:
-                print('Subscribe(%s,%s): %s' % (
-                        attr,ev_type,result.get(ev_type,False)))
+            return result
 
-        return result
-    else:
-        return None
+    except:
+        traceback.print_exc()
+        
+    return None
     
 def set_attribute_events(target, polling = None, rel_event = None, 
                         abs_event = None, per_event = None,
@@ -895,6 +902,7 @@ def put_class_property(klass,property,value=None,db=None):
         if isSequence(value) and not isinstance(value,list):
             value = list(value)
         property = {property:value}
+        
     else:
         for p,v in property.items():          
             if isSequence(v):
@@ -902,6 +910,7 @@ def put_class_property(klass,property,value=None,db=None):
                     property[p] = v[0]
                 elif not isinstance(value,list):
                     property[p] = list(v)
+                    
     return (db or get_database()).put_class_property(klass,property)
             
 def get_device_property(device,property,db=None):
@@ -995,7 +1004,9 @@ def get_devices_properties(device_expr,properties,hosts=[],port=10000):
                  for host,db in tango_dbs.items() for d in get_devs(db,expr))
     
 def property_undo(dev,prop,epoch,db=None):
-    """ Undo property change in the database """
+    """
+    Undo property change in the database 
+    """
     if ':' in dev:
         db, dev = db or get_database(dev), get_normal_name(dev)
         
@@ -1227,11 +1238,15 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 else:
                     return (getattr(attvalue,'value',
                         getattr(attvalue,'rvalue',None)))
+
         except Exception as e: 
-            if trace: traceback.print_exc()
+            if trace: 
+                traceback.print_exc()
             return None if readable or brief else e
+        
     except Exception as e:
-        if trace: traceback.print_exc()
+        if trace: 
+            traceback.print_exc()
         return None if readable or brief else e
     
 @Cached(depth=10000,expire=300,catched=True)
