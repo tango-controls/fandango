@@ -124,7 +124,7 @@ rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))'
 
 #reattr matches attribute and extension
-rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|history))'
+rewhat = '(?:(?:\\.)(?P<what>quality|time|value|exception|history))'#|\[[0-9+]\]))'
 reattr = '(?:/(?P<attribute>'+alnum+')'+rewhat+'?)'
 
 #retango matches the whole expression

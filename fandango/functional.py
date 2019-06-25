@@ -82,7 +82,7 @@ def first(seq,default=Exception):
             if default is not Exception:
                 return default
             else:
-                raise d
+                raise e
             #raise e #if .next() also doesn't work throw unsubscriptable exception
     return
 
@@ -546,7 +546,7 @@ def isString(seq):
     if 'qstring' == str(type(seq)).lower(): return True # It matches QString
     return False
 
-WILDCARDS = '^$*+?{[]\|()' #r'
+WILDCARDS = '^$*+?{\|' #r'[]()
 def isRegexp(seq,wildcards=WILDCARDS):
     """ This function is just a hint, use it with care. """
     return anyone(c in wildcards for c in seq)
