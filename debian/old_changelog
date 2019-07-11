@@ -1,0 +1,72 @@
+fandango (13.2.5+git20170918.1.8cde2d-0~bpo9+0~alba+1~1.gbp1c9358) stretch-backports; urgency=medium
+
+  * local package
+
+  ** SNAPSHOT build @1c9358f3b5dc6f4f5f3ac5c3f9dfc02a64ca4267 **
+
+  * New upstream version 13.2.5+git20170918.1.8cde2d
+
+ -- srubio <srubio@cells.es>  Mon, 18 Sep 2017 07:43:54 +0000
+
+fandango (13.1.10+git20170828.1.6e8e41-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+
+  ** SNAPSHOT build @1d1c39fa5fea6d32ab495c0f004543c16a8bf26f **
+
+  * New upstream version 13.1.10+git20170828.1.6e8e41
+
+ -- srubio <srubio@cells.es>  Mon, 28 Aug 2017 08:52:15 +0000
+
+fandango (13.1.0+git20170628.1.d76235-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+
+  ** SNAPSHOT build @d6df1bcefa9881b1c98bee900a297fd72a5b3474 **
+
+  * New upstream version 13.1.0+git20170628.1.d76235
+
+ -- srubio <srubio@cells.es>  Wed, 28 Jun 2017 15:35:56 +0000
+
+fandango (13.0.1+git20170601.1.80f19a-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * local package
+  * remove taurus as dependency
+  * New upstream version 13.0.1+git20170601.1.80f19a
+
+ -- srubio <srubio@cells.es>  Thu, 01 Jun 2017 15:09:56 +0000
+
+fandango (12.6.1+git20170317.1.5a7706-0~bpo9+0~alba+2) stretch-backports; urgency=medium
+
+  * Remove override about scripts with extensions
+  * Remove manpages override
+  * Add manpages
+  * Add override
+
+ -- mrosanes <mrosanes@cells.es>  Fri, 17 Mar 2017 14:11:44 +0000
+
+fandango (12.6.1+git20170317.1.5a7706-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  * New upstream version 12.6.1+git20170317.1.5a7706
+
+ -- mrosanes <mrosanes@cells.es>  Fri, 17 Mar 2017 08:20:23 +0000
+
+fandango (12.3.0+git20170315.1.00d19e-0~bpo9+0~alba+2) stretch-backports; urgency=medium
+
+  * Add copyright file
+  * Update rules by skipping tests
+  * Correct and update copyright file
+  * Correct copyright format
+  * Fix control file
+  * Ignore lintian manpages warnings
+  * Adapt extended description
+  * Add new rule for overriding lintian warning
+  * Fix upstream version in first entry of changelog
+
+ -- mrosanes <mrosanes@cells.es>  Thu, 16 Mar 2017 07:06:03 +0000
+
+fandango (12.3.0+git20170315.1.00d19e-0~bpo9+0~alba+1) stretch-backports; urgency=low
+
+  * source package automatically created by stdeb 0.8.5
+
+ -- mrosanes <mrosanes@cells.es>  Fri, 10 Mar 2017 14:14:31 +0000

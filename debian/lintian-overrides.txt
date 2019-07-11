@@ -1,0 +1,14 @@
+backports-upload-has-incorrect-version-number
+backports-changes-missing
+new-package-should-not-package-python2-module
+manpage-has-errors-from-man
+binary-without-manpage
+debian-watch-file-should-mangle-version
+new-package-should-close-itp-bug
+possible-unindented-list-in-extended-description#ticket pending
+spelling-error-in-description#ticket pending
+capitalization-error-in-description
+capitalization-error-in-description-synopsis
+debian-changelog-file-contains-invalid-email-address
+changed-by-address-is-root-user
+changed-by-address-malformed

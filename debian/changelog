@@ -1,0 +1,6 @@
+fandango (14.5.1+git20190416.1.4f9fdf-0~bpo9+0~alba+2) stretch-backports; urgency=medium
+
+  * local package
+  * Update upstreams 14.5.1
+
+ -- srubio <srubio@cells.es>  Tue, 16 Apr 2019 13:29:04 +0000
