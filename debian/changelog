@@ -1,3 +1,10 @@
+fandango (14.5.1+git20190711.1614.d75da3-0~bpo9+0~alba+1) stretch-backports; urgency=medium
+
+  [ root ]
+  * Merge upstream/14.5.1+git20190711.1614.d75da3 into debian/stretch
+
+ -- CI Boot <controls.cells.es>  Thu, 11 Jul 2019 15:50:58 +0000
+
 fandango (14.5.1+git20190416.1.4f9fdf-0~bpo9+0~alba+2) stretch-backports; urgency=medium
 
   * local package
