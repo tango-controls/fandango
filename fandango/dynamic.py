@@ -99,6 +99,7 @@ from fandango.tango.dynattr import *
 import fandango.objects as objects
 from fandango.excepts import *
 from fandango.objects import self_locked, Cached
+from fandango.linos import listdir
 from fandango.dicts import SortedDict,CaselessDefaultDict,defaultdict,CaselessDict
 from fandango.log import Logger,shortstr
 import fandango.functional as fun
@@ -1429,7 +1430,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
     
     def get_dyn_attr_list(self):
         """Gets all dynamic attribute names."""
-        return self.dyn_attrs.keys()
+        return sorted(self.dyn_attrs.keys())
     
     @Cached(depth=200,expire=15.)
     def get_polled_attrs(self,load=False):
@@ -1984,6 +1985,18 @@ class DynamicDS(DynamicDSHelpers):
             for k in l if k not in exclude))
     
     #------------------------------------------------------------------
+    #    getDynamicAttributes command:
+    #
+    #    Description: Return current dynamic attributes
+    #
+    #    argin:  DevVoid
+    #    argout: DevVarStringArray      Return current dynamic attributes
+    #------------------------------------------------------------------
+    #Methods started with underscore could be inherited by child device servers for debugging purposes
+    def getDynamicAttributes(self):
+        return self.get_dyn_attr_list()
+    
+    #------------------------------------------------------------------
     #    GetMemUsage command:
     #
     #    Description: Returns own process RSS memory usage (Mb).
@@ -2239,6 +2252,12 @@ class DynamicDSClass(PyTango.DeviceClass):
             {
                 'Display level':PyTango.DispLevel.EXPERT,
              } ],     
+        'getDynamicAttributes':
+            [[PyTango.DevVoid, "Get current dynamic attributes"],
+            [PyTango.DevVarStringArray, "Get current dynamic attributes"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],             
         'getAttrFormula':
             [[PyTango.DevString, "Get current attribute formula"],
             [PyTango.DevString, "Get current attribute formula"],
