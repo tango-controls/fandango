@@ -448,9 +448,12 @@ Attributes declared in properties will have always precedence over attributes de
 To update the attribute formulas from a file while running just use::
 
   import fandango
+  with open('/tmp/config.txt','w') as f:  f.write("A = 5")
   dp = fandango.get_device('your/device/name')
-  fandango.put_device_property('your/device/name','LoadFromFile','/your/default/config.txt')
+  fandango.put_device_property('your/device/name','LoadFromFile','/tmp/config.txt')
   dp.updateDynamicAttributes()
+  dp.A
+  : 5
 
 External python Modules
 -----------------------
