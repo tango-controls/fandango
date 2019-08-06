@@ -311,6 +311,17 @@ class FriendlyDB(log.Logger):
         if partition:
             q += " and partition_name like '%s'" % partition
         return (fn.toList(self.Query(q)) or [0])[0]
+    
+    def checkTable(self, table, partition = None):
+        q = ("select * from %s "% (table))
+        if partition:
+            q += " partition (%s)" % partition
+        q += " limit 1"
+        try:
+            self.Query(q)
+            return True
+        except:
+            return False
         
     def getTableSize(self,table=''):
         table = table or '%';
