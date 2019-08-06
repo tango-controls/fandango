@@ -42,6 +42,7 @@ Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 
 import os,time,datetime,log,traceback,sys
 from .objects import Struct
+from . import functional as fn
 
 """
 MySQL API's are loaded at import time, but can be modified afterwards.
@@ -243,8 +244,9 @@ class FriendlyDB(log.Logger):
         self.debug('Query(): took %f s' % (time.time()-t0))
         return r
    
-    def Select(self,what,tables,clause='',group='',order='',
-               limit='',distinct=False,asDict=False,trace=False):
+    def Select(self, what, tables, clause='', group='', order='',
+               limit='', partition='',
+               distinct=False, asDict=False, trace=False):
         ''' 
         Allows to create and execute Select queries using Lists as arguments
         @return depending on param asDict it returns a list or lists or a list of dictionaries with results
@@ -268,6 +270,7 @@ class FriendlyDB(log.Logger):
         query = 'SELECT '+(distinct and ' DISTINCT ' or '') +' %s'%what
         if tables: query +=  ' FROM %s' % tables
         if clause: query += ' WHERE %s' % clause
+        if partition: query += 'PARTITION (%s)' % partition
         if group: group+= ' GROUP BY %s' % group
         if order: query += ' ORDER BY %s' % order
         if limit: query+= ' LIMIT %s' % limit
@@ -293,6 +296,21 @@ class FriendlyDB(log.Logger):
             q=self.Query('describe %s'%table,False)
             [self.tables[table].append(t[0]) for t in self.tuples2lists(q.fetchall())]
         return self.tables[table]
+    
+    def getTablePartitions(self,table):
+        """ Returns available partitions for table """
+        q = ("select partition_name from information_schema.partitions "
+                " where table_name like '%s' and table_schema like '%s' "
+                " order by partition_name" % (table, self.db_name))
+        return [l[0] for l in self.Query(q)]
+    
+    def getTableRows(self, table, partition = None):
+        q = ("select table_rows from information_schema.partitions "
+                " where table_name like '%s' and table_schema like '%s' "
+                % (table, self.db_name))
+        if partition:
+            q += " and partition_name like '%s'" % partition
+        return (fn.toList(self.Query(q)) or [0])[0]
         
     def getTableSize(self,table=''):
         table = table or '%';
