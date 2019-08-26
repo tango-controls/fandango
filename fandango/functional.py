@@ -491,6 +491,15 @@ ptext = iPiped(lambda input: '\n'.join(imap(str,input)))
 
 ##############################################################################
 
+def fbool(x):
+    """
+    Returns all(x) if sequence else bool(x) or False
+    """
+    if isSequence(x):
+        return all(x)
+    else:
+        return bool(x)
+    
 def notNone(arg,default=None):
     """ Returns arg if not None, else returns default. """
     return [arg,default][arg is None]
