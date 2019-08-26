@@ -214,7 +214,7 @@ class FriendlyDB(log.Logger):
             vals.append(v)
         return vals
    
-    def Query(self,query,export=True,asDict=False):
+    def Query(self, query, export=True, asDict=False):
         ''' Executes a query directly in the database
         @param query SQL query to be executed
         @param export If it's True, it returns directly the values instead of a cursor
@@ -323,15 +323,62 @@ class FriendlyDB(log.Logger):
         except:
             return False
         
-    def getTableSize(self,table=''):
+    def getTableLength(self,table=''):
         table = table or '%';
-        res = self.Query("select table_name,table_rows from information_schema.tables where table_schema = '%s' and table_name like '%s';"%(self.db_name,table))
-        if not res: 
-            return 0
-        elif len(res)==1:
-            return res[0][1]
-        else:
-            return dict(res)
+        res = self.Query("select table_name,table_rows "
+            "from information_schema.tables where "
+            "table_schema = '%s' and table_name like '%s';"
+                % (self.db_name,table))
+        return 0 if not res else (int(res[0][1]) if len(res)==1 else dict(res))
+    
+    def getTableSize(self,table=''):
+        """
+        Returns size in bytes of table files (data and index)
+        """
+        table = table or '%';
+        res = self.Query("select table_name,sum(data_length)+sum(index_length)"
+            " from information_schema.partitions where "
+            " table_schema = '%s' and table_name like '%s';"
+                % (self.db_name,table))
+        return 0 if not res else (int(res[0][1]) if len(res)==1 else dict(res))
+
+    def getPartitionSize(self,table='',partition=''):
+        """
+        Returns size in bytes of table files (data and index)
+        """
+        table = table or '%';
+        partition = "like '%s'"%partition if partition else ' is NULL';
+        q = ("select table_name,sum(data_length)+sum(index_length)"
+            " from information_schema.partitions where "
+            " table_schema = '%s' and table_name like '%s'"
+            " and partition_name %s;"
+                % (self.db_name, table, partition) )
+        res = self.Query(q)
+        try:
+            return 0 if not res else (int(res[0][1]) 
+                                      if len(res)==1 else dict(res))
+        except Exception as e:
+            print(q,res)
+            traceback.print_exc()
+            raise e
+    
+    def getDbSize(self):
+        """
+        Returns size in bytes of table files (data and index)
+        """
+        res = self.Query("select sum(data_length)+sum(index_length)"
+            " from information_schema.partitions where "
+            " table_schema = '%s';"
+                % (self.db_name))
+        return 0 if not res else int(res[0][0])
+    
+    def getBigTables(self,ratio=0.1, dbsize=0):
+        """
+        Returns tables which size exceeds DbSize*ratio
+        """
+        dbsize = dbsize or self.getDbSize()
+        sizes = dict((t,self.getTableSize(t)) for t in self.getTables())
+        return dict((t,s) for t in sizes.items() if s > ratio*dbsize)
 
     def get_all_cols(self):
         if not self.tables: self.getTables()
