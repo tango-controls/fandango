@@ -5,10 +5,22 @@ IMPORTANT:
 
   Due to fandango.device and fandango.tango module refactoring you may need 
   to remove previous package before installing this one
-  
+
+14.6 Inspect DB partitions, push from Lambdas code on Dynamic attributes
+    
+    databases:
+        add methods to get/check table partitions and data size
+        
+    dynamic devices:
+        add Lambdas property to speed up calculations
+        refactor check_changed_event to differentiate push and always
+        add getDynamicAttributes command
+        
+    functional:
+        add fbool() to do all() on sequences
+        remove parenthesis from wildcards list
 
 14.5.1 Improvements for SimulatorDS and Taurus Archiving Schema
----------------------------------------------------------------
 
     databases:
         improve traces
