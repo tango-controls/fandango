@@ -404,15 +404,28 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
                 self.warning('get_DynDS_properties(%s,%s)' % (prop,value))
                 
                 #Type of each property is adapted to python types
-                dstype = DynamicDSTypes.get(str(config[prop][0]),DynamicDSType('','',pytype=list))
+                dstype = DynamicDSTypes.get(str(config[prop][0]),
+                                            DynamicDSType('','',pytype=list))
                 try: 
-                    value = dstype.pytype(value if dstype.dimx>1 or dstype.dimy>1 else value[0])
+                    value = dstype.pytype(value if 
+                            dstype.dimx>1 or dstype.dimy>1 else value[0])
                 except Exception,e:
-                    self.warning('In get_DynDS_properties: %s(%s).%s property parsing failed: %s -> %s' % (type(self),self.get_name(),value,e))
-                    value = config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 else config[prop][-1][0]
+                    self.warning('In get_DynDS_properties: %s(%s).%s '
+                            'property parsing failed: %s -> %s' % (
+                                type(self),self.get_name(),value,e))
+                    value = (config[prop][-1] if dstype.dimx>1 or dstype.dimy>1 
+                                else config[prop][-1][0])
                     
                 if prop=='polled_attr': 
                   self._polled_attr_ = tango.get_polled_attrs(value)
+                  
+                elif prop=='Lambdas':
+                    self.Lambdas = dict(l.split(':',1) for l in value 
+                                        if ':' in l)
+                    try: 
+                        self.Lambdas = dict((k,eval(v)) for k,v in self.Lambdas)
+                    except: 
+                        traceback.print_exc()
                   
                 else:
                     #APPLYING @COPY/@FILE property extensions
@@ -452,17 +465,23 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
                 if aname:
                     attrs.append(aname)
                     if any(d.startswith(aname) for d in self.DynamicAttributes):
-                        self.info('StaticAttribute %s overriden by DynamicAttributes Property'%(aname))
+                        self.info('StaticAttribute %s overriden by '
+                                  'DynamicAttributes Property'%(aname))
                     else:
-                        self.debug('Adding StaticAttribute %s to DynamicAttributes list'%(aname))
+                        self.debug('Adding StaticAttribute %s to '
+                                   'DynamicAttributes list'%(aname))
                         self.DynamicAttributes.append(a)
                 if keep:
-                    #Adds to KeepAttributes if default value is overriden, works if dyn_attr is called after init_device (Tango7)
-                    if not any(k.lower()==aname.lower() for k in self.KeepAttributes):
+                    # Adds to KeepAttributes if default value is overriden,
+                    # works if dyn_attr is called after init_device (Tango7)
+                    if not any(k.lower()==aname.lower() for k in 
+                               self.KeepAttributes):
                         self.KeepAttributes.append(aname)
-                    self.KeepAttributes = [k for k in self.KeepAttributes if 'no'!=k.lower().strip()]
+                    self.KeepAttributes = [k for k in self.KeepAttributes 
+                                           if 'no'!=k.lower().strip()]
             return attrs
-        else: return []   
+        else: 
+            return []   
     
     @staticmethod
     def check_property_extensions(prop,value,db=None,extensions=EXTENSIONS):
@@ -836,8 +855,10 @@ class DynamicDSAttrs(DynamicDSImpl):
             return '' #False
         if not len(self.UseEvents) or self.UseEvents[0] in ('no','false'):
             return ''
-        elif clmatch('state$',aname) or clmatch(EVENT_TYPES,self.UseEvents[0]):
+        elif clmatch('state$',aname):
             return 'true'
+        elif clmatch(EVENT_TYPES,self.UseEvents[0]):
+            return self.UseEvents[0]
 
         for s in self.UseEvents:
             s,e = s.split(':',1) if ':' in s else (s,'True')
@@ -858,23 +879,34 @@ class DynamicDSAttrs(DynamicDSImpl):
         except:pass
         return cabs,crel
     
-    def check_changed_event(self,aname,new_value):
+    def check_changed_event(self,aname,new_value,events=None,config=None):
+        """
+        Events will be always pushed if array,state,bool,string values change
+        If UseEvents=always, it will be always pushed
+        if UseEvents=push, will always push on change, ignoring config
+        if UseEvents=True, then Tango DB config prevails, and is checked
+        """
         aname = self.get_attr_name(aname)
+        
         if aname not in self.dyn_values: 
             self.warning('Unknown %s attribute!'%aname)
             return False
         if self._events_paused:
             self.warning('Events paused externally!')
-            return False    
+            return False
+        
         try:
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
-            cabs,crel = self.check_events_config(aname)
-            self.debug('In check_changed_event(%s): %s!=%s > (%s,%s)?'
-                       %(aname,shortstr(v),shortstr(new_value),cabs,crel))
+            
+            self.info('In check_changed_event(%s,%s,%s): %s!=%s'
+                % (aname,events,config,shortstr(v),shortstr(new_value) ))
             if v is None:
                 self.info('In check_changed_event(%s,%s): first value read!'
                           %(aname,shortstr(new_value)))
+                return True
+            
+            elif events and events == 'always':
                 return True
             
             elif fun.isSequence(new_value) or fun.isSequence(v):
@@ -884,6 +916,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                 self.info('In check_changed_event(%s,%s): changed = %s'
                     %(aname,shortstr(new_value),changed))
                 return changed
+
             else:
                 try: 
                     v,new_value = (float(v) if v is not None else None),\
@@ -898,6 +931,11 @@ class DynamicDSAttrs(DynamicDSImpl):
                     except:
                         return str(v)!=str(new_value)
                 
+                if events == 'push':
+                    cabs,crel = 0,0
+                else:
+                    cabs,crel = config or self.check_events_config(aname)
+                
                 if cabs>0 and not v-cabs<new_value<v+cabs: 
                     self.info('In check_changed_event(%s,%s): absolute change!'
                               %(aname,shortstr(new_value)))
@@ -909,7 +947,8 @@ class DynamicDSAttrs(DynamicDSImpl):
                     return True
                 
                 elif v != new_value:
-                    self.info('In check_changed_event(%s,%s): push on any change'%(aname,shortstr(new_value)))
+                    self.info('In check_changed_event(%s,%s): '
+                        'push on any change'%(aname,shortstr(new_value)))
                     return True
                 
                 else: 
@@ -1179,53 +1218,64 @@ class DynamicDSAttrs(DynamicDSImpl):
                       shortstr(cache.value)))                
                 return cache.value
             
-            self.debug("In evalAttr ... updating locals defaults")
-            try:
-              self._locals.update({
-                  't':time.time()-self.time0,
-                  'WRITE':WRITE,
-                  'READ':bool(not WRITE),
-                  'ATTRIBUTE':aname,
-                  'NAME':self.get_name(),
-                  'VALUE':(VALUE if VALUE is None or aname not in self.dyn_types 
-                      else self.dyn_types[aname].pytype(VALUE)),
-                  'STATE':self.get_state(),
-                  'LOCALS':self._locals,
-                  'ATTRIBUTES':sorted(self.dyn_values.keys()),
-                  'FORMULAS':dict((k,v.formula) for k,v in self.dyn_values.items()),                  
-                  'XATTRS':self._external_attributes,
-                  }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
-               
-              # Redundant but needed
-              [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
-              [self._locals.__setitem__(k,dst.pytype) for k,dst in DynamicDSTypes.items()]
-              #Adding states for convenience evaluation
-              #self.TangoStates = dict((str(v),v) for k,v in PyTango.DevState.values.items())
-              #self._locals.update(self.TangoStates)                  
+            if formula in self.Lambdas:
+                f = self.Lambdas[formula]
+                self.info("In evalAttr(push=%s) ... using Lambdas[%s] = %s" 
+                          % (push,formula,f))
+                if fun.isString(f):
+                    f = self._locals.get(f,self.__getattr__(f,None))
+                result = (f() if fun.isCallable(f) else f)
+                
+            else:
+                self.debug("In evalAttr ... updating locals defaults")
+                try:
+                    self._locals.update({
+                        't':time.time()-self.time0,
+                        'WRITE':WRITE,
+                        'READ':bool(not WRITE),
+                        'ATTRIBUTE':aname,
+                        'NAME':self.get_name(),
+                        'VALUE':(VALUE if VALUE is None or aname not in self.dyn_types 
+                            else self.dyn_types[aname].pytype(VALUE)),
+                        'STATE':self.get_state(),
+                        'LOCALS':self._locals,
+                        'ATTRIBUTES':sorted(self.dyn_values.keys()),
+                        'FORMULAS':dict((k,v.formula) for k,v in self.dyn_values.items()),                  
+                        'XATTRS':self._external_attributes,
+                        }) #It is important to keep this values persistent; becoming available for quality/date/state/status management
+                    
+                    # Redundant but needed
+                    [self._locals.__setitem__(str(quality),quality) for quality in AttrQuality.values.values()]
+                    [self._locals.__setitem__(k,dst.pytype) for k,dst in DynamicDSTypes.items()]
+                    #Adding states for convenience evaluation
+                    #self.TangoStates = dict((str(v),v) for k,v in PyTango.DevState.values.items())
+                    #self._locals.update(self.TangoStates)                  
 
-              if _locals is not None: 
-                  #High Priority: variables passed as argument
-                  self._locals.update(_locals) 
+                    if _locals is not None: 
+                        #High Priority: variables passed as argument
+                        self._locals.update(_locals) 
 
-            except Exception,e:
-              self.error('<'*80)
-              self.error(traceback.format_exc())
-              for t in (
-                  VALUE,type(VALUE),aname,self.dyn_types.get(aname,None),aname 
-                  in self.dyn_types and self.dyn_types[aname].pytype):
-                self.warning(str(t))
-              self.error('<'*80)
-              raise e
-          
-            if WRITE: 
-                self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
-            elif aname in self.dyn_values: 
-                self.debug('%s::evalAttr(READ): Attribute=%s; formula=%s;'%(self.get_name(),aname,formula,))
-            else: 
-                self.info('%s::evalAttr(COMMAND): formula=%s;'%(self.get_name(),formula,))
+                except Exception,e:
+                    self.error('<'*80)
+                    self.error(traceback.format_exc())
+                    for t in (
+                        VALUE,type(VALUE),aname,self.dyn_types.get(aname,None),aname 
+                        in self.dyn_types and self.dyn_types[aname].pytype):
+                        self.warning(str(t))
+                    self.error('<'*80)
+                    raise e
+            
+                if WRITE: 
+                    self.debug('%s::evalAttr(WRITE): Attribute=%s; formula=%s; VALUE=%s'%(self.get_name(),aname,formula,shortstr(VALUE)))
+                elif aname in self.dyn_values: 
+                    self.debug('%s::evalAttr(READ): Attribute=%s; formula=%s;'%(self.get_name(),aname,formula,))
+                else: 
+                    self.info('%s::evalAttr(COMMAND): formula=%s;'%(self.get_name(),formula,))
 
+                ###################################################################
+                result = eval(compiled or formula,self._globals,self._locals)
             ###################################################################
-            result = eval(compiled or formula,self._globals,self._locals)
+            
             self.debug('eval result: '+str(result))
             if aname not in self.dyn_values:
                 return result
@@ -1238,14 +1288,21 @@ class DynamicDSAttrs(DynamicDSImpl):
             #Push/Keep Read Attributes
 
             quality = self.get_attr_quality(aname,result)
-            if hasattr(result,'quality'): result.quality = quality
+            if hasattr(result,'quality'): 
+                result.quality = quality
             date = self.get_attr_date(aname,result)
             value = self.dyn_types[aname].pytype(result)
-            events = self.check_attribute_events(aname)
+
             #Events must be checked before updating the cache
-            check = events and (push or self.check_changed_event(aname,result))
+            events = self.check_attribute_events(aname)
+            check = events and (
+                        push or self.check_changed_event(aname,result,events))
             
-            #Updating the cache:
+            self.debug('events = %s, check = %s' % (events,check))
+            if events and check:
+                self.push_dyn_attr(aname,events=events,changed=1,queued=1)
+            
+            #Updating the cache
             if events or self.dyn_values[aname].keep: 
                 old = self.dyn_values[aname].value
                 self.dyn_values[aname].update(value,date,quality)
@@ -1258,10 +1315,6 @@ class DynamicDSAttrs(DynamicDSImpl):
                 except:
                     self.warning('Unable to check state!')
                     self.warning(traceback.format_exc())            
-
-            self.debug('events = %s, check = %s' % (events,check))
-            if events and (check or fun.clsearch('push',events)):
-                self.push_dyn_attr(aname,events=events,changed=1,queued=1)
 
             return result
 
@@ -1307,7 +1360,12 @@ class DynamicDSAttrs(DynamicDSImpl):
         self.debug('DynamicDS.evalState/evaluateFormula(%s)'%(isinstance(formula,str) and formula or 'code'))
         #MODIFIIED!! to use pure DynamicAttributes
         #Attr = lambda a: self.dyn_values[a].value
-        t = time.time()-self.time0
+        if formula in self.Lambdas:
+            self.info('DynamicDS.evalState: using Lambdas')
+            f = self.Lambdas[formula]
+            return f() if fn.isCallable(f) else f
+            
+        t = time.time()-self.time0            
         for k,v in self.dyn_values.items(): self._locals[k]=v#.value #Updating Last Attribute Values
         __locals = {}#__locals=locals().copy() #Low priority: local variables
         __locals.update(self._locals) #Second priority: object statements
@@ -2037,10 +2095,10 @@ class DynamicDS(DynamicDSHelpers):
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def evaluateFormula(self,argin):
         t0 = time.time()
-        self.debug('\tevaluateFormula(%s)'%(argin,))
+        self.info('\tevaluateFormula(%s)'%(argin,))
         e = self.evalState(str(argin))
         argout=str(e)
-        self.debug('\tevaluateFormula took %s seconds'%(time.time()-t0))
+        self.info('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout        
     
     #------------------------------------------------------------------
@@ -2053,7 +2111,7 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getAttrFormula(self,argin):
-        return self.dyn_attrs[argin.lower()]
+        return self.dyn_attrs[argin]
     
     #------------------------------------------------------------------------------------------------------
     #   Lock/Unlock Methods
@@ -2174,7 +2232,13 @@ class DynamicDSClass(PyTango.DeviceClass):
         'DynamicSpectrumSize':
             [PyTango.DevLong,
             "It will fix the maximum size for all Dynamic Attributes.",
-            [ MAX_ARRAY_SIZE ] ],            
+            [ MAX_ARRAY_SIZE ] ],
+        'Lambdas':
+            [PyTango.DevVarStringArray,
+            "regexp:method ; this property allows to declare accelerated calls,"
+            " whenever a formula matches regexp, method will be called without"
+            " executing an eval.",
+            [ 'test:0#Write here your accelerators' ] ],
         'LoadFromFile':
             [PyTango.DevString,
             "If not empty, a file where additional attribute formulas can be declared. It will be parsed BEFORE DynamicAttributes",
