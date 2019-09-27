@@ -1162,9 +1162,9 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
         if attribute: dp.read_attribute(attribute)
         elif command: dp.command_inout(command)
         else: 
-          s = dp.state()
-          if bad_state:
-            assert s not in bad_state and str(s) not in bad_state
+            s = dp.state()
+            if bad_state:
+                assert s not in bad_state and str(s) not in bad_state
             return str(s) #True
         return True
     except Exception as e:
