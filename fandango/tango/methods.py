@@ -1156,7 +1156,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
             
         dp.set_timeout_millis(int(timeout))
         dp.ping()
-    except Exception,e:
+    except Exception as e:
         return e if throw else False
     try:
         if attribute: dp.read_attribute(attribute)
@@ -1165,9 +1165,9 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
           s = dp.state()
           if bad_state:
             assert s not in bad_state and str(s) not in bad_state
-          return str(s) #True
+            return str(s) #True
         return True
-    except Exception,e:
+    except Exception as e:
         return e if throw else None
 
 @Cached(depth=1000,expire=10,catched=True)
