@@ -51,6 +51,16 @@ __test__ = {}
 ###############################################################################
 
 def add_new_device(server,klass,device):
+    """
+    This methods mimics Jive UI form:
+        server: ExecutableName/Instance
+        klass:  DeviceClass
+        device: domain/family/member
+        
+    e.g.:
+        fandango.tango.add_new_device(
+          'MyServer/test','MyDevice','my/own/device')
+    """
     for c in (server+klass+device):
       if re.match('[^a-zA-Z0-9\-\/_\+\.]',c):
         raise Exception,"CharacterNotAllowed('%s')"%c
