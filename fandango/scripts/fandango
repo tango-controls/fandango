@@ -95,7 +95,7 @@ if __name__ == '__main__':
     from fandango.linos import *
     from fandango.objects import *
     
-    if comms[0] == 'help':
+    if not comms or comms[0] == 'help':
         opts['help'],comms = 1, comms[1:]
     
     if opts.get('x',opts.get('extra',0)):
