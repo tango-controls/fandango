@@ -49,6 +49,7 @@ Out[77]:
 
 import time,sys,os,re,traceback
 import fandango.objects as fun #objects module includes functional
+import fandango.log as log
 
 ################################################################################3
 # Shell methods
@@ -441,7 +442,7 @@ def sysargs_to_dict(args=None,defaults=[],alias={},
     After Fandango 13 argparse will replace the usage of sysargs_to_dict
     
     '''
-    print('sysargs_to_dict is DEPRECATED, use python argparse instead')
+    log.debug('sysargs_to_dict is DEPRECATED, use python argparse instead')
     if args is None: args = sys.argv[1:]
     if trace: print 'sysargs_to_dict(%s,%s)'%(args,defaults)
     result,defargs,vargs = {},[],[]
