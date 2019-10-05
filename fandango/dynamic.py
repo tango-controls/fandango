@@ -2411,6 +2411,7 @@ def CreateDynamicCommands(ds,ds_class):
     """
     U = PyTango.Util.instance()
     server = U.get_ds_name()
+    print('#'*80)
     print('In DynamicDS.CreateDynamicCommands(%s)'%(server,))
     db = U.get_database()
     #devices = DynamicDSClass('DynamicDS').get_devs_in_server()    
@@ -2549,7 +2550,9 @@ class DynamicServer(object):
                     m = self.path+'/%s/%s.py'%(c,c)
                     print('\nLoading %s from %s' % (c,m))
                     self.modules[c] = fandango.objects.loadModule(m)
-            self.util.add_TgClass(getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c)
+            k, i, n = getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c
+            self.util.add_TgClass(k,i,n)
+            CreateDynamicCommands(i,k)
         except:
             traceback.print_exc()
             sys.exit(-1)

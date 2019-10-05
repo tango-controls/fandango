@@ -93,6 +93,7 @@ def delete_device(device,server=True):
       print('Kill %s'%adm)
       get_device(adm).kill()
     
+    from fandango.tango.search import get_matching_device_properties
     props = get_matching_device_properties(device,'*')
     print('Removing %d properties'%len(props))
     db.delete_device_property(device,props)
