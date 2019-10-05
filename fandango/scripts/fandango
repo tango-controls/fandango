@@ -47,6 +47,10 @@ Usage:
   
 Examples:
 
+  fandango --help # prints this help
+
+  fandango --list # lists available methods 
+
   fandango findModule fandango
 
   python $(fandango findModule fandango)/interface/CopyCatDS.py 1
@@ -61,7 +65,7 @@ Examples:
   
   fandango get_matching_attributes "lab/ct/plctest16/*_af"
   
-  fandango -h | grep propert
+  fandango list | grep propert
   
   fandango get_matching_device_properties "lab/ct/plctest16" "*modbus*"
   
@@ -95,9 +99,12 @@ if __name__ == '__main__':
 
     from fandango.linos import *
     from fandango.objects import *
-    
-    if comms[0] == 'help':
-        opts['help'],comms = 1, comms[1:]
+
+    assert any((comms,opts)) and comms != ['help']
+    # go to exit()
+
+    if comms and comms[0] in ('help','list'):
+        opts[comms[0]],comms = 1, comms[1:]
     
     if opts.get('x',opts.get('extra',0)):
       try: 
@@ -110,8 +117,8 @@ if __name__ == '__main__':
         import panic
       except: pass
     
-    if opts.get('h',opts.get('help',0)):
-      ## Executing HELP
+    if opts.get('list') is not None or opts.get('h',opts.get('help',0)):
+      # Executing HELP
       import inspect
       
       _locals=locals()
@@ -126,8 +133,9 @@ if __name__ == '__main__':
         cmd = 'inspect.getsource(%s)'%target
         
       else:
-        cmd = ("sorted([('%s.%s'%(get_module_name(o),k)).strip('.') "
-               " for k,o in locals().items() if not k.startswith('_')])")
+        cmd = ("sorted(m for m in [('%s.%s'%(get_module_name(o),k)).strip('.') "
+               " for k,o in locals().items() if not k.startswith('_')"
+               " and hasattr(o,'__call__')] if not m.startswith('_'))")
         
       r = evalX(cmd,_locals=_locals)
       if isSequence(r):
@@ -136,7 +144,7 @@ if __name__ == '__main__':
         if c in r:
           r = c.join(r.split(c)[:2])+c
       if not target: 
-        r = __doc__+'\n\nAvailable methods:\n\n'+r
+        r = '\nAvailable methods:\n\n'+r
       
     ###########################################################################  
     else:
