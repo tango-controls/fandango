@@ -161,7 +161,7 @@ try:
         cast_tango_type,parse_tango_model,check_attribute, \
         read_attribute,check_device,except2str,\
         TangoEval,ProxiesDict,getTangoValue,TangoCommand, \
-        fakeEvent,fakeEventType
+        fakeEvent,fakeEventType, get_attribute_events, check_attribute_events
 
     try: 
         from device import Dev4Tango,DevChild,TangoCommand

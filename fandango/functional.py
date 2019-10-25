@@ -1264,8 +1264,10 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
     instances = notNone(instances,{})
     
     def import_module(module,reload=False):
-        alias = module.split(' as ',1)[-1] if ' as ' in module else module
+        # This method is re-implemented in objects module for avoiding
+        # inter-dependency between modules
         module = module.split('import ',1)[-1].strip().split()[0]
+        alias = module.split(' as ',1)[-1] if ' as ' in module else module
         if reload or alias not in modules:
             if '.' not in module:
                 modules[module] = imp.load_module(module,
@@ -1281,7 +1283,8 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
                 _locals[alias] = modules[alias]
         if _trace: 
             print('%s(%s) : %s' % (alias,module,modules[alias]))
-        return modules[alias]
+
+        return modules[module]
         
     def get_instance(_module,_klass,_klass_args):
         if (_module,_klass,_klass_args) not in instances:
@@ -1302,8 +1305,10 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
         module = model.get('__module__',None)
         klass = model.get('__class__',None)
         klass_args = model.get('__class_args__',tuple())
+
         if isCallable(target): 
             target = model['__target__']
+
         elif isString(target):
             if module:
                 #module,subs = module.split('.',1)
@@ -1331,6 +1336,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
                 raise _exception('%s()_MethodNotFound'%target)
         else:
             raise _exception('%s()_NotCallable'%target)
+
         value = target(**args) if isDictionary(args) else target(*args)
         if _trace: print('%s: %s'%(model,value))
         
@@ -1339,15 +1345,20 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
         #Parse: method[0](*method[1:])
         if isIterable(target) and isCallable(target[0]):
             value = target[0](*target[1:])
+
         #Parse: method()
         elif isCallable(target):
             value = target()
+
         elif isString(target):
             if _trace: print('evalX("%s")'%target)
+
             #Parse: import $MODULE
             if target.startswith('import ') or ' import ' in target: 
-                import_module(target) #Modules dictionary is updated here
-                value = target
+                #Modules dictionary is updated here
+                value =  import_module(target)
+                #value = target
+
             #Parse: $VAR = #code
             elif (  '=' in target and 
                     '='!=target.split('=',1)[1][0] and 
@@ -1364,6 +1375,7 @@ def evalX(target,_locals=None,modules=None,instances=None,_trace=False,
         else:
             raise _exception('targetMustBeCallable, not %s(%s)'
                              %(type(target),target))
+
         if _trace: print('Out of evalX(%s): %s'%(target,value))
     return value
 

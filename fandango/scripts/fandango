@@ -29,13 +29,14 @@
 ###########################################################################
 
 import fandango
+import fandango.log as log
 
 __doc__ = """
 
 Usage:
 
   fandango [qt] [-l] [-v] [--list] [-h/--help] [-x/--extra] [-n/--new-line] \
-     [fandango_method_0] [fandango_method_1/argument_0] [...]
+     [fandango_method_0] [fandango_method_1/argument_0] [key:=argument_key] [...]
   
   Execute python and fandango methods from shell
 
@@ -168,13 +169,14 @@ if __name__ == '__main__':
         ## MULTIPLE ARGS COMMAND
         str2evalstr = lambda c: (
             str(c) if isNumber(c) else ("'%s'" if "'" not in c else '"%s"')%c)
-        kwargs = [c for c in comms[1:] if c.count('=')==1]
+        kwargs = [c for c in comms[1:] if c.count(':=')==1]
         args = [c for c in comms[1:] if c not in kwargs]
         
         kwargs = ','.join("'%s':%s"%(k,str2evalstr(v)) for k,v in 
-                          (c.split('=') for c in kwargs))
+                          (c.split(':=') for c in kwargs))
         args = ','.join(str2evalstr(c) for c in args)
         cmd = '%s(*[%s],**{%s})'%(comms[0],args,kwargs)
+        log.debug(cmd)
         r = evalX(cmd,_locals=locals())
         
     if opts.get('v'): print(cmd)

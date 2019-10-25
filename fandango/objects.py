@@ -79,17 +79,34 @@ def dirModule(module):
 
 def findModule(module):
     from imp import find_module
-    return find_module(module)[1]
-
-def loadModule(source,modulename=None):
-    #Loads a python module either from source file or from module
-    from imp import load_source,find_module,load_module
-    if modulename or '/' in source or '.' in source:
-        return load_source(modulename or 
-            replaceCl('[-\.]','_',source.split('/')[-1].split('.py')[0]),
-            source)
+    if '.' not in module:
+        return find_module(module)[1]
     else:
-        return load_module(source,*find_module(source))
+        parent,child = module.rsplit('.', 1)
+        #mparent = loadModule(parent)
+        pparent = findModule(parent)
+        pchild = find_module(child, [pparent])[1]
+        return pchild
+
+def loadModule(module,modulename=None):
+    #Loads a python module either from source file or from module
+    import imp
+    if modulename or '/' in module or '.py' in module:
+        if not modulename:
+            modulename = module.split('/')[-1].split('.py')[0]
+            modulename = replaceCl('[-\.]', '_', modulename)
+            
+        return imp.load_source(modulename, module)
+    
+    elif '.' not in module:
+        return imp.load_module(module, *imp.find_module(module))
+   
+    else:
+        parent,child = module.rsplit('.', 1)
+        mparent = loadModule(parent)
+        args = imp.find_module(child, mparent.__path__)
+        mchild = imp.load_module(module, *args)
+        return mchild
 
 def dirClasses(module,owned=False):
     v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
