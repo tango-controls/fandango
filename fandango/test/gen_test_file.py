@@ -81,7 +81,9 @@ try:
             except:
                 t = "''' %s '''" %t
             outs.append('    __test_%s = %s' % (l,t))
-        outs.append('    assert %s.%s' 
+        
+        # asserts are added commented to force you to write the tests
+        outs.append('    #assert %s.%s' 
                 % (sys.argv[1].replace('/','.').replace('.py',''), l))
         outs.append('')
         
