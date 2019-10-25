@@ -18,14 +18,7 @@ from inspect import isclass, getsource, isfunction, ismethod, getdoc
 __all__ = [
     'getdoc','getsource','isclass','isfunction','ismethod',
     'get_autodoc','get_class_docs',
-    'get_function_docs','get_vars_docs']
-
-def get_doc(obj):
-    doc = getattr(obj,'__doc__','')
-    if isinstance(obj,type(object)):
-        
-    elif fn.isCallable(obj):
-        
+    'get_function_docs','get_vars_docs']      
 
 DEFAULT_MODULE = """
 %s
