@@ -1,10 +1,24 @@
-RELEASE_NOTE = "Fandango 14.5 Improvements for SimulatorDS and Archiving"
+RELEASE_NOTE = "Fandango 14.7 Cleaner shell scripts"
 
 """
 IMPORTANT:
 
   Due to fandango.device and fandango.tango module refactoring you may need 
   to remove previous package before installing this one
+  
+14.7 Cleaner shell scripts, + DynamicCommands on DynamicDS
+
+    allow ThreadDict.get() to retrieve hw values
+    find_attributes, return always in lower case
+    solve bug in doc module, add coverage check
+    add tests and gen_test_file
+    add recursivity on loadModule and findModule
+    moving tests to ci/test
+    fixes on shell and export
+    add DynamicCommands to dynamically loaded devices
+    refine fandango shell logs
+    update pydocs
+
 
 14.6 Inspect DB partitions, push from Lambdas code on Dynamic attributes
     
