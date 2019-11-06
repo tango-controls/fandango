@@ -49,6 +49,7 @@ Out[77]:
 
 import time,sys,os,re,traceback
 import fandango.objects as fun #objects module includes functional
+import fandango.log as log
 
 ################################################################################3
 # Shell methods
@@ -408,11 +409,17 @@ def timefun(f):
 # Managing arguments
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
+try:
+    from argparse import ArgumentParser
+except:
+    pass
 
 def sysargs_to_dict(args=None,defaults=[],alias={},
                     trace=False,split=False,cast=True,lazy=True,multiflag=True,
                     multiarg=[],splitter='='):
-    '''  DEPRECATED IN FANDANGO > 13
+    '''  
+    DEPRECATED BY argparse.ArgumentParser IN FANDANGO > 13
+    https://docs.python.org/3/library/argparse.html
     
     It parses the command line arguments into an understandable dict
     @defaults is the list [and values] of anonymous arguments 
@@ -435,6 +442,7 @@ def sysargs_to_dict(args=None,defaults=[],alias={},
     After Fandango 13 argparse will replace the usage of sysargs_to_dict
     
     '''
+    log.debug('sysargs_to_dict is DEPRECATED, use python argparse instead')
     if args is None: args = sys.argv[1:]
     if trace: print 'sysargs_to_dict(%s,%s)'%(args,defaults)
     result,defargs,vargs = {},[],[]

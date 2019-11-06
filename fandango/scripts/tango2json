@@ -6,7 +6,7 @@ import sys,json,gzip
 __doc__ = """
 Usage:
 
- > tango2json.py [--compress] [--commands] [--properties] "filename.json" dev/name/1 "dev/exp/*"
+ > tango2json.py [--compress] [--commands] [--properties] [--attributes] "filename.json" dev/name/1 "dev/exp/*"
 """
 
 args,params,devs,data = [],[],[],fn.CaselessDict()
@@ -33,7 +33,9 @@ if not args[1:]:
 
 if not source:
   for mask in args[1:]:
-    devs.extend(fn.get_matching_devices(mask,exported='--properties' not in params))
+    exported = exported='--attributes' in params
+    fn.log.debug("mask is %s, %s" % (mask,exported))
+    devs.extend(fn.get_matching_devices(mask,exported=exported))
 else:
   raise 'Reading attr config from file not implemented'
   

@@ -205,7 +205,7 @@ class TangoEval(object):
     def __init__(self,formula='',launch=True,timeout=1000,keeptime=100,
               trace=False, proxies=None, attributes=None, cache=0, 
               use_events = False, event_hook = None,**kwargs):
-        print(self.regexp)
+        #print(self.regexp)
         self.formula = formula
         self.source = ''
         self.variables = []

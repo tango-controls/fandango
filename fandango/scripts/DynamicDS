@@ -40,7 +40,7 @@ export PYTHONPATH=$PYTHONPATH:$LcPATH:$DfPATH:$PyPATH:$(pwd)/python/
 
 DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
 
-if [ ! "$DSPATH" ] ; then
+if [ ! "$DSPATH" ] ; then   
  FnPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")
  if [ -e "$FnPATH/device/$DS.py" ] ; then
   DSPATH=$FnPATH/device

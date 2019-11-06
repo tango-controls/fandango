@@ -219,7 +219,8 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
                 try: 
-                    ats = sorted(get_device_attributes(d,[attr]),key=str.lower)
+                    ats = get_device_attributes(d,[attr])
+                    ats = sorted(map(str.lower,ats))
                     attrs.extend([d+'/'+a for a in ats])
                     if limit and len(attrs)>limit: break
                 except: 
@@ -228,7 +229,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                     #print traceback.format_exc()
                     pass
                     
-    result = sorted(set(attrs))
+    result = sorted(map(str.lower,set(attrs)))
     return result[:limit] if limit else result
                     
 def find_attributes(*args,**kwargs):

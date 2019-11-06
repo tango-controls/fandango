@@ -63,6 +63,9 @@ def test_fandango():
   assert fandango.dicts
   assert fandango.threads
 
+  import fandango.db
+  assert fandango.db
+
   if PyTango:
     assert fandango.tango
     assert fandango.servers

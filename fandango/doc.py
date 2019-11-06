@@ -12,9 +12,13 @@ Just do that at the end of your modules:
 """
 
 ## KEEP THIS MODULE CLEAN OF DEPENDENCIES!!
-import inspect,os
+import inspect, os, fandango as fn
+from inspect import isclass, getsource, isfunction, ismethod, getdoc
 
-__all__ = ['get_autodoc','get_class_docs','get_function_docs','get_vars_docs']
+__all__ = [
+    'getdoc','getsource','isclass','isfunction','ismethod',
+    'get_autodoc','get_class_docs',
+    'get_function_docs','get_vars_docs']      
 
 DEFAULT_MODULE = """
 %s

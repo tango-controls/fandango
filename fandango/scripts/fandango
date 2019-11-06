@@ -29,13 +29,14 @@
 ###########################################################################
 
 import fandango
+import fandango.log as log
 
 __doc__ = """
 
 Usage:
 
-  fandango [qt] [-l] [-v] [-h/--help] [-x/--extra] [-n/--new-line] \
-     [fandango_method_0] [fandango_method_1/argument_0] [...]
+  fandango [qt] [-l] [-v] [--list] [-h/--help] [-x/--extra] [-n/--new-line] \
+     [fandango_method_0] [fandango_method_1/argument_0] [key:=argument_key] [...]
   
   Execute python and fandango methods from shell
 
@@ -45,6 +46,10 @@ Usage:
   The --extra option will load PyTangoArchiving and Panic methods
   
 Examples:
+
+  fandango --help # prints this help
+
+  fandango --list # lists available methods 
 
   fandango findModule fandango
 
@@ -60,7 +65,7 @@ Examples:
   
   fandango get_matching_attributes "lab/ct/plctest16/*_af"
   
-  fandango -h | grep propert
+  fandango list | grep propert
   
   fandango get_matching_device_properties "lab/ct/plctest16" "*modbus*"
   
@@ -94,9 +99,12 @@ if __name__ == '__main__':
 
     from fandango.linos import *
     from fandango.objects import *
-    
-    if comms[0] == 'help':
-        opts['help'],comms = 1, comms[1:]
+
+    assert any((comms,opts)) and comms != ['help']
+    # go to exit()
+
+    if comms and comms[0] in ('help','list'):
+        opts[comms[0]],comms = 1, comms[1:]
     
     if opts.get('x',opts.get('extra',0)):
       try: 
@@ -109,8 +117,8 @@ if __name__ == '__main__':
         import panic
       except: pass
     
-    if opts.get('h',opts.get('help',0)):
-      ## Executing HELP
+    if opts.get('list') is not None or opts.get('h',opts.get('help',0)):
+      # Executing HELP
       import inspect
       
       _locals=locals()
@@ -125,8 +133,9 @@ if __name__ == '__main__':
         cmd = 'inspect.getsource(%s)'%target
         
       else:
-        cmd = ("sorted([('%s.%s'%(get_module_name(o),k)).strip('.') "
-               " for k,o in locals().items() if not k.startswith('_')])")
+        cmd = ("sorted(m for m in [('%s.%s'%(get_module_name(o),k)).strip('.') "
+               " for k,o in locals().items() if not k.startswith('_')"
+               " and hasattr(o,'__call__')] if not m.startswith('_'))")
         
       r = evalX(cmd,_locals=_locals)
       if isSequence(r):
@@ -135,7 +144,7 @@ if __name__ == '__main__':
         if c in r:
           r = c.join(r.split(c)[:2])+c
       if not target: 
-        r = __doc__+'\n\nAvailable methods:\n\n'+r
+        r = '\nAvailable methods:\n\n'+r
       
     ###########################################################################  
     else:
@@ -160,13 +169,14 @@ if __name__ == '__main__':
         ## MULTIPLE ARGS COMMAND
         str2evalstr = lambda c: (
             str(c) if isNumber(c) else ("'%s'" if "'" not in c else '"%s"')%c)
-        kwargs = [c for c in comms[1:] if c.count('=')==1]
+        kwargs = [c for c in comms[1:] if c.count(':=')==1]
         args = [c for c in comms[1:] if c not in kwargs]
         
         kwargs = ','.join("'%s':%s"%(k,str2evalstr(v)) for k,v in 
-                          (c.split('=') for c in kwargs))
+                          (c.split(':=') for c in kwargs))
         args = ','.join(str2evalstr(c) for c in args)
         cmd = '%s(*[%s],**{%s})'%(comms[0],args,kwargs)
+        log.debug(cmd)
         r = evalX(cmd,_locals=locals())
         
     if opts.get('v'): print(cmd)
@@ -178,7 +188,7 @@ if __name__ == '__main__':
  
   except AssertionError,e:
     print(__doc__)
-    
+
   except:
     print(cmd)
     import traceback

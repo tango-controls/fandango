@@ -444,7 +444,7 @@ as module methods.
   fandango.Logger.INFO    2016-02-19 11:49:55.609 just a test
 """
 
-_LogLevel = 'INFO'
+_LogLevel = 'WARNING'
 for a in sys.argv:
   if a.startswith('--log-level='):
     _LogLevel = a.split('=')[-1].upper()
@@ -455,6 +455,7 @@ debug = _Logger.debug
 warning = _Logger.warning
 error = _Logger.error
 trace = _Logger.trace
+set_shell_log_level = _Logger.setLogLevel
 
 
 class InOutLogged(Decorator):

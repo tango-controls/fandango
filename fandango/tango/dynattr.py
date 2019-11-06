@@ -265,6 +265,7 @@ class DynamicAttribute(object):
     def operator(self,op_name,other=None,unary=False,multipleargs=False):
         #print('operator() called for %s(%s).%s(%s)'%(self.__class__,str(type(self.value)),op_name,other and other.__class__ or ''))
         value = self.value
+
         if value is None:
             if op_name in ['__nonzero__','__int__','__float__','__long__','__complex__']: 
                 value = 0
@@ -284,13 +285,17 @@ class DynamicAttribute(object):
             if op_name is '__le__': method = lambda s,x: (s.__cmp__(x)<=0)
             if op_name is '__gt__': method = lambda s,x: (s.__cmp__(x)>0)
             if op_name is '__ge__': method = lambda s,x: (s.__cmp__(x)>=0)
-        elif hasattr(type(value),op_name) and hasattr(value,op_name): #Be Careful, method from the class and from the instance don't get the same args
+
+        elif hasattr(type(value),op_name) and hasattr(value,op_name): 
+            #Be Careful, method from the class and from the instance don't get the same args
             method = getattr(type(value),op_name)
             #print('Got %s from %s: %s'%(op_name,type(value),method))
         #elif op_name in value.__class__.__base__.__dict__:
         #    method = value.__class__.__base__.__dict__[op_name]
+
         else:
-            raise Exception,'DynamicAttribute_WrongMethod%sFor%sType==(%s)'% (op_name,str(type(value)),value)
+            raise Exception,'DynamicAttribute_WrongMethod%sFor%sType==(%s)'% (
+                    op_name,str(type(value)),value)
 
         if unary:
             if value is None and op_name in ['__nonzero__','__int__','__float__','__long__','__complex__']: 
