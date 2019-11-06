@@ -219,8 +219,11 @@ class ThreadDict(dict):
         print 'ThreadDict Stopped'
 
     def alive(self):
-        if not hasattr(self,'_Thread') or not self._Thread: return False
-        else: return self._Thread.isAlive()
+        if not hasattr(self,'_Thread') or not self._Thread: 
+            return False
+        else: 
+            return self._Thread.isAlive()
+        
     def __del__(self):
         self.stop()
         
@@ -295,6 +298,10 @@ class ThreadDict(dict):
     @self_locked
     def __locked_getitem__(self,key):
         return dict.__getitem__(self,key)
+    
+    @self_locked
+    def __locked_getitem_hw__(self,key):
+        return self.__getitem__(self,key,hw=True)    
         
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
@@ -318,12 +325,16 @@ class ThreadDict(dict):
         self.set_last_update(time.time())
     
     @self_locked
-    def get(self,key,default=None):
-        if not self.threaded and self.read_method: 
+    def get(self,key,default=None,hw=False):
+        if hw:
+            self.__locked_getitem_hw__(key,hw)
+        elif not self.threaded and self.read_method: 
             dict.__setitem__(self,key,self.read_method(key))
             self.last_update = time.time()
-        if default is False: return dict.get(self,key)
-        else: return dict.get(self,key,default)
+        if default is False: 
+            return dict.get(self,key)
+        else: 
+            return dict.get(self,key,default)
     
     @self_locked
     def __delitem__(self, key):
