@@ -283,7 +283,7 @@ convert the whole formula into a writable attribute.
 
 **MATCH(regexp,str)** : careless regexp matching
 
-**FILE** : open a file
+**FILE** : open a file as a list of strings
 
 **time2str/ctime2time** : Time conversions
 
@@ -436,6 +436,29 @@ Example: for creating a simulated attribute that returns the same value that has
 
   OP-PNV-01=DevBoolean(READ and VAR('OP-PNV-01') or WRITE and VAR('OP-PNV-01',VALUE))
   
+LoadFromFile
+------------
+
+It is possible to load attributes declaration from files. Just write attribute declarations in different rows in a txt file and set the full path to the file in the LoadFromFile property.
+
+At init() and every time that updateDynamicAttributes() command is called ; the attribute formulas will be reloaded from the file.
+
+Attributes declared in properties will have always precedence over attributes declared in files.
+
+To update the attribute formulas from a file while running just use::
+
+  import fandango
+  with open('/tmp/config.txt','w') as f:  f.write("A = 5")
+  dp = fandango.get_device('your/device/name')
+  fandango.put_device_property('your/device/name','LoadFromFile','/tmp/config.txt')
+  dp.updateDynamicAttributes()
+  dp.A
+  : 5
+
+External python Modules
+-----------------------
+
+fandango.DynamicDS does not allow to use other modules in attribute declaration ; but you can use PyAttributeProcessor instead ( https://github.com/ALBA-Synchrotron/PyAttributeProcessor ) ; that integrates this feature using an ExtraModules property for module imports and renaming.
 
 Using TAU 
 ---------
@@ -576,6 +599,8 @@ The attribute will be evaluated (therefore being able to push events) for any of
 
 Advanced DynamicDS creation
 ===========================
+
+You can add the dynamic attributes functionality to any Python Tango Device just inheriting from the fandango.DynamicDS class.
 
 A higher fandango integration (dynamic states, commands, online update) can be achieved modifying the main method::
 
