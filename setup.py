@@ -24,8 +24,8 @@ To tune some options:
 -------------------------------------------------------------------------------
 """
 
-#if 'help' in str(sys.argv): 
-print(__doc__)
+if 'help' in str(sys.argv): 
+  print(__doc__)
 
 release = open('fandango/VERSION').read()
 
