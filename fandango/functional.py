@@ -124,6 +124,8 @@ def rms(seq):
     
 def randomize(seq):
     """ returns a randomized version of the list """
+    if isGenerator(seq):
+        seq = list(seq)
     done,result = list(range(len(seq))),[]
     while done: 
         result.append(seq[done.pop(random.randrange(len(done)))])
