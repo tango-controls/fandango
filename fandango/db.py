@@ -297,12 +297,20 @@ class FriendlyDB(log.Logger):
             [self.tables[table].append(t[0]) for t in self.tuples2lists(q.fetchall())]
         return self.tables[table]
     
+    def getTableCreator(self,table):
+        return self.Query('show create table %s' % table)[0][1]
+     
+    def getPartitionExpression(self,table,partition):
+        cr = self.getTableCreator(table).split('\n')
+        cr = [l for l in cr if fn.clsearch('(partition by|%s)'%partition,l)]
+        return ';'.join(cr)
+    
     def getTablePartitions(self,table):
         """ Returns available partitions for table """
         q = ("select partition_name from information_schema.partitions "
                 " where table_name like '%s' and table_schema like '%s' "
                 " order by partition_name" % (table, self.db_name))
-        return [l[0] for l in self.Query(q)]
+        return [l[0] for l in self.Query(q) if l[0] is not None]
     
     def getTableRows(self, table, partition = None):
         q = ("select table_rows from information_schema.partitions "
