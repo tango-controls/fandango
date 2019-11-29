@@ -1164,14 +1164,21 @@ def ifThen(condition,callback,falsables=tuple()):
     else:
         return condition
     
-def call(args=None,locals_=None):
+def call(args=None,kwargs=None,locals_=None):
     """
     Calls a method from local scope parsing a pipe-like argument list
+    
+    arguments like str=str will be converted to keyword arguments
+    
+    an argument like pickle=filename will export the result to a file
     """
     if args is None:
         import sys
         args = sys.argv[1:]
+        
+    kwargs, export = kwargs or {}, ''
     f,args = args[0],args[1:]
+    
     if not isCallable(f):
         locals_ = locals_ or globals()
         if f=='help':
@@ -1184,9 +1191,22 @@ def call(args=None,locals_=None):
                 m = [k for k,v in locals_.items() if isCallable(v)]
                 return ('\n'.join(sorted(m,key=str.lower)))
         f = locals_.get(f,None) 
+        
     if all(isString(a) for a in args):
+        kwargs = [a for a in args if '=' in a]
+        args = [a for a in args if a not in kwargs]
         args = map(str2type,args)
-    return f(*args)    
+        kwargs = dict((k.split('=',1)) for k in kwargs)
+        kwargs = dict(zip(kwargs.keys(),map(str2type,kwargs.values())))
+
+    export = kwargs.pop('pickle','')
+    r = f(*args, **kwargs)
+    if export:
+        import pickle
+        pickle.dump(r,open(export,'w'))
+        return export
+
+    return r
 
 def retry(callable,retries=3,pause=0,args=[],kwargs={}):
     r = None
