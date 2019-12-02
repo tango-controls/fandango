@@ -1049,6 +1049,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         #if not USE_STATIC_METHODS: self = self.myClass.DynDev
         attr = tango.fakeAttributeValue(attr) if isString(attr) else attr
         aname = self.get_attr_name(attr.get_name())
+        result = None
         tstart=time.time()
         self.debug("DynamicDS(%s)::read_dyn_atr(%s), entering at %s\n%s"
                    % (self.get_name(),aname,time2str(tstart),'<'*80))
@@ -1108,8 +1109,10 @@ class DynamicDSAttrs(DynamicDSImpl):
             self._eval_times[aname]=now-tstart #Internal debugging
             if aname==self.dyn_values.keys()[-1]: self._cycle_start = now
             last_exc = str(e)
-            self.error('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
-            if not isinstance(e,RethrownException): print(traceback.format_exc())
+            self.error('DynamicDS_read_%s_Exception: %s\n\tresult=%s' 
+                       % (aname,last_exc,result))
+            if not isinstance(e,RethrownException): 
+                print(traceback.format_exc())
             raise Exception('DynamicDS_read_%s_Exception: %s' % (aname,last_exc))
     
     ##This hook has been used to force self to be passed always as argument and avoid dynattr missmatching
@@ -1142,39 +1145,43 @@ class DynamicDSAttrs(DynamicDSImpl):
     
     def push_dyn_attr(self,aname,value=None,date=None,quality=None,
             events=None,changed=None,queued=False):
-        
-        queued = queued and self.MaxEventStream
-        
-        if fun.clmatch('state$',aname):
-            aname = 'State'
-            value = value if value is not None else self.get_state()
-            date,quality = time.time(),AttrQuality.ATTR_VALID
+        try:
+            queued = queued and self.MaxEventStream
+            
+            if fun.clmatch('state$',aname):
+                aname = 'State'
+                value = value if value is not None else self.get_state()
+                date,quality = time.time(),AttrQuality.ATTR_VALID
 
-        t = self.dyn_values.get(aname,DynamicAttribute())
-        value = notNone(value,t.value)
-        date = notNone(date,fun.now())
-        quality = notNone(quality,t.quality)
+            t = self.dyn_values.get(aname,DynamicAttribute())
+            value = notNone(value,t.value)
+            date = notNone(date,fun.now())
+            quality = notNone(quality,t.quality)
+                
+            if events is None:
+                events = self.check_attribute_events(aname)
+            if changed is None:
+                changed = self.check_changed_event(aname,value)
+            if not events or not changed:
+                return        
+                
+            self.info('push_dyn_attr(%s,%s)=%s(%s))\n%s'%(aname,
+                queued and 'queued' or 'pushed',type(value),
+                shortstr(value),'<'*80))
             
-        if events is None:
-            events = self.check_attribute_events(aname)
-        if changed is None:
-            changed = self.check_changed_event(aname,value)
-        if not events or not changed:
-            return        
-            
-        self.info('push_dyn_attr(%s,%s)=%s(%s))\n%s'%(aname,
-            queued and 'queued' or 'pushed',type(value),shortstr(value),'<'*80))
-        
-        if queued:
-            try:
-                self._events_lock.acquire()
-                self._events_queue.put((aname,value,date,quality,events))
-            finally:
-                self._events_lock.release()
-        else:
-            self.push_change_event(aname,value,date,quality)
-            if fun.clsearch('archive',events):
-                self.push_archive_event(aname,value,date,quality)  
+            if queued:
+                try:
+                    self._events_lock.acquire()
+                    self._events_queue.put((aname,value,date,quality,events))
+                finally:
+                    self._events_lock.release()
+            else:
+                self.push_change_event(aname,value,date,quality)
+                if fun.clsearch('archive',events):
+                    self.push_archive_event(aname,value,date,quality)
+        except Exception as e:
+            self.error('push_dyn_attr(%s,%s(%s),%s,%s) failed!\n%s' % 
+                (aname,type(value),value,date,quality,traceback.format_exc()))
 
     #------------------------------------------------------------------------------------------------------
     #   Attributes and State Evaluation Methods
@@ -1300,7 +1307,8 @@ class DynamicDSAttrs(DynamicDSImpl):
             
             self.debug('events = %s, check = %s' % (events,check))
             if events and check:
-                self.push_dyn_attr(aname,events=events,changed=1,queued=1)
+                self.push_dyn_attr(aname,value=value,
+                                   events=events,changed=1,queued=1)
             
             #Updating the cache
             if events or self.dyn_values[aname].keep: 
@@ -1363,7 +1371,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         if formula in self.Lambdas:
             self.info('DynamicDS.evalState: using Lambdas')
             f = self.Lambdas[formula]
-            return f() if fn.isCallable(f) else f
+            return f() if fun.isCallable(f) else f
             
         t = time.time()-self.time0            
         for k,v in self.dyn_values.items(): self._locals[k]=v#.value #Updating Last Attribute Values
