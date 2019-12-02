@@ -229,6 +229,7 @@ class ThreadDict(dict):
         
     def run(self):
         self.tracer('In ThreadDict.run()')
+        self.event.wait(self.get_timewait())
         while not self.event.isSet():
             self.set_last_cycle_start(time.time())
             keys = sorted(self.threadkeys())
