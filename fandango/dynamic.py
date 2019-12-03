@@ -1183,9 +1183,9 @@ class DynamicDSAttrs(DynamicDSImpl):
             self.error('push_dyn_attr(%s,%s(%s),%s,%s) failed!\n%s' % 
                 (aname,type(value),value,date,quality,traceback.format_exc()))
 
-    #------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------------
     #   Attributes and State Evaluation Methods
-    #------------------------------------------------------------------------------------------------------
+    #--------------------------------------------------------------------------
 
     ## DYNAMIC ATTRIBUTE EVALUATION ... 
     # Copy it to your device and add any method you will need

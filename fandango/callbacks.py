@@ -164,11 +164,23 @@ class EventListener(Logger,Object): #Logger,
         self.error_hook = callback or getattr(self,'error_hook',None)
     def set_value_hook(self,callback=None): 
         self.value_hook = callback or getattr(self,'value_hook',None)
+        
+    def push_event(self, event):
+        """
+        This method translate PyTango events to Taurus-like events and 
+        passes the result to eventReceived.
+
+        This allows EventListener objects to be used as plain tango callbacks
+        """
+        return self.eventReceived(
+            event.attr_name, event.event_, event.attr_value)
 
     def eventReceived(self, src, type_, value):
         """ 
         Method to implement the event notification
-        Source will be an object, type a PyTango EventType, evt_value an AttrValue
+            Source will be an object, 
+            type a PyTango EventType, 
+            evt_value an AttrValue
         """
         t0 = time.time()
         inc = t0 - self.last_event_time
@@ -208,6 +220,7 @@ class EventListener(Logger,Object): #Logger,
         if self.event_hook:
             try: self.event_hook(src,type_,value)
             except: self.error(' %s:%s'%(src,traceback.format_exc()))
+            
         self.last_event_time = t0
         
 class BufferedEventListener(EventListener,ThreadedObject):
@@ -844,9 +857,8 @@ class EventSource(Logger,SingletonMap):
         Adds a Listener to this EventSource object.
         use_events can be a boolean or a list of event types (change,attr_conf,periodic,archive)
         """
-        if not isCallable(listener) \
-          and not hasattr(listener,'eventReceived') \
-            and not hasattr(listener,'event_received'):
+        if not isCallable(listener) and not any(hasattr(listener,c) for c in (
+            'eventReceived','event_received','push_event')):
               raise Exception('NotAValidListener!: %s'%listener)
         
         if not use_events: 
@@ -960,17 +972,18 @@ class EventSource(Logger,SingletonMap):
                     continue
                 if isinstance(l, weakref.ref):
                     l = l()
+                self.debug('fireEvent(%s) => %s?' % (event_type,l))
                 if hasattr(l,'eventReceived'):
-                    self.debug('fireEvent(%s) => %s?' % (event_type,l))
                     l.eventReceived(self, event_type, event_value)
                 elif hasattr(l,'event_received'):
-                    self.debug('fireEvent(%s) => %s?' % (event_type,l))
                     l.event_received(self, event_type, event_value)
+                elif hasattr(l,'push_event'):
+                    ev = taurusevent2tango(self, event_type, event_value)
+                    l.push_event(ev)
                 elif isCallable(l):
-                    self.debug('fireEvent(%s) => %s()' % (event_type,l))
                     l(self, event_type, event_value)
                 else:
-                    self.debug('fireEvent(%s): %s!?!?!?!?' % (event_type,l))
+                    self.warning('unknown type listener: %s' % (l))
             except:
                 traceback.print_exc()
         try:
@@ -1308,9 +1321,9 @@ class EventSource(Logger,SingletonMap):
             
             et = ctime2time(event.reception_date)
             if et<1e9: 
-              if not event.err: 
-                self.warning('%s event time is 0!'%type_)
-              et = t0
+                if not event.err: 
+                    self.warning('%s event time is 0!'%type_)
+                et = t0
               
             if event.err:
                 # MANAGING ERROR EVENTS
@@ -1322,36 +1335,36 @@ class EventSource(Logger,SingletonMap):
                   'push_event(%s,err=%s,has_events=%s,polled=%s)'%(type_,reason,has_evs,is_polled))
                 
                 if reason == 'API_EventPropertiesNotSet' and self.isUsingEvents():
-                  #Nothing to do, other event types are already subscribed
-                  return
+                    #Nothing to do, other event types are already subscribed
+                    return
                 
                 elif reason in EVENT_TO_POLLING_EXCEPTIONS:
-                  if reason in EVENT_CONF_EXCEPTIONS and any(self.last_event.values()):
-                    #Discard config exceptions if some other event is already working well
+                    if reason in EVENT_CONF_EXCEPTIONS and any(self.last_event.values()):
+                        #Discard config exceptions if some other event is already working well
+                        return
+                    elif self.use_events and not is_polled:
+                        self.info('EVENTS_FAILED! (%s,%s,%s,%s)'%(type_,reason,has_evs,is_polled))
+                        #self.info(str([et,type_,event.err,]))
+                        if check_device_cached(self.device):
+                            self.setState('PENDING')
+                            self.activatePolling()
                     return
-                  elif self.use_events and not is_polled:
-                    self.info('EVENTS_FAILED! (%s,%s,%s,%s)'%(type_,reason,has_evs,is_polled))
-                    #self.info(str([et,type_,event.err,]))
-                    if check_device_cached(self.device):
-                      self.setState('PENDING')
-                      self.activatePolling()
-                  return
                 
                 else:
-                  if reason in (NOT_PROPS,NOT_READY,REG_FAILED):
-                    #Ignore the event
-                    return
-                  
-                  else:
-                    # A valid error is a valid event
-                    # If push_event is executed, attributes are being received
-                    self.warning('ERROR in push_event(%s): %s(%s)'
-                                  %(type_,type(value),reason))
+                    if reason in (NOT_PROPS,NOT_READY,REG_FAILED):
+                        #Ignore the event
+                        return
+                    
+                    else:
+                        # A valid error is a valid event
+                        # If push_event is executed, attributes are being received
+                        self.warning('ERROR in push_event(%s): %s(%s)'
+                                    %(type_,type(value),reason))
 
-                    # This error event will be passed to the queue
-                    self.setState('SUBSCRIBED')
-                    self.attr_value = value
-                    self.last_event_time = et or time.time() 
+                        # This error event will be passed to the queue
+                        self.setState('SUBSCRIBED')
+                        self.attr_value = value
+                        self.last_event_time = et or time.time() 
             
             elif isinstance(event,PyTango.AttrConfEventData):
                 # MANAGING CONF EVENTS
@@ -1417,7 +1430,8 @@ def taurusevent2tango(src,type_,value):
     event.attr_name = getattr(src,'full_name',getattr(src,'attr_name',str(src)))
     event.device = src.proxy
     event.attr_value = value
-    event.err = not hasattr(value,'value') or 'err' in str(type_) or isinstance(value,Exception)
+    event.err = (not hasattr(value,'value') or 'err' in str(type_) \
+        or isinstance(value,Exception))
     event.errors = [] if not event.err else [value]
     event.date = getattr(value,'time',None)
     event.time = fandango.ctime2time(event.date) if event.date else time.time()
