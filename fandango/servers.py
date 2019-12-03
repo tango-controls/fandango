@@ -51,8 +51,7 @@ from fandango.tango import ProxiesDict,get_device_info,get_database,\
     get_tango_host,get_class_devices, get_normal_name
 from fandango.excepts import trial
     
-####################################################################################################################
-
+###############################################################################
 class TServer(Object):
     '''Class used by ServerDict to manage TangoDeviceServer admin devices.'''
     def __init__(self,name='', host='', parent=None):
@@ -239,7 +238,7 @@ class ServersDict(CaselessDict,Object):
     '''
     def __init__(self,pattern='',klass='',devs_list='',servers_list='',
                  hosts='',loadAll=False,log='WARNING',logger=None,
-                 tango_host=''):
+                 tango_host='',host='',devices=''):
         ''' def __init__(self,pattern='', klass='',devs_list='',servers_list=''):
         The ServersDict can be initialized using any of the three argument lists or a wildcard for Database.get_server_list(pattern) 
         ServersDict('*') can be used to load all servers in database
@@ -261,11 +260,13 @@ class ServersDict(CaselessDict,Object):
         if loadAll: self.load_all_servers()
         elif klass: self.load_by_class(klass)
         elif devs_list: self.load_from_devs_list(devs_list)
+        elif devices: self.load_from_devs_list(devices)
         elif servers_list: self.load_from_servers_list(servers_list)
         #elif pattern: self.load_from_servers_list(self.db.get_server_list(pattern))
         elif hosts: 
             hosts = type(hosts) is str and (',' in hosts and hosts.split(',') or [hosts]) or hosts
             for h in hosts: self.load_by_host(h)
+        elif host: self.load_by_host(host)
         elif pattern: self.load_by_name(pattern)
         #dict.__init__(self)
     
@@ -329,7 +330,7 @@ class ServersDict(CaselessDict,Object):
     def load_by_host(self,host):
         """ Initializes the dict with all the servers assigned to a given host. """
         servers = self.get_db_device().DbGetHostServerList(host)
-        self.log.warning("%d servers assigned in DB to host %s: %s" % (len(servers),host,servers))
+        self.log.info("%d servers assigned in DB to host %s: %s" % (len(servers),host,servers))
         if servers: self.load_from_servers_list(servers)
         return self
     
