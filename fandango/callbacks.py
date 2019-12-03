@@ -847,7 +847,7 @@ class EventSource(Logger,SingletonMap):
 
     def _listenerDied(self, weak_listener):
         try:
-            self.warning('_listenerDied(%s)!' % str(weak_listener))
+            self.debug('_listenerDied(%s)!' % str(weak_listener))
             self.listeners.pop(weak_listener)
         except Exception, e:
             pass

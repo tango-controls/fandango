@@ -5,6 +5,19 @@ IMPORTANT:
 
   Due to fandango.device and fandango.tango module refactoring you may need 
   to remove previous package before installing this one
+
+14.8 Solve Bug on DynamicDS.push_dyn_attr, bash shell improvements
+
+    adapt tango_monitor to use fandango.EventSource (event/polling combinator)
+    Astor: add host/devices as valid arguments
+    DynamicDS: pass value to push_dyn_attr (bug on first push), added try/except
+    threadDict: added 1 timewait at the first run()
+    functional:
+      avoid generator except in randomize
+      add kwargs and pickle export to call()
+    databases:
+      add getTableCreator/PartitionExpression methods
+    remove help from setup.py
   
 14.7 Cleaner shell scripts, + DynamicCommands on DynamicDS
 
