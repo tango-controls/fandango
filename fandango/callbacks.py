@@ -1099,9 +1099,9 @@ class EventSource(Logger,SingletonMap):
             # NOTE: a device with listeners and neither use_events nor polled 
             # not forced would be just a dummy CachedAttributeProxy and should
             # be updated "by hand"
-          
+
             if not self.polled and check_device_cached(self.device) and (
-              self.forced or (self.use_events and not self.isUsingEvents())):
+                self.forced or (self.use_events and not self.isUsingEvents())):
               
                 self.info('checkEvents(): events not subscribed, enabling polling')
                 self.activatePolling()
@@ -1159,13 +1159,13 @@ class EventSource(Logger,SingletonMap):
         Read last value acquired, 
         if cache = False or not polled it will trigger
         a proxy.read_attribute() call.
-        
+
         If asynch=True/False, self.tango_asynch will be overriden for this call.
         """
         #self.debug('read(cache=%s,asynch=%s)'%(cache,asynch))
         asynch = notNone(asynch,self.tango_asynch)
         t0 = now()
-        
+
         # If it was just updated, return cache
         if cache is None:
             vtime = ctime2time(getattr(self.attr_value,'time',None))
@@ -1178,16 +1178,13 @@ class EventSource(Logger,SingletonMap):
                 cache = False
             else:
                 cache = True
-       
         self.debug('read(cache=%s,asynch=%s,threaded=%s)'
            %(cache,asynch,self.get_thread().is_alive()))
         self.asynch_hook() # Check for pending asynchronous results
-        
         if not cache or self.attr_value is None:
-          
             if self.checkState('SUBSCRIBED') and not self.last_event:
-                  self.info('Attribute subscribed but no events received yet!!')
 
+                self.info('Attribute subscribed but no events received yet!!')
             self.stats['read']+=1
             self.last_read_time = t0
             self.read_hw(asynch=asynch)
@@ -1195,14 +1192,12 @@ class EventSource(Logger,SingletonMap):
             if self.attr_value is not None: 
                 #if None, asynch has not been read yet
                 self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
-            
         if _raise and getattr(self.attr_value,'error',False):
             raise self.attr_value.value
         else:
             return self.attr_value
         
     def read_hw(self,asynch=False):
-      
         self.debug('read_hw(asynch=%s,\n\tpending=%s)'
                           %(asynch,self.pending_request))
         try:
@@ -1211,7 +1206,6 @@ class EventSource(Logger,SingletonMap):
             if not check_device_cached(self.device):
                 self.warning('read_hw(): %s not running!'%self.device)
                 raise Exception('EvS_CantConnectToDevice')
-            
             if asynch:
                 if self.pending_request is not None:
                     #self.debug('read(): pending_request ...')
@@ -1243,7 +1237,7 @@ class EventSource(Logger,SingletonMap):
             except:
                 self.debug(traceback.format_exc())
                     
-        except Exception,e:
+        except Exception as e:
             # fakeAttributeValue initialized with full_name
             self.info('EventSource.read(%s) failed!,'
               ' polling will be deactivated:\n%s'%(self.full_name,exc2str(e)))
