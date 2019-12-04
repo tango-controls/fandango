@@ -502,8 +502,10 @@ class TangoEval(object):
             try:
                 #Reading or Overriding attribute value, if overriden value will not be kept for future iterations
                 r = _raise if not any(d==device and a==attribute and w=='exception' for t,d,a,w in targets) else FAILED_VALUE
-                self.previous[var_name] = previous.get(target,
-                    self.read_attribute(device,attribute or 'State',what,_raise=r))
+                if target in previous:
+                    self.previous[var_name] = previous.get(target)
+                else:
+                    self.previous[var_name] = self.read_attribute(device,attribute or 'State',what,_raise=r)
                 #Remove attr/name, keep only the variable tag
                 self.previous.pop(target,None)  
                 #Every occurrence of the attribute is managed separately, read_attribute already uses caches within polling intervals
