@@ -92,7 +92,7 @@ def loadTaurus():
     return bool(TAU)
 
 global USE_FQDN
-USE_FQDN = False
+USE_FQDN = str2type(os.getenv('USE_FQDN','None'))
 
 TANGO_STATES = \
   'ON OFF CLOSE OPEN INSERT EXTRACT MOVING STANDBY FAULT INIT RUNNING ALARM '\
@@ -116,11 +116,11 @@ alnum = '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.\+]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 
-#redev matches device names, includes fqdn host
+#rehost matches simple and fqdn hostnames
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
     +'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
 
-# redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
+#redev matches device names
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))'
 
 #reattr matches attribute and extension
@@ -214,6 +214,7 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') \
                             else get_database()
+
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
             
         else:
@@ -223,9 +224,13 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
             else:
                 host,port = host.split(':',1)
         
-        if fqdn: 
+        if fqdn is None:
+            pass #It is done on purpose, it just ignores the fqdn settings
+        
+        elif fqdn is True: 
             host = get_fqdn(host)
-        elif (matchCl('.*[a-z].*',host.lower())
+            
+        elif (matchCl('.*[a-z].*',host)
             #and PyTango.__version_number__ < 800):
             ): #The bug is back!!
             #Remove domain name
