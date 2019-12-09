@@ -1,10 +1,20 @@
-RELEASE_NOTE = "Fandango 14.7 Cleaner shell scripts"
+RELEASE_NOTE = "Fandango 14.8.1 bugfixes for attribute pushing"
 
 """
 IMPORTANT:
 
   Due to fandango.device and fandango.tango module refactoring you may need 
   to remove previous package before installing this one
+  
+MASTER branch provides python 2.6 compatible releases
+DEVELOP branch will provide the current Py2.7/3.3 code
+  
+14.8.1 Apply bugfixes/pull requests from github
+
+    solve fqdn issues (#16)
+    merge PR#17
+    Dont read attribute when previous is supplied (#19)
+
 
 14.8 Solve Bug on DynamicDS.push_dyn_attr, bash shell improvements
 

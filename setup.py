@@ -1,3 +1,5 @@
+from __future__ import print_function
+from builtins import str
 #!/usr/bin/env python
 # Always prefer setuptools over distutils
 import os, imp, sys
@@ -85,7 +87,7 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     platforms=[ "Linux,Windows XP/Vista/7/8" ],
-    install_requires=[],
+    install_requires=['python-future'],
     scripts=scripts,
     entry_points=entry_points,
     include_package_data=True,
