@@ -880,6 +880,9 @@ except:
   print('WARNING: fandango.qt: Importing taurus.qt.qtcore.mimetypes failed!')
   TAURUS_ATTR_MIME_TYPE = TAURUS_DEV_MIME_TYPE = TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE = TEXT_MIME_TYPE
 
+MIMETYPES = [ 'text/plain', TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, 
+             TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE ]
+
 @ClassDecorator
 def Dropable(QtKlass):
     """ 
@@ -898,17 +901,20 @@ def Dropable(QtKlass):
             try: 
                 self.setAcceptDrops(True)
                 # Needed to reapply drop support overriden by taurusgui.ini
-                try: self.setModifiableByUser(True)
-                except: self._dlog(traceback.format_exc())
+                try: 
+                    self.setModifiableByUser(True)
+                except: 
+                    self._dlog(traceback.format_exc())
 
                 if not hasattr(self,'TAURUS_DEV_MIME_TYPE'):
                     self.TAURUS_DEV_MIME_TYPE = TAURUS_DEV_MIME_TYPE
                     self.TAURUS_ATTR_MIME_TYPE = TAURUS_ATTR_MIME_TYPE
                     self.TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_MIME_TYPE
                     self.TAURUS_MODEL_LIST_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE
-            except: traceback.print_exc()
+            except: 
+                traceback.print_exc()
             self.TEXT_MIME_TYPE = 'text/plain'
-            self._dlog('checkDropSupport(True')
+            self._dlog('checkDropSupport(True)')
             return True
 
         def getSupportedMimeTypes(self): 
@@ -1105,7 +1111,8 @@ def MenuContexted(QtKlass):
     
     Example:
       label = MenuContexted(Qt.QLabel)('a/device/name')
-      label.setContextCallbacks({'Test Device',lambda:show_device_panel('a/device/name')})
+      label.setContextCallbacks({'Test Device',
+            lambda:show_device_panel('a/device/name')})
       
     """
     class MenuContextedQtKlass(QtKlass):
