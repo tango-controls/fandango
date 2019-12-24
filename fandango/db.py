@@ -93,7 +93,8 @@ class FriendlyDB(log.Logger):
     def __init__(self,db_name,host='',user='',passwd='',autocommit=True,
                  loglevel='WARNING',use_tuples=False,default_cursor=None):
         """ Initialization of MySQL connection """
-        self.call__init__(log.Logger,self.__class__.__name__,
+        self.call__init__(log.Logger,
+                self.__class__.__name__+'(%s@%s)' % (db_name, host),
                 format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
         self.debug('Using %s as MySQL python API' % mysql_api)

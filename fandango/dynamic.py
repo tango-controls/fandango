@@ -916,7 +916,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                 self.info('In check_changed_event(%s,%s): changed = %s'
                     %(aname,shortstr(new_value),changed))
                 return changed
-
+            
             else:
                 try: 
                     v,new_value = (float(v) if v is not None else None),\
