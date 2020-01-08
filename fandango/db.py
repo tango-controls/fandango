@@ -117,6 +117,9 @@ class FriendlyDB(log.Logger):
         self._recursion = 0
         self.tables={}
         
+    def __repr__(self):
+        return('%s("%s@%s")' % (type(self).__name__,self.db_name,self.host))
+        
     def __del__(self):
         if hasattr(self,'__cursor') and self._cursor: 
             self._cursor.close()
