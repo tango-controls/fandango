@@ -8,6 +8,15 @@ IMPORTANT:
   
 MASTER branch provides python 2.6 compatible releases
 DEVELOP branch will provide the current Py2.7/3.3 code
+
+15.0.1 Develop Branch
+
+    like 14.8.1, but only compatible with PyTango2.7 (using future)
+
+################################################################
+
+14.8.2
+    solve bugs on tango_monitor and ThreadDict.stop()
   
 14.8.1 Apply bugfixes/pull requests from github
 
