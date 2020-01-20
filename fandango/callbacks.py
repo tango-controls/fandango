@@ -1288,7 +1288,7 @@ class EventSource(Logger,SingletonMap):
             return
         
         try:
-            prev = self.attr_value and self.attr_value.value
+            prev = getattr(self.attr_value,'value',None) #None in case of error
             ## The read() call will trigger a fireEvent()
             self.attr_value = self.read(cache=False) 
             #(self.attr_value is not None))
@@ -1539,9 +1539,10 @@ class EventCallback():
             #Pruning tango:$TANGO_HOST and other tags
             attr_name = '/'.join(event.attr_name.split('/')[-4:])
             dev_name = hasattr(event.device,'name') and event.device.name() or event.device
-            print "in EventCallback.push_event(",dev_name,": ",attr_name,")"
+            print("in EventCallback.push_event(",dev_name,": ",attr_name,")")
             if not event.err and event.attr_value is not None:
-                print "in EventCallback.push_event(...): ",attr_name,"=", event.attr_value.value
+                print("in EventCallback.push_event(...): ",attr_name,"=", 
+                      event.attr_value.value)
                 self.TimeOutErrors=0
                 _EventsList[attr_name.lower()].set(event)
                 if attr_name.lower().endswith('/state'):
