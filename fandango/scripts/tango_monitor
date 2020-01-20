@@ -28,8 +28,8 @@ class MyCallback(object):
         aname = fn.tango.get_normal_name(event.attr_name)
         self.counters[aname] = self.counters[aname] + 1
         self.ratios[aname] = self.counters[aname] / (time.time()-self.t0)
-        
-        value = fn.shortstr(event.attr_value and event.attr_value.value)
+        value = getattr(self.attr_value,'value',self.attr_value)
+        value = fn.shortstr(value)
         if self.values[aname] == value:
             self.dups[aname] += 1
             
