@@ -50,6 +50,7 @@ srubio@cells.es,
 """
 
 import time,traceback,os
+import threading # needed for ThreadDict
 import collections
 from collections import defaultdict, deque
 try: from collections import OrderedDict
@@ -182,6 +183,7 @@ class ThreadDict(dict):
         self.last_cycle_start = 0
         self.cycle_count = 0
         self.cycle_average = 0
+        self.event = threading.Event()
         self.parent = type(self).mro()[1] #equals to self.__class__.__base__ or type(self).__bases__[0]
         if other: dict.update(self,other)
     
@@ -198,8 +200,6 @@ class ThreadDict(dict):
             print 'ThreadDict.start(): ThreadDict.stop() must be executed first!'
             return
         print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()        
-        import threading
-        self.event = threading.Event()
         self.event.clear()
         self._Thread = threading.Thread(target=self.run)
         self._Thread.setDaemon(True)
