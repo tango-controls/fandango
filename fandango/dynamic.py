@@ -931,7 +931,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                     except:
                         return str(v)!=str(new_value)
                 
-                if events == 'push':
+                if events == 'push': #UseEvents = push, push always
                     cabs,crel = 0,0
                 else:
                     cabs,crel = config or self.check_events_config(aname)
@@ -1159,6 +1159,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             quality = notNone(quality,t.quality)
                 
             if events is None:
+                # That call parses the contents of UseEvents property
                 events = self.check_attribute_events(aname)
             if changed is None:
                 changed = self.check_changed_event(aname,value)
@@ -1300,7 +1301,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             date = self.get_attr_date(aname,result)
             value = self.dyn_types[aname].pytype(result)
 
-            #Events must be checked before updating the cache
+            #UseEvents must be checked before updating the cache
             events = self.check_attribute_events(aname)
             check = events and (
                         push or self.check_changed_event(aname,result,events))
@@ -1748,6 +1749,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
                             if len(self._external_attributes) == 1: 
                                 tango.TAU_LOGGER.disableLogOutput()
 
+                            # Check UseEvents
                             if (self._locals.get('ATTRIBUTE') 
                                     and self.check_attribute_events(self._locals.get('ATTRIBUTE'))):
                                 #If Attribute has events evalAttr() will be called at every event_received
