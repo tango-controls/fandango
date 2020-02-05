@@ -141,7 +141,7 @@ class EventListener(Logger,Object): #Logger,
     In the case of value_hook it will not pass the event object but event.value/rvalue
     """
     
-    def __init__(self, name, parent=None,source=False):
+    def __init__(self, name, parent=None,source=False,logLevel='WARNING'):
         """ 
         Pass name and parent object for logging.
         If source is True or an object, this listener will subscribe for source or parent events.
@@ -149,6 +149,7 @@ class EventListener(Logger,Object): #Logger,
         """
         self.name,self.parent,self.source = name,parent,source
         Logger.__init__(self,type(self).__name__+'(%s)'%self.name)
+        self.setLogLevel(logLevel)
         self.last_event_time = 0
         #self.call__init__(Logger,name=name, parent=parent)
         self.set_event_hook()
@@ -554,34 +555,45 @@ class EventSource(Logger,SingletonMap):
     
     It implements CachedAttributeProxy methods but doesnt inherit from it; 
     this regression is due to the lack of reliability of AttributeProxy in PyTango 9.
-    
-    Documentation at doc/recipes/EventsAndCallbacks.rst
-    
-    Slow Polling will be always enabled, as a KeepAlive is always kept reading
-    the attribute values at an slow rate.
-    
-    Well, will be always enabled as long there are Listeners or Forced is True. If not polling
-    will not be activated and it will be simply a CachedAttributeProxy.
-    
-    In this implementation, just a faster polling will be enabled if the 
-    attribute provides no events. But the slow polling will never be fully disabled.
-    
-    If no events are received after EVENT_TIMEOUT, polling wil be also enabled.
-    
-    It will also subscribe to all attribute events, not only CHANGE and CONFIG
-    
-    All types are: 'CHANGE_EVENT,PERIODIC_EVENT,QUALITY_EVENT,ARCHIVE_EVENT,ATTR_CONF_EVENT,DATA_READY_EVENT,USER_EVENT'
-    
+
+    __init__ arguments:
+        name, keeptime=1000., fake=False, parent=None,
+        loglevel, tango_asynch, pollingPeriod, keeptime, 
+        enablePolling, use_events 
+        
     Arguments to EventSource(...) are:
     
     - name : attribute name (simple or full)
-    - parent : device name or proxy
+    - keeptime=1000: min. time (in ms!) between HW reads
+    - fake=False
+    - parent=None : device name or proxy
     - enablePolling (force polling by default)
     - pollingPeriod (3000)
-    - keeptime (500 ms) min. time (in ms!) between HW reads
     - tango_asynch = True/False ; to use asynchronous Tango reading
     - listeners = a list of listeners to be added at startup
-    - persistent = if True, a dummy listener is added to enforce subscription
+    - persistent = if True, a dummy listener is added to enforce subscription  
+    
+    Class Parameters are:
+    - EventSource.EVENT_TIMEOUT=900
+    - EventSource.DefaultPolling = 3000.
+    - EventSource.KeepAlive = 15000.    
+    
+    Documentation at doc/recipes/EventsAndCallbacks.rst
+    
+    Slow Polling will enabled as a KeepAlive, reading the attribute values 
+        at an slow rate.
+    
+    It will be enabled if there is Listeners and Forced is True. 
+    Without polling, it behaves as a CachedAttributeProxy.
+    
+    If no events are received after EVENT_TIMEOUT, polling wil be also enabled.
+    A faster polling will be enabled if the attribute provides no events. 
+    But the slow polling will never be fully disabled.
+    
+    It will also subscribe to all attribute events, not only CHANGE and CONFIG
+    
+    All types are: 'CHANGE_EVENT,PERIODIC_EVENT,QUALITY_EVENT,
+        ARCHIVE_EVENT,ATTR_CONF_EVENT,DATA_READY_EVENT,USER_EVENT'
     
     Arguments are supported in CamelCase and lowercase to keep compatibility 
     with previous apis (CachedProxy and TaurusAttribute).
@@ -617,8 +629,7 @@ class EventSource(Logger,SingletonMap):
     
     def __init__(self, name, keeptime=1000., fake=False, parent=None, **kw):
         """ 
-        Arguments: loglevel, tango_asynch, pollingPeriod, keeptime, 
-        enablePolling, use_events 
+        Arguments: see Class __doc__
         """
         ##Set logging
         #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
@@ -1070,7 +1081,7 @@ class EventSource(Logger,SingletonMap):
         tdiff: max time difference allowed between last_event_time and current
         vdiff: difference between last event value and current hw value
         """
-        #self.debug('checkEvents(...)')
+        self.debug('checkEvents(...)')
         delta = now()-self.last_event_time 
         if delta > (tdiff or self.EVENT_TIMEOUT): tdiff = delta
         ## @TODO: vdiff should be compared against event config
