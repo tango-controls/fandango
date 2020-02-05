@@ -324,15 +324,44 @@ class FriendlyDB(log.Logger):
             q += " and partition_name like '%s'" % partition
         return (fn.toList(self.Query(q)) or [0])[0]
     
+    def check(self, method = None, tables = None, verbose = False):
+        """
+        executes method on tables and returns True if there was no exceptions
+        without args it executes getTableCreator on all tables
+        if verbose = True, it returns the check result for each table
+        Anyway, check_result is always kept within the class
+        """
+        method = method or self.getTableCreator
+        tables = fn.toList(tables or self.getTables())
+        self.check_result = {}
+        for t in tables:
+            try:
+                self.check_result[t] = method(t)
+            except Exception as e:
+                self.check_result[t] = e
+        if verbose:
+            return result
+        else:
+            return not any(isinstance(v,(Exception,type(None)))
+                for v in self.check_result.values())
+    
     def checkTable(self, table, partition = None):
-        q = ("select * from %s "% (table))
-        if partition:
+        """ 
+        Performs a getTableCreator on tables and a single query in 
+        partitions
+        """
+        if partition is not None:
+            q = ("select * from %s "% (table))
             q += " partition (%s)" % partition
-        q += " limit 1"
+            q += " limit 1"
+            method,args = self.Query,[q]
+        else:
+            method,args = self.getTableCreator, []
         try:
-            self.Query(q)
+            method(*args)
             return True
         except:
+            tracebac.print_exc()
             return False
         
     def getTableLength(self,table=''):
