@@ -565,12 +565,6 @@ The Workflow is the following:
 UseEvents property
 ------------------
 
-Example:
-
-    UseEvents:yes: Will enable polling+events for State and for any other attribute if change event is configured in jive.
-    UseEvents:(PNV*|WBAT*|State): It will enable polling+events only for state and attributes starting by PNV or WBAT. 
-
-
 If UseEvents contains 'yes','true' or a list of attributes the dynamic push events will become enabled for those attributes that have relative/absolute change events configured.
 
 Events will be pushed if after an evaluation of the attribute its value has changed above the change events range. Events will be pushed always as Change Events.
@@ -579,7 +573,7 @@ To allow pushing custom events (e.g. on quality changing) the default Tango even
 
 The parsing of UseEvents have been modified to prevent UseEvents=Yes to disable Taurus visualization of attributes. It occurs because if set_change_event is called for any attribute Taurus will no poll anymore its values.
 
-But, if UseEvents is "Yes" but the event is not configured or the internal polling is not active then no event will be pushed for the attribute!
+But, if UseEvents is "Yes" and the event is not configured or the internal polling is not active then no event will be pushed for the attribute!
 
 
 To prevent this I established several UseEvents behaviours:
@@ -606,6 +600,10 @@ To prevent this I established several UseEvents behaviours:
               (to allow push if wanted).
 ===========  =====================================================================
 
+Examples::
+
+    :UseEvents=yes: Will enable polling+events for State and for any other attribute if change event is configured in jive.
+    :UseEvents=(PNV*|WBAT*|State): It will enable polling+events only for state and attributes starting by PNV or WBAT. 
 
 
 Triggering a push event
