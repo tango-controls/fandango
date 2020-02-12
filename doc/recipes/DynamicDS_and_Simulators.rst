@@ -565,7 +565,7 @@ The Workflow is the following:
 UseEvents property
 ------------------
 
-Example::
+Example:
 
     UseEvents:yes: Will enable polling+events for State and for any other attribute if change event is configured in jive.
     UseEvents:(PNV*|WBAT*|State): It will enable polling+events only for state and attributes starting by PNV or WBAT. 
@@ -584,13 +584,28 @@ But, if UseEvents is "Yes" but the event is not configured or the internal polli
 
 To prevent this I established several UseEvents behaviours:
 
-| UseEvents value | behaviour | 
-| No/False | No change event is set for any attribute |
-| Yes/True | Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set. |
-| always | Change events are always pushed at attribute evaluation, ignoring events configuration. |
-| push | Change events are pushed on any change, ignoring events configuration. |
-| archive | appended to any of the previous clauses, it will trigger archive together with change. |
-| reg.*exp | Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). |
+===========  =====================================================================
+ UseEvents    Behaviour
+===========  =====================================================================
+ No/False     No change event is set for any attribute
+ 
+ Yes/True     Change event is set if configured both event and polling; 
+              if only event is set then polling is configured for the next device 
+              startup but events are not set. Change event for State will be set.
+              
+ always       Change events are always pushed at attribute evaluation, 
+              ignoring events configuration.
+              
+ push         Change events are pushed on any change, ignoring events configuration. 
+ 
+ archive      appended to any of the previous clauses, it will trigger 
+              archive together with change.
+              
+ reg.*exp     Only attributes that match the regular expression will be setup; 
+              but they will set even if no event is configured in database 
+              (to allow push if wanted).
+===========  =====================================================================
+
 
 
 Triggering a push event
