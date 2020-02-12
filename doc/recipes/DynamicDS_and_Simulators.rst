@@ -582,14 +582,15 @@ The parsing of UseEvents have been modified to prevent UseEvents=Yes to disable 
 But, if UseEvents is "Yes" but the event is not configured or the internal polling is not active then no event will be pushed for the attribute!
 
 
-To prevent this I established several UseEvents behaviours::
+To prevent this I established several UseEvents behaviours:
 
-    UseEvents:No/False: No change event is set for any attribute
-    UseEvents:Yes/True: Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set.
-    UseEvents:always: Change events are always pushed at attribute evaluation, ignoring events configuration.
-    UseEvents:push: Change events are pushed on any change, ignoring events configuration.
-    UseEvents:archive: appended to any of the previous clauses, it will trigger archive together with change.
-    UseEvents:reg.*exp...: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
+| UseEvents value | behaviour | 
+| No/False | No change event is set for any attribute |
+| Yes/True | Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set. |
+| always | Change events are always pushed at attribute evaluation, ignoring events configuration. |
+| push | Change events are pushed on any change, ignoring events configuration. |
+| archive | appended to any of the previous clauses, it will trigger archive together with change. |
+| reg.*exp | Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). |
 
 
 Triggering a push event
