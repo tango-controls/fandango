@@ -582,7 +582,7 @@ To prevent this I established several UseEvents behaviours::
     UseEvents:always: Change events are always pushed at attribute evaluation, ignoring events configuration.
     UseEvents:push: Change events are pushed on any change, ignoring events configuration.
     UseEvents:archive: appended to any of the previous clauses, it will trigger archive together with change.
-    UseEvents:reg.*exp [:] no/yes/always/push: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
+    UseEvents:reg.*exp...: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
 
 Summary::
 
