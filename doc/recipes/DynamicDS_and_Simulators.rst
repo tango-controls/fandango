@@ -539,8 +539,8 @@ Finally, go to Jive and create the DynamicAttributes property and put there your
 
 ----
 
-Tango Events
-============
+Tango Events on Dynamic Attributes
+==================================
 
 There are several Tango artifacts controlling the pushing of events from DynamicDS devices (SimulatorDS, PyAttributeProcessor, PyPLC, etc ...):
 
@@ -556,13 +556,14 @@ The Workflow is the following:
  - If it wasn't configured; then any change is pushed.
  - UseEvents can be set as attr1:push to force inconditional pushing (filters ignored).
  - UseEvents can be set as attr1:archive to push archiving event together with change event.
+ - See UseEvents property below for more information
  
  Apart of that, MaxEventStream > 0 will redirect events to a queue instead of being pushed immediately.
  
  The ProcessEvents command will read the queue and push MaxEventStream events at each call.
 
-The UseEvents property
-----------------------
+UseEvents property
+------------------
 
 If UseEvents contains 'yes','true' or a list of attributes the dynamic push events will become enabled for those attributes that have relative/absolute change events configured.
 
@@ -572,15 +573,18 @@ To allow pushing custom events (e.g. on quality changing) the default Tango even
 
 The parsing of UseEvents have been modified to prevent UseEvents=Yes to disable Taurus visualization of attributes. It occurs because if set_change_event is called for any attribute Taurus will no poll anymore its values.
 
-But, if UseEvents is yes but the event is not configured or the internal polling is not active then no event will be pushed for the attribute!
+But, if UseEvents is "Yes" but the event is not configured or the internal polling is not active then no event will be pushed for the attribute!
 
-To prevent this I established several UseEvents behaviours:
+To prevent this I established several UseEvents behaviours::
 
-:No/False: No change event is set for any attribute
-:Yes/True: Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set.
-:reg.*exp: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
+    UseEvents:No/False: No change event is set for any attribute
+    UseEvents:Yes/True: Change event is set if configured both event and polling; if only event is set then polling is configured for the next device startup but events are not set. Change event for State will be set.
+    UseEvents:always: Change events are always pushed at attribute evaluation, ignoring events configuration.
+    UseEvents:push: Change events are pushed on any change, ignoring events configuration.
+    UseEvents:archive: appended to any of the previous clauses, it will trigger archive together with change.
+    UseEvents:reg.*exp [:] no/yes/always/push: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
 
-Example::
+Summary::
 
     UseEvents:yes: Will enable polling+events for State and for any other attribute if change event is configured in jive.
     UseEvents:(PNV*|WBAT*|State): It will enable polling+events only for state and attributes starting by PNV or WBAT. 
