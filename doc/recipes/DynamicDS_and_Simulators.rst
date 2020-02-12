@@ -565,6 +565,12 @@ The Workflow is the following:
 UseEvents property
 ------------------
 
+Example::
+
+    UseEvents:yes: Will enable polling+events for State and for any other attribute if change event is configured in jive.
+    UseEvents:(PNV*|WBAT*|State): It will enable polling+events only for state and attributes starting by PNV or WBAT. 
+
+
 If UseEvents contains 'yes','true' or a list of attributes the dynamic push events will become enabled for those attributes that have relative/absolute change events configured.
 
 Events will be pushed if after an evaluation of the attribute its value has changed above the change events range. Events will be pushed always as Change Events.
@@ -575,6 +581,7 @@ The parsing of UseEvents have been modified to prevent UseEvents=Yes to disable 
 
 But, if UseEvents is "Yes" but the event is not configured or the internal polling is not active then no event will be pushed for the attribute!
 
+
 To prevent this I established several UseEvents behaviours::
 
     UseEvents:No/False: No change event is set for any attribute
@@ -584,10 +591,6 @@ To prevent this I established several UseEvents behaviours::
     UseEvents:archive: appended to any of the previous clauses, it will trigger archive together with change.
     UseEvents:reg.*exp...: Only attributes that match the regular expression will be setup; but they will set even if no event is configured in database (to allow push if wanted). 
 
-Summary::
-
-    UseEvents:yes: Will enable polling+events for State and for any other attribute if change event is configured in jive.
-    UseEvents:(PNV*|WBAT*|State): It will enable polling+events only for state and attributes starting by PNV or WBAT. 
 
 Triggering a push event
 -----------------------
