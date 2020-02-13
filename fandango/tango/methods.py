@@ -613,7 +613,7 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
             traceback.print_exc()
             
     return config
-  
+
 def get_attribute_events(target,polled=True,throw=False):
     """
     Get current attribute events configuration 
@@ -650,8 +650,8 @@ def get_attribute_events(target,polled=True,throw=False):
             # remove periodic event if it is the only setting (default)
             r.pop('per_event')
             
-        if r or a.lower() in ('state','status'): 
-            # check polling only if something else is active
+        # check polling always, as bool/state/string will have events always
+        if r or polled or a.lower() in ('state','status'):
             polling = dp.get_attribute_poll_period(a)
             r['polling'] = polling
 
@@ -659,6 +659,13 @@ def get_attribute_events(target,polled=True,throw=False):
   
     except Exception,e:
         if throw: raise e
+        return None
+    
+def get_attribute_polling(target):
+    try:
+        dp.get_device(target)
+        return dp.get_attribute_poll_period(target.split('/')[-1])
+    except:
         return None
     
 def check_attribute_events(model,ev_type=None,verbose=False):
