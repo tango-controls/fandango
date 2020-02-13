@@ -140,11 +140,14 @@ def json2dict(jstr,encoding=ENC):
     return d
             
 class ThreadDict(dict):
-    ''' Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.
+    '''
+    Thread safe dictionary with redefinable read/write methods and a background thread for hardware update.
     All methods are thread-safe using @self_lock decorator.
         NOTE: any method decorated in this way CANNOT call other decorated methods!
     All values of the dictionary will be automatically updated in a separate Thread using read_method provided.
     Any value overwritten in the dict should launch the write_method.
+    
+    delay argument will pause the thread for a time after start() is called
     
     Briefing:
         a[2] equals to a[2]=read_method(2)
@@ -169,11 +172,13 @@ class ThreadDict(dict):
     
     @deprecated now in tau.core.utils.containers
     '''
-    def __init__(self,other=None,read_method=None,write_method=None,timewait=0.1,threaded=True,trace=False):
+    def __init__(self,other=None,read_method=None,write_method=None,
+                 timewait=0.1,threaded=True,trace=False,delay=0.):
         self.read_method = read_method
         self.write_method = write_method
         self.timewait = timewait
         self.threaded = threaded
+        self.delay = delay
         self._threadkeys = []
         self._periods = {}
         self._updates = {}
@@ -199,7 +204,9 @@ class ThreadDict(dict):
         if hasattr(self,'_Thread') and self._Thread and self._Thread.isAlive():
             print 'ThreadDict.start(): ThreadDict.stop() must be executed first!'
             return
-        print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()        
+        if self.delay:
+            self.event.wait(self.delay)
+        print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()   
         self.event.clear()
         self._Thread = threading.Thread(target=self.run)
         self._Thread.setDaemon(True)
@@ -220,9 +227,9 @@ class ThreadDict(dict):
 
     def alive(self):
         if not hasattr(self,'_Thread') or not self._Thread: 
-            return False
+            return None #Thread never started
         else: 
-            return self._Thread.isAlive()
+            return self._Thread.isAlive() #True or False
         
     def __del__(self):
         self.stop()
