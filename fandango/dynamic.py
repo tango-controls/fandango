@@ -93,7 +93,7 @@ This Module includes several classes:
 import PyTango,sys,threading,time,traceback,re,inspect
 from PyTango import AttrQuality,DevState
 
-import fandango
+import fandango as fn
 import fandango.tango as tango
 from fandango.tango.dynattr import *
 import fandango.objects as objects
@@ -257,16 +257,16 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self._locals['self'] = self
         self._locals['EVAL'] = lambda formula: self.evaluateFormula(formula)
         self._locals['MATCH'] = lambda expr,cad: fun.matchCl(expr,cad)
-        self._locals['DELAY'] = lambda secs: fandango.wait(secs)
+        self._locals['DELAY'] = lambda secs: fn.wait(secs)
         self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
         self._locals['FORMULA'] = self.get_attr_formula
         self._locals['MODELS'] = self.get_attr_models
-        self._locals['time2str'] = fandango.time2str
-        self._locals['ctime2time'] = fandango.ctime2time
-        self._locals['now'] = fandango.now
-        for k in dir(fandango.functional):
+        self._locals['time2str'] = fn.time2str
+        self._locals['ctime2time'] = fn.ctime2time
+        self._locals['now'] = fn.now
+        for k in dir(fn.functional):
             if '2' in k or k.startswith('to') or k.startswith('is'):
-                self._locals[k] = getattr(fandango.functional,k)
+                self._locals[k] = getattr(fn.functional,k)
         
         # Methods for getting/writing properties
         self._locals['PGET'] = (
@@ -363,7 +363,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
             setattr(self,prop,value)
             
         value = getattr(self,prop)
-        if compact and fandango.isSequence(value) and len(value)==1:
+        if compact and fn.isSequence(value) and len(value)==1:
             return value[0]
         else:
             return value      
@@ -748,7 +748,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                 self._locals[aname] = None
                 if create and events:
                     # THIS IS CONFIGURING EVENTS TO BE "MANUAL", 
-                    # pushed and unfiltered by Jive settings
+                    # pushed=True, filtered=False (ignore Jive settings)
                     self.set_change_event(aname.lower(),True,False)
                     if 'archive' in events:
                         self.set_archive_event(aname.lower(),True,False)
@@ -798,6 +798,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         ##Setting up state events:
         #THESE SETTINGS ARE STILL NEEDED IN TANGO >= 7
         for x in ('state','memusage',):
+            # Both State and MemUsage shall be polled to have events!
             events = self.check_attribute_events(x)
             if events and x not in new_polled_attrs:
                 #To be added at next restart
@@ -883,7 +884,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         """
         Events will be always pushed if array,state,bool,string values change
         If UseEvents=always, it will be always pushed
-        if UseEvents=push, will always push on change, ignoring config
+        if UseEvents=push, will always push on any change, ignoring config
         if UseEvents=True, then Tango DB config prevails, and is checked
         """
         aname = self.get_attr_name(aname)
@@ -906,7 +907,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                           %(aname,shortstr(new_value)))
                 return True
             
-            elif events and events == 'always':
+            elif events and clsearch('always',events):
                 return True
             
             elif fun.isSequence(new_value) or fun.isSequence(v):
@@ -931,7 +932,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                     except:
                         return str(v)!=str(new_value)
                 
-                if events == 'push': #UseEvents = push, push always
+                if clsearch('push',events): #UseEvents = push, push always
                     cabs,crel = 0,0
                 else:
                     cabs,crel = config or self.check_events_config(aname)
@@ -1306,13 +1307,17 @@ class DynamicDSAttrs(DynamicDSImpl):
             check = events and (
                         push or self.check_changed_event(aname,result,events))
             
-            self.debug('events = %s, check = %s' % (events,check))
+            et = 1e3*(fn.now()-tstart)
+            cached = events or self.dyn_values[aname].keep
+            (self.debug if et < 1. else self.warning)(
+                'evalAttr(%s): events = %s, check = %s, cached = %s, '
+                'eval_ms = %d' % (aname,events,check,cached,et))
             if events and check:
                 self.push_dyn_attr(aname,value=value,
                                    events=events,changed=1,queued=1)
             
             #Updating the cache
-            if events or self.dyn_values[aname].keep: 
+            if cached: 
                 old = self.dyn_values[aname].value
                 self.dyn_values[aname].update(value,date,quality)
                 self._locals[aname] = value
@@ -1406,7 +1411,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             
             self.state_lock.acquire()
             if self.dyn_states:
-                self.debug('In DynamicDS.check_state()')
+                self.info('In DynamicDS.check_state()')
                 old_state = new_state if current is None else current
                 ## @remarks: the device state is not changed if none of the DynamicStates evaluates to True
                 #self.set_state(PyTango.DevState.UNKNOWN)
@@ -1456,6 +1461,7 @@ class DynamicDSAttrs(DynamicDSImpl):
     def processEvents(self):
         """
         Polled command to process the internal event queue
+        MaxEventStream must be configured
         """
         try:
             c = 0
@@ -2074,7 +2080,7 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getMemUsage(self):
-        return fandango.linos.get_memory()/1e3
+        return fn.linos.get_memory()/1e3
     
     #------------------------------------------------------------------
     #    Read MemUsage attribute
@@ -2359,7 +2365,11 @@ class DynamicDSClass(PyTango.DeviceClass):
        'MemUsage':
            [[PyTango.DevDouble,
            PyTango.SCALAR,
-           PyTango.READ]],
+           PyTango.READ],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+                'Polling period': 3000,
+            } ],
         'EventQueueSize':
            [[PyTango.DevLong,
            PyTango.SCALAR,
@@ -2505,12 +2515,12 @@ class DynamicServer(object):
         self.instance = self.util.instance()
         self.db = self.instance.get_database()
         class_list = self.db.get_device_class_list(self.instance.get_ds_name()) #Device,Class object list
-        self.classes = fandango.dicts.defaultdict(list)
+        self.classes = fn.dicts.defaultdict(list)
         [self.classes[c].append(d) for d,c in zip(class_list[::2],class_list[1::2]) if c.lower()!='dserver']
         for C,devs in classes.items():
             for d in devs:
                 if C not in self.classes or d not in self.classes[C]:
-                    fandango.tango.add_new_device(self.name,C,d)
+                    fn.tango.add_new_device(self.name,C,d)
                     self.classes[C].append(d)
         self.path = (self.db.get_property(self.PROPERTY,['DeviceClasses'])['DeviceClasses'] or [''])[0]
         if self.path: sys.path.append(self.path)
@@ -2526,7 +2536,7 @@ class DynamicServer(object):
         if not args:args = sys.argv
         assert len(args)>=2,'1 argument required!:\n\tpython dynamic.py instance [-vX]'
         print(args)
-        server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
+        server = args[0] if not fn.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
         instance = args[1]
         logs,orb = log if instance!='-?' else '',[]
         for i in (2,3):
@@ -2547,19 +2557,19 @@ class DynamicServer(object):
             p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
             print('\nLoading %s from %s' % (c,p or self.path))
             if p:
-                self.modules[c] = fandango.objects.loadModule(p)
-            elif c in dir(fandango.device):
-                self.modules[c] = fandango.device
-            elif c in dir(fandango.interface):
-                self.modules[c] = fandango.interface
+                self.modules[c] = fn.objects.loadModule(p)
+            elif c in dir(fn.device):
+                self.modules[c] = fn.device
+            elif c in dir(fn.interface):
+                self.modules[c] = fn.interface
             else:
                 try:
-                    self.modules[c] = fandango.objects.loadModule(c)
+                    self.modules[c] = fn.objects.loadModule(c)
                     assert getattr(self.modules[c],c+'Class')
                 except:
                     m = self.path+'/%s/%s.py'%(c,c)
                     print('\nLoading %s from %s' % (c,m))
-                    self.modules[c] = fandango.objects.loadModule(m)
+                    self.modules[c] = fn.objects.loadModule(m)
             k, i, n = getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c
             self.util.add_TgClass(k,i,n)
             CreateDynamicCommands(i,k)
@@ -2574,7 +2584,7 @@ class DynamicServer(object):
         U.server_init()
         U.server_run()
 
-__doc__ = fandango.doc.get_fn_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
+__doc__ = fn.doc.get_fn_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
         
 if __name__ == '__main__':
     print('.'*80)
