@@ -80,13 +80,19 @@ def main(args = []):
           astor.kill_servers(matched)
       if action in ('stop','restart'):
           print('Stopping : %s'%running)
-          astor.stop_servers(running)
+          conf = raw_input(('%d servers will be stop:\n\t%s' % (
+            len(running),'\n\t'.join(running)))
+            + '\nIs it ok? (y/n)')
+          if conf.lower().strip() in ('y','yes'):
+            astor.stop_servers(running)
       if action in ('restart',):
           time.sleep(15.)
       if action in ('start','restart'):
           print('Starting : %s'%matched)
           if not host and not all(astor[h].host for h in matched):
-              conf = raw_input('Servers will be started locally, is it ok? (y/n)')
+              not_match = [a for a in matched if not astor[h].host]
+              conf = raw_input('Some servers (%s) will be started locally,'
+                               ' is it ok? (y/n)' % not_match)
           else:
               conf = 'y'
           if conf.lower().strip() in ('y','yes'):

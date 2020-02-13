@@ -1212,24 +1212,45 @@ class AsynchronousFunction(threading.Thread):
         threading.Event().wait(0.1)
     print 'result = ',result
     '''
-    def __init__(self,function):
-        """It just creates the function object, you must call function.start() afterwards"""
+    def __init__(self, function, args = None, kwargs = None, 
+                callback=None, pause=0.0, start=False,
+                ):
+        """
+        It just creates the function object.
+        If pause!=0 or start=True, the function will be called
+        """
         self.function  = function
         self.result = None
         self.exception = None
         self.finished = threading.Event()
         self.finished.clear()
         threading.Thread.__init__(self)
+        self.callback = callback
+        self.pause = pause
         self.wait = self.finished.wait
         self.daemon = False
+        self.args = args or []
+        self.kwargs = kwargs or {}
+        if self.pause or start:
+            self.start()
+        
     def run(self):
         try:
-            self.wait(0.01)
-            self.result = self.function()
+            if self.pause:
+                self.wait(self.pause)
+            self.result = self.function(*self.args, **self.kwargs)
         except Exception,e:
             self.result = None            
             self.exception = e
-        self.finished.set() #Not really needed, simply call AsynchronousFunction.isAlive() to know if it has finished
+        # Not really needed, simply call AsynchronousFunction.isAlive() 
+        # to know if it has finished
+        self.finished.set() 
+        if self.callback:
+            try:
+                self._bg = AsynchronousFunction(self.callback, start=True,
+                    args = [self.result] if self.result is not None else [])
+            except:
+                traceback.print_exc()
 
 from . import doc
 __doc__ = doc.get_fn_autodoc(__name__,vars())
