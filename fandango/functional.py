@@ -50,8 +50,9 @@ import time,datetime
 from functools import partial
 from collections import Hashable
 from itertools import count,cycle,repeat,chain,groupby,islice,starmap
-from itertools import dropwhile,takewhile,filterfalse
-try: from itertools import combinations,permutations,product
+from itertools import dropwhile,takewhile
+try: 
+    from itertools import combinations,permutations,product,filterfalse
 except: pass
 
 __test__ = {}

@@ -259,7 +259,8 @@ class ThreadDict(dict):
     
     @self_locked
     def append(self,key,value=None,period=0): #period=0 means that attribute will be updated always
-        if not dict.has_key(self,key): self.parent.__setitem__(self,key,value)
+        if key not in self: 
+            self.parent.__setitem__(self,key,value)
         if key not in self._threadkeys: 
             self._threadkeys.append(key)
             self._periods[key] = period
@@ -389,7 +390,7 @@ class CaselessDict(dict):
 
     def __getitem__(self, key):
         key = str(key)
-        if dict.has_key(self,key):
+        if key not in self:
             return dict.__getitem__(self,key)
         return dict.__getitem__(self, key.lower() if hasattr(key,'lower') else key)
 
@@ -403,7 +404,7 @@ class CaselessDict(dict):
 
     def has_key(self, key):
         key = str(key)
-        return dict.has_key(self, key.lower() if hasattr(key,'lower') else key)
+        return (key.lower() if hasattr(key,'lower') else key) in self
 
     def get(self, key, def_val=None):
         key = str(key)

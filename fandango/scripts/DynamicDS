@@ -73,7 +73,7 @@ else
     CMD=""
   fi
 
-  CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $2 $DSORB"
+  CMD="${CMD} python3 ${DSPATH}/$DS.py $INSTANCE $2 $DSORB"
   echo $CMD
   $CMD
 
