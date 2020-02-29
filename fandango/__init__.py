@@ -32,6 +32,9 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ####################################################################@########
 """
+from __future__ import print_function
+from __future__ import absolute_import
+from builtins import map
 
 __doc__ = """
 @package fandango
@@ -56,19 +59,19 @@ for p in deprecated:
     if os.path.exists(p):
         try:
             os.remove(p)
-            print(('%s removed ...'%p))
+            print('%s removed ...'%p)
         except Exception as e:
             print(e)
             print('fandango, CLEAN OLD FILES ERROR!:')
-            print(('An old file still exists at:\n\t%s'%p))
+            print('An old file still exists at:\n\t%s'%p)
             print('Import fandango as sysadmin and try again')
             print('')
             sys.exit(-1)
 
 try:
     # LOAD VERSION NUMBER
-    import imp
     from . import objects
+    import imp
     from .objects import ReleaseNumber
     PATH = os.path.dirname(objects.__file__)
     vf = open(PATH+'/VERSION')
@@ -76,8 +79,8 @@ try:
     vf.close()
     
 except Exception as e: 
-    print((traceback.format_exc()))
-    print(('Unable to load RELEASE number: %s'%e))
+    print(traceback.format_exc())
+    print('Unable to load RELEASE number: %s'%e)
 
 try:
     import pkg_resources
@@ -92,13 +95,13 @@ __test__ = ['tango']
 try:
     from .functional import *
 except Exception as e: 
-    print(('Unable to import functional module: %s'%e))
+    print('Unable to import functional module: %s'%e)
 
 try:
     from .log import printf,Logger,LogFilter,shortstr,\
         except2str,FakeLogger,pprint
 except Exception as e: 
-    print(('Unable to import log module: %s'%e))
+    print('Unable to import log module: %s'%e)
 
 try:
     from .excepts import trial,getLastException,getPreviousExceptions, \
@@ -110,15 +113,15 @@ try:
     from .objects import Object,Singleton,SingletonMap,Struct,NamedProperty
     from .objects import dirModule,loadModule,dirClasses,obj2dict,copy
     from .objects import Decorator,ClassDecorator,Decorated,BoundDecorator
-    from .objects import Cached
+    from .objects import Cached, Variable
 except Exception as e: 
-    print(('Unable to import objects module: %s'%traceback.format_exc()))
+    print('Unable to import objects module: %s'%traceback.format_exc())
     
 try:
     from .linos import shell_command,ping,sysargs_to_dict,listdir, \
-        sendmail,MyMachine
+        sendmail,MyMachine,get_fqdn
 except: 
-    print(('Unable to import linos module: %s\n'%traceback.format_exc()))
+    print('Unable to import linos module: %s\n'%traceback.format_exc())
 
 try: 
     from .arrays import CSVArray, TimedQueue
@@ -163,7 +166,7 @@ try:
         cast_tango_type,parse_tango_model,check_attribute, \
         read_attribute,check_device,except2str,\
         TangoEval,ProxiesDict,getTangoValue,TangoCommand, \
-        fakeEvent,fakeEventType
+        fakeEvent,fakeEventType, get_attribute_events, check_attribute_events
 
     try: 
         from .device import Dev4Tango,DevChild,TangoCommand
@@ -178,8 +181,8 @@ try:
         deprecated = [f for f in (os.path.join(path,'interface'+ext) 
               for ext in ('.py','.pyc','.pyo','py~')) if os.path.exists(f)]
         if deprecated:
-            print(('fandango.interface: deprecated files still exist: %s'
-                %','.join(deprecated)))
+            print('fandango.interface: deprecated files still exist: %s'
+                %','.join(deprecated))
             try: [os.remove(f) for f in deprecated]
             except: print('... and should be removed manually!')
         from .interface import FullTangoInheritance,NewTypeInheritance
@@ -196,8 +199,8 @@ try:
     except Exception as e: raise Exception('fandango.callbacks: %s'%e)
 
 except Exception as e: 
-    print(('Unable to import fandango.*tango modules: %s'%e))
-    print((traceback.format_exc()))
+    print('Unable to import fandango.*tango modules: %s'%e)
+    print(traceback.format_exc())
 
 
 
