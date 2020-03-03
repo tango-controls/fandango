@@ -91,5 +91,6 @@ setup(
     scripts=scripts,
     entry_points=entry_points,
     include_package_data=True,
-    zip_safe=False
+    zip_safe=False,
+    python_requires='==2.7',
   )
