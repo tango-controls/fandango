@@ -45,6 +45,7 @@ Methods for Astor-like management will go to fandango.servers
 """
 
 from fandango.objects import Cached
+from fandango.linos import get_fqdn
 from .defaults import * ## Regular expressions defined here!
 from .methods import *
 
@@ -203,13 +204,13 @@ def get_matching_devices(expressions,limit=0,exported=False,
     fullname = fullname or any(h not in (defhost,None) for h in hosts) 
 
     all_devs = []
-    if trace: print((hosts,fullname))
+    if trace: print(hosts,fullname)
 
     for host in hosts:
         if host in (None,defhost):
             db_devs = get_all_devices(exported)
         else:
-            print(('get_matching_devices(*%s)'%host))
+            #print('get_matching_devices(*%s)'%host)
             odb = PyTango.Database(*host.split(':'))
             db_devs = odb.get_device_exported('*') if exported \
                         else odb.get_device_name('*','*')
@@ -276,8 +277,8 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                              for d in (match.groupdict(),)]
             host,attr = host or def_host,attr or 'state'
         if trace: 
-            print(('get_matching_attributes(%s): match:%s,host:%s,'
-                  'dev:%s,attr:%s'%(e,bool(match),host,dev,attr)))
+            print('get_matching_attributes(%s): match:%s,host:%s,'
+                  'dev:%s,attr:%s'%(e,bool(match),host,dev,attr))
 
         matches.append((host,dev,attr))
     
@@ -293,7 +294,8 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                 attrs.append(d+'/State')
             if attr.lower().strip() != 'state':
                 try: 
-                    ats = sorted(get_device_attributes(d,[attr]),key=str.lower)
+                    ats = get_device_attributes(d,[attr])
+                    ats = sorted(map(str.lower,ats))
                     attrs.extend([d+'/'+a for a in ats])
                     if limit and len(attrs)>limit: break
                 except: 
@@ -302,7 +304,7 @@ def get_matching_attributes(expressions,limit=0,fullname=None,trace=False):
                     #print traceback.format_exc()
                     pass
                     
-    result = sorted(set(attrs))
+    result = sorted(map(str.lower,set(attrs)))
     return result[:limit] if limit else result
                     
 def find_attributes(*args,**kwargs):
@@ -356,12 +358,12 @@ def get_matching_device_properties(devs,props,hosts=[],exclude='*dserver*',
         exps  = [h+'/'+e if ':' not in e else e for e in devs]
         if trace: print(exps)
         hdevs = [d.replace(h+'/','') for d in get_matching_devices(exps,fullname=False)]
-        if trace: print(('%s: %s vs %s'%(h,hdevs,props)))
+        if trace: print('%s: %s vs %s'%(h,hdevs,props))
         for d in hdevs:
             if exclude and matchCl(exclude,d): continue
             dprops = [p for p in db.get_device_property_list(d,'*') if matchAny(props,p)]
             if not dprops: continue
-            if trace: print((d,dprops))
+            if trace: print(d,dprops)
             vals = db.get_device_property(d,dprops)
             vals = dict((k,list(v) if isSequence(v) else v) for k,v in list(vals.items()))
             if len(hosts)==1 and len(hdevs)==1:
