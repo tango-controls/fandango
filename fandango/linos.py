@@ -49,6 +49,7 @@ Out[77]:
 
 import time,sys,os,re,traceback
 import fandango.objects as fun #objects module includes functional
+import fandango.log as log
 
 ################################################################################3
 # Shell methods
@@ -141,15 +142,29 @@ def get_memory_usage():
     mfree = float(stats['buffers']+stats['cached']+stats['free'])
     return 1-(mfree/stats['total'])
 
-def get_memory(pid=None,virtual=False):
-    """This function uses '/proc/pid/status' to get the memory consumption of a process """
+MEMORY_VALUES = []
+
+def get_process_memory(pid=None,virtual=False):
+    """
+    This function uses '/proc/pid/status'
+    to get the memory consumption of a process (current by default)
+    """
     try:
-        if pid is None: pid = os.getpid()
-        mem,units = shell_command('cat /proc/%s/status | grep Vm%s'%(pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
-        return int(mem)*(1e3 if 'k' in units else (1e6 if 'm' in units else 1))
+        if pid is None: 
+            pid = os.getpid()
+        mem,units = shell_command('cat /proc/%s/status | grep Vm%s' 
+            % (pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
+        units = (('k' in units and 1e3) or ('m' in units and 1e6) 
+                 or ('g' in units and 1e9) or 1)
+        MEMORY_VALUES.append(int(mem)*units)
+        while len(MEMORY_VALUES)>10: 
+            MEMORY_VALUES.pop(0)
+        return MEMORY_VALUES[-1]
     except:
         print(traceback.format_exc())
         return 0
+
+get_memory = get_process_memory
 
 def get_cpu(pid):
     """ Uses ps to get the CPU usage of a process by PID ; it will trigger exception of PID doesn't exist """
@@ -306,6 +321,13 @@ def findfolders(target='',parent='',filter_=True,printout = False):
             result.append(f)
     return result
 
+def get_disk_usage(folder='.'):
+    cmd = 'df -h '+folder
+    r = shell_command(cmd).strip('\n').split('\n')[-1].split()
+    p = [f for f in r if '%' in f]
+    return p and 1e-2*float(p[0].strip('% ')) or 0
+    
+
 ################################################################################3
 # Kde methods        
         
@@ -335,6 +357,12 @@ def desktop_switcher(period,event=None,iterations=2):
         
 ################################################################################3
 # Networking methods
+
+fun.Cached(depth=1000,expire=300.)
+def get_fqdn(hostname):
+    """ Reimplemented to be cached for continuous tango host parsing """
+    import socket
+    return socket.getfqdn(hostname)
 
 def ping(ips,threaded = False, timeout = 1):
     ''' By Noah Gift's, PyCon 2008
@@ -395,11 +423,17 @@ def timefun(f):
 # Managing arguments
 #-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~-~
 import sys
+try:
+    from argparse import ArgumentParser
+except:
+    pass
 
 def sysargs_to_dict(args=None,defaults=[],alias={},
                     trace=False,split=False,cast=True,lazy=True,multiflag=True,
                     multiarg=[],splitter='='):
-    '''  DEPRECATED IN FANDANGO > 13
+    '''  
+    DEPRECATED BY argparse.ArgumentParser IN FANDANGO > 13
+    https://docs.python.org/3/library/argparse.html
     
     It parses the command line arguments into an understandable dict
     @defaults is the list [and values] of anonymous arguments 
@@ -422,6 +456,7 @@ def sysargs_to_dict(args=None,defaults=[],alias={},
     After Fandango 13 argparse will replace the usage of sysargs_to_dict
     
     '''
+    log.debug('sysargs_to_dict is DEPRECATED, use python argparse instead')
     if args is None: args = sys.argv[1:]
     if trace: print('sysargs_to_dict(%s,%s)'%(args,defaults))
     result,defargs,vargs = {},[],[]
