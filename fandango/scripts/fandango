@@ -155,7 +155,7 @@ if __name__ == '__main__':
       s = '\n'.join(s.split())
     print(s)
  
-  except AssertionError,e:
+  except AssertionError as e:
     print(__doc__)
     
   except:
