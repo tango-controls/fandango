@@ -50,6 +50,10 @@ Out[77]:
 import time,sys,os,re,traceback
 import fandango.objects as fun #objects module includes functional
 import fandango.log as log
+try:
+    import psutil
+except:
+    psutil = None
 
 ################################################################################3
 # Shell methods
@@ -152,14 +156,18 @@ def get_process_memory(pid=None,virtual=False):
     try:
         if pid is None: 
             pid = os.getpid()
-        mem,units = shell_command('cat /proc/%s/status | grep Vm%s' 
-            % (pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
-        units = (('k' in units and 1e3) or ('m' in units and 1e6) 
-                 or ('g' in units and 1e9) or 1)
-        MEMORY_VALUES.append(int(mem)*units)
-        while len(MEMORY_VALUES)>10: 
-            MEMORY_VALUES.pop(0)
-        return MEMORY_VALUES[-1]
+        if psutil is not None:
+            mi = psutil.Process(pid).memory_info()
+            return mi.vms if virtual else mi.rss
+        else:
+            mem,units = shell_command('cat /proc/%s/status | grep Vm%s' 
+                % (pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
+            units = (('k' in units and 1e3) or ('m' in units and 1e6) 
+                    or ('g' in units and 1e9) or 1)
+            MEMORY_VALUES.append(int(mem)*units)
+            while len(MEMORY_VALUES)>10: 
+                MEMORY_VALUES.pop(0)
+            return MEMORY_VALUES[-1]
     except:
         print traceback.format_exc()
         return 0
