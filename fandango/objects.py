@@ -961,6 +961,26 @@ class Cached(Decorator):
                 raise v
         else:
             return v
+        
+def Queued(my_queue):
+    """
+    This decorator will put the result of the function
+    into a Queue-like object (using put() method)
+    
+    Intended to be used in processes and threads
+    
+    If use_id is True, then str(fun)+str(args) will be used
+    as ID for the result.
+    """
+    def QueuedDecorator(method, use_id=False):
+        def QueuedFunction(*args,**kwargs):
+            r = method(*args,**kwargs)
+            if use_id:
+                r = (str(method)+str(args)+str(sorted(kwargs.items())),
+                     r)
+            my_queue.put(r)
+        return QueuedFunction
+    return QueuedDecorator        
 
 ###########################################################################
     

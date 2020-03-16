@@ -143,7 +143,6 @@ class FriendlyDB(log.Logger):
                        % autocommit)
             #raise Exception,e
         
-        
     def renewMySQLconnection(self):
         try:
             if hasattr(self,'db') and self.db: 
