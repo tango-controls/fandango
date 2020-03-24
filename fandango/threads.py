@@ -1206,13 +1206,16 @@ def SubprocessMethod(obj,*args,**kwargs):
     local,remote = multiprocessing.Pipe(False)
     
     def do_it(o,m,conn,*a,**k):
-        if None in (o,m): 
-            m = (o or m)
-        elif isString(m): 
-            m = getattr(o,m)
-        #print m,a,k
-        conn.send(m(*a,**k))
-        #conn.close()
+        try:
+            if None in (o,m): 
+                m = (o or m)
+            elif isString(m): 
+                m = getattr(o,m)
+            #print m,a,k
+            conn.send(m(*a,**k))
+            #conn.close()
+        except Exception as e:
+            conn.send(e)
         
     args = (obj,method,remote)+args
     proc = multiprocessing.Process(target=do_it,args=args,kwargs=kwargs)
