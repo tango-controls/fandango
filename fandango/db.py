@@ -43,6 +43,7 @@ Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 import os,time,datetime,log,traceback,sys
 from .objects import Struct
 from . import functional as fn
+from .dicts import defaultdict
 
 """
 MySQL API's are loaded at import time, but can be modified afterwards.
@@ -381,6 +382,13 @@ class FriendlyDB(log.Logger):
             " table_schema = '%s' and table_name like '%s';"
                 % (self.db_name,table))
         return 0 if not res else (int(res[0][1]) if len(res)==1 else dict(res))
+    
+    def getTableIndex(self,table):
+        q = self.Query('show indexes from '+table,asDict=True)
+        r = defaultdict(dict)
+        for l in q:
+            r[l['Key_name']][l['Column_name']] = l
+        return r
 
     def getPartitionSize(self,table='',partition=''):
         """
