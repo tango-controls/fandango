@@ -151,24 +151,29 @@ def reldiff(x,y,floor=None):
     floor would be a decimal value, e.g. 0.05
     """
     d = x-y
-    if not d: return 0
+    if not d: 
+        return 0
     ref = x or y
     d = float(d)/ref
     return d if not floor else (0,d)[abs(d)>=floor]
     #return 0 if x*(1-r)<y<x*(1+r) else -1
 
-def absdiff(x,y,floor=0.01):
+def absdiff(x,y,floor=0):
     """
-    Checks absolute difference <floor between x and y
+    Checks absolute difference between x and y
+    If diff < floor, 0 is returned
     floor would be a decimal value, e.g. 0.05
     """
     d = abs(x-y)
-    if d < floor: d = 0
+    if floor and d < floor: 
+        d = 0
     return d
 
 def seqdiff(x,y,method=reldiff,floor=None):
     """
-    Being x and y two arrays it checks (method) difference <floor between the elements of them.
+    Being x and y two arrays it checks (method) difference 
+    smaller than  floor between the elements of them.
+
     floor would be a decimal value, e.g. 0.05
     """
     if not floor:
@@ -512,6 +517,7 @@ def isTrue(arg):
     else: return arg
     
 NaN = float('nan')
+inf = float('inf')
     
 def isNaN(seq):
     return (isinstance(seq,(int,float)) and math.isnan(seq) or 
