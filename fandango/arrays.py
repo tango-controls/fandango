@@ -422,12 +422,12 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     (crosschecked with 1e6 samples against the 
     PyTangoArchiving.utils.decimate_array method using numpy)
     """
-    if 1: #trace: 
-        print('filter_array([%d],w=%f' % (len(data),window))
+    print('filter_array([%d],w=%f' % (len(data),window))
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     begin,end,window = map(float,((begin,end,window)))
     try:
-        assert window<1.
+        if window>=1.: 
+            raise Exception('numpy not needed')
         import numpy
         ranger = numpy.arange
         tfloor = lambda x: float(fun.floor(x,window))
