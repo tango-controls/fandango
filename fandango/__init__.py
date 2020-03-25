@@ -34,7 +34,11 @@
 """
 from __future__ import print_function
 from __future__ import absolute_import
-from builtins import map
+try:
+  from builtins import map
+except:
+  pass
+
 
 __doc__ = """
 @package fandango
