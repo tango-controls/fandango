@@ -1,9 +1,13 @@
-from __future__ import print_function
-from builtins import str
 #!/usr/bin/env python
+
 # Always prefer setuptools over distutils
 import os, imp, sys
 from setuptools import setup, find_packages
+try:
+    from __future__ import print_function
+    from builtins import str
+except:
+    pass
 
 __doc__ = """
 
