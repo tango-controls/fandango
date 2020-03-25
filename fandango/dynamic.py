@@ -423,7 +423,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
                     self.Lambdas = dict(l.split(':',1) for l in value 
                                         if ':' in l)
                     try: 
-                        self.Lambdas = dict((k,eval(v)) for k,v in self.Lambdas)
+                        self.Lambdas = dict((k,eval(v)) for k,v in self.Lambdas.items())
                     except: 
                         traceback.print_exc()
                   
