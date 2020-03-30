@@ -65,6 +65,7 @@ def get_property(obj,prop='',opts=[],var=''):
     
   return list(value) if fandango.isSequence(value) else value
 
+
 def main(args):
   #assert args,'Arguments must be OBJECT.Property'
   if not args:
@@ -91,7 +92,8 @@ def main(args):
               
     return vals
 
-if __name__ == '__main__':
+
+def main_script():
   import sys
   value = main(sys.argv[1:])
   if not value:
@@ -99,3 +101,7 @@ if __name__ == '__main__':
   else:
     print('\n'.join(value) if fandango.isSequence(value) else value)
     sys.exit(0)
+
+
+if __name__ == '__main__':
+    main_script()

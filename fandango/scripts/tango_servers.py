@@ -13,9 +13,9 @@ This script uses fn.servers.ServersDict class to start/stop devices on any point
   
 Examples:
 
-  tango_servers.py status              # Will display status of devices in localhost
-  tango_servers.py hostname.you.org stop "*hdb*"    # Will stop all *hdb* devices in hostname.you.org
-  tango_servers.py restart "pyalarm/*"     # Will restart PyAlarm devices in ALL hosts
+  tango_servers status              # Will display status of devices in localhost
+  tango_servers hostname.you.org stop "*hdb*"    # Will stop all *hdb* devices in hostname.you.org
+  tango_servers restart "pyalarm/*"     # Will restart PyAlarm devices in ALL hosts
   
 NOTE: ctds and tango_admin scripts provide similar functionality
 

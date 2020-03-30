@@ -89,7 +89,7 @@ def monitor(*args, **kwargs):
         
     #[dp.unsubscribe_event(ei) for ei in eis];
         
-if __name__ == '__main__':
+def main():
     import sys
     try:
         args = sys.argv[1:]
@@ -105,3 +105,5 @@ if __name__ == '__main__':
         print(__doc__)
     
 
+if __name__ == '__main__':
+    main()

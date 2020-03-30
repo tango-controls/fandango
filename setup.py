@@ -3,11 +3,11 @@
 # Always prefer setuptools over distutils
 import os, imp, sys
 from setuptools import setup, find_packages
-try:
-    from __future__ import print_function
-    from builtins import str
-except:
-    pass
+# try:
+#     from __future__ import print_function
+#     from builtins import str
+# except:
+#     pass
 
 __doc__ = """
 
@@ -36,26 +36,37 @@ if 'help' in str(sys.argv):
 release = open('fandango/VERSION').read()
 
 scripts = [
-'./fandango/scripts/ctds',
-'./fandango/scripts/csv2tango',
-'./fandango/scripts/tango2csv',
-'./fandango/scripts/tango2json',
-'./fandango/scripts/sardanact',
+# './fandango/scripts/ctds',
+# './fandango/scripts/csv2tango',
+# './fandango/scripts/tango2csv',
+# './fandango/scripts/tango2json',
+# './fandango/scripts/sardanact',
 './fandango/scripts/tango_cleanup',
-'./fandango/scripts/folder-gui',
-'./fandango/scripts/fandango',
+# './fandango/scripts/folder-gui',
+# './fandango/scripts/fandango',
 './fandango/scripts/DynamicDS',
 './fandango/scripts/WorkerDS',
 './fandango/scripts/CopyCatDS',
 './fandango/scripts/FolderDS',
-'./fandango/scripts/tango_servers',
-'./fandango/scripts/tango_host',
-'./fandango/scripts/tango_property',
-'./fandango/scripts/tango_monitor',
+# './fandango/scripts/tango_servers',
+# './fandango/scripts/tango_host',
+# './fandango/scripts/tango_property',
+# './fandango/scripts/tango_monitor',
 ]
 
 entry_points = {
         'console_scripts': [
+            'ctds = fandango.scripts.ctds:main',
+            'csv2tango = fandango.scripts.csv2tango:main',
+            'tango2csv = fandango.scripts.tango2csv:main',
+            'tango2json = fandango.scripts.tango2json:main',
+            'sardanact = fandango.scripts.sardanact:main',
+            'folder_gui = fandango.device.FolderGUI:main',
+            'fandango = fandango.scripts.fandango:main',
+            'tango_servers = fandango.scripts.tango_servers:main',
+            'tango_host = fandango.scripts.tango_host:main',
+            'tango_property = fandango.scripts.tango_property:main_script',
+            'tango_monitor = fandango.scripts.tango_monitor:main',
             #'CopyCatDS = fandango.interface.CopyCatDS:main',
             #'WorkerDS = fandango.device.WorkerDS:main',
         ],
@@ -90,8 +101,8 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Software Development :: Libraries',
     ],
-    platforms=[ "Linux,Windows XP/Vista/7/8" ],
-    install_requires=['python-future'],
+    platforms=["Linux,Windows XP/Vista/7/8" ],
+    install_requires=['future'],
     scripts=scripts,
     entry_points=entry_points,
     include_package_data=True,
