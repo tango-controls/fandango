@@ -165,29 +165,32 @@ def tango2csv(filters,options=[]):
     except Exception,e:
         print '-------> An unforeseen exception occured....',traceback.format_exc()
 
-        
-if __name__ == '__main__':        
 
-        opts = [a for a in sys.argv[1:] if a.startswith('-')]
-        args = [a for a in sys.argv[1:] if not a.startswith('-')]
-        if not args:
-            print(__doc__)
-        elif '--tree' not in opts:
-            tango2csv(args,opts)
+
+def main():
+    opts = [a for a in sys.argv[1:] if a.startswith('-')]
+    args = [a for a in sys.argv[1:] if not a.startswith('-')]
+    if not args:
+        print(__doc__)
+    elif '--tree' not in opts:
+        tango2csv(args, opts)
+    else:
+        if len(args) > 1:
+            fout = args[-1]
+            args = args[:-1]
         else:
-            if len(args)>1:
-                fout = args[-1]
-                args = args[:-1]
-            else:
-                fout = ''
+            fout = ''
 
-            text = fd.tango.tango2table(args,opts=opts+['--text'])
-            
-            if fout:
-                fout = open(fout,'w')
-                fout.write(text)
-                fout.close()
-            else:
-                print(text)
-            
-            
+        text = fd.tango.tango2table(args, opts=opts + ['--text'])
+
+        if fout:
+            fout = open(fout, 'w')
+            fout.write(text)
+            fout.close()
+        else:
+            print(text)
+
+if __name__ == '__main__':
+    main()
+
+

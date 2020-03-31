@@ -1,0 +1,51 @@
+{% set data = load_setup_py_data(setup_file="../setup.py",
+  from_recipe_dir=True) %}
+
+package:
+  name: {{ data.get('name') }}
+  version: {{ data.get('version') }}
+
+source:
+  path: ..
+
+build:
+  noarch: python
+  script: '{{PYTHON}} setup.py install --single-version-externally-managed
+    --record=record.txt'
+
+  string: 'py{{CONDA_PY}}_{{GIT_DESCRIBE_HASH}}'
+  entry_points:
+    - ctds = fandango.scripts.ctds:main
+    - csv2tango = fandango.scripts.csv2tango:main
+    - tango2csv = fandango.scripts.tango2csv:main
+    - tango2json = fandango.scripts.tango2json:main
+    - sardanact = fandango.scripts.sardanact:main
+    - folder-gui = fandango.device.FolderGUI:main
+    - fandango = fandango.scripts.fandango_script:main
+    - tango_servers = fandango.scripts.tango_servers:main
+    - tango_host = fandango.scripts.tango_host:main
+    - tango_property = fandango.scripts.tango_property:main_script
+    - tango_monitor = fandango.scripts.tango_monitor:main
+
+requirements:
+  host:
+    - python {{python}}
+    - setuptools
+  run:
+    - python {{python}}
+    - future
+    - pytango
+
+test:
+  import:
+    - fandango
+
+about:
+  home: {{ data.get('url')}}
+  license: {{ data.get('license')}}
+  summary: {{ data.get('description')}}
+  author: {{ data.get('author')}}
+  description: {{ data.get('long_description')}}
+
+
+
