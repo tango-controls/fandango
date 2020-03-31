@@ -3,11 +3,6 @@
 # Always prefer setuptools over distutils
 import os, imp, sys
 from setuptools import setup, find_packages
-try:
-    from __future__ import print_function
-    from builtins import str
-except:
-    pass
 
 __doc__ = """
 
@@ -29,9 +24,11 @@ To tune some options:
 
 -------------------------------------------------------------------------------
 """
-
-if 'help' in str(sys.argv): 
-  print(__doc__)
+try:
+  #python3
+  from builtins import str
+except:
+  pass
 
 release = open('fandango/VERSION').read()
 
