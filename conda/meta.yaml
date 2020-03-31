@@ -20,7 +20,7 @@ build:
     - tango2csv = fandango.scripts.tango2csv:main
     - tango2json = fandango.scripts.tango2json:main
     - sardanact = fandango.scripts.sardanact:main
-    - folder-gui = fandango.scripts.folder-gui:main
+    - folder-gui = fandango.device.FolderGUI:main
     - fandango = fandango.scripts.fandango_script:main
     - tango_servers = fandango.scripts.tango_servers:main
     - tango_host = fandango.scripts.tango_host:main
