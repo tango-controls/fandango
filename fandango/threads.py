@@ -1164,7 +1164,7 @@ in background processes
 
 def SubprocessMethod(obj,*args,**kwargs):
     """
-    arguments: 
+    arguments (this will be extracted from kwargs): 
         object : object to extract method or callable
         method :  string or callable to get from object
         timeout : seconds 
@@ -1234,7 +1234,7 @@ def SubprocessMethod(obj,*args,**kwargs):
     proc.terminate(),proc.join() #close process
 
     if time.time()>t0+timeout:
-        result = Exception('TimeOut(%s)!'%str(obj))
+        result = Exception('TimeOut(%s,%s)!'%(str(obj),timeout))
     if callback:
         callback(result)
     elif isinstance(result,Exception):
