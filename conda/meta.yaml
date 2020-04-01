@@ -2,8 +2,8 @@
   from_recipe_dir=True) %}
 
 package:
-  name: {{ data.get('name') }}
-  version: {{ data.get('version') }}
+  name: {{data.get('name').lower().replace(' ', '_')}}
+  version: {{data.get('version')}}
 
 source:
   path: ..
@@ -16,18 +16,7 @@ build:
 
   string: 'py{{CONDA_PY}}_{{ PKG_BUILDNUM }}_{{environ.get
   ("GIT_DESCRIBE_HASH",0) }}'
-  entry_points:
-    - ctds = fandango.scripts.ctds:main
-    - csv2tango = fandango.scripts.csv2tango:main
-    - tango2csv = fandango.scripts.tango2csv:main
-    - tango2json = fandango.scripts.tango2json:main
-    - sardanact = fandango.scripts.sardanact:main
-    - folder-gui = fandango.device.FolderGUI:main
-    - fandango = fandango.scripts.fandango_script:main
-    - tango_servers = fandango.scripts.tango_servers:main
-    - tango_host = fandango.scripts.tango_host:main
-    - tango_property = fandango.scripts.tango_property:main_script
-    - tango_monitor = fandango.scripts.tango_monitor:main
+  entry_points: {{data.get('entry_points', {}).get('console_scripts', [])}}
 
 requirements:
   host:
@@ -39,8 +28,9 @@ requirements:
     - pytango
 
 test:
-  import:
-    - fandango
+  requirementes:
+    -pytango
+  import: {{data.get('packages')}}
 
 about:
   home: {{ data.get('url')}}
