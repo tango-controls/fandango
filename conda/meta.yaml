@@ -29,8 +29,8 @@ requirements:
     - pytango
 
 test:
-  requirementes:
-    -pytango
+  requires:
+    - pytango
   import: {{data.get('packages')}}
 
 about:
