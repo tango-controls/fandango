@@ -31,8 +31,11 @@ requirements:
 test:
   requires:
     - pytango
-  import: {{data.get('packages')}}
-
+    - future
+  imports:
+    {% for pack in data['packages'] %}
+    - {{pack}}
+    {% endfor %}
 about:
   home: {{ data.get('url')}}
   license: {{ data.get('license')}}
