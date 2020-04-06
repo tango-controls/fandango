@@ -169,6 +169,10 @@ def test_inCl():
     Returns a caseless "in" boolean function, using regex if wanted
     """
     #assert fandango.functional.inCl
+    r = [True, True, False, True]
+    vals = 'abcdEf',['CDe'],['bcDef'],{'cDe':0}
+    vs = [fandango.functional.inCl('cde',v)  for v in vals]
+    assert r == vs
 
 def test_matchCl():
     """

@@ -299,17 +299,18 @@ def matchTuples(mapping,key,value):
         
 def inCl(exp,seq,regexp=True):
     """ Returns a caseless "in" boolean function, using regex if wanted """
-    if not seq: 
-        return False
     if isString(seq):
         return searchCl(exp,seq) if (regexp and isRegexp(exp)) else exp.lower() in seq.lower()
-    elif isSequence(seq) and isString(seq[0]):
-        if regexp:
-            return any(matchCl(exp,s) for s in seq)
-        else:
-            return any(exp.lower()==s.lower() for s in seq)
+    if seq is not None and len(seq):
+        if not isSequence(seq):
+            seq = toList(seq)
+        for s in seq:
+            s = str(s)
+            m = matchCl(exp,s) if regexp else exp.lower().strip()==s.lower().strip()
+            if m: 
+                return m
     else:
-        return exp in seq
+        return None
     
 def matchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless match between expression and given string """
