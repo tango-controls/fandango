@@ -333,7 +333,7 @@ class FriendlyDB(log.Logger):
                 % (table, self.db_name))
         if partition:
             q += " and partition_name like '%s'" % partition
-        return (fn.toList(self.Query(q)) or [0])[0]
+        return sum((t or [0])[0] for t in (fn.toList(self.Query(q))))
     
     def check(self, method = None, tables = None, verbose = False):
         """
