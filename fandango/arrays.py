@@ -59,7 +59,8 @@ is filter_array; which averages data at some given time intervals
 
 ###############################################################################
 
-from fandango.functional import reldiff,absdiff,seqdiff
+import fandango.functional as fn
+from fandango.functional import reldiff,absdiff,seqdiff,isSequence
 MAX_DATA_SIZE = 2*1024
 
 def decimator(data,min_inc=.05,min_rel=None,
@@ -416,6 +417,9 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     First interval will be floor(data[0][0],window)+window, containing average 
         of data[t0:t0+window]
     If begin,end intervals are passed, cut-off and filling methods are applied
+
+    filling> F_LAST fill with previous value, F_NONE for None, F_ZERO for zero value
+
     The value at floor(time) is the value that closes each interval
     
     IF YOUR DATA SOURCE IS A PYTHON LIST; THIS METHOD IS AS FAST AS NUMPY 
@@ -474,17 +478,19 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     #Filling initial range with data
     #--------------------------------------------------------------------------
     if begin:
+        #print('Filling initial range with data')
         nx =  prev and prev[1] or data[0][1]
         ndata = [(tt+window,nx) for tt in ranger(tfloor(begin),
                                                 tfloor(data[0][0]),window)]
         if trace: print('prev: %s'%str(ndata and ndata[-1]))
-    else: 
+    else:
+        # print('ndata is empty')
         ndata =[]
     
     #Inserting averaged data
     #--------------------------------------------------------------------------
     i,i0 = 0,0
-    next = []
+    # next = []
     ilast = len(data)-1
     if trace: print('t0: %s' % (window+tfloor(data[0][0]-1)))
     try:
@@ -494,16 +500,19 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         for t in ranger(rb,re,rs):
             if i<=ilast:
                 if data[i][0]>t:
-                    #Filling "whitespace" with last data
-                    nx = (
-                        (filling==F_LAST and ndata and ndata[-1][1]) or
-                        (filling==F_NONE and None) or
-                        (filling==F_ZERO and 0) or
-                        None)
+                    #print('Filling "whitespace" with last data')
+                    if filling == F_LAST:
+                        nx = ndata[-1][1] if len(ndata) else (
+                            data[0][1] if len(data) and data[0][0]<t+window else None)
+                    elif filling == F_ZERO:
+                        nx = 0
+                    else:
+                        nx = None
+
                     ndata.append((t,nx))
                     #print 'whitespace: %s'%str(ndata[-1])
                 else:
-                    #Averaging data within interval
+                    #print('Averaging data within interval')
                     i0 = i
                     while i<=ilast and data[i][0]<=t: 
                         i+=1
@@ -512,6 +521,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                     a2 = ndata and ndata[-1][-1] or 0
                     ##########################################################
                     val = method(a1,a2)
+                    # if fn.isSequence(val) or hasattr(val,'__len__'):
+                    #    print('%s(%s,%s) returned an array!' % (method,a1,a2))
                     ndata.append((t,val))
                     #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
                     ##########################################################
@@ -522,7 +533,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                 else: nx = None
                 ndata.append((t,nx))
                 #print 'post: %s'%str(ndata[-1])
-    except Exception,e:
+
+    except Exception as e:
         print('Error in filter_array(): %s' % e)
         print('\t %s - %s / %s : %s : %s ' 
               % (i0,i,ilast,filling,data[i0:i]))
