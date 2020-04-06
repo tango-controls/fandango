@@ -732,14 +732,41 @@ def unicode2str(obj):
 def toList(val,default=[],check=isSequence):
     if val is None: 
         return default
-    elif hasattr(val,'__len__') and len(val)==0: #To prevent exceptions due to non evaluable numpy arrays
-        return []
-    elif not check(val): #You can use (lambda s:isinstance(s,list)) if you want
-        return [val]
-    elif not hasattr(val,'__len__'): #It forces the return type to have a fixed length
-        return list(val)
     else:
-        return val
+        hlen = hasattr(val,'__len__')
+        ch = check(val)
+        
+        if hlen: #list,string,dictionary
+            if len(val)==0:
+                #To prevent exceptions due to non evaluable numpy arrays
+                return default
+            elif hasattr(val,'keys'):
+                # dictionary
+                return list(val)
+            elif not ch:
+                #string? iterable not sequence
+                return [val]
+            else:
+                #already a valid sequence
+                return val
+        elif ch:
+            #sequence with no len, generator?
+            #It forces the return type to have a fixed length
+            return list(val)
+        else:
+            #scalar?
+            return [val]
+                
+        #if hlen and len(val)==0: #To prevent exceptions due to non evaluable numpy arrays
+            #return default
+        #elif not ch: #You can use (lambda s:isinstance(s,list)) if you want
+            ## hlen and not ch: string!
+            #return [val]
+        #elif not hlen: #check and no len, generator?
+            #return list(val)
+        #else:
+            #return val
+
 toSequence = toList
 
 def toString(*val):

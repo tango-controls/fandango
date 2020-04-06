@@ -408,6 +408,8 @@ def test_unicode2str():
 def test_toList():
     
     #assert fandango.functional.toList
+    vs = ['hola'],range(10),1,'hola',{'hello':'world'},[],None
+    assert all(isinstance(fandango.functional.toList(v),list) for v in vs)
 
 def test_toString():
     
