@@ -90,7 +90,7 @@ def main(args = []):
       if action in ('start','restart'):
           print('Starting : %s'%matched)
           if not host and not all(astor[h].host for h in matched):
-              not_match = [a for a in matched if not astor[h].host]
+              not_match = [a for a in matched if not astor[a].host]
               conf = raw_input('Some servers (%s) will be started locally,'
                                ' is it ok? (y/n)' % not_match)
           else:

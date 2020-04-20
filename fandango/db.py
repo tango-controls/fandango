@@ -237,7 +237,8 @@ class FriendlyDB(log.Logger):
         '''
         t0 = time.time()
         try:
-            self.debug(query)
+            self.debug(query.replace('where', '\nwhere').replace(
+                'group,', '\ngroup'))
             try:
                 q=self.getCursor(klass = dict if asDict else self.default_cursor)
                 q.execute(query)
