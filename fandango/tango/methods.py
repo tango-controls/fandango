@@ -1203,15 +1203,20 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
         dp.ping()
     except Exception as e:
         return e if throw else False
+
     try:
-        if attribute: dp.read_attribute(attribute)
-        elif command: dp.command_inout(command)
-        else: 
+        if 'state' in (attribute,command):
+            print('state')
             s = dp.state()
             if bad_state:
                 assert s not in bad_state and str(s) not in bad_state
             return str(s) #True
-        return True
+        elif attribute:
+            return dp.read_attribute(attribute)
+        elif command:
+            return dp.command_inout(command)
+        else:
+            return True
     except Exception as e:
         return e if throw else None
 

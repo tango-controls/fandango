@@ -297,9 +297,11 @@ def get_proxy(argin,use_tau=False,keep=False):
         return get_device(argin,use_tau,keep)
 
 def get_device(dev,use_tau=False,keep=False): 
-    if use_tau and not TAU: use_tau = loadTaurus()
+    if use_tau and not TAU:
+        use_tau = loadTaurus()
     if isinstance(dev,basestring): 
-        if dev.count('/')==1: dev = 'dserver/'+dev
+        if dev.count('/')==1:
+            dev = 'dserver/'+dev
         if use_tau and TAU: 
             return TAU.Device(dev)
         else:
@@ -309,7 +311,7 @@ def get_device(dev,use_tau=False,keep=False):
             if TangoProxies and (dev in TangoProxies or keep):
                 return TangoProxies[dev]
             else: 
-                m = clmatch(retango,dev) 
+                m = clmatch(retango,dev)
                 if m and m.groupdict()['attribute']:
                     dev = dev.rsplit('/',1)[0]
                 return PyTango.DeviceProxy(dev)

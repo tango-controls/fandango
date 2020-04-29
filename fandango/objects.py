@@ -843,7 +843,6 @@ class Cached(Decorator):
     """
   
     def __init__(self,func=None,depth=10,expire=3.,log=False,catched=False):
-
         self.log = log
         self._im = None
         self.cache = {}
@@ -905,7 +904,7 @@ class Cached(Decorator):
             expire = time.time()-notNone(expire,self.expire)
             cache = sorted(k for k in list(self.cache.keys()) if k[0]>expire)
             if (len(cache)!=len(self.cache) or len(cache)>self.depth):
-                #self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
+                self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
                 pass
                 
             self.cache = dict((k,self.cache[k]) for k in cache[-self.depth:])
@@ -925,9 +924,10 @@ class Cached(Decorator):
             #assert all(isinstance(k,Hashable) for l in key[1:] for k in l)
             assert isHashable(key)
         except:
-            self._log('unhashable arguments!')
+            self._log('Cached: unhashable arguments!')
             expire = 0
-        
+
+        self._log('Cached.key: %s' % str(key))
         if not self.depth or not expire:
             self._log('disabling cache ...')
             if not self.depth: self.cache = {}
@@ -936,7 +936,7 @@ class Cached(Decorator):
         else:
             cache = self.prune(expire)
             match = first((k for k in cache if (k[1:]) == (key[1:])),None)
-            
+            self._log('Cached.match: %s' % str(match))
             if match:
                 v = self.cache[match]
                 #self._log('(%s,%s) was in cache: %s'%(args,kwargs,v))
