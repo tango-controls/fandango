@@ -49,8 +49,8 @@ from excepts import getLastException,exc2str
 from objects import *
 from functional import *
 from dicts import *
-from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict
-from tango import get_full_name,get_attribute_events, check_device_cached
+from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict,get_device
+from tango import get_full_name,get_attribute_events, check_device, check_device_cached
 from threads import ThreadedObject,timed_range,wait,threading
 from log import Logger,printf,tracer
 
@@ -419,12 +419,12 @@ class EventThread(Logger,ThreadedObject):
                 if name not in queue: queue[name] = []
                 queue[name].append((source,args))
 
-            except Queue.Empty,e:
+            except Queue.Empty as e:
+                #The queue is empty, long period attributes can be processed
                 WAS_EMPTY = True
                 break
 
-            except Exception,e:
-                #The queue is empty, long period attributes can be processed
+            except Exception as e:
                 if 'empty' not in str(e).lower():
                     self.error(traceback.format_exc())
                 break
@@ -441,6 +441,7 @@ class EventThread(Logger,ThreadedObject):
         #Sequential execution of events received is relatively guaranteed
         if queue:
             self.debug('Process %d events received ...'%(len(queue)))        
+
         for s,events in sorted(queue.items()):
             #@TODO: Event Filters should be implemented here 
             #including removal of PERIODIC events if a change event is queued
@@ -471,12 +472,13 @@ class EventThread(Logger,ThreadedObject):
         t0 = now()
         pollings = []
         for s in self.sources.copy():
-            s.checkEvents(tdiff=2e-3*s.polling_period)
+            self.debug('%s.process => checkEvents(%s,%s)' % (self.full_name,s,s.getState()))
+            s.checkEvents(tdiff=2e-3*s.polling_period) #Tries to subscribe/updates polling
             if s.getMode():
-                alive = check_device_cached(s.device)
+                alive = check_device_cached(s.proxy)
                 polled = s.isPollingEnabled()
-                if not alive and s.last_read_time < t0-s.KeepAlive:
-                    self.debug('%s is not alive, last read was at %s'
+                if not alive and s.last_read_time < (t0-s.KeepAlive):
+                    self.debug('%s seems not alive, last read was at %s'
                                %(s.device,time2str(s.last_read_time)))
                 polled = alive and polled
                 nxt = s.last_read_time+1e-3*(
@@ -488,22 +490,25 @@ class EventThread(Logger,ThreadedObject):
                 self.debug('Executing pollings (%d/%d/%d)'
                            %(polls,len(pollings),len(self.sources)))
                 try:
-                  if WAS_EMPTY: 
-                    lg('KeepAlive(%s) after %s ms'%(
-                                source.full_name,source.KeepAlive))
-                  #poll->read->fireEvent
-                  source.poll() 
-                  polls+=1
+                    lg('process.poll(%s,%s,%s) after %s ms'%(
+                        source.full_name,source.polling_period,WAS_EMPTY,1e3*(t0-s.last_read_time)))
+                    #poll->read->fireEvent
+                    source.poll() 
+                    polls+=1
                 except:
-                  traceback.print_exc()
-                  if WAS_EMPTY: break
+                    traceback.print_exc()
+                    if WAS_EMPTY: #Only one poll per cycle, to allow events to enter
+                        break 
                 finally:
-                  source.last_read_time = now()
+                    source.last_read_time = now()
             self.wait(self.MinWait/10.) #breathing
                 
         asynch_hw = [s[1] for s in pollings 
                      if getattr(s,'pending_request',None) is not None]
-        if asynch_hw: self.warning('Check pending HW asynch requests')
+        
+        if asynch_hw: 
+            self.warning('Check pending HW asynch requests')
+            
         for source in randomize(asynch_hw):
             try: 
               source.asynch_hook() #<<<< THIS SHOULD BE ASYNCHRONOUS!
@@ -607,12 +612,14 @@ class EventSource(Logger,SingletonMap):
     
     EVENT_TIMEOUT = 900  # 10s
     DEFAULT_LOG = 'WARNING'
-    DEFAULT_EVENTS = [ 'periodic', 'change', 'archive', 'quality' ] #'user_event',
+    DEFAULT_EVENTS = ['change'] #[ 'periodic', 'change', 'archive', 'quality' ] #'user_event',
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
     TAURUS_EVENTS = ['change','attr_conf']
     QUEUE = None
     DefaultPolling = 3000.
     KeepAlive = 15000.
+    event_lock = threading.RLock() #Lock()
+    
     INSTANCES = []
     PROXIES = ProxiesDict()
     DUMMY = EventListener('dummy') #Dummy listener for subscription persistence
@@ -652,7 +659,7 @@ class EventSource(Logger,SingletonMap):
             try:
               self.proxy = not self.fake and self.PROXIES[parent]
             except:
-              self.proxy = not self.fake and PyTango.DeviceProxy(parent)
+              self.proxy = not self.fake and get_device(parent, keep=True)
         else:
             try:
                 self.device = parent.name()
@@ -694,7 +701,6 @@ class EventSource(Logger,SingletonMap):
             self.use_events = self.DEFAULT_EVENTS
 
         self.attr_value = None
-        self.event_lock = threading.Lock()
         self.last_event = dict()
         self.last_event_time = 0
         self.last_error = None
@@ -752,6 +758,7 @@ class EventSource(Logger,SingletonMap):
         """
         if EventSource.QUEUE is None:
             EventSource.QUEUE = EventThread()
+            EventSource.QUEUE.setLogLevel(self.getLogLevel())
         return EventSource.QUEUE
     
     @staticmethod
@@ -772,11 +779,14 @@ class EventSource(Logger,SingletonMap):
         except:
           self.error('UNKNOWN STATE: %s'%state)
           
+    def getState(self):
+        return self.STATES.get_key(self.state)
+          
     def checkState(self,*states):
         states = states or [self.state]
         states = [self.STATES.get(s,s) for s in states]
         if self.state in states:
-          return self.STATES.get_key(self.state)
+          return self.getState()
         else:
           return False
             
@@ -784,7 +794,7 @@ class EventSource(Logger,SingletonMap):
         """
         SYNCHRONOUS = 0
         EVENTS = 1
-        POLLED = 2
+        POLLED = 2 or 3
         """
         m = (self.use_events and 1) or (self.forced and 2) or (self.polled and 3)
         return int(m)
@@ -812,7 +822,7 @@ class EventSource(Logger,SingletonMap):
         try:
             #self.factory().addAttributeToPolling(self, self.getPollingPeriod())      
             self.forced = notNone(force,self.forced)
-            if not self.forced and not check_device_cached(self.device):
+            if not self.forced and not check_device_cached(self.proxy):
                 self.warning('activatePolling(): %s not running!'
                               %self.device)
                 return
@@ -1076,14 +1086,31 @@ class EventSource(Logger,SingletonMap):
                 return False
         return True        
 
+    @Cached(depth=100,expire=3.)
     def checkEvents(self,tdiff=None,vdiff=None):
         """
-        tdiff: max time difference allowed between last_event_time and current
-        vdiff: difference between last event value and current hw value
+        This method will update the events/polling configuration for the model.
+        
+        tdiff: max time difference IN SECONDS allowed between last_event_time and current
+        vdiff: difference between last event value and current hw value        
+        
+        if use_events & UNSUBSCRIBED => subscribeEvents()
+        if tdiff & SUBSCRIBING => PENDING + polling try
+        if tdiff & vdiff & isUsingEvents(): 
+        if tdiff & vdiff & isUsingEvents: warning!
+        if tdiff: r = False
+        
+        polling will be activated if:
+            there are listeners
+            device is running
+            forced or events wanted but not provided by device
+            
+        if it will be deactivated if:
+            not forced and not listeners
         """
-        self.debug('checkEvents(...)')
+        self.debug('checkEvents(%s,%s)' % (self.full_name,self.getState()))
         delta = now()-self.last_event_time 
-        if delta > (tdiff or self.EVENT_TIMEOUT): tdiff = delta
+        tdiff = delta if delta > (tdiff or self.EVENT_TIMEOUT) else 0
         ## @TODO: vdiff should be compared against event config
         vdiff = vdiff if not isSequence(vdiff) else any(vdiff)
         r  =  True
@@ -1091,18 +1118,20 @@ class EventSource(Logger,SingletonMap):
         if self.use_events:
         
             if self.checkState('UNSUBSCRIBED'):
+                self.debug('checkEvents(...), subscribing!')
                 self.subscribeEvents(asynchronous=False)
           
             if tdiff and (self.checkState('SUBSCRIBING') or (
                           vdiff and self.isUsingEvents())):
               
-                if not self.isUsingEvents():
-                    self.info('Event subscribing failed (tdiff=%s,vdiff=%s)'
-                      ' switching to polling'%(tdiff,vdiff))
-                    self.setState('PENDING')
-                else:
+                if self.isUsingEvents():
                     self.warning('Values differ and no event received '
                       '(check attr_conf)! (tdiff=%s,vdiff=%s)'%(tdiff,vdiff))
+
+                elif delta > self.EVENT_TIMEOUT:
+                    self.info('Event subscribing failed (tdiff=%s,vdiff=%s)'
+                      ' switching to polling'%(tdiff,vdiff))
+                    self.setState('PENDING')                    
 
                 r = False
 
@@ -1110,13 +1139,14 @@ class EventSource(Logger,SingletonMap):
             # NOTE: a device with listeners and neither use_events nor polled 
             # not forced would be just a dummy CachedAttributeProxy and should
             # be updated "by hand"
-
-            if not self.polled and check_device_cached(self.device) and (
-                self.forced or (self.use_events and not self.isUsingEvents())):
-              
-                self.info('checkEvents(): events not subscribed, enabling polling')
-                self.activatePolling()
-            
+            self.debug('checkEvents(...), listeners')
+            check = self.proxy.ping()
+            is_events = self.isUsingEvents() # just returns current state
+            if not self.polled and (self.forced or (self.use_events and not is_events)):
+                #check = self.proxy.ping() #check_device_cached(self.proxy)                               
+                if check:
+                    self.info('checkEvents(): events not subscribed, enabling polling')
+                    self.activatePolling()            
         else:
             if self.polled and not self.forced:
                 self.info('checkEvents(): no clients, stop polling')
@@ -1127,20 +1157,27 @@ class EventSource(Logger,SingletonMap):
                 #self.info('checkEvents(): no clients, disabling events')
                 #self.unsubscribeEvents()
 
+        self.debug('out of checkEvents(...)')
         return r
                 
     def unsubscribeEvents(self):
-        self.info('unsubscribeEvents(...)')
-        self.use_events = []
-        for type_,ID in  self.event_ids.items():
-            try:
-                self.proxy.unsubscribe_event(ID)
-                self.event_ids.pop(type_)
-            except Exception,e:
-                self.debug('Error unsubscribing %s events: %s'%(type_,e))
-        if not self.hasListeners() and not self.isPollingForced():
-            self.deactivatePolling()
-        self.setState('UNSUBSCRIBED')
+        try:
+            self.event_lock.acquire()
+            self.info('unsubscribeEvents(...)')
+            self.use_events = []
+            for type_,ID in  self.event_ids.items():
+                try:
+                    self.proxy.unsubscribe_event(ID)
+                    self.event_ids.pop(type_)
+                except Exception,e:
+                    self.debug('Error unsubscribing %s events: %s'%(type_,e))
+            if not self.hasListeners() and not self.isPollingForced():
+                self.deactivatePolling()
+            self.setState('UNSUBSCRIBED')
+        except:
+            self.error(traceback.format_exc())
+        finally:
+            self.event_lock.release()
     
     def decodeAttrInfoEx(self,attr_conf):
         pass
@@ -1213,8 +1250,9 @@ class EventSource(Logger,SingletonMap):
                           %(asynch,self.pending_request))
         try:
             ## Do not merge these IF's, order matters
-            #self.debug('read(): cache : %s'%shortstr(self.attr_value))
-            if not check_device_cached(self.device):
+            self.event_lock.acquire()
+            self.debug('read(): cache : %s'%shortstr(self.attr_value))
+            if not check_device_cached(self.proxy):
                 self.warning('read_hw(): %s not running!'%self.device)
                 raise Exception('EvS_CantConnectToDevice')
             if asynch:
@@ -1255,9 +1293,11 @@ class EventSource(Logger,SingletonMap):
             #traceback.format_exc().split('desc')[-1][:80]))
             self.attr_value = fakeAttributeValue(
                                   self.full_name,value=e,error=e)
-            if (not check_device_cached(self.device) 
+            if (not check_device_cached(self.proxy)
                     and self.polled and not self.forced):
                 self.deactivatePolling()
+        finally:
+            self.event_lock.release()
         
     
     def asynch_hook(self):
@@ -1291,7 +1331,13 @@ class EventSource(Logger,SingletonMap):
     def poll(self):
         t0 = now()
         #self.logPrint('DEBUG','\n\n',False)
-        self.debug('poll(+%s): %s'%(t0-self.last_read_time,self.stats['poll']))
+        tdiff = t0-self.last_read_time
+        if tdiff < (self.polling_period/2):
+            log = self.warning
+        else:
+            log = self.debug
+        log('poll(+%s vs %s): %s'%(tdiff,self.polling_period,self.stats['poll']))
+            
         self.stats['poll']+=1
         if self.checkState('SUBSCRIBING'):
             ## While subscribing, polling is ignored and resumed on SUBSCRIBED/PENDING state
@@ -1302,12 +1348,13 @@ class EventSource(Logger,SingletonMap):
             prev = getattr(self.attr_value,'value',None) #None in case of error
             ## The read() call will trigger a fireEvent()
             self.attr_value = self.read(cache=False) 
-            #(self.attr_value is not None))
             av = getattr(self.attr_value,'value',self.attr_value)
             diff = prev != av
-            r = self.checkEvents(vdiff=diff)
+            # checkEvents(diff) to crosscheck if attribute is using events
+            self.debug('%s.poll => checkEvents()' % self.full_name)
+            #r = self.checkEvents(vdiff=diff) #it will just show a warning if events are missing
             if diff and self.isUsingEvents(): 
-              self.info('Polled a subscribed attribute; diff: %s!=%s'%(prev,av))
+                self.info('Polled a subscribed attribute; diff: %s!=%s'%(prev,av))
               
         except Exception,e:
             self.debug('poll(%s) exception: %s'%(self.full_name,exc2str(e)))
@@ -1316,6 +1363,8 @@ class EventSource(Logger,SingletonMap):
     
     def push_event(self,event):
         try:           
+            self.debug('push_event(%s) ... waiting for lock' % (event.event))
+            self.event_lock.acquire()
             REG_FAILED = 'API_DSFailedRegisteringEvent'
             NOT_READY = 'API_AttributeNotDataReadyEnabled'
             NOT_PROPS = 'API_EventPropertiesNotSet'
@@ -1350,7 +1399,7 @@ class EventSource(Logger,SingletonMap):
                     elif self.use_events and not is_polled:
                         self.info('EVENTS_FAILED! (%s,%s,%s,%s)'%(type_,reason,has_evs,is_polled))
                         #self.info(str([et,type_,event.err,]))
-                        if check_device_cached(self.device):
+                        if check_device_cached(self.proxy):
                             self.setState('PENDING')
                             self.activatePolling()
                     return
@@ -1411,6 +1460,8 @@ class EventSource(Logger,SingletonMap):
         except:
             self.error(type(event),dir(event))
             traceback.print_exc()
+        finally:
+            self.event_lock.release()
             
 ###############################################################################
 
@@ -1533,7 +1584,7 @@ class TAttr(EventStruct):
 ###############################################################################
 # OLD API, DEPRECATED
 
-class EventCallback():
+class EventCallback(): #SHOULD BE RENAMED OR REMOVED
     """ 
     It provides persistent storage.
     lock.acquire and lock.release should be used to prevent threading problems!, 
