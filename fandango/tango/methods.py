@@ -1183,6 +1183,7 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
     It will return True for devices ok, False for devices not running 
     and None for unresponsive devices.
     """
+    #print('check_device(%s,%s,%s)' % (dev,attribute,command))
     try:
         if isinstance(dev,DeviceProxy):
             dp = dev
@@ -1197,10 +1198,13 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
                     return False
                 if not check_device('dserver/%s'%info.server,full=False):
                     return False
-            dp = DeviceProxy(dev)
+
+            dp = get_device(dev)
             
         dp.set_timeout_millis(int(timeout))
-        dp.ping()
+        p = dp.ping()
+        if not p:
+            return False
     except Exception as e:
         return e if throw else False
 
@@ -1210,13 +1214,17 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
             s = dp.state()
             if bad_state:
                 assert s not in bad_state and str(s) not in bad_state
-            return str(s) #True
-        elif attribute:
-            return dp.read_attribute(attribute)
-        elif command:
-            return dp.command_inout(command)
-        else:
-            return True
+            r = str(s) #True            
+        elif attribute: 
+            r = dp.read_attribute(attribute)
+        elif command: 
+            r = dp.command_inout(command)
+        else: 
+            r = True
+
+        #print('pinged, check %s,%s = %s' % (attribute,command,r))
+        return r
+        
     except Exception as e:
         return e if throw else None
 
