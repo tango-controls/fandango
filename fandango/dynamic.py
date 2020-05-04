@@ -2089,7 +2089,9 @@ class DynamicDS(DynamicDSHelpers):
         self.debug("In read_MemUsage()")
         
         #    Add your own code here
-        attr.set_value(self.getMemUsage())
+        m = self.getMemUsage()
+        self.push_change_event('MemUsage',m)
+        attr.set_value(m)
         
     #------------------------------------------------------------------
     #    Read EventQueueSize attribute
