@@ -668,7 +668,7 @@ def get_attribute_polling(target):
     except:
         return None
     
-def check_attribute_events(model,ev_type=None,verbose=False):
+def check_attribute_events(model,ev_type=None,verbose=False,asynch=False):
     """
     This method expects model and a list of event types.
     If empty, CHANGE and ARCHIVE events are tested.
@@ -688,10 +688,18 @@ def check_attribute_events(model,ev_type=None,verbose=False):
             for ev_type in result.keys():
                 try:
                     def hook(self,*args,**kwargs):
+                        # IT SEEMS NOT EXECUTED PROPERLY!!!!
+                        # keep alive threads running?
                         if self.eid is not None:
                             self.proxy.unsubscribe_event(eid)
-                            
-                    cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                    
+                    if asynch:
+                        cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                    else:
+                        cb = lambda *args: None
+                        ei = dp.subscribe_event(attr,ev_type,cb)
+                        dp.unsubscribe_event(ei)
+                        
                     period = dp.get_attribute_poll_period(attr) 
                     result[ev_type] = period or True
                 except:
