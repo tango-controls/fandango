@@ -657,11 +657,17 @@ def shape(seq):
 
 def str2int(seq):
     """ It returns the first integer encountered in the string """
-    return int(re.search(reint,seq).group())
+    try:
+        return int(re.search(reint,seq).group())
+    except:
+        return None
 
 def str2float(seq):
     """ It returns the first float (x.ye-z) encountered in the string """
-    return float(re.search(refloat,seq).group())
+    try:
+        return float(re.search(refloat,seq).group())
+    except:
+        return None
 
 def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
