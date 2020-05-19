@@ -1219,6 +1219,7 @@ def SubprocessMethod(obj,*args,**kwargs):
         
     args = (obj,method,remote)+args
     proc = multiprocessing.Process(target=do_it,args=args,kwargs=kwargs)
+    print('New Process(%s)' % str(do_it))
     proc.daemon = True
     proc.start()
     t0 = time.time()
@@ -1231,6 +1232,7 @@ def SubprocessMethod(obj,*args,**kwargs):
         wait(.1)
         
     local.close(),remote.close() #close pipes
+    print('Join Process(%s)' % str(do_it))
     proc.terminate(),proc.join() #close process
 
     if time.time()>t0+timeout:

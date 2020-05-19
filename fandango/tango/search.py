@@ -59,6 +59,9 @@ __test__ = {}
 TANGO_KEEPTIME = 60 
 
 class get_all_devices(objects.SingletonMap):
+    """
+    This method implements an early versio of Cache using SingletonMap
+    """
     
     _keeptime = TANGO_KEEPTIME
     
