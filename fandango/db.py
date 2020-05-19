@@ -421,6 +421,26 @@ class FriendlyDB(log.Logger):
             print(q,res)
             traceback.print_exc()
             raise e
+        
+    def getPartitionRows(self,table='',partition=''):
+        """
+        Returns rows in partition files
+        """
+        table = table or '%';
+        partition = "like '%s'"%partition if partition else ' is NULL';
+        q = ("select partition_name,table_rows"
+            " from information_schema.partitions where "
+            " table_schema = '%s' and table_name like '%s'"
+            " and partition_name %s;"
+                % (self.db_name, table, partition) )
+        res = self.Query(q)
+        try:
+            return 0 if not res else (int(res[0][1]) 
+                                      if len(res)==1 else dict(res))
+        except Exception as e:
+            print(q,res)
+            traceback.print_exc()
+            raise e        
     
     def getDbSize(self):
         """
