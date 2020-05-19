@@ -440,7 +440,11 @@ class EventThread(Logger,ThreadedObject):
         
         #Sequential execution of events received is relatively guaranteed
         if queue:
-            self.debug('Process %d events received ...'%(len(queue)))        
+            self.debug('Process %d events received ...'%(len(queue)))
+        pending = self.get_pending()
+        if pending:
+          self.info('%d events processed, %d still in queue' 
+                    % (len(queue),pending))
 
         for s,events in sorted(queue.items()):
             #@TODO: Event Filters should be implemented here 
@@ -472,8 +476,10 @@ class EventThread(Logger,ThreadedObject):
         t0 = now()
         pollings = []
         for s in self.sources.copy():
+            #@TODO ... avoid copy!
             self.debug('%s.process => checkEvents(%s,%s)' % (self.full_name,s,s.getState()))
             s.checkEvents(tdiff=2e-3*s.polling_period) #Tries to subscribe/updates polling
+                
             if s.getMode():
                 alive = check_device_cached(s.proxy)
                 polled = s.isPollingEnabled()
@@ -574,9 +580,10 @@ class EventSource(Logger,SingletonMap):
     - parent=None : device name or proxy
     - enablePolling (force polling by default)
     - pollingPeriod (3000)
-    - tango_asynch = True/False ; to use asynchronous Tango reading
+    - tango_asynch (False); to use asynchronous Tango reading
     - listeners = a list of listeners to be added at startup
     - persistent = if True, a dummy listener is added to enforce subscription  
+    - queued (True); if True, events are queued and filtered before calling listeners
     
     Class Parameters are:
     - EventSource.EVENT_TIMEOUT=900
@@ -636,7 +643,9 @@ class EventSource(Logger,SingletonMap):
     
     def __init__(self, name, keeptime=1000., fake=False, parent=None, **kw):
         """ 
-        Arguments: see Class __doc__
+        **kw used to keep compatibility with old api
+
+        for arguments: see this type __doc__
         """
         ##Set logging
         #self.call__init__(Logger,self.full_name) ##This fails, for unknown reasons
@@ -681,6 +690,7 @@ class EventSource(Logger,SingletonMap):
         self.state = self.STATES.UNSUBSCRIBED
         self.tango_asynch = kw.get('tango_asynch',False)
         self.write_with_read = kw.get('write_with_read',False)        
+        self.queued = kw.get('queued',True)
         
         ## Set polling configuration
         # Indicates if the attribute is being polled periodically
@@ -725,6 +735,10 @@ class EventSource(Logger,SingletonMap):
     def __repr__(self):  
         return str(self)
       
+    def setLogLevel(self,level):
+        Logger.setLogLevel(self,level)
+        self.get_thread().setLogLevel(level)
+        
     def getParent(self):return self.proxy
     def getParentName(self):return self.device
     def getParentObj(self):return self.proxy
@@ -758,7 +772,6 @@ class EventSource(Logger,SingletonMap):
         """
         if EventSource.QUEUE is None:
             EventSource.QUEUE = EventThread()
-            EventSource.QUEUE.setLogLevel(self.getLogLevel())
         return EventSource.QUEUE
     
     @staticmethod
@@ -972,10 +985,6 @@ class EventSource(Logger,SingletonMap):
         poll() events will be allowed to pass through
         """
         self.debug('fireEvent()')
-        pending = self.get_thread().get_pending()
-        if pending:
-          self.warning('fireEvent(%s), %d events still in queue'%
-                       (event_type,pending))
         self.stats['fired']+=1
 
         listeners = listeners or self.listeners.keys()
@@ -1362,6 +1371,13 @@ class EventSource(Logger,SingletonMap):
         ##FIRE EVENT IS ALREADY DONE IN read() METHOD!
     
     def push_event(self,event):
+        """
+        This hook is directly called from Tango DeviceProxy on receiving event.
+
+        It will parse event data and add it to EventThread queue
+
+        EventThread queue will then trigger fire_event if there are listeners
+        """
         try:           
             self.debug('push_event(%s) ... waiting for lock' % (event.event))
             self.event_lock.acquire()
@@ -1456,7 +1472,10 @@ class EventSource(Logger,SingletonMap):
             self.last_event[type_] = event
 
             #Instead of firingEvent, I return and pass the value to the queue
-            self.get_thread().put((self,type_,value))
+            if self.queued:
+                self.get_thread().put((self,type_,value))
+            else:
+                self.fireEvent(type_,value)
         except:
             self.error(type(event),dir(event))
             traceback.print_exc()
