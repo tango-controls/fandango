@@ -1215,6 +1215,7 @@ def SubprocessMethod(obj,*args,**kwargs):
             conn.send(m(*a,**k))
             #conn.close()
         except Exception as e:
+            traceback.print_exc()
             conn.send(e)
         
     args = (obj,method,remote)+args
