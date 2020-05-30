@@ -1082,8 +1082,12 @@ def time2str(epoch=None, cad='', us=False, bt=True,
     """
     if epoch is None: epoch = now() 
     elif bt and epoch<0: epoch = now()+epoch
-    global DEFAULT_TIME_FORMAT
-    cad = cad or DEFAULT_TIME_FORMAT
+    global DEFAULT_TIME_FORMAT 
+    if cad:
+        cad = 'T'.join(cad.split(' ',1)) if iso else cad
+    else:
+        cad = ISO_TIME_FORMAT if iso else DEFAULT_TIME_FORMAT
+        
     t = time.strftime(cad,time2tuple(epoch,utc=utc))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
