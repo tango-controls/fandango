@@ -860,6 +860,7 @@ class Cached(Decorator):
         """
         if self.func is None:
             # Deferred decorator
+            self._log('Cached(): decorating %s' % str(args[0]))
             self.decorate(args[0])
             return self
         else:
@@ -870,7 +871,7 @@ class Cached(Decorator):
         if isCallable(self.log): 
           self.log(msg) 
         elif self.log: 
-          print(msg)
+          print(self.func,msg)
       
     @staticmethod
     def getCachedObject(obj,methods=[],depth=10.,expire=3.,catched=False):
@@ -936,21 +937,23 @@ class Cached(Decorator):
         else:
             cache = self.prune(expire)
             match = first((k for k in cache if (k[1:]) == (key[1:])),None)
-            self._log('Cached.match: %s' % str(match))
+            self._log('Cached.match: %s in %s' % (match, cache))
             if match:
                 v = self.cache[match]
-                #self._log('(%s,%s) was in cache: %s'%(args,kwargs,v))
+                self._log('(%s,%s) was in cache: %s ...'%(args,kwargs,str(v)[:80]))
             else:
                 try:
+                    self._log('%s(%s,%s) = ...'%(self.func,args,kwargs))                    
                     v = self.func(*args,**kwargs)
                 except Exception as e:
+                    self._log(traceback.format_exc())
                     v = e
-                #self._log('%s(%s,%s) = %s'%(self.func,args,kwargs,v))
+                #self._log('%s(%s,%s) = %s'%(self.func,args,kwargs,str(v)[:80]))
                 try:
+                    self._log('cache[%s] = %s ...'%(key,str(v)[:80]))
                     self.cache[key] = v
                 except:
-                    print('%s(%s,%s) = %s'%(self.func,args,kwargs,v))
-                    print('cache[%s] = %s'%(key,v))
+                    self._log(traceback.format_exc())
                     raise
             
         if isinstance(v,Exception):
@@ -959,7 +962,6 @@ class Cached(Decorator):
                     self._log(traceback.format_exc())
                 return v
             else:
-                self._log(str(self.func))
                 self._log(traceback.format_exc())
                 raise v
         else:
