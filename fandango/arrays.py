@@ -364,7 +364,24 @@ def logfloor(x):
     v = (v for v,k in ((0.1,i<1),(1,i<2),(2,i<5),(5,True)) if k).next()
     return v*(10**m)
 
+def get_min_step(data,index=False):
+    """
+    gets min difference between two consecutive values
+    """
+    import numpy
+    vs = numpy.array(data)
+    diff = vs[1:]-vs[:-1]
+    mx = numpy.nanmin(diff)
+    if not index:
+        return mx
+    else: #Return at which position the step was found
+        ix =1+numpy.where(diff==mx)[0][0]
+        return (ix,mx)
+
 def get_max_step(data,index=False):
+    """
+    gets max difference between two consecutive values
+    """
     import numpy
     vs = numpy.array(data)
     diff = vs[1:]-vs[:-1]
