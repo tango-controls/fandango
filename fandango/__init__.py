@@ -108,7 +108,7 @@ except Exception as e:
 
 try:
     from .excepts import trial,getLastException,getPreviousExceptions, \
-        ExceptionWrapper,Catched,CatchedArgs
+        ExceptionWrapper,Catched,CatchedArgs,get_current_stack
 except: 
     print('Unable to import excepts module')
 

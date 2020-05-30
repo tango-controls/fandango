@@ -117,6 +117,14 @@ def trial(tries,excepts=None,args=None,kwargs=None,return_exception=None):
 
 exLogger = log.Logger('fandango',level='WARNING')
 
+def get_current_stack():
+    r = []
+    for i,line in enumerate(traceback.format_stack()):
+        line = line.strip().split('\n')
+        for l in line:
+            r.append((' '*i)+l)
+    return '\n'.join(r)
+
 def getLastException():
     """ returns last exception traceback """
     return str(traceback.format_exc())
