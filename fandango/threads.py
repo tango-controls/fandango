@@ -1220,7 +1220,7 @@ def SubprocessMethod(obj,*args,**kwargs):
         
     args = (obj,method,remote)+args
     proc = multiprocessing.Process(target=do_it,args=args,kwargs=kwargs)
-    print('New Process(%s)' % str(do_it))
+    #print('New Process(%s)' % str(do_it))
     proc.daemon = True
     proc.start()
     t0 = time.time()
