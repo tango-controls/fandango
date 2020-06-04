@@ -96,7 +96,7 @@ def monitor(*args, **kwargs):
                     #XBPMOptions
                     polling_period=1000.,
                     keeptime=1e-2,
-                    queued=False,
+                    queued=True,
                     ))
             else:
                 # for DeviceProxies
