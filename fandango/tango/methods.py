@@ -177,81 +177,6 @@ def attr2str(attr_value):
                             attr_value.value)
     else: 
         return '%s%s(%s)' %(att_name,type(attr_value).__name__,attr_value)
-
-def get_real_name(dev,attr=None):
-    """
-    It translate any device/attribute string by name/alias/label
-    
-    :param device: Expected format is [host:port/][device][/attribute]; 
-        where device can be either a/b/c or alias
-    :param attr: optional, when passed it will be regexp 
-        matched against attributes/labels
-    """
-    if isString(dev):
-        if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): 
-          dev,attr = dev.rsplit('/',1)
-        if '/' not in dev: 
-          dev = get_device_for_alias(dev)
-        if attr is None: return dev
-    for a in get_device_attributes(dev):
-        if matchCl(attr,a): return (dev+'/'+a)
-        if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
-    return None
-
-def get_full_name(model,fqdn=None):
-    """ 
-    Returns full schema name as needed by HDB++ api
-    """
-    model = model.split('tango://')[-1]
-
-    if fqdn is None: 
-        fqdn = fandango.tango.defaults.USE_FQDN
-
-    if ':' in model:
-        h,m = model.split(':',1)
-        if '.' in h and not fqdn:
-            h = h.split('.')[0]
-        elif '.' not in h and fqdn:
-            h = get_fqdn(h)
-        model = h+':'+m
-        
-    else:
-        model = get_tango_host(fqdn=fqdn)+'/'+model
-    
-    model = 'tango://'+model
-    return model
-
-def get_normal_name(model):
-    """ 
-    returns simple name as just domain/family/member,
-    without schema/host/port, as needed by TangoDB API
-    """
-    if ':' in model:
-        model = model.split(':')[-1].split('/',1)[-1]
-    return model.split('#')[0].strip('/')
-
-def get_attr_name(model,default='state'):
-    """
-    gets just the attribute part of a Tango URI
-    """
-    if not model: return ''
-    model = get_normal_name(model)
-    if model.count('/')==3:
-        return model.split('/')[-1]
-    else:
-        return default
-    
-def get_dev_name(model,full=True,fqdn=None):
-    """
-    gets just the device part of a Tango URI
-    """
-    norm = get_normal_name(model)
-    if norm.count('/')>2: 
-        model = model.rsplit('/',1)[0]
-    if not full:
-        return get_normal_name(model)
-    else:
-        return get_full_name(model,fqdn=fqdn)
         
 def get_model_name(model):
     """
@@ -1185,7 +1110,7 @@ def check_starter(host):
         return False
     
 def check_device(dev,attribute=None,command=None,full=False,admin=False,
-        bad_state=False,throw=False, timeout=3000):
+        bad_state=False,throw=False, timeout=None):
     """ 
     Command may be 'StateDetailed' for testing HdbArchivers 
     It will return True for devices ok, False for devices not running 
@@ -1208,8 +1133,9 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
                     return False
 
             dp = get_device(dev)
-            
-        dp.set_timeout_millis(int(timeout))
+
+        if timeout:    
+            dp.set_timeout_millis(int(timeout))
         p = dp.ping()
         if not p:
             return False

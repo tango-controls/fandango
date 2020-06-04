@@ -185,6 +185,81 @@ AC_PARAMS = [
 global TangoDatabase,TangoDevice,TangoProxies
 TangoDatabase,TangoDevice,TangoProxies = None,None,None
 
+def get_real_name(dev,attr=None):
+    """
+    It translate any device/attribute string by name/alias/label
+    
+    :param device: Expected format is [host:port/][device][/attribute]; 
+        where device can be either a/b/c or alias
+    :param attr: optional, when passed it will be regexp 
+        matched against attributes/labels
+    """
+    if isString(dev):
+        if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): 
+          dev,attr = dev.rsplit('/',1)
+        if '/' not in dev: 
+          dev = get_device_for_alias(dev)
+        if attr is None: return dev
+    for a in get_device_attributes(dev):
+        if matchCl(attr,a): return (dev+'/'+a)
+        if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
+    return None
+
+def get_full_name(model,fqdn=None):
+    """ 
+    Returns full schema name as needed by HDB++ api
+    """
+    model = model.split('tango://')[-1]
+
+    if fqdn is None: 
+        fqdn = fandango.tango.defaults.USE_FQDN
+
+    if ':' in model:
+        h,m = model.split(':',1)
+        if '.' in h and not fqdn:
+            h = h.split('.')[0]
+        elif '.' not in h and fqdn:
+            h = get_fqdn(h)
+        model = h+':'+m
+        
+    else:
+        model = get_tango_host(fqdn=fqdn)+'/'+model
+    
+    model = 'tango://'+model
+    return model
+
+def get_normal_name(model):
+    """ 
+    returns simple name as just domain/family/member,
+    without schema/host/port, as needed by TangoDB API
+    """
+    if ':' in model:
+        model = model.split(':')[-1].split('/',1)[-1]
+    return model.split('#')[0].strip('/')
+
+def get_attr_name(model,default='state'):
+    """
+    gets just the attribute part of a Tango URI
+    """
+    if not model: return ''
+    model = get_normal_name(model)
+    if model.count('/')==3:
+        return model.split('/')[-1]
+    else:
+        return default
+    
+def get_dev_name(model,full=True,fqdn=None):
+    """
+    gets just the device part of a Tango URI
+    """
+    norm = get_normal_name(model)
+    if norm.count('/')>2: 
+        model = model.rsplit('/',1)[0]
+    if not full:
+        return get_normal_name(model)
+    else:
+        return get_full_name(model,fqdn=fqdn)
+
 @Cached(depth=100,expire=60)
 def get_tango_host(dev_name='',use_db=False, fqdn=None):
     """
@@ -296,12 +371,22 @@ def get_proxy(argin,use_tau=False,keep=False):
     else:
         return get_device(argin,use_tau,keep)
 
-def get_device(dev,use_tau=False,keep=False): 
+def get_device(dev,use_tau=False,keep=False,proxy=None): 
     if use_tau and not TAU:
         use_tau = loadTaurus()
     if isinstance(dev,basestring): 
         if dev.count('/')==1:
             dev = 'dserver/'+dev
+        m = clmatch(retango,dev)
+        if m and m.groupdict()['attribute']:
+            dev = dev.rsplit('/',1)[0]
+        
+        # To ensure keep working
+        try:
+            dev = get_dev_name(dev,full=True,fqdn=True).lower()
+        except:
+            dev = get_dev_name(dev,full=True,fqdn=False).lower()
+        
         if use_tau and TAU: 
             return TAU.Device(dev)
         else:
@@ -309,12 +394,12 @@ def get_device(dev,use_tau=False,keep=False):
             if keep and TangoProxies is None: 
                 TangoProxies = ProxiesDict(use_tau=use_tau)
             if TangoProxies and (dev in TangoProxies or keep):
+                if proxy and dev not in TangoProxies:
+                    TangoProxies[dev] = proxy
                 return TangoProxies[dev]
             else: 
-                m = clmatch(retango,dev)
-                if m and m.groupdict()['attribute']:
-                    dev = dev.rsplit('/',1)[0]
                 return PyTango.DeviceProxy(dev)
+            
     elif isinstance(dev,PyTango.DeviceProxy) \
         or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
         return dev
