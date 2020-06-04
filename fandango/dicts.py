@@ -351,6 +351,10 @@ class ThreadDict(dict):
     @self_locked
     def __contains__(self, key):
         return dict.__contains__(self, key)
+    
+    @self_locked
+    def has_key(self, key):
+        return dict.has_key(self, key)
 
     @self_locked
     def __iter__(self):
