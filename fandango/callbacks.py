@@ -287,6 +287,10 @@ class EventThread(Logger,ThreadedObject):
     On Current EventSource implementation this is a SINGLETONE!!!, 
     its configuration will apply for the whole running process!
     
+    period: how often the process() method will be called
+    
+    events stored in queue will be processed until latency ms has ellapsed
+    or the events queue is empty. Then it will proceed to process pollings.
 
     The filtered argument will just forward last event received 
     on each loop iteration for each source. 
@@ -496,8 +500,9 @@ class EventThread(Logger,ThreadedObject):
                 self.debug('Executing pollings (%d/%d/%d)'
                            %(polls,len(pollings),len(self.sources)))
                 try:
-                    lg('process.poll(%s,%s,%s) after %s ms'%(
-                        source.full_name,source.polling_period,WAS_EMPTY,1e3*(t0-s.last_read_time)))
+                    self.debug('process.poll(%s,%s,%s) after %s ms'%(
+                        source.full_name,source.polling_period,WAS_EMPTY,
+                        1e3*(t0-s.last_read_time)))
                     #poll->read->fireEvent
                     source.poll() 
                     polls+=1
@@ -618,7 +623,7 @@ class EventSource(Logger,SingletonMap):
     """
     
     EVENT_TIMEOUT = 900  # 10s
-    DEFAULT_LOG = 'WARNING'
+    DEFAULT_LOG = 'INFO'
     DEFAULT_EVENTS = ['change'] #[ 'periodic', 'change', 'archive', 'quality' ] #'user_event',
     VALUE_EVENTS = ['periodic','change','archive','quality','user_event']
     TAURUS_EVENTS = ['change','attr_conf']
@@ -726,7 +731,9 @@ class EventSource(Logger,SingletonMap):
         listeners = toList(kw.get('listeners',[]))
         if kw.get('persistent',False):
             listeners.append(EventSource.DUMMY)
-        map(self.addListener,listeners)
+
+        for l in listeners:
+            self.addListener(l)
             
     def __del__(self): 
         self.cleanUp()
@@ -890,6 +897,7 @@ class EventSource(Logger,SingletonMap):
         """
         Adds a Listener to this EventSource object.
         use_events can be a boolean or a list of event types (change,attr_conf,periodic,archive)
+        it can be used to disable events, but will enable it only if it is already True for that Source
         """
         if not isCallable(listener) and not any(hasattr(listener,c) for c in (
             'eventReceived','event_received','push_event')):
@@ -901,7 +909,7 @@ class EventSource(Logger,SingletonMap):
             use_events = self.use_events or self.DEFAULT_EVENTS
             
         use_events = toList(use_events or self.use_events)
-        self.debug('addListener(%s,use_events=%s,polled=%s)'
+        self.warning('addListener(%s,use_events=%s,polled=%s)'
                     %(listener,use_events,use_polling))
         self.forced = self.forced or use_polling
         

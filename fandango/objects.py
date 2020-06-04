@@ -867,10 +867,10 @@ class Cached(Decorator):
             # Instantiated decorator
             return self.execute(*args,**kwargs)
           
-    def _log(self,msg):
+    def _log(self,msg,force=False):
         if isCallable(self.log): 
           self.log(msg) 
-        elif self.log: 
+        elif self.log or force: 
           print(self.func,msg)
       
     @staticmethod
@@ -946,7 +946,7 @@ class Cached(Decorator):
                     self._log('%s(%s,%s) = ...'%(self.func,args,kwargs))                    
                     v = self.func(*args,**kwargs)
                 except Exception as e:
-                    self._log(traceback.format_exc())
+                    self._log(traceback.format_exc(), True)
                     v = e
                 #self._log('%s(%s,%s) = %s'%(self.func,args,kwargs,str(v)[:80]))
                 try:

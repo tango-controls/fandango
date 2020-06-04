@@ -9,8 +9,10 @@ usage:
 
 import sys
 import time
+import traceback
 import PyTango
 import fandango as fn
+
 
 class MyCallback(object):
     
@@ -18,25 +20,36 @@ class MyCallback(object):
     
     def __init__(self):
         self.t0 = time.time()
+        self.m0 = fn.linos.get_process_memory()
         self.counters = fn.dicts.defaultdict(int)
         self.values = fn.dicts.defaultdict(str)
         self.dups = fn.dicts.defaultdict(int)
         self.ratios = fn.dicts.defaultdict(float)
 
     def push_event(self,event):
-        MyCallback.counter+=1
-        aname = fn.tango.get_normal_name(event.attr_name)
-        self.counters[aname] = self.counters[aname] + 1
-        self.ratios[aname] = self.counters[aname] / (time.time()-self.t0)
-        value = getattr(event.attr_value,'value',event.attr_value)
-        value = fn.shortstr(value)
-        if self.values[aname] == value:
-            self.dups[aname] += 1
-            
-        self.values[aname] = value
-        print('%s:%s = %s; %s; ct=%d/%d, e/s=%2.2f, dups=%d' %
-                (fn.time2str(),aname,value,event.event, self.counters[aname],
-                MyCallback.counter,self.ratios[aname],self.dups[aname]))
+        try:
+            MyCallback.counter+=1
+            aname = fn.tango.get_normal_name(event.attr_name)
+            tt = (time.time()-self.t0)
+            self.counters[aname] = self.counters[aname] + 1
+            self.ratios[aname] = self.counters[aname] / tt
+            value = getattr(event.attr_value,'value',event.attr_value)
+            value = fn.shortstr(value)
+            if self.values[aname] == value:
+                self.dups[aname] += 1
+                
+            self.values[aname] = value
+            value = str(value)[:40]+'...'
+            print('%s:%s = %s; %s; ct=%d/%d, Hz=%2.2f, dups=%d, leak=%2.1fKbps' 
+                %  (fn.time2str(),aname,value,event.event, 
+                    self.counters[aname],
+                    MyCallback.counter,
+                    self.ratios[aname],
+                    self.dups[aname],
+                    (fn.linos.get_process_memory()-self.m0)/(1e3*tt),
+                    ))
+        except:
+            traceback.print_exc()
         
 
 def monitor(*args, **kwargs):
@@ -64,22 +77,37 @@ def monitor(*args, **kwargs):
     models = [(a if '/' in a else d+'/'+a) for a in attrs]
     for a in models:
         (failed,worked)[bool(fn.tango.check_attribute_events(a))].append(a)
-        
+
+
+    fn.EventThread.MinWait = 1e-2 #1e-4
+    fn.EventThread.DEFAULT_PERIOD_ms = 300 #0.1        
+    
     for m in models:
         try:
             sources.append(fn.EventSource(m,enablePolling=True,
-                listeners=[cb], pollingPeriod=kwargs.get('period',3000)))
+                listeners=[cb], 
+                use_events=True,
+                #pollingPeriod=kwargs.get('period',3000)))
+                #XBPMOptions
+                polling_period=1000.,
+                keeptime=1e-2,
+                ))
+
+            # for DeviceProxies
             #for e in events:
                 #eis.append(dp.subscribe_event(a,e,cb))
             #worked.append(a)
         except:
             print(fn.except2str())
             #failed.append(a)
+            
+    fn.EventSource.get_thread().setup(period_ms=50,latency=5.,filtered=False)
 
     print('%d attributes NOT provide events: %s' % (len(failed),failed))      
     print('%d attributes provide events: %s' % (len(worked),worked))
     print('-'*80 + '\n' + '-'*80)
     try:
+        cb.m0,cb.t0 = fn.linos.get_process_memory(),fn.now()
         while True:
             time.sleep(1)
     except: #KeyboardInterrupt
