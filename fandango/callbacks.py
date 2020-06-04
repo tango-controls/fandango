@@ -49,7 +49,7 @@ from excepts import getLastException,exc2str
 from objects import *
 from functional import *
 from dicts import *
-from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict,get_device
+from tango import PyTango,EventType,fakeAttributeValue,ProxiesDict,get_device,get_dev_name
 from tango import get_full_name,get_attribute_events, check_device, check_device_cached
 from threads import ThreadedObject,timed_range,wait,threading
 from log import Logger,printf,tracer
@@ -425,6 +425,7 @@ class EventThread(Logger,ThreadedObject):
 
             except Queue.Empty as e:
                 #The queue is empty, long period attributes can be processed
+                #self.info('Empty Queue! + %s' % (time.time()-t0))
                 WAS_EMPTY = True
                 break
 
@@ -443,8 +444,9 @@ class EventThread(Logger,ThreadedObject):
                 break 
         
         #Sequential execution of events received is relatively guaranteed
-        if queue:
+        if len(queue):
             self.debug('Process %d events received ...'%(len(queue)))
+            
         pending = self.get_pending()
         if pending:
           self.info('%d events processed, %d still in queue' 
@@ -460,13 +462,14 @@ class EventThread(Logger,ThreadedObject):
                     e = events.pop(0)
                     source,args = e
                     if filtered: #propagate last event to all sources
-                      sources = self.get_sources(self.get_source_name(s))
+                      sources = self.get_sources(s) #self.get_source_name(s))
                     else:
                       sources = [source] #each source should push its own events
                     for source in sources:
                       if True:
                         # Update timestamp also for errors 
                         # not filtered in push_event
+                        # redundance needed to avoid overpolling
                         source.last_read_time = now()
                           
                       self.fireEvent(source,*args)
@@ -474,29 +477,36 @@ class EventThread(Logger,ThreadedObject):
                 except:
                     self.error('%s:%s\n%s'%(s,e,traceback.format_exc()))
 
-        self.wait(0) #breathing
+        self.wait(1e-6) #breathing
        
         #Process pollings and keep alive
         t0 = now()
         pollings = []
-        for s in self.sources.copy():
-            #@TODO ... avoid copy!
-            self.debug('%s.process => checkEvents(%s,%s)' % (self.full_name,s,s.getState()))
-            s.checkEvents(tdiff=2e-3*s.polling_period) #Tries to subscribe/updates polling
+        
+        for s in self.sources: #@TODO ... avoid copy!
                 
             if s.getMode():
-                alive = check_device_cached(s.proxy)
                 polled = s.isPollingEnabled()
-                if not alive and s.last_read_time < (t0-s.KeepAlive):
-                    self.debug('%s seems not alive, last read was at %s'
-                               %(s.device,time2str(s.last_read_time)))
-                polled = alive and polled
-                nxt = s.last_read_time+1e-3*(
-                    s.polling_period if polled else s.KeepAlive)
-                pollings.append((nxt,s))
+
+                # Check alive only if needed
+                if t0 > (s.last_read_time + 1e3*(
+                    s.polling_period if polled else s.KeepAlive)):
+                    
+                    alive = check_device_cached(s.device)
+                    if not alive and s.last_read_time < (t0-s.KeepAlive):
+                        self.debug('%s seems not alive, last read was at %s'
+                                %(s.device,time2str(s.last_read_time)))
+                    polled = alive and polled
+                    nxt = s.last_read_time+1e-3*(
+                        s.polling_period if polled else s.KeepAlive)
+                    pollings.append((nxt,s))
             
         for nxt,source in reversed(sorted(pollings)):
             if t0 > nxt and (s.isPollingActive() or WAS_EMPTY):
+                
+                self.info('%s.process => checkEvents(%s,%s)' % (self.full_name,source,source.getState()))
+                source.checkEvents(tdiff=2e-3*s.polling_period) #Tries to subscribe/updates polling
+                
                 self.debug('Executing pollings (%d/%d/%d)'
                            %(polls,len(pollings),len(self.sources)))
                 try:
@@ -511,7 +521,9 @@ class EventThread(Logger,ThreadedObject):
                     if WAS_EMPTY: #Only one poll per cycle, to allow events to enter
                         break 
                 finally:
+                    # redundance needed to avoid overpolling
                     source.last_read_time = now()
+
             self.wait(self.MinWait/10.) #breathing
                 
         asynch_hw = [s[1] for s in pollings 
@@ -530,7 +542,8 @@ class EventThread(Logger,ThreadedObject):
             break
           
         self.wait(0)
-        if evs or polls: lg('Processed %d events, %d pollings'%(evs,polls))
+        if evs or polls: 
+            lg('Processed %d events, %d pollings'%(evs,polls))
         notupdated = [s for s in self.sources if not s.stats['fired']]
         if notupdated:
             self.info('%d/%d sources not updated yet'%(
@@ -633,7 +646,6 @@ class EventSource(Logger,SingletonMap):
     event_lock = threading.RLock() #Lock()
     
     INSTANCES = []
-    PROXIES = ProxiesDict()
     DUMMY = EventListener('dummy') #Dummy listener for subscription persistence
     
     #States
@@ -668,19 +680,17 @@ class EventSource(Logger,SingletonMap):
             parent = name.rsplit('/',1)[0]
         
         self.fake = kw.get('fake',False)
-        if isString(parent):
-            self.device = parent # just to keep it alive
-            try:
-              self.proxy = not self.fake and self.PROXIES[parent]
-            except:
-              self.proxy = not self.fake and get_device(parent, keep=True)
-        else:
-            try:
-                self.device = parent.name()
+        try:
+            if isString(parent):
+                self.device = get_dev_name(parent,full=True,fqdn=True) # just to keep it alive
+                self.proxy = not self.fake and get_device(parent, keep=True)
+            else:
+                self.device = get_dev_name(parent.name(),full=True,fqdn=True)
                 self.proxy = parent
-            except:
-                raise Exception('A valid device name is needed: %s'%
-                                ([name,self.simple_name,parent]))
+        except:
+            traceback.print_exc()
+            raise Exception('A valid device name is needed: %s'%
+                            ([name,self.simple_name,parent]))
               
         self.full_name = get_full_name('/'.join(
                         (self.device,self.simple_name)))
@@ -842,7 +852,7 @@ class EventSource(Logger,SingletonMap):
         try:
             #self.factory().addAttributeToPolling(self, self.getPollingPeriod())      
             self.forced = notNone(force,self.forced)
-            if not self.forced and not check_device_cached(self.proxy):
+            if not self.forced and not check_device_cached(self.device):
                 self.warning('activatePolling(): %s not running!'
                               %self.device)
                 return
@@ -1160,7 +1170,7 @@ class EventSource(Logger,SingletonMap):
             check = self.proxy.ping()
             is_events = self.isUsingEvents() # just returns current state
             if not self.polled and (self.forced or (self.use_events and not is_events)):
-                #check = self.proxy.ping() #check_device_cached(self.proxy)                               
+                #check = self.proxy.ping() #check_device_cached(self.device)                               
                 if check:
                     self.info('checkEvents(): events not subscribed, enabling polling')
                     self.activatePolling()            
@@ -1269,7 +1279,7 @@ class EventSource(Logger,SingletonMap):
             ## Do not merge these IF's, order matters
             self.event_lock.acquire()
             self.debug('read(): cache : %s'%shortstr(self.attr_value))
-            if not check_device_cached(self.proxy):
+            if not check_device_cached(self.device):
                 self.warning('read_hw(): %s not running!'%self.device)
                 raise Exception('EvS_CantConnectToDevice')
             if asynch:
@@ -1310,7 +1320,7 @@ class EventSource(Logger,SingletonMap):
             #traceback.format_exc().split('desc')[-1][:80]))
             self.attr_value = fakeAttributeValue(
                                   self.full_name,value=e,error=e)
-            if (not check_device_cached(self.proxy)
+            if (not check_device_cached(self.device)
                     and self.polled and not self.forced):
                 self.deactivatePolling()
         finally:
@@ -1423,7 +1433,7 @@ class EventSource(Logger,SingletonMap):
                     elif self.use_events and not is_polled:
                         self.info('EVENTS_FAILED! (%s,%s,%s,%s)'%(type_,reason,has_evs,is_polled))
                         #self.info(str([et,type_,event.err,]))
-                        if check_device_cached(self.proxy):
+                        if check_device_cached(self.device):
                             self.setState('PENDING')
                             self.activatePolling()
                     return
@@ -1484,6 +1494,7 @@ class EventSource(Logger,SingletonMap):
                 self.get_thread().put((self,type_,value))
             else:
                 self.fireEvent(type_,value)
+                self.last_read_time = time.time()
         except:
             self.error(type(event),dir(event))
             traceback.print_exc()
