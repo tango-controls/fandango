@@ -40,13 +40,15 @@ class MyCallback(object):
                 
             self.values[aname] = value
             value = str(value)[:40]+'...'
-            print('%s:%s = %s; %s; ct=%d/%d, Hz=%2.2f, dups=%d, leak=%2.1fKbps' 
+            m1 = fn.linos.get_process_memory()
+            print('%s:%s = %s; %s; ct=%d/%d, Hz=%2.2f, dups=%d, leak=%2.1fKbps/%1.3fMb' 
                 %  (fn.time2str(),aname,value,event.event, 
                     self.counters[aname],
                     MyCallback.counter,
                     self.ratios[aname],
                     self.dups[aname],
-                    (fn.linos.get_process_memory()-self.m0)/(1e3*tt),
+                    (m1-self.m0)/(1e3*tt),
+                    m1/1e6,
                     ))
         except:
             traceback.print_exc()
@@ -79,40 +81,71 @@ def monitor(*args, **kwargs):
         (failed,worked)[bool(fn.tango.check_attribute_events(a))].append(a)
 
 
-    fn.EventThread.MinWait = 1e-2 #1e-4
-    fn.EventThread.DEFAULT_PERIOD_ms = 300 #0.1        
+    USE_ES = 1
+    if USE_ES:
+        fn.EventThread.MinWait = 1e-2 #1e-4
+        fn.EventThread.DEFAULT_PERIOD_ms = 300 #0.1        
     
     for m in models:
         try:
-            sources.append(fn.EventSource(m,enablePolling=True,
-                listeners=[cb], 
-                use_events=True,
-                #pollingPeriod=kwargs.get('period',3000)))
-                #XBPMOptions
-                polling_period=1000.,
-                keeptime=1e-2,
-                ))
-
-            # for DeviceProxies
-            #for e in events:
-                #eis.append(dp.subscribe_event(a,e,cb))
-            #worked.append(a)
+            if USE_ES:
+                sources.append(fn.EventSource(m,enablePolling=True,
+                    listeners=[cb], 
+                    use_events=True,
+                    #pollingPeriod=kwargs.get('period',3000)))
+                    #XBPMOptions
+                    polling_period=1000.,
+                    keeptime=1e-2,
+                    queued=False,
+                    ))
+            else:
+                # for DeviceProxies
+                d,a = m.rsplit('/',1)
+                dp = fn.get_device(d,keep=True)
+                #dp = PyTango.DeviceProxy(d)
+                type_ = PyTango.EventType.CHANGE_EVENT
+                #for e in events:
+                eis.append((dp,
+                    dp.subscribe_event(a,
+                    type_,
+                    cb,
+                    #[],True,
+                    )))
+                worked.append(m)
         except:
-            print(fn.except2str())
-            #failed.append(a)
-            
-    fn.EventSource.get_thread().setup(period_ms=50,latency=5.,filtered=False)
+            #print(fn.except2str())
+            traceback.print_exc()
+            failed.append(m)
+    
+    if USE_ES:
+        fn.EventSource.get_thread().setup(period_ms=50,
+                                          latency=5.,filtered=False,)
+        fn.EventSource.get_thread().setLogLevel('INFO')
 
     print('%d attributes NOT provide events: %s' % (len(failed),failed))      
     print('%d attributes provide events: %s' % (len(worked),worked))
     print('-'*80 + '\n' + '-'*80)
     try:
-        cb.m0,cb.t0 = fn.linos.get_process_memory(),fn.now()
+        #cb.m0,cb.t0 = fn.linos.get_process_memory(),fn.now()
+        ct = 0
         while True:
+            if ct == 10:
+                print('\n\n\n\n\nReset memory counter\n\n\n\n\n')
+                cb.t0 = fn.now()
+                cb.m0 = fn.linos.get_process_memory()
             time.sleep(1)
+            ct+=1
     except: #KeyboardInterrupt
         print(fn.except2str())
         print('-'*80)
+        print('Unsubscribing ...')
+        if USE_ES:
+            for s in sources:
+                s.removeListener(cb)
+        else:
+            for dp,ei in eis:
+                dp.unsubscribe_event(ei)
+                
         print "Finished monitoring"
         
     #[dp.unsubscribe_event(ei) for ei in eis];
