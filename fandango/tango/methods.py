@@ -177,6 +177,26 @@ def attr2str(attr_value):
                             attr_value.value)
     else: 
         return '%s%s(%s)' %(att_name,type(attr_value).__name__,attr_value)
+    
+def get_real_name(dev,attr=None):
+    """
+    It translate any device/attribute string by name/alias/label
+    
+    :param device: Expected format is [host:port/][device][/attribute]; 
+        where device can be either a/b/c or alias
+    :param attr: optional, when passed it will be regexp 
+        matched against attributes/labels
+    """
+    if isString(dev):
+        if attr is None and dev.count('/') in (1,4 if ':' in dev else 3): 
+          dev,attr = dev.rsplit('/',1)
+        if '/' not in dev: 
+          dev = get_device_for_alias(dev)
+        if attr is None: return dev
+    for a in get_device_attributes(dev):
+        if matchCl(attr,a): return (dev+'/'+a)
+        if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
+    return None
         
 def get_model_name(model):
     """
