@@ -309,7 +309,7 @@ class ThreadDict(dict):
     
     @self_locked
     def __locked_getitem_hw__(self,key):
-        return self.__getitem__(self,key,hw=True)    
+        return self.__getitem__(key,hw=True)    
         
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
@@ -335,7 +335,7 @@ class ThreadDict(dict):
     @self_locked
     def get(self,key,default=None,hw=False):
         if hw:
-            self.__locked_getitem_hw__(key,hw)
+            self.__locked_getitem_hw__(key)
         elif not self.threaded and self.read_method: 
             dict.__setitem__(self,key,self.read_method(key))
             self.last_update = time.time()
