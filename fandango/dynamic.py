@@ -1545,10 +1545,10 @@ class DynamicDSHelpers(DynamicDSAttrs):
                              ' trying to evaluate ...'%(aname,))
                 formula,compiled=aname,None
         if full:
-          return aname,formula,compiled
+            return aname,formula,compiled
         else:
-          #If no attribute is matching, attribute name is returned
-          return formula
+            #If no attribute is matching, attribute name is returned
+            return formula
       
     def get_attr_models(self,attribute):
         """
@@ -2129,7 +2129,7 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getAttrFormula(self,argin):
-        return self.dyn_attrs[argin]
+        return self.get_attr_formula(argin)
     
     #------------------------------------------------------------------------------------------------------
     #   Lock/Unlock Methods
