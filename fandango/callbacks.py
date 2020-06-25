@@ -479,6 +479,7 @@ class EventThread(Logger,ThreadedObject):
 
         self.wait(1e-6) #breathing
        
+        ######################################################################
         #Process pollings and keep alive
         t0 = now()
         pollings = []
@@ -489,7 +490,7 @@ class EventThread(Logger,ThreadedObject):
                 polled = s.isPollingEnabled()
 
                 # Check alive only if needed
-                if t0 > (s.last_read_time + 1e3*(
+                if t0 > (s.last_read_time + 1e-3*(
                     s.polling_period if polled else s.KeepAlive)):
                     
                     alive = check_device_cached(s.device)
@@ -682,11 +683,12 @@ class EventSource(Logger,SingletonMap):
         self.fake = kw.get('fake',False)
         try:
             if isString(parent):
-                self.device = get_dev_name(parent,full=True,fqdn=True) # just to keep it alive
+                self.device = get_dev_name(parent,full=True,fqdn=True) 
+                # just to keep it alive, keep True initializes cache
                 self.proxy = not self.fake and get_device(parent, keep=True)
             else:
                 self.device = get_dev_name(parent.name(),full=True,fqdn=True)
-                self.proxy = parent
+                self.proxy = get_device(self.device, proxy=parent, keep=True)
         except:
             traceback.print_exc()
             raise Exception('A valid device name is needed: %s'%
@@ -837,6 +839,8 @@ class EventSource(Logger,SingletonMap):
         if force: self.activatePolling(force = force)
         
     def forcePolling(self, period = None):
+        period = period if isNumber(period) else float(
+            self.getPollingPeriod() or self.DefaultPolling)
         if period: self.activatePolling(period,force=True)
         else: self.deactivatePolling()
 
@@ -1253,13 +1257,15 @@ class EventSource(Logger,SingletonMap):
                 cache = False
             else:
                 cache = True
+
         self.debug('read(cache=%s,asynch=%s,threaded=%s)'
            %(cache,asynch,self.get_thread().is_alive()))
+
         self.asynch_hook() # Check for pending asynchronous results
         if not cache or self.attr_value is None:
             if self.checkState('SUBSCRIBED') and not self.last_event:
-
                 self.info('Attribute subscribed but no events received yet!!')
+                
             self.stats['read']+=1
             self.last_read_time = t0
             self.read_hw(asynch=asynch)
@@ -1267,6 +1273,7 @@ class EventSource(Logger,SingletonMap):
             if self.attr_value is not None: 
                 #if None, asynch has not been read yet
                 self.fireEvent(EventType.PERIODIC_EVENT,self.attr_value)
+                
         if _raise and getattr(self.attr_value,'error',False):
             raise self.attr_value.value
         else:
