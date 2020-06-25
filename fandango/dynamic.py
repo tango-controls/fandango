@@ -649,7 +649,9 @@ class DynamicDSAttrs(DynamicDSImpl):
             # if the code is the same ... don't touch anything
             # if the code or the type changes ... remove the attribute!
             # dyn_attr() will create the attributes only if they don't exist.
-            if aname not in self.dyn_values:
+            aname = self.get_attr_name(aname)
+            if not any(k.lower()==aname.lower() for k in self.dyn_values):
+                #if aname not in self.dyn_values:
                 create = True
                 self.dyn_values[aname]=DynamicAttribute(name=aname)
                 self.dyn_types[aname]=None
@@ -965,6 +967,7 @@ class DynamicDSAttrs(DynamicDSImpl):
     @Cached
     def check_dependencies(self, aname):
         #Checking attribute dependencies
+        aname = self.get_attr_name(aname)
         if aname not in self.dyn_values:
             aname,formula,compiled = self.get_attr_formula(aname,full=True)
             
@@ -1005,6 +1008,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         #Updating Last Attribute Values
         now = time.time()
         changed = False
+        aname = self.get_attr_name(aname)
         for k in (self.dyn_values[aname].dependencies or []):
             self.debug("In update_dependencies(%s): "
                 " (%s,last read at %s, KeepTime is %s)"
@@ -1147,10 +1151,12 @@ class DynamicDSAttrs(DynamicDSImpl):
     def push_dyn_attr(self,aname,value=None,date=None,quality=None,
             events=None,changed=None,queued=False):
         try:
+            aname = self.get_attr_name(aname)
             queued = queued and self.MaxEventStream
             
             if fun.clmatch('state$',aname):
                 aname = 'State'
+                events,changed = True,True
                 value = value if value is not None else self.get_state()
                 date,quality = time.time(),AttrQuality.ATTR_VALID
 
@@ -1165,7 +1171,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             if changed is None:
                 changed = self.check_changed_event(aname,value)
             if not events or not changed:
-                return        
+                return 'nothing to do'
                 
             self.info('push_dyn_attr(%s,%s)=%s(%s))\n%s'%(aname,
                 queued and 'queued' or 'pushed',type(value),
@@ -1177,10 +1183,20 @@ class DynamicDSAttrs(DynamicDSImpl):
                     self._events_queue.put((aname,value,date,quality,events))
                 finally:
                     self._events_lock.release()
+                return 'queued'
             else:
-                self.push_change_event(aname,value,date,quality)
+                if aname.lower() in ('state','status'):
+                    self.push_change_event(aname)
+                else:
+                    self.push_change_event(aname,value,date,quality)
                 if fun.clsearch('archive',events):
-                    self.push_archive_event(aname,value,date,quality)
+                    if aname.lower() in ('state','status'):
+                        self.push_change_event(aname)
+                    else:
+                        self.push_archive_event(aname,value,date,quality)
+
+                return 'pushed'
+            
         except Exception as e:
             self.error('push_dyn_attr(%s,%s(%s),%s,%s) failed!\n%s' % 
                 (aname,type(value),value,date,quality,traceback.format_exc()))
@@ -1480,7 +1496,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             for i in range(self.MaxEventStream):
                 try:
                     a,v,d,q,e = self._events_queue.get(False)
-                    self.push_dyn_attr(a,v,d,q,e,True,False)
+                    self.push_dyn_attr(a,v,d,q,e,changed=True,queued=False)
                     c+=1
                 except objects.Queue.Empty:
                     break
@@ -1520,6 +1536,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         return aname
     
     def get_attr_date(self,aname,value):
+        aname = self.get_attr_name(aname)
         if type(value) is DynamicAttribute:
             return value.date
         return time.time()    
@@ -1529,6 +1546,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         Returns the formula for the given attribute
         The as_tuple flag will return an attr,formula,compiled tuple
         """
+        aname = self.get_attr_name(aname)
         if aname in self.dyn_values:
             formula = self.dyn_values[aname].formula
             compiled = self.dyn_values[aname].compiled
@@ -1561,6 +1579,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         return ['/'.join(filter(bool,s)) for s in matches]   
     
     def get_attr_quality(self,aname,attr_value):
+        aname = self.get_attr_name(aname)
         formula = self.dyn_qualities.get(aname.lower()) or 'Not specified'
         self.debug('In get_attr_quality(%s,%s): %s' 
             % (aname,shortstr(attr_value,15)[:10],formula))
@@ -1644,8 +1663,9 @@ class DynamicDSHelpers(DynamicDSAttrs):
         if len(argin)<2: value=VALUE
         else: value=argin[1]
         aname = argin[0]
-
-        if aname not in self.dyn_values.keys(): raise Exception('Unknown State or Attribute : ', aname)
+        aname = self.get_attr_name(aname)
+        if aname not in self.dyn_values.keys(): 
+            raise Exception('Unknown State or Attribute : ', aname)
         elif value is not None:
             self.dyn_values[aname].forced=value
             if self.simulationMode:
@@ -1769,7 +1789,9 @@ class DynamicDSHelpers(DynamicDSAttrs):
                             self._external_attributes[full_name].addListener(self.event_received)
                         else: 
                             #USING PLAIN PYTANGO (POLLING UNCACHED VALUES)
-                            self._external_attributes[full_name] = tango.CachedAttributeProxy(full_name,max((100,self.KeepTime)))#keeptime=self.KeepTime)
+                            cap = tango.CachedAttributeProxy(full_name,
+                                    keeptime=max((100,self.KeepTime)))#keeptime=self.KeepTime)
+                            self._external_attributes[full_name] = cap
                     else:
                         self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if self.UseTaurus else 'PyTango',full_name))
                     if write: 
@@ -2119,6 +2141,12 @@ class DynamicDS(DynamicDSHelpers):
         self.info('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout        
     
+    def pushAttribute(self,argin):
+        try:
+            return self.push_dyn_attr(argin,changed=True,queued=True)
+        except:
+            return(traceback.format_exc())
+    
     #------------------------------------------------------------------
     #    getAttrFormula command:
     #
@@ -2359,7 +2387,12 @@ class DynamicDSClass(PyTango.DeviceClass):
                 'Display level':PyTango.DispLevel.EXPERT,
                 'Polling period': 3000,
             } ],
-
+        'pushAttribute':
+            [[PyTango.DevString, "Get current attribute formula"],
+            [PyTango.DevString, "Get current attribute formula"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],                   
         }
 
     #    Attribute definitions
