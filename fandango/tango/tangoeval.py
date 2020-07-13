@@ -51,7 +51,10 @@ from .search import *
 
 def get_attribute_time(value):
     #Gets epoch for a Tango value
-    return getattr(value.time,'tv_sec',value.time)
+    t = value.time
+    if hasattr(t,'tv_sec'):
+        t = t.tv_sec + 1e-6*t.tv_usec
+    return t
 
 class TangoedValue(object):
   
