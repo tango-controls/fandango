@@ -367,10 +367,13 @@ def desktop_switcher(period,event=None,iterations=2):
 # Networking methods
 
 fun.Cached(depth=1000,expire=300.)
-def get_fqdn(hostname):
+def get_fqdn(hostname,keep_alias=True):
     """ Reimplemented to be cached for continuous tango host parsing """
     import socket
-    return socket.getfqdn(hostname)
+    fqdn = socket.getfqdn(hostname)
+    if keep_alias:
+        fqdn = '.'.join(hostname.split('.')[:1]+fqdn.split('.')[1:])
+    return fqdn
 
 def ping(ips,threaded = False, timeout = 1):
     ''' By Noah Gift's, PyCon 2008

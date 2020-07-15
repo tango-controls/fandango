@@ -295,7 +295,8 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
         
         elif fqdn is True: 
             try:
-                host = get_fqdn(host)
+                if host.count('.')<2:
+                    host = get_fqdn(host)
             except:
                 pass
             
