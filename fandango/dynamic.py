@@ -156,6 +156,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self.DynamicAttributes = []
         self.DynamicStates = []
         self.DynamicStatus = []
+        self.Lambdas = {}
         self.CheckDependencies = True
         #Internals
         self.dyn_attrs = {}
@@ -419,7 +420,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
                 if prop=='polled_attr': 
                   self._polled_attr_ = tango.get_polled_attrs(value)
                   
-                elif prop=='Lambdas':
+                elif prop=='StoredLambdas':
                     self.Lambdas = dict(l.split(':',1) for l in value 
                                         if ':' in l)
                     try: 
@@ -2279,7 +2280,7 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevLong,
             "It will fix the maximum size for all Dynamic Attributes.",
             [ MAX_ARRAY_SIZE ] ],
-        'Lambdas':
+        'StoredLambdas':
             [PyTango.DevVarStringArray,
             "regexp:method ; this property allows to declare accelerated calls,"
             " whenever a formula matches regexp, method will be called without"
