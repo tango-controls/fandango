@@ -443,7 +443,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     (crosschecked with 1e6 samples against the 
     PyTangoArchiving.utils.decimate_array method using numpy)
     """
-    print('filter_array([%d],w=%f' % (len(data),window))
+    if trace: print('filter_array([%d],w=%f' % (len(data),window))
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     begin,end,window = map(float,((begin,end,window)))
     try:
@@ -459,6 +459,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         if window < 1.:
             print('ranges only accept integers, so the minimum window is 1')
             window = 1.
+        #window = int(window)
     
     #CUT-OFF; removing data out of interval    
     #--------------------------------------------------------------------------
@@ -514,6 +515,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         rb,re,rs = window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window
         if ranger == range:
             rb,re,rs = int(rb),int(re),int(rs)
+        if trace: print('filter_array.%s(%s,%s,%s)' % (ranger,rb,re,rs))
         for t in ranger(rb,re,rs):
             if i<=ilast:
                 if data[i][0]>t:

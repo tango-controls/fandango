@@ -884,7 +884,7 @@ def put_class_property(klass,property,value=None,db=None):
                     
     return (db or get_database()).put_class_property(klass,property)
             
-def get_device_property(device,property,db=None):
+def get_device_property(device,property,db=None,raw=False):
     """
     It returns device property value or just first item 
     if value list has lenght==1
@@ -894,7 +894,7 @@ def get_device_property(device,property,db=None):
         
     prop = (db or get_database()).get_device_property(
                                     device,[property])[property]
-    return prop if len(prop)!=1 else prop[0]
+    return prop if raw or len(prop)!=1 else prop[0]
 
 def put_device_property(device,property,*value,**db):
                         #value=None,db=None):
