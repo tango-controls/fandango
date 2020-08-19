@@ -48,6 +48,12 @@ Enum classes are borrowed from taurus.core.utils (by Tiago Coutinho)
 
 """
 from __future__ import print_function
+
+try:
+    import builtins
+except:
+    import __builtin__ as builtins
+    
 try:
   from future import standard_library
   standard_library.install_aliases()
@@ -151,23 +157,27 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
     :param fltr: a callable(name):bool method
     """
     dct = {}
+    if isDictionary(obj):
+        members = obj.items()
+    else:
+        members = [(k,getattr(obj,k)) for k in dir(obj)]
     try:
-        for name in dir(obj):
+        for name,attr in members:
             if fltr and not fltr(name):
                 continue
             try:
-                attr = getattr(obj,name)
                 if hasattr(attr,'__call__'): continue
                 if name == 'inited_class_list': continue
                 if name.startswith('__'): continue
                 if type_check:
                     try: 
-                        if type(attr).__name__ not in dir(__builtin__):
+                        if type(attr).__name__ not in dir(builtins):
                             if isinstance(attr,dict):
-                                attr = dict((k,v) for k,v in list(attr.items()))
+                                attr = attr.copy()
                             else:
                                 attr = str(attr)
                     except: 
+                        traceback.print_exc()
                         continue
                 dct[name] = attr
             except Exception as e:
