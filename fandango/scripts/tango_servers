@@ -54,6 +54,8 @@ def main(args = []):
       if action in ('status','states','info','list'):
           if targets:
               for k,v in sorted(astor.items()):
+                if host and v.host!=host:
+                    continue
                 print('%s (%s):\t%s'%(k,v.host,str(sts[k])))
                 try:
                   for d,s in sorted(v.get_all_states().items()):
@@ -62,7 +64,8 @@ def main(args = []):
                 print('')
 
           else:
-            for h,ls in sorted(astor.get_host_overview().items()):
+            
+            for h,ls in sorted(astor.get_host_overview(host).items()):
                 print('Note: Devices not controlled by Astor will not appear in this report\n\n')
                 for l,ds in sorted(ls.items()):
                     print '%s:%s'%(h,l)
