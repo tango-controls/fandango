@@ -53,18 +53,19 @@ try:
     import builtins
 except:
     import __builtin__ as builtins
-    
-try:
-  from future import standard_library
-  standard_library.install_aliases()
-  from builtins import map
-  from builtins import str
-  from past.builtins import basestring
-  from builtins import object
-  import builtins
-  from builtins import object
-except: 
-  pass
+ 
+### BUG!!! Using python 2 backports caused standard_library to trigger test.py
+#try:
+  #from future.standard_library import install_aliases
+  #install_aliases()
+  #from builtins import map
+  #from builtins import str
+  #from past.builtins import basestring
+  #from builtins import object
+  #import builtins
+  #from builtins import object
+#except: 
+  #pass
 
 import traceback
 from fandango.functional import *
