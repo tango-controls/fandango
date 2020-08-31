@@ -460,12 +460,14 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
     def parseStaticAttributes(self,add=True,keep=True):
         """ Parsing StaticAttributes if defined. """
         attrs = []
+        dynamics = [d.split('=')[0].strip().lower() 
+                    for d in self.DynamicAttributes]
         if hasattr(self,'StaticAttributes'): 
             for a in self.StaticAttributes:
                 aname = a.split('#')[0].split('=')[0].strip()
                 if aname:
                     attrs.append(aname)
-                    if any(d.startswith(aname) for d in self.DynamicAttributes):
+                    if aname.lower() in dynamics:
                         self.info('StaticAttribute %s overriden by '
                                   'DynamicAttributes Property'%(aname))
                     else:
