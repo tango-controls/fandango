@@ -46,6 +46,7 @@ import re
 import random
 import math
 import time,datetime
+import traceback
 
 from operator import isCallable
 from functools import partial
@@ -315,6 +316,7 @@ def inCl(exp,seq,regexp=True):
 def matchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless match between expression and given string """
     try:
+        exp,seq = str(exp),str(seq)
         if extend:
             if '&' in exp:
                 return all(matchCl(e.strip(),seq,terminate=False,extend=True) 
@@ -323,7 +325,8 @@ def matchCl(exp,seq,terminate=False,extend=False):
                 return not matchCl(exp[1:],seq,terminate,extend=True) 
         return re.match(toRegexp(exp,terminate=terminate,lower=True),seq.lower())
     except:
-        print('matchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        #print('matchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        traceback.print_exc()
         raise
     
 clmatch = matchCl #For backward compatibility
@@ -332,6 +335,7 @@ def searchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless regular expression search between 
     expression and given string """
     try:
+        exp,seq = str(exp),str(seq)
         if extend:
             if '&' in exp:
                 return all(searchCl(e.strip(),seq,terminate=False,extend=True) 
@@ -340,7 +344,8 @@ def searchCl(exp,seq,terminate=False,extend=False):
                 return not searchCl(exp[1:],seq,terminate,extend=True)
         return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
     except:
-        print('searchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        #print('searchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        traceback.print_exc()
         raise
     
 clsearch = searchCl #For backward compatibility
