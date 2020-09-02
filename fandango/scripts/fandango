@@ -85,7 +85,7 @@ If it is problem is solved in the future, then will be moved to fandango.linos
 
 if __name__ == '__main__':
   import sys
-  cmd = ''
+  cmd, r = '', None
   try:
     #comms = sys.argv[sys.argv.index('-c')+1:]
     comms,opts = fandango.sysargs_to_dict(split=True,cast=False,lazy=False)
@@ -179,12 +179,15 @@ if __name__ == '__main__':
         log.debug(cmd)
         r = evalX(cmd,_locals=locals())
         
-    if opts.get('v'): print(cmd)
-    linesep = '\n' if opts.get('l') else ';'
-    s = obj2str(r,sep=' ',linesep=linesep)
-    if opts.get('l') and '\n' not in s:
-      s = '\n'.join(s.split())
-    print(s)
+    if opts.get('v'): 
+        print(cmd)
+        
+    if r is not None:
+        linesep = '\n' if opts.get('l') else ';'
+        s = obj2str(r,sep=' ',linesep=linesep)
+        if opts.get('l') and '\n' not in s:
+            s = '\n'.join(s.split())
+        print(s)
  
   except AssertionError,e:
     print(__doc__)
