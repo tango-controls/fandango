@@ -95,15 +95,17 @@ def dirModule(module):
         if getattr(v,'__module__','') == module.__name__]
 
 def findModule(module):
-    from imp import find_module
+    import imp
     if '.' not in module:
-        return find_module(module)[1]
+        return imp.find_module(module)[1]
     else:
         parent,child = module.rsplit('.', 1)
         #mparent = loadModule(parent)
         pparent = findModule(parent)
-        pchild = find_module(child, [pparent])[1]
+        pchild = imp.find_module(child, [pparent])[1]
         return pchild
+
+find_module = findModule
 
 def loadModule(module,modulename=None):
     #Loads a python module either from source file or from module
@@ -124,6 +126,8 @@ def loadModule(module,modulename=None):
         args = imp.find_module(child, mparent.__path__)
         mchild = imp.load_module(module, *args)
         return mchild
+
+load_module = loadModule
 
 def dirClasses(module,owned=False):
     v = [a for a,v in list(module.__dict__.items()) if isinstance(v,type)]
