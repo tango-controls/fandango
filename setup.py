@@ -88,10 +88,10 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     platforms=[ "Linux,Windows XP/Vista/7/8" ],
-    install_requires=['python-future'],
+    install_requires=['future'],
     scripts=scripts,
     entry_points=entry_points,
     include_package_data=True,
     zip_safe=False,
-    python_requires='==2.7',
+    python_requires='>2.6,<3',
   )
