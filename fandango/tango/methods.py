@@ -613,7 +613,8 @@ def get_attribute_polling(target):
     except:
         return None
     
-def check_attribute_events(model,ev_type=None,verbose=False,asynch=False):
+def check_attribute_events(model, ev_type = None, verbose = False, 
+                           asynch = False, keep = False, wait = 0.01):
     """
     This method expects model and a list of event types.
     If empty, CHANGE and ARCHIVE events are tested.
@@ -625,8 +626,9 @@ def check_attribute_events(model,ev_type=None,verbose=False,asynch=False):
     """
     try:
         dev,attr = model.rsplit('/',1)
-        dp = get_device(dev)
-        ev_type = ev_type or (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT)
+        dp = get_device(dev, keep = keep)
+        ev_type = fandango.notNone(ev_type,
+                    (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT))
         result = dict.fromkeys(toSequence(ev_type))
         
         if check_device(dp):
@@ -642,7 +644,12 @@ def check_attribute_events(model,ev_type=None,verbose=False,asynch=False):
                         cb = EventCallback(dp,hook).subscribe(attr,ev_type)
                     else:
                         cb = lambda *args: None
+                        if verbose:
+                            print('%s.subscribe_event(%s)' % (dp,attr))
                         ei = dp.subscribe_event(attr,ev_type,cb)
+                        fandango.wait(wait)
+                        if verbose:
+                            print('%s.unsubscribe_event(%s)' % (dp,ei))
                         dp.unsubscribe_event(ei)
                         
                     period = dp.get_attribute_poll_period(attr) 
