@@ -724,8 +724,9 @@ class DynamicDSAttrs(DynamicDSImpl):
                 else:
                     dyntype = DynamicDSTypes['DevDouble']
                     self.debug('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
-                    if (create): self.add_attribute(PyTango.Attr(aname,PyTango.ArgType.DevDouble, AttrType), \
-                        self.read_dyn_attr,self.write_dyn_attr,_is_allowed)
+                    if (create): 
+                        self.add_attribute(PyTango.Attr(aname,PyTango.ArgType.DevDouble, AttrType), \
+                            self.read_dyn_attr,self.write_dyn_attr,_is_allowed)
                         #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
                 self.dyn_types[aname]=dyntype
 
@@ -733,8 +734,10 @@ class DynamicDSAttrs(DynamicDSImpl):
             self.dyn_attrs[aname]=formula
             #TODO: Some day self.dyn_values should substitute both dyn_attrs and dyn_types
             self.dyn_values[aname].formula=formula
-            try: self.dyn_values[aname].compiled=compile(formula.strip(),'<string>','eval')
-            except: self.error(traceback.format_exc())
+            try: 
+                self.dyn_values[aname].compiled=compile(formula.strip(),'<string>','eval')
+            except: 
+                self.error(traceback.format_exc())
             self.dyn_values[aname].type=self.dyn_types[aname]
 
             #Adding attributes to DynamicStates queue:
@@ -748,7 +751,8 @@ class DynamicDSAttrs(DynamicDSImpl):
             events = self.check_attribute_events(aname) 
             self.dyn_values[aname].keep = events or (self.KeepAttributes and 
                 (not 'no' in self.KeepAttributes) and any(q.lower() 
-                in self.KeepAttributes for q in [aname,'*','yes','true']))            
+                in self.KeepAttributes for q in [aname,'*','yes','true']))
+                
             if events:
                 self._locals[aname] = None
                 if create and events:
@@ -878,11 +882,16 @@ class DynamicDSAttrs(DynamicDSImpl):
         cabs,crel = 0,0
         try:
             ac = self.get_attribute_config_3(aname)[0]
-            try: cabs = float(ac.event_prop.ch_event.abs_change)
-            except: pass
-            try: crel = float(ac.event_prop.ch_event.rel_change)
-            except: pass
-        except:pass
+            try: 
+                cabs = float(ac.event_prop.ch_event.abs_change)
+            except: 
+                pass
+            try: 
+                crel = float(ac.event_prop.ch_event.rel_change)
+            except: 
+                pass
+        except:
+            pass
         return cabs,crel
     
     def check_changed_event(self,aname,new_value,events=None,config=None):
@@ -905,6 +914,8 @@ class DynamicDSAttrs(DynamicDSImpl):
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
             
+            events = events or self.check_attribute_events(aname)
+            
             self.info('In check_changed_event(%s,%s,%s): %s!=%s'
                 % (aname,events,config,shortstr(v),shortstr(new_value) ))
             if v is None:
@@ -916,11 +927,15 @@ class DynamicDSAttrs(DynamicDSImpl):
                 return True
             
             elif fun.isSequence(new_value) or fun.isSequence(v):
+                # Event pushed ignoring cabs/crel config!
                 v,new_value = fun.notNone(v,[]),fun.notNone(new_value,[])
+                
                 changed = len(v)!=len(new_value) \
                     or any(v!=vv for v,vv in zip(v,new_value))
+                
                 self.info('In check_changed_event(%s,%s): changed = %s'
                     %(aname,shortstr(new_value),changed))
+                
                 return changed
             
             else:
@@ -937,10 +952,15 @@ class DynamicDSAttrs(DynamicDSImpl):
                     except:
                         return str(v)!=str(new_value)
                 
-                if clsearch('push',events): #UseEvents = push, push always
-                    cabs,crel = 0,0
-                else:
-                    cabs,crel = config or self.check_events_config(aname)
+                if clsearch('push',events): #UseEvents = push #on any change
+                    #cabs,crel = 1e-12,1e-12
+                    if v != new_value: #It should be only if UseEvents=push
+                        self.info('In check_changed_event(%s,%s): '
+                            'push on any change'%(aname,shortstr(new_value)))
+                        return True                    
+                
+                #If events = True or number
+                cabs,crel = config or self.check_events_config(aname)
                 
                 if cabs>0 and not v-cabs<new_value<v+cabs: 
                     self.info('In check_changed_event(%s,%s): absolute change!'
@@ -952,10 +972,10 @@ class DynamicDSAttrs(DynamicDSImpl):
                               %(aname,shortstr(new_value)))
                     return True
                 
-                elif v != new_value:
-                    self.info('In check_changed_event(%s,%s): '
-                        'push on any change'%(aname,shortstr(new_value)))
-                    return True
+                #elif v != new_value: #It should be only if UseEvents=push
+                    #self.info('In check_changed_event(%s,%s): '
+                        #'push on any change'%(aname,shortstr(new_value)))
+                    #return True
                 
                 else: 
                     self.debug('In check_changed_event(%s,%s): nothing changed'
@@ -1071,25 +1091,12 @@ class DynamicDSAttrs(DynamicDSImpl):
         try:
             self.debug("DynamicDS(%s)::read_dyn_atr(%s) => evalAttr()"
                    % (self.get_name(),aname))
-            result = self.evalAttr(aname)
+            result = self.evalAttr(aname) #push is done here
             quality = getattr(result,'quality',
                               self.get_attr_quality(aname,result))
             date = self.get_attr_date(aname,result)
             result = self.dyn_types[aname].pytype(result)
-
-            if 1: #hasattr(attr,'set_value_date_quality'):
-                attr.set_value_date_quality(result,date,quality)
-            #else: #PyTango<7
-              #if type(result) in (list,set,tuple):
-                #attr_DynAttr_read = []
-                #for r in result: attr_DynAttr_read.append(r)
-                #try: 
-                #    PyTango.set_attribute_value_date_quality(
-                #   attr_DynAttr_read,date,quality,len(attr_DynAttr_read),0)
-                #except: attr.set_value(attr_DynAttr_read)
-              #else: 
-                #try: PyTango.set_attribute_value_date_quality(attr,result,date,quality)
-                #except: attr.set_value(result)
+            attr.set_value_date_quality(result,date,quality)
                 
             text_result = (type(result) is list and result and '%s[%s]'
                            %(type(result[0]),len(result))) or str(result)
@@ -1172,7 +1179,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                 # That call parses the contents of UseEvents property
                 events = self.check_attribute_events(aname)
             if changed is None:
-                changed = self.check_changed_event(aname,value)
+                changed = self.check_changed_event(aname,value,events)
             if not events or not changed:
                 return 'nothing to do'
                 
@@ -1194,7 +1201,7 @@ class DynamicDSAttrs(DynamicDSImpl):
                     self.push_change_event(aname,value,date,quality)
                 if fun.clsearch('archive',events):
                     if aname.lower() in ('state','status'):
-                        self.push_change_event(aname)
+                        self.push_archive_event(aname)
                     else:
                         self.push_archive_event(aname,value,date,quality)
 
