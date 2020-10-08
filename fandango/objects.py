@@ -47,8 +47,18 @@ and Singleton (by Marc Santiago)
 Enum classes are borrowed from taurus.core.utils (by Tiago Coutinho)
 
 """
-import __builtin__
-from __builtin__ import object
+from __future__ import print_function
+try:
+  from future import standard_library
+  standard_library.install_aliases()
+  from builtins import map
+  from builtins import str
+  from past.builtins import basestring
+  from builtins import object
+  import builtins
+  from builtins import object
+except: 
+  pass
 
 import traceback
 from fandango.functional import *
@@ -60,11 +70,11 @@ import functools
 
 #Python 2-3 conundrum
 try:
-    import queue
-    import queue as Queue
-except:
     import Queue
     import Queue as queue
+except:
+    import queue
+    import queue as Queue
 
 try: 
     from collections import namedtuple #Only available since python 2.6
@@ -74,7 +84,7 @@ except:
 ## Inspection methods
 
 def dirModule(module):
-    return [a for a,v in module.__dict__.items() 
+    return [a for a,v in list(module.__dict__.items()) 
         if getattr(v,'__module__','') == module.__name__]
 
 def findModule(module):
@@ -109,7 +119,7 @@ def loadModule(module,modulename=None):
         return mchild
 
 def dirClasses(module,owned=False):
-    v = [a for a,v in module.__dict__.items() if isinstance(v,type)]
+    v = [a for a,v in list(module.__dict__.items()) if isinstance(v,type)]
     if owned: return [a for a in dirModule(module) if a in v]
     else: return v
   
@@ -154,13 +164,13 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
                     try: 
                         if type(attr).__name__ not in dir(__builtin__):
                             if isinstance(attr,dict):
-                                attr = dict((k,v) for k,v in attr.items())
+                                attr = dict((k,v) for k,v in list(attr.items()))
                             else:
                                 attr = str(attr)
                     except: 
                         continue
                 dct[name] = attr
-            except Exception,e:
+            except Exception as e:
                 print(e)
 
         if class_check:
@@ -172,7 +182,7 @@ def obj2dict(obj,type_check=True,class_check=False,fltr=None):
             if '__base__' not in dct: 
                 dct['__base__'] = klass.__base__.__name__
                 
-    except Exception,e:
+    except Exception as e:
         print(e)
     return(dct)
 
@@ -229,14 +239,14 @@ class Struct(object):
         dct = args[0] if len(args)==1 else (args or kwargs)
         if isSequence(dct) and not isDictionary(dct): 
             dct = dict.fromkeys(dct) #isDictionary also matches items lists
-        [setattr(self,k,v) for k,v in (dct.items() 
+        [setattr(self,k,v) for k,v in (list(dct.items()) 
                                        if hasattr(dct,'items') else dct)]
         
     #Overriding dictionary methods
     def update(self,*args,**kwargs): return self.load(*args,**kwargs)
-    def keys(self): return self.__dict__.keys()
-    def values(self): return self.__dict__.values()
-    def items(self): return self.__dict__.items()
+    def keys(self): return list(self.__dict__.keys())
+    def values(self): return list(self.__dict__.values())
+    def items(self): return list(self.__dict__.items())
     def dict(self): return self.__dict__
   
     def get(self,k,default=None): 
@@ -247,7 +257,7 @@ class Struct(object):
       
     def get_key(self,value):
       """ Reverse lookup """
-      for k,v in self.items():
+      for k,v in list(self.items()):
         if v == value:
           return k
       raise Exception('%s_NotFound!'%value)
@@ -255,7 +265,7 @@ class Struct(object):
     def set(self,k,v): return setattr(self,k,v)
     def setdefault(self,v): self.dict().setdefault(v)
     def pop(self,k): return self.__dict__.pop(k)
-    def has_key(self,k): return self.__dict__.has_key(k)
+    def has_key(self,k): return k in self.__dict__
     def __getitem__(self,k): return getattr(self,k)
     def __setitem__(self,k,v): return setattr(self,k,v)
     def __contains__(self,k): return hasattr(self,k)
@@ -268,7 +278,7 @@ class Struct(object):
         else: self.load(*args,**kwargs)
     def __repr__(self):
         return 'fandango.Struct({\n'+'\n'.join("\t'%s': %s,"%(k,v) 
-                                for k,v in self.__dict__.items())+'\n\t})'
+                                for k,v in list(self.__dict__.items()))+'\n\t})'
     def __str__(self):
         return self.__repr__().replace('\n','').replace('\t','')
     def to_str(self,order=None,sep=','):
@@ -282,7 +292,7 @@ class Struct(object):
         If it is, it will return value as an evaluable string.
         If it is not, then it will do same action on the passed value.
         """
-        if key not in self.keys() and not value:
+        if key not in list(self.keys()) and not value:
           key,value = None,key #defaults to single argument mode
         value = notNone(value,key and self.get(key))
         if not isString(value): 
@@ -302,8 +312,8 @@ class Struct(object):
         """
         The cast() method is used to convert an struct to a pickable/json obj
         """
-        items = items or self.items()
-        items = [(k,self.cast(value=v)) for k,v in self.items()]
+        items = items or list(self.items())
+        items = [(k,self.cast(value=v)) for k,v in list(self.items())]
         if update:
           [self.set(k,v) for k,v in items]
         return items
@@ -327,7 +337,7 @@ class Variable(object):
     e.g. fandango.DEFAULT_TIME_FORMAT <=> functional.DEFAULT_TIME_FORMAT
     """
     def __new__(cls, value):
-        print(cls,value)
+        print((cls,value))
         __instance = object.__new__(cls, value)
         cls.__init__(__instance, value)
         return __instance.value
@@ -386,8 +396,8 @@ def locked(f,*args,**kwargs):
     try:
         _lock.acquire()
         return f(*args,**kwargs)
-    except Exception,e:
-        print 'Exception in%s(*%s,**%s): %s' % (f.__name__,args,kwargs,e)
+    except Exception as e:
+        print('Exception in%s(*%s,**%s): %s' % (f.__name__,args,kwargs,e))
     finally:
         _lock.release()
             
@@ -587,7 +597,7 @@ class Object(object):
                             nkw[arg], i = _args[i], i+1
                     self.call_all__init__(base,*_args,**_kw)
                     self.call__init__(base,**nkw)
-                except Exception,e:
+                except Exception as e:
                     print('Unable to execute %s.__init__!: %s' 
                           % (base.__name__,str(e)))
         return
@@ -871,7 +881,7 @@ class Cached(Decorator):
         """
         klass = obj if isinstance(obj,type) else type(obj)
         if not methods:
-            methods = [k for k,f in klass.__dict__.items() if isCallable(f)]
+            methods = [k for k,f in list(klass.__dict__.items()) if isCallable(f)]
         for k in methods:
             try:
                 m = Cached(getattr(klass,k),depth,expire,catched=catched)
@@ -893,7 +903,7 @@ class Cached(Decorator):
             self.lock.acquire()
             depth = notNone(depth,self.depth)
             expire = time.time()-notNone(expire,self.expire)
-            cache = sorted(k for k in self.cache.keys() if k[0]>expire)
+            cache = sorted(k for k in list(self.cache.keys()) if k[0]>expire)
             if (len(cache)!=len(self.cache) or len(cache)>self.depth):
                 #self._log('pruning: %s => %s'%(len(self.cache),len(cache)))
                 pass
@@ -933,7 +943,7 @@ class Cached(Decorator):
             else:
                 try:
                     v = self.func(*args,**kwargs)
-                except Exception,e:
+                except Exception as e:
                     v = e
                 #self._log('%s(%s,%s) = %s'%(self.func,args,kwargs,v))
                 try:
@@ -954,6 +964,26 @@ class Cached(Decorator):
                 raise v
         else:
             return v
+        
+def Queued(my_queue):
+    """
+    This decorator will put the result of the function
+    into a Queue-like object (using put() method)
+    
+    Intended to be used in processes and threads
+    
+    If use_id is True, then str(fun)+str(args) will be used
+    as ID for the result.
+    """
+    def QueuedDecorator(method, use_id=False):
+        def QueuedFunction(*args,**kwargs):
+            r = method(*args,**kwargs)
+            if use_id:
+                r = (str(method)+str(args)+str(sorted(kwargs.items())),
+                     r)
+            my_queue.put(r)
+        return QueuedFunction
+    return QueuedDecorator        
 
 ###########################################################################
     
@@ -1008,7 +1038,7 @@ class BoundDecorator(Decorator):
             self._trace = False
         def __get__(self,obj,type=None):return self
         def __set__(self,obj,value):self._trace = value
-        def __nonzero__(self): return self._trace
+        def __bool__(self): return self._trace
         def __call__(self,msg):
             if self: print(msg)
             

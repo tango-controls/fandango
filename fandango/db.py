@@ -43,6 +43,7 @@ Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 import os,time,datetime,log,traceback,sys
 from .objects import Struct
 from . import functional as fn
+from .dicts import defaultdict
 
 """
 MySQL API's are loaded at import time, but can be modified afterwards.
@@ -67,23 +68,31 @@ To test it on Debian (NOT NEEDED AS MYSQLCLIENT IS NOW python-mysqldb):
 
 """
 
-try:
-    # This import will fail in Debian as mysqlclient is loaded as MySQLdb
-    # in other OS, mysqlclient should be used
-    import mysqlclient
-    import mysqlclient as mysql_api
-    mysql = Struct()
-    mysql.connector = MySQLdb = None
-except:
+# mysql.connector is not the default, but to use prepared cursors
+# it can be imported before fandango and take precedence
+
+if 'mysql.connector' in sys.modules:
+    import mysql.connector
+    import mysql.connector as mysql_api
+    mysqlclient = MySQLdb = None
+else:
     try:
-        import MySQLdb
-        import MySQLdb as mysql_api
+        # This import will fail in Debian as mysqlclient is loaded as MySQLdb
+        # in other OS, mysqlclient should be used
+        import mysqlclient
+        import mysqlclient as mysql_api
         mysql = Struct()
-        mysqlclient = mysql.connector = None
+        mysql.connector = MySQLdb = None
     except:
-        import mysql.connector
-        import mysql.connector as mysql_api
-        mysqlclient = MySQLdb = None        
+        try:
+            import MySQLdb
+            import MySQLdb as mysql_api
+            mysql = Struct()
+            mysqlclient = mysql.connector = None
+        except:
+            import mysql.connector
+            import mysql.connector as mysql_api
+            mysqlclient = MySQLdb = None        
 
 class FriendlyDB(log.Logger):
     """ 
@@ -97,7 +106,7 @@ class FriendlyDB(log.Logger):
                 self.__class__.__name__+'(%s@%s)' % (db_name, host),
                 format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
-        self.debug('Using %s as MySQL python API' % mysql_api)
+        self.info('Using %s as MySQL python API' % mysql_api)
         #def __init__(self,api,db_name,user='',passwd='', host=''):
         #if not api or not database:
             #self.error('ArchivingAPI and database are required arguments for ArchivingDB initialization!')
@@ -143,7 +152,6 @@ class FriendlyDB(log.Logger):
                        % autocommit)
             #raise Exception,e
         
-        
     def renewMySQLconnection(self):
         try:
             if hasattr(self,'db') and self.db: 
@@ -172,7 +180,10 @@ class FriendlyDB(log.Logger):
         '''
         try:
             if klass in ({},dict):
-                klass = mysql_api.cursors.DictCursor
+                try:
+                    klass = mysql_api.cursors.DictCursor
+                except:
+                    klass = mysql_api.cursor.MySQLCursorDict
             if (renew or klass) and self._cursor: 
                 if not self._recursion:
                     self._cursor.close()
@@ -322,7 +333,7 @@ class FriendlyDB(log.Logger):
                 % (table, self.db_name))
         if partition:
             q += " and partition_name like '%s'" % partition
-        return (fn.toList(self.Query(q)) or [0])[0]
+        return sum((t or [0])[0] for t in (fn.toList(self.Query(q))))
     
     def check(self, method = None, tables = None, verbose = False):
         """
@@ -356,12 +367,12 @@ class FriendlyDB(log.Logger):
             q += " limit 1"
             method,args = self.Query,[q]
         else:
-            method,args = self.getTableCreator, []
+            method,args = self.getTableCreator, [table]
         try:
             method(*args)
             return True
         except:
-            tracebac.print_exc()
+            traceback.print_exc()
             return False
         
     def getTableLength(self,table=''):
@@ -382,6 +393,13 @@ class FriendlyDB(log.Logger):
             " table_schema = '%s' and table_name like '%s';"
                 % (self.db_name,table))
         return 0 if not res else (int(res[0][1]) if len(res)==1 else dict(res))
+    
+    def getTableIndex(self,table):
+        q = self.Query('show indexes from '+table,asDict=True)
+        r = defaultdict(dict)
+        for l in q:
+            r[l['Key_name']][l['Column_name']] = l
+        return r
 
     def getPartitionSize(self,table='',partition=''):
         """

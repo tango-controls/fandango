@@ -463,20 +463,52 @@ class fakeEvent(object):
         self.err=err
         self.errors=errors
         
-class EventCallback(object):
-    def __init__(self,device,hook=None):
+class TangoEventCallback(object):
+    """
+    Template class for Tango event callbacks
+    """
+    def __init__(self,device,attribute='',hook=None,trace=False):
         self.proxy = get_device(device)
         self.eid = None
-        self.hook = None
+        self.attribute = attribute
+        self.hook = hook
+        self.trace = trace
+
+    def __del__(self):
+        self._trace('%s(%s,%s).__del__()'%(type(self),self.device,self.attribute))
+        try:
+            self.unsubscribe()
+        except:
+            pass
+        
+    def _trace(self, msg):
+        msg = fn.time2str()+' : '+msg
+        if self.trace:
+            if fn.isCallable(self.trace):
+                self.trace(msg)
+            else:
+                print(msg)
+
     def subscribe(self,attribute='State',
             event_type=PyTango.EventType.CHANGE_EVENT,
             filters=[],stateless=False):
+        if self.eid:
+            raise Exception('AlreadySubscribed!')
+        self.attribute = attribute
+        self._trace('%s(%s,%s).subscribe()'%(type(self),self.device,self.attribute))
         self.eid = self.proxy.subscribe_event(attribute,
                         event_type,self,filters,stateless)
         return self
+
+    def unsubscribe(self):
+        self._trace('%s(%s,%s).unsubscribe()'%(type(self),self.device,self.attribute))
+        self.proxy.unsubscribe(self.eid)
+        
     def push_event(self,*args,**kwargs):
         # Reimplement this method in subclasses
         try:
+            self._trace('%s(%s,%s).push_event(%s)' % (
+                type(self),self.device,self.attribute,str(args[0])))
             if self.hook is not None:
                 return self.hook(self,*args,**kwargs)        
         except:

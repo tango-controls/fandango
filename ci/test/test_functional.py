@@ -32,19 +32,25 @@ def test_rms():
     """
     returns the rms value (sqrt of the squares average)
     """
-    #assert fandango.functional.rms
+    data = 1,2,3,4
+    assert fandango.functional.rms(data) == \
+        fandango.functional.math.sqrt(sum(a**2 for a in data))
 
 def test_randomize():
     """
     returns a randomized version of the list
     """
-    #assert fandango.functional.randomize
+    data = 1,2,3,4
+    rdata = fandango.functional.randomize(data)
+    assert all(a in rdata for a in data) and len(data) == len(rdata)
 
 def test_randpop():
     """
     removes and returns a random item from the sequence
     """
-    #assert fandango.functional.randpop
+    data = 1,2,3,4
+    rdata = [fandango.functional.randpop(data) for i in range(4)]
+    assert all(a in rdata for a in data) and len(data) == len(rdata)
 
 def test_floor():
     """

@@ -691,7 +691,7 @@ def check_attribute_events(model,ev_type=None,verbose=False):
                         if self.eid is not None:
                             self.proxy.unsubscribe_event(eid)
                             
-                    cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                    cb = TangoEventCallback(dp,hook).subscribe(attr,ev_type)
                     period = dp.get_attribute_poll_period(attr) 
                     result[ev_type] = period or True
                 except:
