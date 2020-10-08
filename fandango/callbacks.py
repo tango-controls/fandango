@@ -1533,7 +1533,7 @@ class TAttr(EventStruct):
 ###############################################################################
 # OLD API, DEPRECATED
 
-class EventCallback():
+class EventHook():
     """ 
     It provides persistent storage.
     lock.acquire and lock.release should be used to prevent threading problems!, 
@@ -1546,25 +1546,29 @@ class EventCallback():
     
     def push_event(self,event):
         self.lock.acquire()
+
         try:
             #Pruning tango:$TANGO_HOST and other tags
             attr_name = '/'.join(event.attr_name.split('/')[-4:])
             dev_name = hasattr(event.device,'name') and event.device.name() or event.device
-            print("in EventCallback.push_event(",dev_name,": ",attr_name,")")
+            print("in EventHook.push_event(",dev_name,": ",attr_name,")")
+
             if not event.err and event.attr_value is not None:
-                print("in EventCallback.push_event(...): ",attr_name,"=", 
+                print("in EventHook.push_event(...): ",attr_name,"=", 
                       event.attr_value.value)
                 self.TimeOutErrors=0
                 _EventsList[attr_name.lower()].set(event)
                 if attr_name.lower().endswith('/state'):
                     _StatesList[dev_name.lower()]=event.attr_value.value
                 _AttributesList[event.attr_name.lower()]=event.attr_value
+
             else:
-                print 'in EventCallback.push_event(...): Received an Error Event!: ',event.errors
+                print 'in EventHook.push_event(...): Received an Error Event!: ',event.errors
                 _EventsList[attr_name.lower()].set(event)
                 #if 'OutOfSync' in event.errors[0]['reason']: or 'API_EventTimeout' in event.errors[0]['reason']:
                 #if [e for e in event.errors if hasattr(e,'keys') and 'reason' in e.keys() and any(re.search(exp,e['reason']) for exp in self.NotifdExceptions)]:
                 reasons = [getattr(e,'reason',e.get('reason',str(e)) if hasattr(e,'get') else str(e)) for e in event.errors] #Needed to catch both PyTango3 and PyTango7 exceptions
+
                 if any(n in r for n in self.NotifdExceptions for r in reasons):
                     print 'callbacks=> DISCARDED EVENT FOR NOTIFD REASONS!!! %s(%s)' \
                         %(dev_name,reasons)
@@ -1576,6 +1580,7 @@ class EventCallback():
                     if attr_name.lower().endswith('/state'):
                         _StatesList[dev_name.lower()]=None #An unreaded State cannot be UNKNOWN, it must be None to notify that an exception occurred!
                     _AttributesList[attr_name.lower()]=None
+
             #Launching Device.push_event()                
             for rec in _EventsList[attr_name].receivers:
                 if rec in _EventReceivers.keys(): _EventReceivers[rec].push_event(event)
@@ -1583,15 +1588,17 @@ class EventCallback():
                 elif isinstance(rec,threading.Event): rec.set()
                 elif callable(rec): rec()
                 else: raise 'UnknownEventReceiverType'
+
         except Exception,e:
-            print 'exception in EventCallback.push_event(): ',e, ";", getLastException()
+            print 'exception in EventHook.push_event(): ',e, ";", getLastException()
+
         self.lock.release()
 
 ###############################################################################
 # OLD API, DEPRECATED
 
 #THIS IS THE EVENTS CALLBACK SINGLETONE:
-GlobalCallback = EventCallback()
+GlobalCallback = EventHook()
 
 ## @TODO ... implemented in addTAttr and addReceiver ... missing a dp attribute to finish the work
 #def subscribeToAttribute(subscriber,att_name):
