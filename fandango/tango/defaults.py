@@ -312,6 +312,22 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
         print('ERROR: get_tango_host(): '+traceback.format_exc())
         return 'localhost:10000'
     
+def set_tango_host(tango_host):
+    """ Sets TANGO_HOST environment variable, cleans up caches """
+    
+    global TangoDatabase,TangoDevice,TangoProxies
+    TangoDatabase,TangoDevice,TangoProxies = None,None,None
+    import fandango.tango
+    for k in dir(fandango.tango):
+        f = getattr(fandango.tango,k)
+        if hasattr(f,'cache'):
+            try:
+                f.cache.clear()
+            except:
+                pass
+    os.environ['TANGO_HOST'] = tango_host
+    return tango_host
+    
 def get_database(host='',port='',use_tau=False): 
     """
     Method to get a singleton instance of the Tango Database
