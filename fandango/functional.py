@@ -1100,7 +1100,7 @@ def time2str(epoch=None, cad='', us=False, bt=True,
   
 epoch2str = time2str
  
-def str2time(seq='', cad='', throw=True):
+def str2time(seq='', cad='', throw=True, relative=False):
     """ 
     :param seq: Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format or -N [d/m/y/s/h]
     
@@ -1109,10 +1109,16 @@ def str2time(seq='', cad='', throw=True):
     The conversion itself is done by time.strptime method.
     
     :param cad: You can pass a custom time format
+    :param relative: negative times will be converted to now()-time
+    :param throw: if False, None is returned instead of exception
     """
     try: 
         if seq in (None,''): 
             return time.time()
+        if 'NOW-' in seq:
+            seq,relative = seq.replace('NOW',''),True
+        elif seq=='NOW':
+            return now()
         
         t, seq = None, str(seq).strip()
         if not cad:
@@ -1141,7 +1147,10 @@ def str2time(seq='', cad='', throw=True):
                 except: 
                     pass
                 
-        return time.mktime(t)+(ms or 0)
+        v = time.mktime(t)+(ms or 0)
+        if relative and v<0:
+            v = fn.now()-v
+        return v
     except: 
         if throw:
             raise Exception('PARAMS_ERROR','unknown time format: %s' % seq)
