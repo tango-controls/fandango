@@ -15,6 +15,108 @@ DEVELOP branch will provide the current Py2.7/3.3 code
 
 ################################################################
 
+
+14.12
+
+    add relative mode in str2time using NOW keyword
+    add tango.set_tango_host method to add new database and clean caches
+
+    Refactor check_changed_event (test pending)
+    add wait() on check_attribute_events
+
+    solve import errors, clean traces
+    add pythonic methods for modules
+    solve bug in clsearch
+
+    check for caseless static attributes
+    solve bug with future imports
+    apply host filter on status
+
+    solve bugs on exporting
+
+    add raw arg to get_device_property
+
+    renamed Lambdas property to StoredLambdas to avoid bug on PyPLC start
+    solve issue with FQDN and Alias
+
+14.11: plenty of bugfixes for pyalarm
+
+    solve int(time) bug in TangoEval
+    force all proxies kept fqdn, add KEEP_PROXIES flag
+    solve bug on polling
+    solve push state leak, case issues, pushAttribute
+    move get_real_name to methods submodule
+    Solve bug in getAttrFormula
+    fix bugs on ThreadDict
+
+
+14.10: refactored callbacks and get_device method
+
+    refactored, reduce checks, avoid leak in cache
+    fixed bugs/traces in tango_monitor
+    has_key method added to Threaddict
+    TangoProxies only with full names,
+    naming methods moved to defaults
+    fix tango_monitor, improve traces in cached
+    cache logging
+    use ISO time format also on custom strings
+    add arrays.get_min_step method
+    add get_current_stack method
+    add traces to subprocess excepts
+
+14.9.6: fix callbacks bug
+
+    logs
+    set event check synchronous by default
+    add try/except for int/float conversions
+    getPartitionRows
+    add non-queued behaviour, solve bugs
+
+
+14.9.5 solve ESource deadlock
+
+    refactor check_device
+    push memusage event
+    deadlocks: use event lock, use proxy and ping on checks
+    check_device, do not access state by default
+    check_device, do not access state by default
+    solve bug in tango_servers script
+    filter_array: solve bugs on filtering null values
+
+
+14.9.3 fixes
+
+    fix bug in inCl
+    fix fn.toList(dict)
+    solve return value in getTableRows()
+    remove future import
+    SubprocessMethod TimeOut(time) exception
+    allow to force a mysql driver
+    solve py3 bug
+
+
+14.9.2: asynchronous methods and decimation
+
+    solve py2to3 issues
+    replace asserts by raise
+    solve bug in dynamicds lambdas
+    add try/except to SubprocessMethod
+    add functional.inf
+    add getTableIndex
+    improve aggregators
+    SubprocessMethod update
+    better get_process_memory
+    version reverted to 14.9 (pre py3)
+    update setup.py for pip2
+    add cache to get_process_memory()
+    add delay pause to ThreadDict
+    add callback and pause to AsynchronousFunctions
+    set MemUsage polled, use fn., add traces
+    get attribute polling when checking events
+    bug in monitor event callback
+    add confirmation before stop
+    add check/checkTable methods
+
 14.8.2
     solve bugs on tango_monitor and ThreadDict.stop()
   

@@ -88,7 +88,7 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     platforms=[ "Linux,Windows XP/Vista/7/8" ],
-    install_requires=['python-future'],
+    #install_requires=[], #['python-future'],
     scripts=scripts,
     entry_points=entry_points,
     include_package_data=True,
