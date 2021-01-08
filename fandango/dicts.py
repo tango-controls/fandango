@@ -50,6 +50,7 @@ srubio@cells.es,
 """
 
 import time,traceback,os
+import threading # needed for ThreadDict
 import collections
 from collections import defaultdict, deque
 try: from collections import OrderedDict
@@ -139,11 +140,14 @@ def json2dict(jstr,encoding=ENC):
     return d
             
 class ThreadDict(dict):
-    ''' Thread safe dictionary with redefinable read/write methods and a backgroud thread for hardware update.
+    '''
+    Thread safe dictionary with redefinable read/write methods and a background thread for hardware update.
     All methods are thread-safe using @self_lock decorator.
         NOTE: any method decorated in this way CANNOT call other decorated methods!
     All values of the dictionary will be automatically updated in a separate Thread using read_method provided.
     Any value overwritten in the dict should launch the write_method.
+    
+    delay argument will pause the thread for a time after start() is called
     
     Briefing:
         a[2] equals to a[2]=read_method(2)
@@ -168,11 +172,13 @@ class ThreadDict(dict):
     
     @deprecated now in tau.core.utils.containers
     '''
-    def __init__(self,other=None,read_method=None,write_method=None,timewait=0.1,threaded=True,trace=False):
+    def __init__(self,other=None,read_method=None,write_method=None,
+                 timewait=0.1,threaded=True,trace=False,delay=0.):
         self.read_method = read_method
         self.write_method = write_method
         self.timewait = timewait
         self.threaded = threaded
+        self.delay = delay
         self._threadkeys = []
         self._periods = {}
         self._updates = {}
@@ -182,6 +188,7 @@ class ThreadDict(dict):
         self.last_cycle_start = 0
         self.cycle_count = 0
         self.cycle_average = 0
+        self.event = threading.Event()
         self.parent = type(self).mro()[1] #equals to self.__class__.__base__ or type(self).__bases__[0]
         if other: dict.update(self,other)
     
@@ -197,9 +204,9 @@ class ThreadDict(dict):
         if hasattr(self,'_Thread') and self._Thread and self._Thread.isAlive():
             print 'ThreadDict.start(): ThreadDict.stop() must be executed first!'
             return
-        print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()        
-        import threading
-        self.event = threading.Event()
+        if self.delay:
+            self.event.wait(self.delay)
+        print 'In ThreadDict.start(), keys are: %s' % self.threadkeys()   
         self.event.clear()
         self._Thread = threading.Thread(target=self.run)
         self._Thread.setDaemon(True)
@@ -220,9 +227,9 @@ class ThreadDict(dict):
 
     def alive(self):
         if not hasattr(self,'_Thread') or not self._Thread: 
-            return False
+            return None #Thread never started
         else: 
-            return self._Thread.isAlive()
+            return self._Thread.isAlive() #True or False
         
     def __del__(self):
         self.stop()
@@ -302,7 +309,7 @@ class ThreadDict(dict):
     
     @self_locked
     def __locked_getitem_hw__(self,key):
-        return self.__getitem__(self,key,hw=True)    
+        return self.__getitem__(key,hw=True)    
         
     def __getitem__(self,key,hw=False):
         ''' This method launches a read_method execution if there's no thread on charge of doing that or if the hw flag is set to True. '''
@@ -328,7 +335,7 @@ class ThreadDict(dict):
     @self_locked
     def get(self,key,default=None,hw=False):
         if hw:
-            self.__locked_getitem_hw__(key,hw)
+            self.__locked_getitem_hw__(key)
         elif not self.threaded and self.read_method: 
             dict.__setitem__(self,key,self.read_method(key))
             self.last_update = time.time()
@@ -344,6 +351,10 @@ class ThreadDict(dict):
     @self_locked
     def __contains__(self, key):
         return dict.__contains__(self, key)
+    
+    @self_locked
+    def has_key(self, key):
+        return dict.has_key(self, key)
 
     @self_locked
     def __iter__(self):

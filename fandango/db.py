@@ -43,6 +43,7 @@ Go to http://mysql-python.sourceforge.net/MySQLdb.html for further information
 import os,time,datetime,log,traceback,sys
 from .objects import Struct
 from . import functional as fn
+from .dicts import defaultdict
 
 """
 MySQL API's are loaded at import time, but can be modified afterwards.
@@ -67,23 +68,31 @@ To test it on Debian (NOT NEEDED AS MYSQLCLIENT IS NOW python-mysqldb):
 
 """
 
-try:
-    # This import will fail in Debian as mysqlclient is loaded as MySQLdb
-    # in other OS, mysqlclient should be used
-    import mysqlclient
-    import mysqlclient as mysql_api
-    mysql = Struct()
-    mysql.connector = MySQLdb = None
-except:
+# mysql.connector is not the default, but to use prepared cursors
+# it can be imported before fandango and take precedence
+
+if 'mysql.connector' in sys.modules:
+    import mysql.connector
+    import mysql.connector as mysql_api
+    mysqlclient = MySQLdb = None
+else:
     try:
-        import MySQLdb
-        import MySQLdb as mysql_api
+        # This import will fail in Debian as mysqlclient is loaded as MySQLdb
+        # in other OS, mysqlclient should be used
+        import mysqlclient
+        import mysqlclient as mysql_api
         mysql = Struct()
-        mysqlclient = mysql.connector = None
+        mysql.connector = MySQLdb = None
     except:
-        import mysql.connector
-        import mysql.connector as mysql_api
-        mysqlclient = MySQLdb = None        
+        try:
+            import MySQLdb
+            import MySQLdb as mysql_api
+            mysql = Struct()
+            mysqlclient = mysql.connector = None
+        except:
+            import mysql.connector
+            import mysql.connector as mysql_api
+            mysqlclient = MySQLdb = None        
 
 class FriendlyDB(log.Logger):
     """ 
@@ -93,10 +102,11 @@ class FriendlyDB(log.Logger):
     def __init__(self,db_name,host='',user='',passwd='',autocommit=True,
                  loglevel='WARNING',use_tuples=False,default_cursor=None):
         """ Initialization of MySQL connection """
-        self.call__init__(log.Logger,self.__class__.__name__,
+        self.call__init__(log.Logger,
+                self.__class__.__name__+'(%s@%s)' % (db_name, host),
                 format='%(levelname)-8s %(asctime)s %(name)s: %(message)s')
         self.setLogLevel(loglevel or 'WARNING')
-        self.debug('Using %s as MySQL python API' % mysql_api)
+        self.info('Using %s as MySQL python API' % mysql_api)
         #def __init__(self,api,db_name,user='',passwd='', host=''):
         #if not api or not database:
             #self.error('ArchivingAPI and database are required arguments for ArchivingDB initialization!')
@@ -115,6 +125,9 @@ class FriendlyDB(log.Logger):
         self._cursor=None
         self._recursion = 0
         self.tables={}
+        
+    def __repr__(self):
+        return('%s("%s@%s")' % (type(self).__name__,self.db_name,self.host))
         
     def __del__(self):
         if hasattr(self,'__cursor') and self._cursor: 
@@ -138,7 +151,6 @@ class FriendlyDB(log.Logger):
             self.error('Unable to set MySQL.connection.autocommit to %s'
                        % autocommit)
             #raise Exception,e
-        
         
     def renewMySQLconnection(self):
         try:
@@ -168,7 +180,10 @@ class FriendlyDB(log.Logger):
         '''
         try:
             if klass in ({},dict):
-                klass = mysql_api.cursors.DictCursor
+                try:
+                    klass = mysql_api.cursors.DictCursor
+                except:
+                    klass = mysql_api.cursor.MySQLCursorDict
             if (renew or klass) and self._cursor: 
                 if not self._recursion:
                     self._cursor.close()
@@ -222,7 +237,8 @@ class FriendlyDB(log.Logger):
         '''
         t0 = time.time()
         try:
-            self.debug(query)
+            self.debug(query.replace('where', '\nwhere').replace(
+                'group,', '\ngroup'))
             try:
                 q=self.getCursor(klass = dict if asDict else self.default_cursor)
                 q.execute(query)
@@ -318,17 +334,46 @@ class FriendlyDB(log.Logger):
                 % (table, self.db_name))
         if partition:
             q += " and partition_name like '%s'" % partition
-        return (fn.toList(self.Query(q)) or [0])[0]
+        return sum((t or [0])[0] for t in (fn.toList(self.Query(q))))
+    
+    def check(self, method = None, tables = None, verbose = False):
+        """
+        executes method on tables and returns True if there was no exceptions
+        without args it executes getTableCreator on all tables
+        if verbose = True, it returns the check result for each table
+        Anyway, check_result is always kept within the class
+        """
+        method = method or self.getTableCreator
+        tables = fn.toList(tables or self.getTables())
+        self.check_result = {}
+        for t in tables:
+            try:
+                self.check_result[t] = method(t)
+            except Exception as e:
+                self.check_result[t] = e
+        if verbose:
+            return result
+        else:
+            return not any(isinstance(v,(Exception,type(None)))
+                for v in self.check_result.values())
     
     def checkTable(self, table, partition = None):
-        q = ("select * from %s "% (table))
-        if partition:
+        """ 
+        Performs a getTableCreator on tables and a single query in 
+        partitions
+        """
+        if partition is not None:
+            q = ("select * from %s "% (table))
             q += " partition (%s)" % partition
-        q += " limit 1"
+            q += " limit 1"
+            method,args = self.Query,[q]
+        else:
+            method,args = self.getTableCreator, [table]
         try:
-            self.Query(q)
+            method(*args)
             return True
         except:
+            traceback.print_exc()
             return False
         
     def getTableLength(self,table=''):
@@ -349,6 +394,13 @@ class FriendlyDB(log.Logger):
             " table_schema = '%s' and table_name like '%s';"
                 % (self.db_name,table))
         return 0 if not res else (int(res[0][1]) if len(res)==1 else dict(res))
+    
+    def getTableIndex(self,table):
+        q = self.Query('show indexes from '+table,asDict=True)
+        r = defaultdict(dict)
+        for l in q:
+            r[l['Key_name']][l['Column_name']] = l
+        return r
 
     def getPartitionSize(self,table='',partition=''):
         """
@@ -369,6 +421,26 @@ class FriendlyDB(log.Logger):
             print(q,res)
             traceback.print_exc()
             raise e
+        
+    def getPartitionRows(self,table='',partition=''):
+        """
+        Returns rows in partition files
+        """
+        table = table or '%';
+        partition = "like '%s'"%partition if partition else ' is NULL';
+        q = ("select partition_name,table_rows"
+            " from information_schema.partitions where "
+            " table_schema = '%s' and table_name like '%s'"
+            " and partition_name %s;"
+                % (self.db_name, table, partition) )
+        res = self.Query(q)
+        try:
+            return 0 if not res else (int(res[0][1]) 
+                                      if len(res)==1 else dict(res))
+        except Exception as e:
+            print(q,res)
+            traceback.print_exc()
+            raise e        
     
     def getDbSize(self):
         """

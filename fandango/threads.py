@@ -56,7 +56,10 @@ _EVENT = threading.Event()
 def wait(seconds,event=True,hook=None):
     """
     :param seconds: seconds to wait for
-    :param event: if True (default) it uses a dummy Event, if False it uses time.sleep, if Event is passed then it calls event.wait(seconds)
+    :param event: if True (default) it uses a dummy Event, 
+        if False it uses time.sleep,
+        if Event is passed then it calls event.wait(seconds)
+    :param hook: a callable to be executed before the wait
     """
     r = 0
     try:
@@ -814,17 +817,20 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
         # Adds a command to be periodically executed
         data = self.data[key] = ProcessedData(key,target=target,args=args,period=period,expire=expire,callback=callback)
         self.send(self.__ADDKEY,target=data.get_args())
+        
     def get(self,key,default=__NULL,_raise=False):
         # Returns a key value (or default if defined)
         if key not in self.data and default!=self.__NULL: return default
         result = self.data[key].get()
         if _raise and isinstance(result,Exception): raise result
         return result
+    
     def pop(self,key):
         # Returns a key value and removes from dictionary
         d = self.data.pop(key)
         self.send(self.__REMOVEKEY,key)
         return d
+    
     def pause(self,timeout):
         # Stops for a while the execution of scheduled keys
         self.paused = time.time()+timeout
@@ -845,6 +851,7 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
             #self.trace('send(%s,%s,%s,%s) => %s'%(key,target,args,callback,self.callbacks[key]))
             self.callbacks[key].append(callback)
         return
+    
     def command(self,command,args=None):
         """ This method performs a synchronous command (no callback, no persistence),
         it doesn't return until it is resolved """
@@ -983,10 +990,12 @@ class WorkerProcess(Object,SingletonMap): #,Object,SingletonMap):
                         #print traceback.format_exc()
                         #print e
                         pipe.send((key,getPickable(e)))
+            
             except Exception,e:
                 self.trace('.Process:\tUnknown Error in process!\n%s'%traceback.format_exc())
             key = None
             event.wait(self.timewait)
+        
         print '!'*80
         self.trace('.Process: exit_process: event=%s, thread not alive for %d s' % (event.is_set(),time.time()-last_alive))
                         
@@ -1148,54 +1157,93 @@ class Pool(object):
     
 ###############################################################################
 
-def SubprocessMethod(obj,method,*args,**kwargs):
+"""
+SubprocessMethod and AsynchronousFunction provide an API to execute tasks
+in background processes
+"""
+
+def SubprocessMethod(obj,*args,**kwargs):
     """
-    Method for executing reader.get_attribute_values in background with a timeout (30 s by default)
-    In fact, it allows to call any object method passed by name; or just pass a callable as object.
-    This method could be embedded in a thread with very high timeout to trigger a callback when data is received.
-    This advanced behavior is not implemented yet.
+    arguments (this will be extracted from kwargs): 
+        object : object to extract method or callable
+        method :  string or callable to get from object
+        timeout : seconds 
+        callback : optional method to be called
+    
+    Method for executing reader.get_attribute_values in background 
+    with a timeout (30 s by default)
+
+    In fact, it allows to call any object method passed by name; 
+    or just pass a callable as object.
+
+    This method could be embedded in a thread with very high timeout 
+    to trigger a callback when data is received.
+
+    This advanced behavior can be implemented using AsynchronousFunction
     
     example:
     reader,att = PyTangoArchiving.Reader(),'just/some/nice/attribute'
     dates = '2014-06-23 00:00','2014-06-30 00:00'
-    values = fandango.threads.SubprocessMethod(reader,'get_attribute_values',att,*dates,timeout=10.)
+    values = fandango.threads.SubprocessMethod(reader,'get_attribute_values',
+        att,*dates,timeout=10.)
     
     or 
     
-    def callback(v): print('>> received %d values'%len(v))
-    fandango.threads.SubprocessMethod(reader,'get_attribute_values',att,*dates,timeout=10.,callback=callback)
+    def callback(v): 
+        print('>> received %d values'%len(v))
+        
+    fandango.threads.SubprocessMethod(reader,
+        'get_attribute_values',att,*dates,
+        timeout=10.,callback=callback)
     
     >> received 414131 values
     """
+    method = kwargs.pop('method',None)
     timeout = kwargs.pop('timeout',30.)
     callback = kwargs.pop('callback',None)
-    print args
-    print kwargs
+    
+    #Using pipe because it's faster than queue and more efficient
     local,remote = multiprocessing.Pipe(False)
-    def do_query(o,m,conn,*a,**k):
-        if None in (o,m): m = o or m
-        else: m = getattr(o,m)
-        print m,a,k
-        conn.send(m(*a,**k))
-        conn.close()
+    
+    def do_it(o,m,conn,*a,**k):
+        try:
+            if None in (o,m): 
+                m = (o or m)
+            elif isString(m): 
+                m = getattr(o,m)
+            #print m,a,k
+            conn.send(m(*a,**k))
+            #conn.close()
+        except Exception as e:
+            traceback.print_exc()
+            conn.send(e)
+        
     args = (obj,method,remote)+args
-    subproc = multiprocessing.Process(target=do_query,args=args,kwargs=kwargs)
-    subproc.start()
+    proc = multiprocessing.Process(target=do_it,args=args,kwargs=kwargs)
+    #print('New Process(%s)' % str(do_it))
+    proc.daemon = True
+    proc.start()
     t0 = time.time()
     result = None
+    
     while time.time()<t0+timeout:
         if local.poll():
             result = local.recv()
             break
-        threading.Event().wait(.1)
-    local.close(),remote.close()
-    subproc.terminate(),subproc.join()
+        wait(.1)
+        
+    local.close(),remote.close() #close pipes
+    print('Join Process(%s)' % str(do_it))
+    proc.terminate(),proc.join() #close process
+
     if time.time()>t0+timeout:
-        raise Exception('TimeOut(%s)!'%str(obj))
-    elif callback:
+        result = Exception('TimeOut(%s,%s)!'%(str(obj),timeout))
+    if callback:
         callback(result)
-    else:
-        return result
+    elif isinstance(result,Exception):
+        raise result
+
+    return result
     
 class AsynchronousFunction(threading.Thread):
     '''This class executes a given function in a separate thread
@@ -1212,24 +1260,45 @@ class AsynchronousFunction(threading.Thread):
         threading.Event().wait(0.1)
     print 'result = ',result
     '''
-    def __init__(self,function):
-        """It just creates the function object, you must call function.start() afterwards"""
+    def __init__(self, function, args = None, kwargs = None, 
+                callback=None, pause=0.0, start=False,
+                ):
+        """
+        It just creates the function object.
+        If pause!=0 or start=True, the function will be called
+        """
         self.function  = function
         self.result = None
         self.exception = None
         self.finished = threading.Event()
         self.finished.clear()
         threading.Thread.__init__(self)
+        self.callback = callback
+        self.pause = pause
         self.wait = self.finished.wait
         self.daemon = False
+        self.args = args or []
+        self.kwargs = kwargs or {}
+        if self.pause or start:
+            self.start()
+        
     def run(self):
         try:
-            self.wait(0.01)
-            self.result = self.function()
+            if self.pause:
+                self.wait(self.pause)
+            self.result = self.function(*self.args, **self.kwargs)
         except Exception,e:
             self.result = None            
             self.exception = e
-        self.finished.set() #Not really needed, simply call AsynchronousFunction.isAlive() to know if it has finished
+        # Not really needed, simply call AsynchronousFunction.isAlive() 
+        # to know if it has finished
+        self.finished.set() 
+        if self.callback:
+            try:
+                self._bg = AsynchronousFunction(self.callback, start=True,
+                    args = [self.result] if self.result is not None else [])
+            except:
+                traceback.print_exc()
 
 from . import doc
 __doc__ = doc.get_fn_autodoc(__name__,vars())

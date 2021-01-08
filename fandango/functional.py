@@ -46,6 +46,7 @@ import re
 import random
 import math
 import time,datetime
+import traceback
 
 from operator import isCallable
 from functools import partial
@@ -151,24 +152,29 @@ def reldiff(x,y,floor=None):
     floor would be a decimal value, e.g. 0.05
     """
     d = x-y
-    if not d: return 0
+    if not d: 
+        return 0
     ref = x or y
     d = float(d)/ref
     return d if not floor else (0,d)[abs(d)>=floor]
     #return 0 if x*(1-r)<y<x*(1+r) else -1
 
-def absdiff(x,y,floor=0.01):
+def absdiff(x,y,floor=0):
     """
-    Checks absolute difference <floor between x and y
+    Checks absolute difference between x and y
+    If diff < floor, 0 is returned
     floor would be a decimal value, e.g. 0.05
     """
     d = abs(x-y)
-    if d < floor: d = 0
+    if floor and d < floor: 
+        d = 0
     return d
 
 def seqdiff(x,y,method=reldiff,floor=None):
     """
-    Being x and y two arrays it checks (method) difference <floor between the elements of them.
+    Being x and y two arrays it checks (method) difference 
+    smaller than  floor between the elements of them.
+
     floor would be a decimal value, e.g. 0.05
     """
     if not floor:
@@ -294,21 +300,23 @@ def matchTuples(mapping,key,value):
         
 def inCl(exp,seq,regexp=True):
     """ Returns a caseless "in" boolean function, using regex if wanted """
-    if not seq: 
-        return False
     if isString(seq):
         return searchCl(exp,seq) if (regexp and isRegexp(exp)) else exp.lower() in seq.lower()
-    elif isSequence(seq) and isString(seq[0]):
-        if regexp:
-            return any(matchCl(exp,s) for s in seq)
-        else:
-            return any(exp.lower()==s.lower() for s in seq)
+    if seq is not None and len(seq):
+        if not isSequence(seq):
+            seq = toList(seq)
+        for s in seq:
+            s = str(s)
+            m = matchCl(exp,s) if regexp else exp.lower().strip()==s.lower().strip()
+            if m: 
+                return m
     else:
-        return exp in seq
+        return None
     
 def matchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless match between expression and given string """
     try:
+        exp,seq = str(exp),str(seq)
         if extend:
             if '&' in exp:
                 return all(matchCl(e.strip(),seq,terminate=False,extend=True) 
@@ -317,7 +325,8 @@ def matchCl(exp,seq,terminate=False,extend=False):
                 return not matchCl(exp[1:],seq,terminate,extend=True) 
         return re.match(toRegexp(exp,terminate=terminate,lower=True),seq.lower())
     except:
-        print('matchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        #print('matchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        traceback.print_exc()
         raise
     
 clmatch = matchCl #For backward compatibility
@@ -326,6 +335,7 @@ def searchCl(exp,seq,terminate=False,extend=False):
     """ Returns a caseless regular expression search between 
     expression and given string """
     try:
+        exp,seq = str(exp),str(seq)
         if extend:
             if '&' in exp:
                 return all(searchCl(e.strip(),seq,terminate=False,extend=True) 
@@ -334,7 +344,8 @@ def searchCl(exp,seq,terminate=False,extend=False):
                 return not searchCl(exp[1:],seq,terminate,extend=True)
         return re.search(toRegexp(exp.lower(),terminate=terminate),seq.lower())
     except:
-        print('searchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        #print('searchCl(%s,%s,%s,%s) failed'%(exp,seq,terminate,extend))
+        traceback.print_exc()
         raise
     
 clsearch = searchCl #For backward compatibility
@@ -512,6 +523,7 @@ def isTrue(arg):
     else: return arg
     
 NaN = float('nan')
+inf = float('inf')
     
 def isNaN(seq):
     return (isinstance(seq,(int,float)) and math.isnan(seq) or 
@@ -650,11 +662,17 @@ def shape(seq):
 
 def str2int(seq):
     """ It returns the first integer encountered in the string """
-    return int(re.search(reint,seq).group())
+    try:
+        return int(re.search(reint,seq).group())
+    except:
+        return None
 
 def str2float(seq):
     """ It returns the first float (x.ye-z) encountered in the string """
-    return float(re.search(refloat,seq).group())
+    try:
+        return float(re.search(refloat,seq).group())
+    except:
+        return None
 
 def str2bool(seq):
     """ It parses true/yes/no/false/1/0 as booleans """
@@ -726,14 +744,41 @@ def unicode2str(obj):
 def toList(val,default=[],check=isSequence):
     if val is None: 
         return default
-    elif hasattr(val,'__len__') and len(val)==0: #To prevent exceptions due to non evaluable numpy arrays
-        return []
-    elif not check(val): #You can use (lambda s:isinstance(s,list)) if you want
-        return [val]
-    elif not hasattr(val,'__len__'): #It forces the return type to have a fixed length
-        return list(val)
     else:
-        return val
+        hlen = hasattr(val,'__len__')
+        ch = check(val)
+        
+        if hlen: #list,string,dictionary
+            if len(val)==0:
+                #To prevent exceptions due to non evaluable numpy arrays
+                return default
+            elif hasattr(val,'keys'):
+                # dictionary
+                return list(val)
+            elif not ch:
+                #string? iterable not sequence
+                return [val]
+            else:
+                #already a valid sequence
+                return val
+        elif ch:
+            #sequence with no len, generator?
+            #It forces the return type to have a fixed length
+            return list(val)
+        else:
+            #scalar?
+            return [val]
+                
+        #if hlen and len(val)==0: #To prevent exceptions due to non evaluable numpy arrays
+            #return default
+        #elif not ch: #You can use (lambda s:isinstance(s,list)) if you want
+            ## hlen and not ch: string!
+            #return [val]
+        #elif not hlen: #check and no len, generator?
+            #return list(val)
+        #else:
+            #return val
+
 toSequence = toList
 
 def toString(*val):
@@ -1042,8 +1087,12 @@ def time2str(epoch=None, cad='', us=False, bt=True,
     """
     if epoch is None: epoch = now() 
     elif bt and epoch<0: epoch = now()+epoch
-    global DEFAULT_TIME_FORMAT
-    cad = cad or DEFAULT_TIME_FORMAT
+    global DEFAULT_TIME_FORMAT 
+    if cad:
+        cad = 'T'.join(cad.split(' ',1)) if iso else cad
+    else:
+        cad = ISO_TIME_FORMAT if iso else DEFAULT_TIME_FORMAT
+        
     t = time.strftime(cad,time2tuple(epoch,utc=utc))
     us = us and epoch%1
     if us: t+='.%06d'%(1e6*us)
@@ -1051,7 +1100,7 @@ def time2str(epoch=None, cad='', us=False, bt=True,
   
 epoch2str = time2str
  
-def str2time(seq='', cad='', throw=True):
+def str2time(seq='', cad='', throw=True, relative=False):
     """ 
     :param seq: Date must be in ((Y-m-d|d/m/Y) (H:M[:S]?)) format or -N [d/m/y/s/h]
     
@@ -1060,10 +1109,16 @@ def str2time(seq='', cad='', throw=True):
     The conversion itself is done by time.strptime method.
     
     :param cad: You can pass a custom time format
+    :param relative: negative times will be converted to now()-time
+    :param throw: if False, None is returned instead of exception
     """
     try: 
         if seq in (None,''): 
             return time.time()
+        if 'NOW-' in seq:
+            seq,relative = seq.replace('NOW',''),True
+        elif seq=='NOW':
+            return now()
         
         t, seq = None, str(seq).strip()
         if not cad:
@@ -1092,7 +1147,10 @@ def str2time(seq='', cad='', throw=True):
                 except: 
                     pass
                 
-        return time.mktime(t)+(ms or 0)
+        v = time.mktime(t)+(ms or 0)
+        if relative and v<0:
+            v = fn.now()-v
+        return v
     except: 
         if throw:
             raise Exception('PARAMS_ERROR','unknown time format: %s' % seq)

@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 # Always prefer setuptools over distutils
 import os, imp, sys
 from setuptools import setup, find_packages
@@ -23,9 +24,11 @@ To tune some options:
 
 -------------------------------------------------------------------------------
 """
-
-if 'help' in str(sys.argv): 
-  print(__doc__)
+try:
+  #python3
+  from builtins import str
+except:
+  pass
 
 release = open('fandango/VERSION').read()
 
@@ -85,9 +88,10 @@ setup(
         'Topic :: Software Development :: Libraries',
     ],
     platforms=[ "Linux,Windows XP/Vista/7/8" ],
-    install_requires=[],
+    #install_requires=[], #['python-future'],
     scripts=scripts,
     entry_points=entry_points,
     include_package_data=True,
-    zip_safe=False
+    zip_safe=False,
+    python_requires='~=2.7',
   )

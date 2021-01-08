@@ -35,7 +35,7 @@
 ## along with this program; if not, see <http://www.gnu.org/licenses/>.
 ###########################################################################
 
-import csv,sys,re,operator,traceback
+import csv,sys,re,operator,traceback,math
 import functional as fun
 from fandango.log import printf
 from fandango.dicts import SortedDict
@@ -59,7 +59,8 @@ is filter_array; which averages data at some given time intervals
 
 ###############################################################################
 
-from fandango.functional import reldiff,absdiff,seqdiff
+import fandango.functional as fn
+from fandango.functional import reldiff,absdiff,seqdiff,isSequence
 MAX_DATA_SIZE = 2*1024
 
 def decimator(data,min_inc=.05,min_rel=None,
@@ -215,50 +216,73 @@ F_INT = 3 #linear interpolation
 F_ZERO = 4 #fill with zeroes
 F_NEXT = 5 #fill with next value
 
-# For all this methos arguments may be just values sequence or 
+# For all this methods arguments may be just values sequence or 
 # currentsequence / previousvalue
 
+# THIS METHODS ARE AGGREGATORS! Not Filters!
+
 def average(*args):
+    """ aggregator"""
     return fun.avg(args[0])
 
 def rms_value(*args):
+    """ aggregator"""
     return fun.rms(args[0])
 
 def pickfirst(*args):
-    """ Just pick first valid value """
-    for v in args[0]:
-        if v is not None:
-            return v
+    """ aggregator, Just pick first valid value """
+    #for v in args[0]:
+        #if v is not None:
+            #return v
+    return fun.first(args[0])
 
 def maxdiff(*args):
-    """ Filter that maximizes changes (therefore, noise) """
+    """ aggregator that maximizes changes (therefore, noise) """
     seq,ref = args
-    if None in seq: return None
-    return sorted((fun.absdiff(s,ref,0),s) for s in seq)[-1][-1]
-    
+    r,d0 = ref,0
+    for s in seq:  #AVOID GENERATION EXHAUSTION
+        if s is None: 
+            return s
+        d = fun.absdiff(s,ref,0)
+        if d > d0: 
+            r,d0 = s,d
+    return r
+
 def mindiff(*args):
-    """ Filter that maximizes changes (therefore, noise) """
+    """ aggregator that maximizes changes (therefore, noise) """
     seq,ref = args
-    return sorted((fun.absdiff(s,ref,0),s) for s in seq
-                    if s is not None)[0][-1]
+    r,d0 = None,None
+    for s in seq:
+        if s == ref:
+            return s
+        elif None not in (s,ref):
+            d = fun.absdiff(s,ref,0)
+            if None in (r,d0) or d < d0:
+                r,d0 = s,d
+    return r
 
 def notnone(*args):
-    """ This method returns an averaging method applied to all none values
-    in a sequence """
+    """ 
+    notnone(sequence, [ref value, method])
+    
+    aggregator, It gets a None/NaN value from sequence.
+    
+    If ref and an averaging method is provided, 
+    it is applied to all filtered values (using ref as previous last value).
+    """
     seq,ref = args[0],fun.first(args[1:] or [0])
-    method = fun.first(args[2:] or [average])
+    method = fun.first(args[2:] or [pickfirst])
     try:
-        if np: 
-            return method(*((v for v in seq if v is not None 
-                            and not np.isnan(v)),ref))
-        else: 
-            return method(*((v for v in seq if v is not None),ref))
+        seq = (v for v in seq if v is not None and not math.isnan(v))
+        return method(seq,ref)
     except:
         traceback.print_exc()
         return ref
 
 def maxmin(*args):
     """ 
+    aggregator
+    
     Returns timed ((t,max),(t,min)) values from a (t,v) dataset 
     When used to filter an array the winndow will have to be doubled to 
     allocate both values (or just keep the one with max absdiff from previous).
@@ -268,10 +292,11 @@ def maxmin(*args):
     mn,mx = (t[0][1],t[0][0]),(t[-1][1],t[-1][0])
     return sorted((mx,mn))
 
-##METHODS OBTAINED FROM PyTangoArchiving READER
+## aggregators METHODS OBTAINED FROM PyTangoArchiving READER
 
 def choose_first_value(v,w,t=0,tmin=-300):
     """ 
+    aggregator
     Args are v,w for values and t for point to calcullate; 
     tmin is the min epoch to be considered valid
     """  
@@ -285,6 +310,7 @@ def choose_first_value(v,w,t=0,tmin=-300):
 
 def choose_last_value(v,w,t=0,tmin=-300):
     """ 
+    aggregator
     Args are v,w for values and t for point to calcullate; 
     tmin is the min epoch to be considered valid
     """  
@@ -298,6 +324,7 @@ def choose_last_value(v,w,t=0,tmin=-300):
     
 def choose_max_value(v,w,t=0,tmin=-300):
     """ 
+    aggregator
     Args are v,w for values and t for point to calcullate; 
     tmin is the min epoch to be considered valid
     """  
@@ -313,6 +340,7 @@ def choose_max_value(v,w,t=0,tmin=-300):
     
 def choose_last_max_value(v,w,t=0,tmin=-300):
     """ 
+    aggregator
     This method returns max value for epochs out of interval
     For epochs in interval, it returns latest
     Args are v,w for values and t for point to calcullate; 
@@ -336,7 +364,24 @@ def logfloor(x):
     v = (v for v,k in ((0.1,i<1),(1,i<2),(2,i<5),(5,True)) if k).next()
     return v*(10**m)
 
+def get_min_step(data,index=False):
+    """
+    gets min difference between two consecutive values
+    """
+    import numpy
+    vs = numpy.array(data)
+    diff = vs[1:]-vs[:-1]
+    mx = numpy.nanmin(diff)
+    if not index:
+        return mx
+    else: #Return at which position the step was found
+        ix =1+numpy.where(diff==mx)[0][0]
+        return (ix,mx)
+
 def get_max_step(data,index=False):
+    """
+    gets max difference between two consecutive values
+    """
     import numpy
     vs = numpy.array(data)
     diff = vs[1:]-vs[:-1]
@@ -389,18 +434,21 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     First interval will be floor(data[0][0],window)+window, containing average 
         of data[t0:t0+window]
     If begin,end intervals are passed, cut-off and filling methods are applied
+
+    filling> F_LAST fill with previous value, F_NONE for None, F_ZERO for zero value
+
     The value at floor(time) is the value that closes each interval
     
     IF YOUR DATA SOURCE IS A PYTHON LIST; THIS METHOD IS AS FAST AS NUMPY 
     (crosschecked with 1e6 samples against the 
     PyTangoArchiving.utils.decimate_array method using numpy)
     """
-    if 1: #trace: 
-        print('filter_array([%d],w=%f' % (len(data),window))
+    if trace: print('filter_array([%d],w=%f' % (len(data),window))
     data = sorted(data) #DATA MUST BE ALWAYS SORTED
     begin,end,window = map(float,((begin,end,window)))
     try:
-        assert window<1.
+        if window>=1.: 
+            raise Exception('numpy not needed')
         import numpy
         ranger = numpy.arange
         tfloor = lambda x: float(fun.floor(x,window))
@@ -411,6 +459,7 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
         if window < 1.:
             print('ranges only accept integers, so the minimum window is 1')
             window = 1.
+        #window = int(window)
     
     #CUT-OFF; removing data out of interval    
     #--------------------------------------------------------------------------
@@ -447,36 +496,42 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
     #Filling initial range with data
     #--------------------------------------------------------------------------
     if begin:
+        #print('Filling initial range with data')
         nx =  prev and prev[1] or data[0][1]
         ndata = [(tt+window,nx) for tt in ranger(tfloor(begin),
                                                 tfloor(data[0][0]),window)]
         if trace: print('prev: %s'%str(ndata and ndata[-1]))
-    else: 
+    else:
+        # print('ndata is empty')
         ndata =[]
     
     #Inserting averaged data
     #--------------------------------------------------------------------------
     i,i0 = 0,0
-    next = []
+    # next = []
     ilast = len(data)-1
     if trace: print('t0: %s' % (window+tfloor(data[0][0]-1)))
     try:
         rb,re,rs = window+tfloor(data[0][0]-1),1+window+tfloor(max((end,data[-1][0]))),window
         if ranger == range:
             rb,re,rs = int(rb),int(re),int(rs)
+        if trace: print('filter_array.%s(%s,%s,%s)' % (ranger,rb,re,rs))
         for t in ranger(rb,re,rs):
             if i<=ilast:
                 if data[i][0]>t:
-                    #Filling "whitespace" with last data
-                    nx = (
-                        (filling==F_LAST and ndata and ndata[-1][1]) or
-                        (filling==F_NONE and None) or
-                        (filling==F_ZERO and 0) or
-                        None)
+                    #print('Filling "whitespace" with last data')
+                    if filling == F_LAST:
+                        nx = ndata[-1][1] if len(ndata) else (
+                            data[0][1] if len(data) and data[0][0]<t+window else None)
+                    elif filling == F_ZERO:
+                        nx = 0
+                    else:
+                        nx = None
+
                     ndata.append((t,nx))
                     #print 'whitespace: %s'%str(ndata[-1])
                 else:
-                    #Averaging data within interval
+                    #print('Averaging data within interval')
                     i0 = i
                     while i<=ilast and data[i][0]<=t: 
                         i+=1
@@ -485,6 +540,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                     a2 = ndata and ndata[-1][-1] or 0
                     ##########################################################
                     val = method(a1,a2)
+                    # if fn.isSequence(val) or hasattr(val,'__len__'):
+                    #    print('%s(%s,%s) returned an array!' % (method,a1,a2))
                     ndata.append((t,val))
                     #print '%s-%s = [%s:%s] = %s'%(t-window,t,i0,i,ndata[-1])
                     ##########################################################
@@ -495,7 +552,8 @@ def filter_array(data,window=300,method=average,begin=0,end=0,filling=F_LAST,
                 else: nx = None
                 ndata.append((t,nx))
                 #print 'post: %s'%str(ndata[-1])
-    except Exception,e:
+
+    except Exception as e:
         print('Error in filter_array(): %s' % e)
         print('\t %s - %s / %s : %s : %s ' 
               % (i0,i,ilast,filling,data[i0:i]))

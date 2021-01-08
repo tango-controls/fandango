@@ -93,7 +93,7 @@ This Module includes several classes:
 import PyTango,sys,threading,time,traceback,re,inspect
 from PyTango import AttrQuality,DevState
 
-import fandango
+import fandango as fn
 import fandango.tango as tango
 from fandango.tango.dynattr import *
 import fandango.objects as objects
@@ -156,6 +156,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self.DynamicAttributes = []
         self.DynamicStates = []
         self.DynamicStatus = []
+        self.Lambdas = {}
         self.CheckDependencies = True
         #Internals
         self.dyn_attrs = {}
@@ -257,16 +258,16 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self._locals['self'] = self
         self._locals['EVAL'] = lambda formula: self.evaluateFormula(formula)
         self._locals['MATCH'] = lambda expr,cad: fun.matchCl(expr,cad)
-        self._locals['DELAY'] = lambda secs: fandango.wait(secs)
+        self._locals['DELAY'] = lambda secs: fn.wait(secs)
         self._locals['FILE'] = lambda filename: DynamicDS.open_file(filename,device=self) #This command will allow to setup attributes from config files
         self._locals['FORMULA'] = self.get_attr_formula
         self._locals['MODELS'] = self.get_attr_models
-        self._locals['time2str'] = fandango.time2str
-        self._locals['ctime2time'] = fandango.ctime2time
-        self._locals['now'] = fandango.now
-        for k in dir(fandango.functional):
+        self._locals['time2str'] = fn.time2str
+        self._locals['ctime2time'] = fn.ctime2time
+        self._locals['now'] = fn.now
+        for k in dir(fn.functional):
             if '2' in k or k.startswith('to') or k.startswith('is'):
-                self._locals[k] = getattr(fandango.functional,k)
+                self._locals[k] = getattr(fn.functional,k)
         
         # Methods for getting/writing properties
         self._locals['PGET'] = (
@@ -363,7 +364,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
             setattr(self,prop,value)
             
         value = getattr(self,prop)
-        if compact and fandango.isSequence(value) and len(value)==1:
+        if compact and fn.isSequence(value) and len(value)==1:
             return value[0]
         else:
             return value      
@@ -419,11 +420,11 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
                 if prop=='polled_attr': 
                   self._polled_attr_ = tango.get_polled_attrs(value)
                   
-                elif prop=='Lambdas':
+                elif prop=='StoredLambdas':
                     self.Lambdas = dict(l.split(':',1) for l in value 
                                         if ':' in l)
                     try: 
-                        self.Lambdas = dict((k,eval(v)) for k,v in self.Lambdas)
+                        self.Lambdas = dict((k,eval(v)) for k,v in self.Lambdas.items())
                     except: 
                         traceback.print_exc()
                   
@@ -459,12 +460,14 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
     def parseStaticAttributes(self,add=True,keep=True):
         """ Parsing StaticAttributes if defined. """
         attrs = []
+        dynamics = [d.split('=')[0].strip().lower() 
+                    for d in self.DynamicAttributes]
         if hasattr(self,'StaticAttributes'): 
             for a in self.StaticAttributes:
                 aname = a.split('#')[0].split('=')[0].strip()
                 if aname:
                     attrs.append(aname)
-                    if any(d.startswith(aname) for d in self.DynamicAttributes):
+                    if aname.lower() in dynamics:
                         self.info('StaticAttribute %s overriden by '
                                   'DynamicAttributes Property'%(aname))
                     else:
@@ -649,7 +652,9 @@ class DynamicDSAttrs(DynamicDSImpl):
             # if the code is the same ... don't touch anything
             # if the code or the type changes ... remove the attribute!
             # dyn_attr() will create the attributes only if they don't exist.
-            if aname not in self.dyn_values:
+            aname = self.get_attr_name(aname)
+            if not any(k.lower()==aname.lower() for k in self.dyn_values):
+                #if aname not in self.dyn_values:
                 create = True
                 self.dyn_values[aname]=DynamicAttribute(name=aname)
                 self.dyn_types[aname]=None
@@ -719,8 +724,9 @@ class DynamicDSAttrs(DynamicDSImpl):
                 else:
                     dyntype = DynamicDSTypes['DevDouble']
                     self.debug('Creating attribute (%s,%s,dimx=%s,%s)'%(aname,dyntype.tangotype,dyntype.dimx,AttrType))
-                    if (create): self.add_attribute(PyTango.Attr(aname,PyTango.ArgType.DevDouble, AttrType), \
-                        self.read_dyn_attr,self.write_dyn_attr,_is_allowed)
+                    if (create): 
+                        self.add_attribute(PyTango.Attr(aname,PyTango.ArgType.DevDouble, AttrType), \
+                            self.read_dyn_attr,self.write_dyn_attr,_is_allowed)
                         #self.read_dyn_attr,self.write_dyn_attr,self.is_dyn_allowed)
                 self.dyn_types[aname]=dyntype
 
@@ -728,8 +734,10 @@ class DynamicDSAttrs(DynamicDSImpl):
             self.dyn_attrs[aname]=formula
             #TODO: Some day self.dyn_values should substitute both dyn_attrs and dyn_types
             self.dyn_values[aname].formula=formula
-            try: self.dyn_values[aname].compiled=compile(formula.strip(),'<string>','eval')
-            except: self.error(traceback.format_exc())
+            try: 
+                self.dyn_values[aname].compiled=compile(formula.strip(),'<string>','eval')
+            except: 
+                self.error(traceback.format_exc())
             self.dyn_values[aname].type=self.dyn_types[aname]
 
             #Adding attributes to DynamicStates queue:
@@ -743,12 +751,13 @@ class DynamicDSAttrs(DynamicDSImpl):
             events = self.check_attribute_events(aname) 
             self.dyn_values[aname].keep = events or (self.KeepAttributes and 
                 (not 'no' in self.KeepAttributes) and any(q.lower() 
-                in self.KeepAttributes for q in [aname,'*','yes','true']))            
+                in self.KeepAttributes for q in [aname,'*','yes','true']))
+                
             if events:
                 self._locals[aname] = None
                 if create and events:
                     # THIS IS CONFIGURING EVENTS TO BE "MANUAL", 
-                    # pushed and unfiltered by Jive settings
+                    # pushed=True, filtered=False (ignore Jive settings)
                     self.set_change_event(aname.lower(),True,False)
                     if 'archive' in events:
                         self.set_archive_event(aname.lower(),True,False)
@@ -798,6 +807,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         ##Setting up state events:
         #THESE SETTINGS ARE STILL NEEDED IN TANGO >= 7
         for x in ('state','memusage',):
+            # Both State and MemUsage shall be polled to have events!
             events = self.check_attribute_events(x)
             if events and x not in new_polled_attrs:
                 #To be added at next restart
@@ -872,18 +882,23 @@ class DynamicDSAttrs(DynamicDSImpl):
         cabs,crel = 0,0
         try:
             ac = self.get_attribute_config_3(aname)[0]
-            try: cabs = float(ac.event_prop.ch_event.abs_change)
-            except: pass
-            try: crel = float(ac.event_prop.ch_event.rel_change)
-            except: pass
-        except:pass
+            try: 
+                cabs = float(ac.event_prop.ch_event.abs_change)
+            except: 
+                pass
+            try: 
+                crel = float(ac.event_prop.ch_event.rel_change)
+            except: 
+                pass
+        except:
+            pass
         return cabs,crel
     
     def check_changed_event(self,aname,new_value,events=None,config=None):
         """
         Events will be always pushed if array,state,bool,string values change
         If UseEvents=always, it will be always pushed
-        if UseEvents=push, will always push on change, ignoring config
+        if UseEvents=push, will always push on any change, ignoring config
         if UseEvents=True, then Tango DB config prevails, and is checked
         """
         aname = self.get_attr_name(aname)
@@ -899,6 +914,8 @@ class DynamicDSAttrs(DynamicDSImpl):
             v = self.dyn_values[aname].value
             new_value = getattr(new_value,'value',new_value)
             
+            events = events or self.check_attribute_events(aname)
+            
             self.info('In check_changed_event(%s,%s,%s): %s!=%s'
                 % (aname,events,config,shortstr(v),shortstr(new_value) ))
             if v is None:
@@ -906,17 +923,21 @@ class DynamicDSAttrs(DynamicDSImpl):
                           %(aname,shortstr(new_value)))
                 return True
             
-            elif events and events == 'always':
+            elif events and clsearch('always',events):
                 return True
             
             elif fun.isSequence(new_value) or fun.isSequence(v):
+                # Event pushed ignoring cabs/crel config!
                 v,new_value = fun.notNone(v,[]),fun.notNone(new_value,[])
+                
                 changed = len(v)!=len(new_value) \
                     or any(v!=vv for v,vv in zip(v,new_value))
+                
                 self.info('In check_changed_event(%s,%s): changed = %s'
                     %(aname,shortstr(new_value),changed))
+                
                 return changed
-
+            
             else:
                 try: 
                     v,new_value = (float(v) if v is not None else None),\
@@ -931,10 +952,15 @@ class DynamicDSAttrs(DynamicDSImpl):
                     except:
                         return str(v)!=str(new_value)
                 
-                if events == 'push':
-                    cabs,crel = 0,0
-                else:
-                    cabs,crel = config or self.check_events_config(aname)
+                if clsearch('push',events): #UseEvents = push #on any change
+                    #cabs,crel = 1e-12,1e-12
+                    if v != new_value: #It should be only if UseEvents=push
+                        self.info('In check_changed_event(%s,%s): '
+                            'push on any change'%(aname,shortstr(new_value)))
+                        return True                    
+                
+                #If events = True or number
+                cabs,crel = config or self.check_events_config(aname)
                 
                 if cabs>0 and not v-cabs<new_value<v+cabs: 
                     self.info('In check_changed_event(%s,%s): absolute change!'
@@ -946,10 +972,10 @@ class DynamicDSAttrs(DynamicDSImpl):
                               %(aname,shortstr(new_value)))
                     return True
                 
-                elif v != new_value:
-                    self.info('In check_changed_event(%s,%s): '
-                        'push on any change'%(aname,shortstr(new_value)))
-                    return True
+                #elif v != new_value: #It should be only if UseEvents=push
+                    #self.info('In check_changed_event(%s,%s): '
+                        #'push on any change'%(aname,shortstr(new_value)))
+                    #return True
                 
                 else: 
                     self.debug('In check_changed_event(%s,%s): nothing changed'
@@ -964,6 +990,7 @@ class DynamicDSAttrs(DynamicDSImpl):
     @Cached
     def check_dependencies(self, aname):
         #Checking attribute dependencies
+        aname = self.get_attr_name(aname)
         if aname not in self.dyn_values:
             aname,formula,compiled = self.get_attr_formula(aname,full=True)
             
@@ -1004,6 +1031,7 @@ class DynamicDSAttrs(DynamicDSImpl):
         #Updating Last Attribute Values
         now = time.time()
         changed = False
+        aname = self.get_attr_name(aname)
         for k in (self.dyn_values[aname].dependencies or []):
             self.debug("In update_dependencies(%s): "
                 " (%s,last read at %s, KeepTime is %s)"
@@ -1063,25 +1091,12 @@ class DynamicDSAttrs(DynamicDSImpl):
         try:
             self.debug("DynamicDS(%s)::read_dyn_atr(%s) => evalAttr()"
                    % (self.get_name(),aname))
-            result = self.evalAttr(aname)
+            result = self.evalAttr(aname) #push is done here
             quality = getattr(result,'quality',
                               self.get_attr_quality(aname,result))
             date = self.get_attr_date(aname,result)
             result = self.dyn_types[aname].pytype(result)
-
-            if 1: #hasattr(attr,'set_value_date_quality'):
-                attr.set_value_date_quality(result,date,quality)
-            #else: #PyTango<7
-              #if type(result) in (list,set,tuple):
-                #attr_DynAttr_read = []
-                #for r in result: attr_DynAttr_read.append(r)
-                #try: 
-                #    PyTango.set_attribute_value_date_quality(
-                #   attr_DynAttr_read,date,quality,len(attr_DynAttr_read),0)
-                #except: attr.set_value(attr_DynAttr_read)
-              #else: 
-                #try: PyTango.set_attribute_value_date_quality(attr,result,date,quality)
-                #except: attr.set_value(result)
+            attr.set_value_date_quality(result,date,quality)
                 
             text_result = (type(result) is list and result and '%s[%s]'
                            %(type(result[0]),len(result))) or str(result)
@@ -1146,10 +1161,12 @@ class DynamicDSAttrs(DynamicDSImpl):
     def push_dyn_attr(self,aname,value=None,date=None,quality=None,
             events=None,changed=None,queued=False):
         try:
+            aname = self.get_attr_name(aname)
             queued = queued and self.MaxEventStream
             
             if fun.clmatch('state$',aname):
                 aname = 'State'
+                events,changed = True,True
                 value = value if value is not None else self.get_state()
                 date,quality = time.time(),AttrQuality.ATTR_VALID
 
@@ -1159,11 +1176,12 @@ class DynamicDSAttrs(DynamicDSImpl):
             quality = notNone(quality,t.quality)
                 
             if events is None:
+                # That call parses the contents of UseEvents property
                 events = self.check_attribute_events(aname)
             if changed is None:
-                changed = self.check_changed_event(aname,value)
+                changed = self.check_changed_event(aname,value,events)
             if not events or not changed:
-                return        
+                return 'nothing to do'
                 
             self.info('push_dyn_attr(%s,%s)=%s(%s))\n%s'%(aname,
                 queued and 'queued' or 'pushed',type(value),
@@ -1175,10 +1193,20 @@ class DynamicDSAttrs(DynamicDSImpl):
                     self._events_queue.put((aname,value,date,quality,events))
                 finally:
                     self._events_lock.release()
+                return 'queued'
             else:
-                self.push_change_event(aname,value,date,quality)
+                if aname.lower() in ('state','status'):
+                    self.push_change_event(aname)
+                else:
+                    self.push_change_event(aname,value,date,quality)
                 if fun.clsearch('archive',events):
-                    self.push_archive_event(aname,value,date,quality)
+                    if aname.lower() in ('state','status'):
+                        self.push_archive_event(aname)
+                    else:
+                        self.push_archive_event(aname,value,date,quality)
+
+                return 'pushed'
+            
         except Exception as e:
             self.error('push_dyn_attr(%s,%s(%s),%s,%s) failed!\n%s' % 
                 (aname,type(value),value,date,quality,traceback.format_exc()))
@@ -1300,18 +1328,22 @@ class DynamicDSAttrs(DynamicDSImpl):
             date = self.get_attr_date(aname,result)
             value = self.dyn_types[aname].pytype(result)
 
-            #Events must be checked before updating the cache
+            #UseEvents must be checked before updating the cache
             events = self.check_attribute_events(aname)
             check = events and (
                         push or self.check_changed_event(aname,result,events))
             
-            self.debug('events = %s, check = %s' % (events,check))
+            et = 1e3*(fn.now()-tstart)
+            cached = events or self.dyn_values[aname].keep
+            (self.debug if et < 1. else self.warning)(
+                'evalAttr(%s): events = %s, check = %s, cached = %s, '
+                'eval_ms = %d' % (aname,events,check,cached,et))
             if events and check:
                 self.push_dyn_attr(aname,value=value,
                                    events=events,changed=1,queued=1)
             
             #Updating the cache
-            if events or self.dyn_values[aname].keep: 
+            if cached: 
                 old = self.dyn_values[aname].value
                 self.dyn_values[aname].update(value,date,quality)
                 self._locals[aname] = value
@@ -1405,7 +1437,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             
             self.state_lock.acquire()
             if self.dyn_states:
-                self.debug('In DynamicDS.check_state()')
+                self.info('In DynamicDS.check_state()')
                 old_state = new_state if current is None else current
                 ## @remarks: the device state is not changed if none of the DynamicStates evaluates to True
                 #self.set_state(PyTango.DevState.UNKNOWN)
@@ -1455,6 +1487,7 @@ class DynamicDSAttrs(DynamicDSImpl):
     def processEvents(self):
         """
         Polled command to process the internal event queue
+        MaxEventStream must be configured
         """
         try:
             c = 0
@@ -1473,7 +1506,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             for i in range(self.MaxEventStream):
                 try:
                     a,v,d,q,e = self._events_queue.get(False)
-                    self.push_dyn_attr(a,v,d,q,e,True,False)
+                    self.push_dyn_attr(a,v,d,q,e,changed=True,queued=False)
                     c+=1
                 except objects.Queue.Empty:
                     break
@@ -1513,6 +1546,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         return aname
     
     def get_attr_date(self,aname,value):
+        aname = self.get_attr_name(aname)
         if type(value) is DynamicAttribute:
             return value.date
         return time.time()    
@@ -1522,6 +1556,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         Returns the formula for the given attribute
         The as_tuple flag will return an attr,formula,compiled tuple
         """
+        aname = self.get_attr_name(aname)
         if aname in self.dyn_values:
             formula = self.dyn_values[aname].formula
             compiled = self.dyn_values[aname].compiled
@@ -1538,10 +1573,10 @@ class DynamicDSHelpers(DynamicDSAttrs):
                              ' trying to evaluate ...'%(aname,))
                 formula,compiled=aname,None
         if full:
-          return aname,formula,compiled
+            return aname,formula,compiled
         else:
-          #If no attribute is matching, attribute name is returned
-          return formula
+            #If no attribute is matching, attribute name is returned
+            return formula
       
     def get_attr_models(self,attribute):
         """
@@ -1554,6 +1589,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         return ['/'.join(filter(bool,s)) for s in matches]   
     
     def get_attr_quality(self,aname,attr_value):
+        aname = self.get_attr_name(aname)
         formula = self.dyn_qualities.get(aname.lower()) or 'Not specified'
         self.debug('In get_attr_quality(%s,%s): %s' 
             % (aname,shortstr(attr_value,15)[:10],formula))
@@ -1637,8 +1673,9 @@ class DynamicDSHelpers(DynamicDSAttrs):
         if len(argin)<2: value=VALUE
         else: value=argin[1]
         aname = argin[0]
-
-        if aname not in self.dyn_values.keys(): raise Exception('Unknown State or Attribute : ', aname)
+        aname = self.get_attr_name(aname)
+        if aname not in self.dyn_values.keys(): 
+            raise Exception('Unknown State or Attribute : ', aname)
         elif value is not None:
             self.dyn_values[aname].forced=value
             if self.simulationMode:
@@ -1748,6 +1785,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
                             if len(self._external_attributes) == 1: 
                                 tango.TAU_LOGGER.disableLogOutput()
 
+                            # Check UseEvents
                             if (self._locals.get('ATTRIBUTE') 
                                     and self.check_attribute_events(self._locals.get('ATTRIBUTE'))):
                                 #If Attribute has events evalAttr() will be called at every event_received
@@ -1761,7 +1799,9 @@ class DynamicDSHelpers(DynamicDSAttrs):
                             self._external_attributes[full_name].addListener(self.event_received)
                         else: 
                             #USING PLAIN PYTANGO (POLLING UNCACHED VALUES)
-                            self._external_attributes[full_name] = tango.CachedAttributeProxy(full_name,max((100,self.KeepTime)))#keeptime=self.KeepTime)
+                            cap = tango.CachedAttributeProxy(full_name,
+                                    keeptime=max((100,self.KeepTime)))#keeptime=self.KeepTime)
+                            self._external_attributes[full_name] = cap
                     else:
                         self.debug('%s.getXAttr: using %s proxy to %s' % (self._locals.get('ATTRIBUTE'),'taurus' if self.UseTaurus else 'PyTango',full_name))
                     if write: 
@@ -2072,7 +2112,7 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getMemUsage(self):
-        return fandango.linos.get_memory()/1e3
+        return fn.linos.get_memory()/1e3
     
     #------------------------------------------------------------------
     #    Read MemUsage attribute
@@ -2081,7 +2121,9 @@ class DynamicDS(DynamicDSHelpers):
         self.debug("In read_MemUsage()")
         
         #    Add your own code here
-        attr.set_value(self.getMemUsage())
+        m = self.getMemUsage()
+        self.push_change_event('MemUsage',m)
+        attr.set_value(m)
         
     #------------------------------------------------------------------
     #    Read EventQueueSize attribute
@@ -2109,6 +2151,12 @@ class DynamicDS(DynamicDSHelpers):
         self.info('\tevaluateFormula took %s seconds'%(time.time()-t0))
         return argout        
     
+    def pushAttribute(self,argin):
+        try:
+            return self.push_dyn_attr(argin,changed=True,queued=True)
+        except:
+            return(traceback.format_exc())
+    
     #------------------------------------------------------------------
     #    getAttrFormula command:
     #
@@ -2119,7 +2167,7 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getAttrFormula(self,argin):
-        return self.dyn_attrs[argin]
+        return self.get_attr_formula(argin)
     
     #------------------------------------------------------------------------------------------------------
     #   Lock/Unlock Methods
@@ -2241,7 +2289,7 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevLong,
             "It will fix the maximum size for all Dynamic Attributes.",
             [ MAX_ARRAY_SIZE ] ],
-        'Lambdas':
+        'StoredLambdas':
             [PyTango.DevVarStringArray,
             "regexp:method ; this property allows to declare accelerated calls,"
             " whenever a formula matches regexp, method will be called without"
@@ -2349,7 +2397,12 @@ class DynamicDSClass(PyTango.DeviceClass):
                 'Display level':PyTango.DispLevel.EXPERT,
                 'Polling period': 3000,
             } ],
-
+        'pushAttribute':
+            [[PyTango.DevString, "Get current attribute formula"],
+            [PyTango.DevString, "Get current attribute formula"],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+             } ],                   
         }
 
     #    Attribute definitions
@@ -2357,7 +2410,11 @@ class DynamicDSClass(PyTango.DeviceClass):
        'MemUsage':
            [[PyTango.DevDouble,
            PyTango.SCALAR,
-           PyTango.READ]],
+           PyTango.READ],
+            {
+                'Display level':PyTango.DispLevel.EXPERT,
+                'Polling period': 3000,
+            } ],
         'EventQueueSize':
            [[PyTango.DevLong,
            PyTango.SCALAR,
@@ -2503,12 +2560,12 @@ class DynamicServer(object):
         self.instance = self.util.instance()
         self.db = self.instance.get_database()
         class_list = self.db.get_device_class_list(self.instance.get_ds_name()) #Device,Class object list
-        self.classes = fandango.dicts.defaultdict(list)
+        self.classes = fn.dicts.defaultdict(list)
         [self.classes[c].append(d) for d,c in zip(class_list[::2],class_list[1::2]) if c.lower()!='dserver']
         for C,devs in classes.items():
             for d in devs:
                 if C not in self.classes or d not in self.classes[C]:
-                    fandango.tango.add_new_device(self.name,C,d)
+                    fn.tango.add_new_device(self.name,C,d)
                     self.classes[C].append(d)
         self.path = (self.db.get_property(self.PROPERTY,['DeviceClasses'])['DeviceClasses'] or [''])[0]
         if self.path: sys.path.append(self.path)
@@ -2524,7 +2581,7 @@ class DynamicServer(object):
         if not args:args = sys.argv
         assert len(args)>=2,'1 argument required!:\n\tpython dynamic.py instance [-vX]'
         print(args)
-        server = args[0] if not fandango.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
+        server = args[0] if not fn.re.match('^(.*[/])?dynamic.py$',args[0]) else 'DynamicServer'
         instance = args[1]
         logs,orb = log if instance!='-?' else '',[]
         for i in (2,3):
@@ -2545,19 +2602,19 @@ class DynamicServer(object):
             p = (self.db.get_property(self.PROPERTY,[c])[c] or [''])[0]
             print('\nLoading %s from %s' % (c,p or self.path))
             if p:
-                self.modules[c] = fandango.objects.loadModule(p)
-            elif c in dir(fandango.device):
-                self.modules[c] = fandango.device
-            elif c in dir(fandango.interface):
-                self.modules[c] = fandango.interface
+                self.modules[c] = fn.objects.loadModule(p)
+            elif c in dir(fn.device):
+                self.modules[c] = fn.device
+            elif c in dir(fn.interface):
+                self.modules[c] = fn.interface
             else:
                 try:
-                    self.modules[c] = fandango.objects.loadModule(c)
+                    self.modules[c] = fn.objects.loadModule(c)
                     assert getattr(self.modules[c],c+'Class')
                 except:
                     m = self.path+'/%s/%s.py'%(c,c)
                     print('\nLoading %s from %s' % (c,m))
-                    self.modules[c] = fandango.objects.loadModule(m)
+                    self.modules[c] = fn.objects.loadModule(m)
             k, i, n = getattr(self.modules[c],c+'Class'),getattr(self.modules[c],c),c
             self.util.add_TgClass(k,i,n)
             CreateDynamicCommands(i,k)
@@ -2572,7 +2629,7 @@ class DynamicServer(object):
         U.server_init()
         U.server_run()
 
-__doc__ = fandango.doc.get_fn_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
+__doc__ = fn.doc.get_fn_autodoc(__name__,vars(),module_vars=['DynamicDSTypes'])
         
 if __name__ == '__main__':
     print('.'*80)

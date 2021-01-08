@@ -73,17 +73,19 @@ from fandango.excepts import exc2str
 #taurus imports, here USE_TAU is defined for all fandango
 global TAU,USE_TAU,TAU_LOGGER
 TAU,USE_TAU = None,False
+
 def loadTaurus():
     print('%s fandango.tango.loadTaurus()'%time.ctime())
     global TAU,USE_TAU,TAU_LOGGER
     try:
-        assert str(os.getenv('USE_TAU')).strip().lower() not in 'no,false,0'
-        import taurus
-        TAU = taurus
-        USE_TAU=True
-        TAU_LOGGER = taurus.core.util.Logger
-        """USE_TAU will be used to choose between taurus.Device 
-        and PyTango.DeviceProxy"""
+        if str(os.getenv('USE_TAU')).strip().lower() in 'yes,true,1':
+            import taurus
+            TAU = taurus
+            USE_TAU=True
+            TAU_LOGGER = taurus.core.util.Logger
+            """USE_TAU will be used to choose between taurus.Device 
+            and PyTango.DeviceProxy"""
+            print('fandango.tango: USE_TAU=True, using Taurus for proxies')
     except:
         print('fandango.tango: USE_TAU disabled')
         TAU = None
@@ -92,7 +94,7 @@ def loadTaurus():
     return bool(TAU)
 
 global USE_FQDN
-USE_FQDN = False
+USE_FQDN = str2type(os.getenv('USE_FQDN','None'))
 
 TANGO_STATES = \
   'ON OFF CLOSE OPEN INSERT EXTRACT MOVING STANDBY FAULT INIT RUNNING ALARM '\
@@ -116,11 +118,11 @@ alnum = '(?:[a-zA-Z0-9-_\*\.]|(?:\.\*))(?:[a-zA-Z0-9-_\*\.\+]|(?:\.\*))*'
 no_alnum = '[^a-zA-Z0-9-_]'
 no_quotes = '(?:^|$|[^\'"a-zA-Z0-9_\./])'
 
-#redev matches device names, includes fqdn host
+#rehost matches simple and fqdn hostnames
 rehost = '(?:(?P<host>'+alnum+'(?:\.'+alnum+')?'+'(?:\.'+alnum+')?'\
     +'(?:\.'+alnum+')?'+'[\:][0-9]+)(?:/))' #(?:'+alnum+':[0-9]+/)?
 
-# redev = '(?P<device>(?:'+alnum+':[0-9]+/{1,2})?(?:'+'/'.join([alnum]*3)+'))' 
+#redev matches device names
 redev = '(?P<device>'+'(?:'+'/'.join([alnum]*3)+'))'
 
 #reattr matches attribute and extension
@@ -184,6 +186,70 @@ AC_PARAMS = [
 ##TangoDatabase singletone
 global TangoDatabase,TangoDevice,TangoProxies
 TangoDatabase,TangoDevice,TangoProxies = None,None,None
+# TangoProxies to be redefined at the end of file
+
+global KEEP_PROXIES
+KEEP_PROXIES = False
+
+def get_full_name(model,fqdn=None):
+    """ 
+    Returns full schema name as needed by HDB++ api
+    """
+    model = model.split('tango://')[-1]
+
+    if fqdn is None: 
+        fqdn = fandango.tango.defaults.USE_FQDN
+
+    if ':' in model:
+        h,m = model.split(':',1)
+        if '.' in h and not fqdn:
+            h = h.split('.')[0]
+        elif '.' not in h and fqdn:
+            try:
+                h = get_fqdn(h)
+            except: 
+                pass
+        model = h+':'+m
+        
+    else:
+        model = get_tango_host(fqdn=fqdn)+'/'+model
+    
+    model = 'tango://'+model
+    return model
+
+def get_normal_name(model):
+    """ 
+    returns simple name as just domain/family/member,
+    without schema/host/port, as needed by TangoDB API
+    """
+    if ':' in model:
+        model = model.split(':')[-1].split('/',1)[-1]
+    return model.split('#')[0].strip('/')
+
+def get_attr_name(model,default='state'):
+    """
+    gets just the attribute part of a Tango URI
+    
+    set default=False to do a boolean check whether URI belongs to attribute
+    """
+    if not model: return ''
+    model = get_normal_name(model)
+    if model.count('/')==3:
+        return model.split('/')[-1]
+    else:
+        return default
+    
+def get_dev_name(model,full=True,fqdn=None):
+    """
+    gets just the device part of a Tango URI
+    """
+    norm = get_normal_name(model)
+    if norm.count('/')>2: 
+        model = model.rsplit('/',1)[0]
+    if not full:
+        return get_normal_name(model)
+    else:
+        return get_full_name(model,fqdn=fqdn)
 
 @Cached(depth=100,expire=60)
 def get_tango_host(dev_name='',use_db=False, fqdn=None):
@@ -214,6 +280,7 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
         elif use_db:
             use_db = use_db if hasattr(use_db,'get_db_host') \
                             else get_database()
+
             host,port = use_db.get_db_host(),int(use_db.get_db_port())
             
         else:
@@ -223,9 +290,17 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
             else:
                 host,port = host.split(':',1)
         
-        if fqdn: 
-            host = get_fqdn(host)
-        elif (matchCl('.*[a-z].*',host.lower())
+        if fqdn is None:
+            pass #It is done on purpose, it just ignores the fqdn settings
+        
+        elif fqdn is True: 
+            try:
+                if host.count('.')<2:
+                    host = get_fqdn(host)
+            except:
+                pass
+            
+        elif (matchCl('.*[a-z].*',host)
             #and PyTango.__version_number__ < 800):
             ): #The bug is back!!
             #Remove domain name
@@ -236,6 +311,22 @@ def get_tango_host(dev_name='',use_db=False, fqdn=None):
     except:
         print('ERROR: get_tango_host(): '+traceback.format_exc())
         return 'localhost:10000'
+    
+def set_tango_host(tango_host):
+    """ Sets TANGO_HOST environment variable, cleans up caches """
+    
+    global TangoDatabase,TangoDevice,TangoProxies
+    TangoDatabase,TangoDevice,TangoProxies = None,None,None
+    import fandango.tango
+    for k in dir(fandango.tango):
+        f = getattr(fandango.tango,k)
+        if hasattr(f,'cache'):
+            try:
+                f.cache.clear()
+            except:
+                pass
+    os.environ['TANGO_HOST'] = tango_host
+    return tango_host
     
 def get_database(host='',port='',use_tau=False): 
     """
@@ -291,28 +382,57 @@ def get_proxy(argin,use_tau=False,keep=False):
     else:
         return get_device(argin,use_tau,keep)
 
-def get_device(dev,use_tau=False,keep=False): 
-    if use_tau and not TAU: use_tau = loadTaurus()
-    if isinstance(dev,basestring): 
-        if dev.count('/')==1: dev = 'dserver/'+dev
-        if use_tau and TAU: 
-            return TAU.Device(dev)
+def get_device(dev,use_tau=False,keep=None,proxy=None,trace=False): 
+    try:
+        r, cached = None, False
+        if keep is None:
+            global KEEP_PROXIES
+            keep = KEEP_PROXIES
+        if use_tau and not TAU:
+            use_tau = loadTaurus()
+
+        if isinstance(dev,basestring): 
+            if dev.count('/')==1:
+                dev = 'dserver/'+dev
+            m = clmatch(retango,dev)
+            if m and m.groupdict()['attribute']:
+                dev = dev.rsplit('/',1)[0]
+            
+            # To ensure keep working
+            # Using get_dev_name instead of full_name to remove attr names
+            dev = get_dev_name(dev,full=True,fqdn=True).lower()
+            
+            if use_tau and TAU: 
+                r = TAU.Device(dev)
+            else:
+                global TangoProxies
+                # Key names managed by ProxiesDict
+                if TangoProxies and (dev in TangoProxies or keep):
+                    if proxy and dev not in TangoProxies:
+                        TangoProxies[dev] = proxy
+                    r = TangoProxies[dev]
+                    cached = True
+                else: 
+                    r = PyTango.DeviceProxy(dev)
+                
+        elif isinstance(dev,PyTango.DeviceProxy) \
+            or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
+            r = dev
         else:
-            global TangoProxies
-            if keep and TangoProxies is None: 
-                TangoProxies = ProxiesDict(use_tau=use_tau)
-            if TangoProxies and (dev in TangoProxies or keep):
-                return TangoProxies[dev]
-            else: 
-                m = clmatch(retango,dev) 
-                if m and m.groupdict()['attribute']:
-                    dev = dev.rsplit('/',1)[0]
-                return PyTango.DeviceProxy(dev)
-    elif isinstance(dev,PyTango.DeviceProxy) \
-        or (use_tau and TAU and isinstance(dev,TAU.core.tango.TangoDevice)):
-        return dev
-    else:
-        return None
+            r = None
+        
+        if trace and not cached:
+            h = time2str()
+            h += ' %s'%trace if isString(trace) else ''
+            print('%s %s(%s,keep=%s,cached=%s)' % (h,type(r),dev,keep,cached))
+                
+        return r
+
+    except Exception as e:
+        if trace:
+            print('get_device(%s,keep=%s,cached=%s)' % (dev, keep, cached))
+            traceback.print_exc()
+        raise e
     
 def get_device_cached(dev):
     return get_device(dev,keep=True)
@@ -482,11 +602,17 @@ class EventCallback(object):
 ## The ProxiesDict class, to manage DeviceProxy pools
 
 class ProxiesDict(CaselessDefaultDict,Object): 
-    ''' Dictionary that stores PyTango.DeviceProxies
+    ''' 
+    Dictionary that stores PyTango.DeviceProxies/AttributeProxies
+    
     It is like a normal dictionary but creates a new proxy each time 
         that the "get" method is called
+        
+    All keys translated to full tango URIs (fqdn=True by default)
+        
     An earlier version is used in PyTangoArchiving.utils module
-    This class must be substituted by Tau.Core.TauManager().getFactory()()
+    
+    Taurus3+ support is not tested
     '''
     def __init__(self,use_tau = False, tango_host = ''):
         self.log = Logger('ProxiesDict')
@@ -494,6 +620,18 @@ class ProxiesDict(CaselessDefaultDict,Object):
         self.use_tau = TAU and use_tau
         self.tango_host = tango_host
         self.call__init__(CaselessDefaultDict,self.__default_factory__)
+        
+    def translate(self, dev):
+        try:
+            attr = get_attr_name(dev,False)
+            if self.tango_host and ':' not in dev:
+                dev = self.tango_host + '/' + dev            
+            dev = get_dev_name(dev,full=True,fqdn=True).lower()
+        except:
+            dev = get_dev_name(dev,full=True,fqdn=False).lower()
+        if attr:
+            dev += '/'+attr
+        return dev
 
     def __default_factory__(self,dev_name):
         '''
@@ -504,8 +642,7 @@ class ProxiesDict(CaselessDefaultDict,Object):
         doesn't exists) a None value is returned
         '''
         
-        if self.tango_host and ':' not in dev_name:
-            dev_name = self.tango_host + '/' + dev_name
+        dev_name = self.translate(dev_name)
             
         if dev_name not in self.keys():
             self.log.debug( 'Getting a Proxy for %s'%dev_name)
@@ -514,17 +651,20 @@ class ProxiesDict(CaselessDefaultDict,Object):
                 devklass,attrklass = (TAU.Device,TAU.Attribute) \
                     if self.use_tau else \
                     (PyTango.DeviceProxy,PyTango.AttributeProxy)
-                dev = (attrklass if 
-                    str(dev_name).count('/')==(4 if ':' in dev_name else 3) 
-                    else devklass)(dev_name)
+                klass = (devklass,attrklass)[get_attr_name(dev_name,False)]
+                dev = klass(dev_name)
+                
             except Exception,e:
                 print('ProxiesDict: %s doesnt exist!'%dev_name)
                 dev = None
         return dev
+    
+    def __setitem__(self,key,value):
+        key = self.translate(key)
+        return CaselessDefaultDict.__setitem__(self,key,value)
       
     def __getitem__(self,key):
-        if self.tango_host and ':' not in key:
-            key = self.tango_host + '/' + key
+        key = self.translate(key)
         return CaselessDefaultDict.__getitem__(self,key)
             
     def get(self,dev_name):
@@ -540,9 +680,10 @@ class ProxiesDict(CaselessDefaultDict,Object):
       
     def pop(self,dev_name):
         '''Removes a device from the dict'''
-        if self.tango_host and ':' not in dev_name:
-            dev_name = self.tango_host + '/' + dev_name
+        dev_name = self.translate(dev_name)
         if dev_name not in self.keys(): return
         self.log.debug( 'Deleting the Proxy for %s'%dev_name)
         return CaselessDefaultDict.pop(self,dev_name)
         
+# DO NOT CHANGE THIS LINE!, NEEDED HERE FOR PERSISTANCE
+TangoProxies = ProxiesDict(use_tau = USE_TAU)

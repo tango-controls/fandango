@@ -7,6 +7,17 @@ __doc__ = """
 Usage:
 
  > tango2json.py [--compress] [--commands] [--properties] [--attributes] "filename.json" dev/name/1 "dev/exp/*"
+ 
+ 
+To reload the data from ipython:
+
+  import json
+  f = open('filename.json')
+  data = eval(json.load(f,encoding='latin-1'))
+  f.close()
+  
+  print(data.keys())
+  
 """
 
 args,params,devs,data = [],[],[],fn.CaselessDict()
@@ -45,10 +56,15 @@ print('Exporting %d devices to %s'%(len(devs),filename))
 
 for d in devs:
   if d not in data:
-    data[d] = fn.tango.export_device_to_dict(d,
+    try:
+        data[d] = fn.tango.export_device_to_dict(d,
             commands = '--commands' in params,
             properties = '--properties' in params
             )
+    except:
+        print('%s export failed!!!' % d)
+        print(fn.except2str())
+        break
     
 data = fn.dict2json(data) #Do not convert, just filters
 

@@ -50,6 +50,10 @@ Out[77]:
 import time,sys,os,re,traceback
 import fandango.objects as fun #objects module includes functional
 import fandango.log as log
+try:
+    import psutil
+except:
+    psutil = None
 
 ################################################################################3
 # Shell methods
@@ -142,15 +146,33 @@ def get_memory_usage():
     mfree = float(stats['buffers']+stats['cached']+stats['free'])
     return 1-(mfree/stats['total'])
 
-def get_memory(pid=None,virtual=False):
-    """This function uses '/proc/pid/status' to get the memory consumption of a process """
+MEMORY_VALUES = []
+
+def get_process_memory(pid=None,virtual=False):
+    """
+    This function uses '/proc/pid/status'
+    to get the memory consumption of a process (current by default)
+    """
     try:
-        if pid is None: pid = os.getpid()
-        mem,units = shell_command('cat /proc/%s/status | grep Vm%s'%(pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
-        return int(mem)*(1e3 if 'k' in units else (1e6 if 'm' in units else 1))
+        if pid is None: 
+            pid = os.getpid()
+        if psutil is not None:
+            mi = psutil.Process(pid).memory_info()
+            return mi.vms if virtual else mi.rss
+        else:
+            mem,units = shell_command('cat /proc/%s/status | grep Vm%s' 
+                % (pid,'Size' if virtual else 'RSS')).lower().strip().split()[1:3]
+            units = (('k' in units and 1e3) or ('m' in units and 1e6) 
+                    or ('g' in units and 1e9) or 1)
+            MEMORY_VALUES.append(int(mem)*units)
+            while len(MEMORY_VALUES)>10: 
+                MEMORY_VALUES.pop(0)
+            return MEMORY_VALUES[-1]
     except:
         print traceback.format_exc()
         return 0
+
+get_memory = get_process_memory
 
 def get_cpu(pid):
     """ Uses ps to get the CPU usage of a process by PID ; it will trigger exception of PID doesn't exist """
@@ -345,10 +367,13 @@ def desktop_switcher(period,event=None,iterations=2):
 # Networking methods
 
 fun.Cached(depth=1000,expire=300.)
-def get_fqdn(hostname):
+def get_fqdn(hostname,keep_alias=True):
     """ Reimplemented to be cached for continuous tango host parsing """
     import socket
-    return socket.getfqdn(hostname)
+    fqdn = socket.getfqdn(hostname)
+    if keep_alias:
+        fqdn = '.'.join(hostname.split('.')[:1]+fqdn.split('.')[1:])
+    return fqdn
 
 def ping(ips,threaded = False, timeout = 1):
     ''' By Noah Gift's, PyCon 2008

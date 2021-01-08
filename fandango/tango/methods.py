@@ -177,7 +177,7 @@ def attr2str(attr_value):
                             attr_value.value)
     else: 
         return '%s%s(%s)' %(att_name,type(attr_value).__name__,attr_value)
-
+    
 def get_real_name(dev,attr=None):
     """
     It translate any device/attribute string by name/alias/label
@@ -197,61 +197,6 @@ def get_real_name(dev,attr=None):
         if matchCl(attr,a): return (dev+'/'+a)
         if matchCl(attr,get_attribute_label(dev+'/'+a)): return (dev+'/'+a)
     return None
-
-def get_full_name(model,fqdn=None):
-    """ 
-    Returns full schema name as needed by HDB++ api
-    """
-    model = model.split('tango://')[-1]
-
-    if fqdn is None: 
-        fqdn = fandango.tango.defaults.USE_FQDN
-
-    if ':' in model:
-        h,m = model.split(':',1)
-        if '.' in h and not fqdn:
-            h = h.split('.')[0]
-        elif '.' not in h and fqdn:
-            h = get_fqdn(h)
-        model = h+':'+m
-        
-    else:
-        model = get_tango_host(fqdn=fqdn)+'/'+model
-    
-    model = 'tango://'+model
-    return model
-
-def get_normal_name(model):
-    """ 
-    returns simple name as just domain/family/member,
-    without schema/host/port, as needed by TangoDB API
-    """
-    if ':' in model:
-        model = model.split(':')[-1].split('/',1)[-1]
-    return model.split('#')[0].strip('/')
-
-def get_attr_name(model,default='state'):
-    """
-    gets just the attribute part of a Tango URI
-    """
-    if not model: return ''
-    model = get_normal_name(model)
-    if model.count('/')==3:
-        return model.split('/')[-1]
-    else:
-        return default
-    
-def get_dev_name(model,full=True,fqdn=None):
-    """
-    gets just the device part of a Tango URI
-    """
-    norm = get_normal_name(model)
-    if norm.count('/')>2: 
-        model = model.rsplit('/',1)[0]
-    if not full:
-        return get_normal_name(model)
-    else:
-        return get_full_name(model,fqdn=fqdn)
         
 def get_model_name(model):
     """
@@ -613,7 +558,7 @@ def set_attribute_config(device,attribute,config,events=True,verbose=False):
             traceback.print_exc()
             
     return config
-  
+
 def get_attribute_events(target,polled=True,throw=False):
     """
     Get current attribute events configuration 
@@ -650,8 +595,8 @@ def get_attribute_events(target,polled=True,throw=False):
             # remove periodic event if it is the only setting (default)
             r.pop('per_event')
             
-        if r or a.lower() in ('state','status'): 
-            # check polling only if something else is active
+        # check polling always, as bool/state/string will have events always
+        if r or polled or a.lower() in ('state','status'):
             polling = dp.get_attribute_poll_period(a)
             r['polling'] = polling
 
@@ -661,7 +606,15 @@ def get_attribute_events(target,polled=True,throw=False):
         if throw: raise e
         return None
     
-def check_attribute_events(model,ev_type=None,verbose=False):
+def get_attribute_polling(target):
+    try:
+        dp.get_device(target)
+        return dp.get_attribute_poll_period(target.split('/')[-1])
+    except:
+        return None
+    
+def check_attribute_events(model, ev_type = None, verbose = False, 
+                           asynch = False, keep = False, wait = 0.01):
     """
     This method expects model and a list of event types.
     If empty, CHANGE and ARCHIVE events are tested.
@@ -673,18 +626,32 @@ def check_attribute_events(model,ev_type=None,verbose=False):
     """
     try:
         dev,attr = model.rsplit('/',1)
-        dp = get_device(dev)
-        ev_type = ev_type or (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT)
+        dp = get_device(dev, keep = keep)
+        ev_type = fandango.notNone(ev_type,
+                    (EventType.CHANGE_EVENT, EventType.ARCHIVE_EVENT))
         result = dict.fromkeys(toSequence(ev_type))
         
         if check_device(dp):
             for ev_type in result.keys():
                 try:
                     def hook(self,*args,**kwargs):
+                        # IT SEEMS NOT EXECUTED PROPERLY!!!!
+                        # keep alive threads running?
                         if self.eid is not None:
                             self.proxy.unsubscribe_event(eid)
-                            
-                    cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                    
+                    if asynch:
+                        cb = EventCallback(dp,hook).subscribe(attr,ev_type)
+                    else:
+                        cb = lambda *args: None
+                        if verbose:
+                            print('%s.subscribe_event(%s)' % (dp,attr))
+                        ei = dp.subscribe_event(attr,ev_type,cb)
+                        fandango.wait(wait)
+                        if verbose:
+                            print('%s.unsubscribe_event(%s)' % (dp,ei))
+                        dp.unsubscribe_event(ei)
+                        
                     period = dp.get_attribute_poll_period(attr) 
                     result[ev_type] = period or True
                 except:
@@ -924,7 +891,7 @@ def put_class_property(klass,property,value=None,db=None):
                     
     return (db or get_database()).put_class_property(klass,property)
             
-def get_device_property(device,property,db=None):
+def get_device_property(device,property,db=None,raw=False):
     """
     It returns device property value or just first item 
     if value list has lenght==1
@@ -934,7 +901,7 @@ def get_device_property(device,property,db=None):
         
     prop = (db or get_database()).get_device_property(
                                     device,[property])[property]
-    return prop if len(prop)!=1 else prop[0]
+    return prop if raw or len(prop)!=1 else prop[0]
 
 def put_device_property(device,property,*value,**db):
                         #value=None,db=None):
@@ -1170,12 +1137,13 @@ def check_starter(host):
         return False
     
 def check_device(dev,attribute=None,command=None,full=False,admin=False,
-        bad_state=False,throw=False, timeout=3000):
+        bad_state=False,throw=False, timeout=None):
     """ 
     Command may be 'StateDetailed' for testing HdbArchivers 
     It will return True for devices ok, False for devices not running 
     and None for unresponsive devices.
     """
+    #print('check_device(%s,%s,%s)' % (dev,attribute,command))
     try:
         if isinstance(dev,DeviceProxy):
             dp = dev
@@ -1190,21 +1158,34 @@ def check_device(dev,attribute=None,command=None,full=False,admin=False,
                     return False
                 if not check_device('dserver/%s'%info.server,full=False):
                     return False
-            dp = DeviceProxy(dev)
-            
-        dp.set_timeout_millis(int(timeout))
-        dp.ping()
+
+            dp = get_device(dev)
+
+        if timeout:    
+            dp.set_timeout_millis(int(timeout))
+        p = dp.ping()
+        if not p:
+            return False
     except Exception as e:
         return e if throw else False
+
     try:
-        if attribute: dp.read_attribute(attribute)
-        elif command: dp.command_inout(command)
-        else: 
+        if 'state' in (attribute,command):
+            print('state')
             s = dp.state()
             if bad_state:
                 assert s not in bad_state and str(s) not in bad_state
-            return str(s) #True
-        return True
+            r = str(s) #True            
+        elif attribute: 
+            r = dp.read_attribute(attribute)
+        elif command: 
+            r = dp.command_inout(command)
+        else: 
+            r = True
+
+        #print('pinged, check %s,%s = %s' % (attribute,command,r))
+        return r
+        
     except Exception as e:
         return e if throw else None
 

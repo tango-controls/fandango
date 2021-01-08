@@ -42,14 +42,20 @@ from fandango.log import Logger,shortstr,tracer
 from fandango.dicts import SortedDict
 from fandango.objects import Singleton,Decorated,Decorator,ClassDecorator,BoundDecorator
 
-def getQt(full=False):
+def getQt(full=False,qt4=True):
     """
     Choosing between PyQt and Taurus Qt distributions
     """
     try:
-        import taurus
-        taurus.setLogLevel(taurus.Warning)
-        from taurus.external.qt import Qt,QtCore,QtGui
+        if 0: #qt4:
+            from PyQt4 import Qt,QtCore,QtGui
+            import taurus
+        else:
+            import taurus.tauruscustomsettings
+            taurus.tauruscustomsettings.DEFAULT_QT_API = "pyqt"
+            import taurus
+            taurus.setLogLevel(taurus.Warning)
+            from taurus.external.qt import Qt,QtCore,QtGui
     except:
         try: #Taurus3
             from taurus.qt import Qt,QtCore,QtGui
@@ -506,7 +512,8 @@ try:
     from taurus.qt.qtgui.graphic import TaurusGraphicsItem
     from taurus.qt.qtgui.container.tauruswidget import TaurusWidget
 except:
-    print 'Unable to import Taurus!'
+    print('Unable to import Taurus!')
+    traceback.print_exc()
     taurus,colors,taurusbase,tie = None,None,None,TaurusImportException
     TaurusBaseComponent,TaurusEventType,TaurusAttribute,TaurusGraphicsItem,TaurusWidget = tie,tie,tie,tie,tie
 
@@ -880,6 +887,9 @@ except:
   print('WARNING: fandango.qt: Importing taurus.qt.qtcore.mimetypes failed!')
   TAURUS_ATTR_MIME_TYPE = TAURUS_DEV_MIME_TYPE = TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE = TEXT_MIME_TYPE
 
+MIMETYPES = [ 'text/plain', TAURUS_ATTR_MIME_TYPE, TAURUS_DEV_MIME_TYPE, 
+             TAURUS_MODEL_MIME_TYPE, TAURUS_MODEL_LIST_MIME_TYPE ]
+
 @ClassDecorator
 def Dropable(QtKlass):
     """ 
@@ -898,17 +908,20 @@ def Dropable(QtKlass):
             try: 
                 self.setAcceptDrops(True)
                 # Needed to reapply drop support overriden by taurusgui.ini
-                try: self.setModifiableByUser(True)
-                except: self._dlog(traceback.format_exc())
+                try: 
+                    self.setModifiableByUser(True)
+                except: 
+                    self._dlog(traceback.format_exc())
 
                 if not hasattr(self,'TAURUS_DEV_MIME_TYPE'):
                     self.TAURUS_DEV_MIME_TYPE = TAURUS_DEV_MIME_TYPE
                     self.TAURUS_ATTR_MIME_TYPE = TAURUS_ATTR_MIME_TYPE
                     self.TAURUS_MODEL_MIME_TYPE = TAURUS_MODEL_MIME_TYPE
                     self.TAURUS_MODEL_LIST_MIME_TYPE = TAURUS_MODEL_LIST_MIME_TYPE
-            except: traceback.print_exc()
+            except: 
+                traceback.print_exc()
             self.TEXT_MIME_TYPE = 'text/plain'
-            self._dlog('checkDropSupport(True')
+            self._dlog('checkDropSupport(True)')
             return True
 
         def getSupportedMimeTypes(self): 
@@ -1105,7 +1118,8 @@ def MenuContexted(QtKlass):
     
     Example:
       label = MenuContexted(Qt.QLabel)('a/device/name')
-      label.setContextCallbacks({'Test Device',lambda:show_device_panel('a/device/name')})
+      label.setContextCallbacks({'Test Device',
+            lambda:show_device_panel('a/device/name')})
       
     """
     class MenuContextedQtKlass(QtKlass):
@@ -1733,7 +1747,7 @@ class QEvaluator(Qt.QWidget):
 
     def __init__(self,parent=None,model='',filename='~/.qeval_history'): #'import fandango'):
         import fandango.web, fandango.functional
-        print('%s()'%type(self).__name__)
+        #print('%s()'%type(self).__name__)
         Qt.QWidget.__init__(self,parent)
         try:
             self.name = type(self).__name__
@@ -1792,7 +1806,7 @@ class QEvaluator(Qt.QWidget):
         setModel(obj) will set the last element of a sequence of commands as Model for the shell
         The Model can be either an object, class, module, ...
         """
-        print 'QEvaluator.setModel(%s)'%model
+        #print 'QEvaluator.setModel(%s)'%model
         try:
             if model:
                 if isString(model):
@@ -1828,7 +1842,8 @@ class QEvaluator(Qt.QWidget):
             w = QExceptionMessage()
         
     def evalQ(self,c):
-        return fandango.evalX(c,_locals=self._locals,modules=self._modules,instances=self._instances,_trace=True)
+        return fandango.evalX(c,_locals=self._locals,modules=self._modules,
+                              instances=self._instances,_trace=True)
         
     def setup_ui(self):
         try:
@@ -1895,7 +1910,7 @@ class QEvaluator(Qt.QWidget):
             q = cmd if cmd not in self.commands else 'self.target.%s'%(cmd)
             o = self._eval(q)
             if fandango.isCallable(o) and args:
-                print '%s(%s)'%(o,args)
+                #print '%s(%s)'%(o,args)
                 self._locals['_ftmp'] = o
                 o = self._eval('_ftmp(%s)'%(args))
                 self.history.append('%s(%s)'%(o,args))
@@ -1942,12 +1957,12 @@ class QEvaluator(Qt.QWidget):
     @staticmethod
     def main(args=None):
         qapp = getApplication()
-        print(len(args),args)
+        #print(len(args),args)
         args = notNone(args,sys.argv[1:])
         if args and os.path.isfile(args[0]):
           args = filter(bool,map(str.strip,open(args[0]).readlines()))
         kw = args and {'model':';'.join(args)} or {}
-        print('model',kw.get('model'))
+        #print('model',kw.get('model'))
         w = QEvaluator(**kw)
         w.show()
         qapp.exec_()        
