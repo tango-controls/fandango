@@ -313,6 +313,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         device = device.lower()
         deviceObj = neighbours.get(device,None)
         self.use_tau = getattr(self,'use_tau',TAU and use_tau)
+        
         if self.use_tau and deviceObj is None:
             for attribute in attributes: #Done in two loops to ensure that all Cache objects are available
                 self.info ('::init_device(%s): Configuring %s.Attribute for %s' % (self.get_name(),str(TAU.__name__),device+'/'+attribute))
@@ -323,10 +324,12 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                 self.debug('Changing polling period ...')
                 at.changePollingPeriod(self.PollingCycle)
                 self.ExternalAttributes[aname] = at
+                
         else: #Managing attributes from internal devices
             self.info('===========> Subscribing attributes from an internal or non-tau device')
             for attribute in attributes:
-                self.ExternalAttributes[(device+'/'+attribute).lower()] = fakeAttributeValue(attribute,None,parent=deviceObj,device=device)
+                self.ExternalAttributes[(device+'/'+attribute).lower()] = \
+                    fakeAttributeValue(attribute,None,parent=deviceObj,device=device)
             import threading
             if not hasattr(self,'Event'): self.Event = threading.Event()
             if not hasattr(self,'UpdateAttributesThread'):
@@ -413,9 +416,14 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         while not self.Event.isSet():
             waittime = 3.
             try:
-                serverAttributes = [a for a,v in self.ExternalAttributes.items() if isinstance(v,fakeAttributeValue)]
+                serverAttributes = [a for a,v in self.ExternalAttributes.items() 
+                                    if isinstance(v,fakeAttributeValue)]
                 waittime = 1e-3*self.PollingCycle/(len(serverAttributes)+1)
-                for aname in serverAttributes:
+                
+                for ii,aname in enumerate(sorted(serverAttributes)):
+                    self.Event.wait(waittime)
+                    print('ExternalAttributes %d/%d: %s' 
+                          % (ii,len(serverAttributes),aname))
                     self.last_update = time.time()
                     try:
                         if self.Event.isSet():
@@ -423,30 +431,37 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
                             break
                         attr = self.ExternalAttributes[aname]
                         device,attribute = aname.rsplit('/',1)
-                        self.debug('====> updating values from %s(%s.%s) after %s s'%(type(attr.parent),device,attribute,waittime))
+                        self.debug('====> updating values from %s(%s.%s) '
+                            'after %s s'%(type(attr.parent),device,attribute,waittime))
                         event_type = fakeEventType.lookup['Periodic']
+                        
                         try:
                             attr.read(cache=False)
                         except Exception,e:
-                            print '#'*80
+                            print('#'*80)
                             event_type = fakeEventType.lookup['Error']
                             self.events_error = except2str(e) #traceback.format_exc()
-                            print self.events_error
-                            
-                        self.info('Sending fake event: %s/%s = %s(%s)' % (device,attr.name,event_type,attr.value))
+                            print(self.events_error)
+                    
+                        self.info('Sending fake event: %s/%s = %s(%s)' 
+                            % (device,attr.name,event_type,attr.value))
                         self.event_received(device+'/'+attr.name,event_type,attr)
+                        
                     except: 
                         self.events_error = traceback.format_exc()
-                        print 'Exception in %s.update_attributes(%s): \n%s' % (self.get_name(),attr.name,self.events_error)
-                    self.Event.wait(waittime)
+                        print('Exception in %s.update_attributes(%s): \n%s' 
+                            % (self.get_name(),attr.name,self.events_error))
+                            
                     #End of for
+                print('#$-'*30)
                 self.Event.wait(waittime)
             except:
                 self.events_error = traceback.format_exc()
                 self.Event.wait(3.)
-                print self.events_error
-                print 'Exception in %s.update_attributes()' % (self.get_name())
+                print(self.events_error)
+                print('Exception in %s.update_attributes()' % (self.get_name()))
             #End of while
+
         self.info('%s.update_attributes finished')
         if not self.events_error.replace('None','').strip():
             self.events_error = traceback.format_exc()
@@ -458,9 +473,14 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
         This method must be overriden in child classes.
         """
         #self.info,debug,error,warning should not be used here to avoid conflicts with taurus.core logging
-        def log(prio,s): print '%s %s %s: %s' % (prio.upper(),time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),self.get_name(),s)
+        def log(prio,s): 
+            print('%s %s %s: %s' % (prio.upper(),
+            time.strftime('%Y-%m-%d %H:%M:%S',
+            time.localtime()),self.get_name(),s))
         self.last_event_received = time.time()
-        log('info','In Dev4Tango.event_received(%s(%s),%s,%s) at %s'%(type(source).__name__,source,fakeEventType[type_],type(attr_value).__name__,self.last_event_received))
+        log('info','In Dev4Tango.event_received(%s(%s),%s,%s) at %s'
+            %(type(source).__name__,source,fakeEventType[type_],
+              type(attr_value).__name__,self.last_event_received))
         return
         
     ##@}        
