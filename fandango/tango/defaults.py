@@ -507,7 +507,7 @@ class fakeAttributeValue(object):
         #Method to emulate AttributeProxy returning an AttributeValue
         if not self.parent:
             self.parent = get_device(self.device,use_tau=False,keep=True)
-        if not cache or 0<self.keeptime<(time.time()-self.read()):
+        if not cache or 0<self.keeptime<(time.time()-self.lastread):
             #it's important to pass self as argument so values will be kept
             import fandango.tango.methods as fmt
             return fmt.read_internal_attribute(self.parent,self) 
