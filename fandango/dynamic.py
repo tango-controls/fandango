@@ -188,6 +188,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self._events_lock = threading.Lock()        
 
         self.time0 = time.time() #<< Used by child devices to check startup time
+        self.mem0 = None #MemUsage at startup, recorded at first Init()
         self.simulationMode = False #If it is enabled the ForceAttr command overwrites the values of dyn_values
         self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
         self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
@@ -1985,6 +1986,9 @@ class DynamicDS(DynamicDSHelpers):
                         raise e
         except: 
             print(traceback.format_exc()) #self.warning(traceback.format_exc())
+
+        self.mem0 = self.getMemUsage()
+        self.time0 = time.time()
         self._init_count +=1
 
     def delete_device(self):
@@ -2105,19 +2109,24 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #    GetMemUsage command:
     #
-    #    Description: Returns own process RSS memory usage (Mb).
+    #    Description: Returns own process RSS memory usage (Kb).
     #
     #    argin:  DevVoid
-    #    argout: DevString      Returns own process RSS memory usage (Mb)
+    #    argout: DevString      Returns own process RSS memory usage (Kb)
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getMemUsage(self):
-        return fn.linos.get_memory()/1e3
+        """ returns memory usage in kb """
+        m = fn.linos.get_memory()/1e3
+        if self.mem0:
+            self.memleak = float(m-self.mem0) / (time.time() - self.time0)
+        return m
     
     #------------------------------------------------------------------
     #    Read MemUsage attribute
     #------------------------------------------------------------------
     def read_MemUsage(self, attr):
+        """ returns memory usage in kb """
         self.debug("In read_MemUsage()")
         
         #    Add your own code here
