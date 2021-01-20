@@ -62,7 +62,7 @@ def add_new_device(server,klass,device):
           'MyServer/test','MyDevice','my/own/device')
     """
     for c in (server+klass+device):
-      if re.match('[^a-zA-Z0-9\-\/_\+\.]',c):
+      if re.match('[^a-zA-Z0-9\-\/_\+\.\:]',c):
         raise Exception,"CharacterNotAllowed('%s')"%c
     assert server.count('/')==1
     assert clmatch(alnum,klass)
@@ -1197,7 +1197,8 @@ def check_device_cached(*args,**kwargs):
     """
     return check_device(*args,**kwargs)
 
-def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
+def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False,
+                    expire=0):
     """ checks if attribute is available.
     
     Returns None if attribute does not exist, Exception if unreadable, 
@@ -1205,7 +1206,7 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
     
     :param readable: Whether if it's mandatory that the attribute returns 
             a value or if it must simply exist.
-    :param timeout: Checks if the attribute value have been effectively 
+    :param expire: Checks if the attribute value have been effectively 
             updated (check zombie processes).
     :param brief: return just .value instead of AttrValue object
     """
@@ -1218,11 +1219,14 @@ def check_attribute(attr,readable=False,timeout=0,brief=False,trace=False):
                 for s in DeviceProxy(dev).get_attribute_list()],'AttrNotFound'
           proxy = AttributeProxy(attr)
           
+        if timeout:
+            proxy.get_device_proxy().set_timeout_millis(timeout)
+            
         try: 
             attvalue = proxy.read()
             if readable and attvalue.quality == AttrQuality.ATTR_INVALID:
                 return None
-            elif timeout and attvalue.time.totime()<(time.time()-timeout):
+            elif expire and attvalue.time.totime()<(time.time()-expire):
                 return None
             else:
                 if not brief:
@@ -1385,15 +1389,25 @@ def read_internal_attribute(device,attribute):
     
     attr = (attribute if isinstance(attribute,fakeAttributeValue) 
                     else fakeAttributeValue(name=attribute,parent=device))
+    #attr = attribute
     
     isProxy = isinstance(device,DeviceProxy)
     isDyn = hasattr(device,'read_dyn_attr')
     aname = attr.name.lower()
+
     if aname=='state': 
-        if isProxy: attr.set_value(device.state())
-        elif hasattr(device,'last_state'): attr.set_value(device.last_state)
-        else: attr.set_value(device.get_state())
-        print('%s = %s' % (attr.name,attr.value))
+        if isProxy: 
+            # read_attribute(state) does not work and may have leaks
+            print('fandango.read_internal_attribute(): '
+                    'calling DeviceProxy(%s).state()'
+                    %(attr.device))     
+            v = device.state()
+            attr.set_value(v)
+        elif hasattr(device,'last_state'): 
+            attr.set_value(device.last_state)
+        else: 
+            attr.set_value(device.get_state())
+        print('%s.%s = %s' % (attr.device,attr.name,attr.value))
         attr.error = ''
     else: 
         if isProxy:

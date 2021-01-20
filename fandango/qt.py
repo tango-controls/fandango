@@ -526,6 +526,7 @@ def getColorsForValue(value,palette = getattr(colors,'QT_DEVICE_STATE_PALETTE',N
     if value is None:
         return Qt.QColor(Qt.Qt.gray),Qt.QColor(Qt.Qt.black)
     elif hasattr(value,'value'): #isinstance(value,PyTango.DeviceAttribute):
+        import PyTango
         if value.type == PyTango.ArgType.DevState:
             bg_brush, fg_brush = colors.QT_DEVICE_STATE_PALETTE.qbrush(value.value)
         elif value.type == PyTango.ArgType.DevBoolean:
@@ -1105,6 +1106,12 @@ def Draggable(QtKlass):
             drag.setHotSpot(event.pos() - self.rect().topLeft())
             dropAction = drag.start(Qt.Qt.CopyAction)
             #tracer('Out of Draggable(%s).mouseMoveEvent'%self._qt_klass__)
+            
+        def setModel(self,model):
+            self._model = model
+            
+        def getModel(self):
+            return self._model
             
     return DraggableQtKlass
 
