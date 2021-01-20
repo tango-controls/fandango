@@ -1,4 +1,5 @@
-#!/usr/bin/env python2.5
+#!/usr/bin/env python2
+
 """ @if gnuheader
 #############################################################################
 ##
@@ -60,20 +61,20 @@ from fandango.dynamic import DynamicDS,USE_STATIC_METHODS
 ########################################################################################
 ## Device servers template
 
-class Dev4Tango(PyTango.Device_4Impl,log.Logger):
+class Dev4Tango(PyTango.DeviceImpl,log.Logger):
     """
     See documentation at doc/devices/Dev4Tango.rst
     
     This class provides several new features to TangoDevice implementations.
     By including log.Logger it also includes objects.Object as parent class.
     It allows to use call__init__(self, klass, *args, **kw) to avoid multiple inheritance from same parent problems.
-    Therefore, use self.call__init__(PyTango.Device_4Impl,cl,name) instead of PyTango.Device_4Impl.__init__(self,cl,name)
+    Therefore, use self.call__init__(PyTango.DeviceImpl,cl,name) instead of PyTango.DeviceImpl.__init__(self,cl,name)
     
     It also allows to connect several devices within the same server or not usint taurus.core
     """
     
     def __init__(self,cl,name):
-        self.call__init__(PyTango.Device_4Impl,cl,name)
+        self.call__init__(PyTango.DeviceImpl,cl,name)
         self.init_logger()
 
     def trace(self,prio,s):
@@ -92,7 +93,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     def set_state(self,state):
         self._state = state
         #type(self).mro()[type(self).mro().index(Dev4Tango)+1].set_state(self,state)
-        PyTango.Device_4Impl.set_state(self,state)
+        PyTango.DeviceImpl.set_state(self,state)
         
     def get_state(self):
         #@Tango6
@@ -225,7 +226,7 @@ class Dev4Tango(PyTango.Device_4Impl,log.Logger):
     def get_device_properties(self,myclass):
         self.info('In Dev4Tango.get_device_properties(%s) ...' % str(myclass))
 
-        PyTango.Device_4Impl.get_device_properties(self,myclass)
+        PyTango.DeviceImpl.get_device_properties(self,myclass)
         if hasattr(self,'LogLevel'):
           self.setLogLevel(self.LogLevel)
 

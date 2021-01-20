@@ -56,8 +56,8 @@ try:
     from PyTango.utils import EventCallBack
 except: pass
 
-if 'Device_4Impl' not in dir(PyTango):
-    PyTango.Device_4Impl = PyTango.Device_3Impl
+#if 'DeviceImpl' not in dir(PyTango):
+#    PyTango.DeviceImpl = PyTango.Device_4Impl
 
 import fandango
 import fandango.objects as objects

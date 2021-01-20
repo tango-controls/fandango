@@ -60,7 +60,7 @@ This Module includes several classes:
         DynamicDS.always_executed_hook(self)
 
     4.DECLARATION OF CLASSES SHOULD BE:
-        #class PyPLC(PyTango.Device_3Impl):
+        #class PyPLC(PyTango.DeviceImpl):
         class PyPLC(DynamicDS):
         #class PyPLCClass(PyTango.PyDeviceClass):
         class PyPLCClass(DynamicDSClass):
@@ -71,7 +71,7 @@ This Module includes several classes:
 
     5.AND THE __init__ METHOD:
     df __init__(self,cl, name):
-        #PyTango.Device_3Impl.__init__(self,cl,name)
+        #PyTango.DeviceImpl.__init__(self,cl,name)
         DynamicDS.__init__(self,cl,name,_locals={},useDynStates=True)
 
         #The _locals dictionary allows to parse the commands of the class to be available in attributes declaration:
@@ -130,13 +130,13 @@ GARBAGE,NEW_GARBAGE = None,None
 if GARBAGE_COLLECTION:
     import gc
         
-if 'Device_4Impl' not in dir(PyTango): PyTango.Device_4Impl = PyTango.Device_3Impl
+#if 'DeviceImpl' not in dir(PyTango): PyTango.DeviceImpl = PyTango.Device_4Impl
 if 'DeviceClass' not in dir(PyTango): PyTango.DeviceClass = PyTango.PyDeviceClass
 
 MAX_ARRAY_SIZE = 8192
 EVENT_TYPES = '(true|yes|push|archive|[0-9]+)$'
 
-class DynamicDSImpl(PyTango.Device_4Impl,Logger):
+class DynamicDSImpl(PyTango.DeviceImpl,Logger):
     
     EXTENSIONS = dict(list(tango.EXTENSIONS.items()))    
     
@@ -144,8 +144,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
             _locals=None, useDynStates=True):
         
         print('> '+'~'*78)
-        self.call__init__('Device_4Impl' in dir(PyTango) 
-                and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
+        self.call__init__(PyTango.DeviceImpl,cl,name)
         # Logger must be called after init to use Tango logs properly
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s'
                                         ' %(name)s: %(message)s',level='INFO')
@@ -1989,7 +1988,7 @@ class DynamicDS(DynamicDSHelpers):
 
     def delete_device(self):
         self.warning( 'DynamicDS.delete_device(): ... ')
-        ('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl).delete_device(self)
+        PyTango.DeviceImpl.delete_device(self)
         
     @self_locked
     def always_executed_hook(self):
