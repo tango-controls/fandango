@@ -146,7 +146,7 @@ def FullTangoInheritance(name,child,childClass,parent,parentClass,Exclude=[],For
             newdeviceclass = type(name+'Class',(childClass,parentClass),{})
         else:
             import PyTango
-            newdevice = type(name,(child,parent,PyTango.DeviceImpl),{})
+            newdevice = type(name,(child,parent,PyTango.LatestDeviceImpl),{})
             newdeviceclass = type(name+'Class',(childClass,parentClass,PyTango.DeviceClass),{})
         updateChildClassDicts(newdeviceclass,parentClass,Exclude)
         return newdevice,newdeviceclass

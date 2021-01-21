@@ -60,7 +60,7 @@ This Module includes several classes:
         DynamicDS.always_executed_hook(self)
 
     4.DECLARATION OF CLASSES SHOULD BE:
-        #class PyPLC(PyTango.DeviceImpl):
+        #class PyPLC(PyTango.LatestDeviceImpl):
         class PyPLC(DynamicDS):
         #class PyPLCClass(PyTango.PyDeviceClass):
         class PyPLCClass(DynamicDSClass):
@@ -71,7 +71,7 @@ This Module includes several classes:
 
     5.AND THE __init__ METHOD:
     df __init__(self,cl, name):
-        #PyTango.DeviceImpl.__init__(self,cl,name)
+        #PyTango.LatestDeviceImpl.__init__(self,cl,name)
         DynamicDS.__init__(self,cl,name,_locals={},useDynStates=True)
 
         #The _locals dictionary allows to parse the commands of the class to be available in attributes declaration:
@@ -130,13 +130,13 @@ GARBAGE,NEW_GARBAGE = None,None
 if GARBAGE_COLLECTION:
     import gc
         
-#if 'DeviceImpl' not in dir(PyTango): PyTango.DeviceImpl = PyTango.Device_4Impl
+#if 'LatestDeviceImpl' not in dir(PyTango): PyTango.LatestDeviceImpl = PyTango.Device_4Impl
 if 'DeviceClass' not in dir(PyTango): PyTango.DeviceClass = PyTango.PyDeviceClass
 
 MAX_ARRAY_SIZE = 8192
 EVENT_TYPES = '(true|yes|push|archive|[0-9]+)$'
 
-class DynamicDSImpl(PyTango.DeviceImpl,Logger):
+class DynamicDSImpl(PyTango.LatestDeviceImpl,Logger):
     
     EXTENSIONS = dict(list(tango.EXTENSIONS.items()))    
     
@@ -144,7 +144,7 @@ class DynamicDSImpl(PyTango.DeviceImpl,Logger):
             _locals=None, useDynStates=True):
         
         print('> '+'~'*78)
-        self.call__init__(PyTango.DeviceImpl,cl,name)
+        self.call__init__(PyTango.LatestDeviceImpl,cl,name)
         # Logger must be called after init to use Tango logs properly
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s'
                                         ' %(name)s: %(message)s',level='INFO')
@@ -1992,7 +1992,7 @@ class DynamicDS(DynamicDSHelpers):
 
     def delete_device(self):
         self.warning( 'DynamicDS.delete_device(): ... ')
-        PyTango.DeviceImpl.delete_device(self)
+        PyTango.LatestDeviceImpl.delete_device(self)
         
     @self_locked
     def always_executed_hook(self):

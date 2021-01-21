@@ -151,11 +151,11 @@ class Logger(Object):
     to all classes inheriting it.
     To use it you must inherit from it and add it within your __init__ method:
     
-    klass MyTangoDevice(DeviceImpl,Logger):
+    klass MyTangoDevice(LatestDeviceImpl,Logger):
     
       def __init__(self,cl, name):
       
-        PyTango.DeviceImpl.__init__(self,cl,name)
+        PyTango.LatestDeviceImpl.__init__(self,cl,name)
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s'
           ' %(name)s: %(message)s')
     

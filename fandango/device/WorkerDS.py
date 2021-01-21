@@ -68,7 +68,7 @@ def get_module_dict(module,ks=None):
 #==================================================================
 if __name__ == '__main__': print('WorkerDS 13.0')
     
-class WorkerDS(PyTango.DeviceImpl):
+class WorkerDS(PyTango.LatestDeviceImpl):
 
     #--------- Add you global variables here --------------------------
     LIBS = [fandango.functional] #math,random,scipy,scipy.signal] #IMPORTED AS "from module import *
@@ -178,7 +178,7 @@ class WorkerDS(PyTango.DeviceImpl):
     #    Device constructor
     #------------------------------------------------------------------
     def __init__(self,cl, name):
-        #PyTango.DeviceImpl.__init__(self,cl,name)
+        #PyTango.LatestDeviceImpl.__init__(self,cl,name)
         #print 'IN WorkerDS.__INIT__'
         _locals = {}
         [_locals.update(get_module_dict(m)) for m in self.LIBS]
