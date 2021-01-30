@@ -57,6 +57,7 @@ from fandango.dicts import CaselessDefaultDict,CaselessDict
 from fandango.arrays import TimedQueue
 from fandango.dynamic import DynamicDS,USE_STATIC_METHODS
 
+#EventThread.DEFAULT_PERIOD_ms = 1000 #0.1
 
 ########################################################################################
 ## Device servers template
@@ -70,7 +71,7 @@ class Dev4Tango(PyTango.LatestDeviceImpl,log.Logger):
     It allows to use call__init__(self, klass, *args, **kw) to avoid multiple inheritance from same parent problems.
     Therefore, use self.call__init__(PyTango.LatestDeviceImpl,cl,name) instead of PyTango.LatestDeviceImpl.__init__(self,cl,name)
     
-    It also allows to connect several devices within the same server or not usint taurus.core
+    It also allows to connect several devices within the same server or not
     """
     
     def __init__(self,cl,name):
@@ -302,35 +303,48 @@ class Dev4Tango(PyTango.LatestDeviceImpl,log.Logger):
     ##@name DevChild like methods
     #@{    
     
-    def subscribe_external_attributes(self,device,attributes,use_tau=False):
+    def subscribe_external_attributes(self,device,attributes,**kw):
         neighbours = self.get_devs_in_server()
-        self.info('In subscribe_external_attributes(%s,%s): Devices in the same server are: %s'%(device,attributes,neighbours.keys()))
-        if not hasattr(self,'ExternalAttributes'): self.ExternalAttributes = CaselessDict()
-        if not hasattr(self,'PollingCycle'): self.PollingCycle = 3000
-        if not hasattr(self,'last_event_received'): self.last_event_received = 0
-        if not hasattr(self,'_state'): self._state = PyTango.DevState.INIT
-        if not hasattr(self,'events_error'): self.events_error = ''
-        if not hasattr(self,'last_update'): self.last_update = 0
+        self.info(('In subscribe_external_attributes(%s,%s): '
+            'Devices in the same server are: %s') % 
+            (device,attributes,neighbours.keys()))
+        if not hasattr(self,'ExternalAttributes'): 
+            self.ExternalAttributes = CaselessDict()
+        if not hasattr(self,'PollingCycle'): 
+            self.PollingCycle = 3000
+        if not hasattr(self,'last_event_received'): 
+            self.last_event_received = 0
+        if not hasattr(self,'_state'): 
+            self._state = PyTango.DevState.INIT
+        if not hasattr(self,'events_error'): 
+            self.events_error = ''
+        if not hasattr(self,'last_update'): 
+            self.last_update = 0
+            
         device = device.lower()
         deviceObj = neighbours.get(device,None)
-        self.use_tau = getattr(self,'use_tau',TAU and use_tau)
         
-        if self.use_tau and deviceObj is None:
-            for attribute in attributes: #Done in two loops to ensure that all Cache objects are available
-                self.info ('::init_device(%s): Configuring %s.Attribute for %s' % (self.get_name(),str(TAU.__name__),device+'/'+attribute))
+        if deviceObj is None:
+            #Done in two loops to ensure that all Cache objects are available
+            for attribute in attributes: 
+                self.info ('::init_device(%s): Configuring callback for %s'
+                    % (self.get_name(),device+'/'+attribute))
                 aname = (device+'/'+attribute).lower()
-                at = TAU.Attribute(aname)
-                self.debug('Adding Listener to %s ...'%type(at))
+                at = fandango.callbacks.EventSource(aname,log_level='INFO',
+                    keeptime=250,polling_period=self.PollingCycle)
+                #at.setLogLevel('INFO')
+                self.info('Adding Listener to %s(%s)'%(type(at),aname))
                 at.addListener(self.event_received)
                 self.debug('Changing polling period ...')
                 at.changePollingPeriod(self.PollingCycle)
                 self.ExternalAttributes[aname] = at
                 
         else: #Managing attributes from internal devices
-            self.info('===========> Subscribing attributes from an internal or non-tau device')
+            self.info('==> Subscribing to an internal device')
             for attribute in attributes:
                 self.ExternalAttributes[(device+'/'+attribute).lower()] = \
                     fakeAttributeValue(attribute,None,parent=deviceObj,device=device)
+
             import threading
             if not hasattr(self,'Event'): self.Event = threading.Event()
             if not hasattr(self,'UpdateAttributesThread'):
@@ -479,8 +493,9 @@ class Dev4Tango(PyTango.LatestDeviceImpl,log.Logger):
             time.strftime('%Y-%m-%d %H:%M:%S',
             time.localtime()),self.get_name(),s))
         self.last_event_received = time.time()
+        etype = fakeEventType.get(type_,type_)
         log('info','In Dev4Tango.event_received(%s(%s),%s,%s) at %s'
-            %(type(source).__name__,source,fakeEventType[type_],
+            %(type(source).__name__,source,etype,
               type(attr_value).__name__,self.last_event_received))
         return
         
