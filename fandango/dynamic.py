@@ -307,6 +307,10 @@ class DynamicDSImpl(PyTango.LatestDeviceImpl,Logger):
         
     def get_parent_class(self):
         return type(self).mro()[type(self).mro().index(DynamicDSImpl)+1]
+    
+    def reset_memleak(self):
+        self.mem0 = self.getMemUsage()
+        self.time0 = time.time()
 
     def prepare_DynDS(self):
         """
@@ -1517,6 +1521,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             self.warning(traceback.format_exc())
         finally:
             self._events_lock.release()
+            self.debug('events lock released')
         return c
             
 ######################################################################################################
@@ -1837,6 +1842,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         receive events from other devices (e.g. use XATTR in formula)
         """
 
+        etype = tango.fakeEventType.get(type_,type_)
         def _log(prio,s,obj=self): #,level=self.log_obj.level): 
             if obj.getLogLevel(prio)>=obj.log_obj.level:
                 print('%s(%s) %s %s: %s' % (
@@ -1845,16 +1851,16 @@ class DynamicDSHelpers(DynamicDSAttrs):
                   time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),
                   obj.get_name(),s))
 
-        if type_ == tango.fakeEventType.Config:
+        if clmatch('config|attr_conf',etype):
             _log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Config Event Not Implemented!'%(
-                type(source).__name__,source,tango.fakeEventType[type_],type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
+                type(source).__name__,source,etype,type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
                 ))
         else:
             _log('info','In DynamicDS.event_received(%s(%s),%s,%s)'%(
-                type(source).__name__,source,tango.fakeEventType[type_],type(attr_value).__name__)
+                type(source).__name__,source,etype,type(attr_value).__name__)
                 )
             try:
-                if type_ in ('Error',tango.fakeEventType['Error']):
+                if type_ in ('Error','error',tango.fakeEventType['Error']):
                     _log('error','Error received from %s: %s'%(source, attr_value))
                 full_name = tango.get_model_name(source) #.get_full_name()
                 if full_name not in self._external_listeners:
@@ -1986,8 +1992,7 @@ class DynamicDS(DynamicDSHelpers):
         except: 
             print(traceback.format_exc()) #self.warning(traceback.format_exc())
 
-        self.mem0 = self.getMemUsage()
-        self.time0 = time.time()
+        self.reset_memleak()
         self._init_count +=1
 
     def delete_device(self):
