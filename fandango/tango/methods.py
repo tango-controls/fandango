@@ -1350,7 +1350,8 @@ def get_device_help(self,str_format='text'):
       traceback.print_exc()
       raise e
     return docsep.join(docs)
-    
+
+@Cached(depth=1,expire=3600,catched=True)
 def get_internal_devices():
     """ Gets all devices declared in the current Tango server """
     try:
