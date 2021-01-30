@@ -70,6 +70,9 @@ from fandango.linos import get_fqdn
 from fandango.log import Logger,except2str,printf
 from fandango.excepts import exc2str
 
+global TANGO_DEBUG
+TANGO_DEBUG = os.getenv('TANGO_DEBUG')
+
 #taurus imports, here USE_TAU is defined for all fandango
 global TAU,USE_TAU,TAU_LOGGER
 TAU,USE_TAU = None,False
@@ -317,6 +320,7 @@ def set_tango_host(tango_host):
     
     global TangoDatabase,TangoDevice,TangoProxies
     TangoDatabase,TangoDevice,TangoProxies = None,None,None
+    TangoProxies = ProxiesDict(use_tau = USE_TAU)
     import fandango.tango
     for k in dir(fandango.tango):
         f = getattr(fandango.tango,k)
@@ -407,12 +411,18 @@ def get_device(dev,use_tau=False,keep=None,proxy=None,trace=False):
             else:
                 global TangoProxies
                 # Key names managed by ProxiesDict
-                if TangoProxies and (dev in TangoProxies or keep):
-                    if proxy and dev not in TangoProxies:
+                cached = dev in TangoProxies
+                if TANGO_DEBUG:
+                    print('>>>> TangoProxies(keep=%s): %s' % (keep,str(TangoProxies.keys())))
+                if cached or keep:
+                    if proxy: # and dev not in TangoProxies:
                         TangoProxies[dev] = proxy
+                    if not cached and TANGO_DEBUG:
+                        print('>>>> get_device(%s): TangoProxies.new()' % dev)
                     r = TangoProxies[dev]
-                    cached = True
                 else: 
+                    if TANGO_DEBUG:
+                        print('>>>> get_device(%s): creating new proxy' % dev)
                     r = PyTango.DeviceProxy(dev)
                 
         elif isinstance(dev,PyTango.DeviceProxy) \
@@ -477,6 +487,8 @@ class fakeAttributeValue(object):
                  quality=PyTango.AttrQuality.ATTR_VALID,
                  dim_x=1,dim_y=1,parent=None,device='',
                  error=False,keeptime=0):
+        if TANGO_DEBUG:
+            print('new fakeAttributeValue(%s)' % name)
         self.name=name
         self.device=device or (self.name.rsplit('/',1)[0] 
                                if '/' in self.name else '')
@@ -504,6 +516,8 @@ class fakeAttributeValue(object):
     def get_quality(self): return self.quality
     
     def read(self,cache=True):
+        if TANGO_DEBUG:
+            print('fakeAttributeValue.read(%s,%s)' % (self.name,self.parent))
         #Method to emulate AttributeProxy returning an AttributeValue
         if not self.parent:
             self.parent = get_device(self.device,use_tau=False,keep=True)
