@@ -10,6 +10,10 @@ else
  DS=$(basename $0)
  INSTANCE=$1
 fi
+if [ ! "$INSTANCE" ] ; then
+ INSTANCE="-?"
+fi
+
 ARGS="$2 $3 $4"
 DSlw=$(echo "$DS" | tr '[:upper:]' '[:lower:]')
 
