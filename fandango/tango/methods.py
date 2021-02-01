@@ -1380,7 +1380,7 @@ def read_internal_attribute(device,attribute):
     if the device is not internal this method will connect to a PyTango Proxy
     the method will return a fakeAttributeValue object
     """
-    print('read_internal_attribute(%s,%s)'%(device,attribute))
+    #print('read_internal_attribute(%s,%s)'%(device,attribute))
     import fandango.dynamic as dynamic
     
     if isString(device):
@@ -1399,9 +1399,9 @@ def read_internal_attribute(device,attribute):
     if aname=='state': 
         if isProxy: 
             # read_attribute(state) does not work and may have leaks
-            print('fandango.read_internal_attribute(): '
-                    'calling DeviceProxy(%s).state()'
-                    %(attr.device))     
+            #print('fandango.read_internal_attribute(): '
+                    #'calling DeviceProxy(%s).state()'
+                    #%(attr.device))     
             v = device.state()
             attr.set_value(v)
         elif hasattr(device,'last_state'): 

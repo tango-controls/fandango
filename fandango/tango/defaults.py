@@ -410,10 +410,11 @@ def get_device(dev,use_tau=False,keep=None,proxy=None,trace=False):
                 r = TAU.Device(dev)
             else:
                 global TangoProxies
+                if TangoProxies is None:
+                    TangoProxies = ProxiesDict(use_tau = USE_TAU)
+                    
                 # Key names managed by ProxiesDict
                 cached = dev in TangoProxies
-                if TANGO_DEBUG:
-                    print('>>>> TangoProxies(keep=%s): %s' % (keep,str(TangoProxies.keys())))
                 if cached or keep:
                     if proxy: # and dev not in TangoProxies:
                         TangoProxies[dev] = proxy
@@ -489,14 +490,15 @@ class fakeAttributeValue(object):
                  error=False,keeptime=0):
         if TANGO_DEBUG:
             print('new fakeAttributeValue(%s)' % name)
-        self.name=name
-        self.device=device or (self.name.rsplit('/',1)[0] 
-                               if '/' in self.name else '')
+        self.full_name = name
+        self.name = name.rsplit('/',1)[-1]
+        self.device = (device or (name.rsplit('/',1)[0]) if '/' in name 
+                                 else (parent or ''))
         self.set_value(value,dim_x,dim_y)
         self.set_date(time_ or time.time())
         self.write_value = self.wvalue = None
-        self.quality=quality
-        self.parent=parent
+        self.quality = quality
+        self.parent = parent
         self.error = self.err = error
         self.keeptime = keeptime*1e3 if keeptime<10. else keeptime
         self.lastread = 0
@@ -510,6 +512,8 @@ class fakeAttributeValue(object):
     __str__ = __repr__
         
     def get_name(self): return self.name
+    def get_full_name(self): return self.full_name
+    def get_device(self): return self.device
     def get_value(self): return self.value
     def get_date(self): return self.time
     def get_time(self): return self.time.totime()

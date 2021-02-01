@@ -673,7 +673,7 @@ class EventSource(Logger,SingletonMap):
         
         self.setLogLevel(kw.get('loglevel',kw.get('log_level',
             kw.get('logLevel',self.DEFAULT_LOG))))
-        self.info('Init(%s)'%str(kw))
+        self.info('%s.Init(%s,%s)'%(type(self).__name__,name,str(kw)))
         
         #@TODO: All this mangling to be replaced by fandango.parse_tango_model
         if 0 < name.replace('//','/').count('/') < name.count(':')+3:
