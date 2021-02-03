@@ -56,8 +56,8 @@ try:
     from PyTango.utils import EventCallBack
 except: pass
 
-if 'Device_4Impl' not in dir(PyTango):
-    PyTango.Device_4Impl = PyTango.Device_3Impl
+#if 'LatestDeviceImpl' not in dir(PyTango):
+#    PyTango.LatestDeviceImpl = PyTango.Device_4Impl
 
 import fandango
 import fandango.objects as objects
@@ -69,6 +69,9 @@ from fandango.objects import Object,Struct,Cached
 from fandango.linos import get_fqdn
 from fandango.log import Logger,except2str,printf
 from fandango.excepts import exc2str
+
+global TANGO_DEBUG
+TANGO_DEBUG = os.getenv('TANGO_DEBUG')
 
 #taurus imports, here USE_TAU is defined for all fandango
 global TAU,USE_TAU,TAU_LOGGER
@@ -317,6 +320,7 @@ def set_tango_host(tango_host):
     
     global TangoDatabase,TangoDevice,TangoProxies
     TangoDatabase,TangoDevice,TangoProxies = None,None,None
+    TangoProxies = ProxiesDict(use_tau = USE_TAU)
     import fandango.tango
     for k in dir(fandango.tango):
         f = getattr(fandango.tango,k)
@@ -406,13 +410,20 @@ def get_device(dev,use_tau=False,keep=None,proxy=None,trace=False):
                 r = TAU.Device(dev)
             else:
                 global TangoProxies
+                if TangoProxies is None:
+                    TangoProxies = ProxiesDict(use_tau = USE_TAU)
+                    
                 # Key names managed by ProxiesDict
-                if TangoProxies and (dev in TangoProxies or keep):
-                    if proxy and dev not in TangoProxies:
+                cached = dev in TangoProxies
+                if cached or keep:
+                    if proxy: # and dev not in TangoProxies:
                         TangoProxies[dev] = proxy
+                    if not cached and TANGO_DEBUG:
+                        print('>>>> get_device(%s): TangoProxies.new()' % dev)
                     r = TangoProxies[dev]
-                    cached = True
                 else: 
+                    if TANGO_DEBUG:
+                        print('>>>> get_device(%s): creating new proxy' % dev)
                     r = PyTango.DeviceProxy(dev)
                 
         elif isinstance(dev,PyTango.DeviceProxy) \
@@ -477,14 +488,17 @@ class fakeAttributeValue(object):
                  quality=PyTango.AttrQuality.ATTR_VALID,
                  dim_x=1,dim_y=1,parent=None,device='',
                  error=False,keeptime=0):
-        self.name=name
-        self.device=device or (self.name.rsplit('/',1)[0] 
-                               if '/' in self.name else '')
+        if TANGO_DEBUG:
+            print('new fakeAttributeValue(%s)' % name)
+        self.full_name = name
+        self.name = name.rsplit('/',1)[-1]
+        self.device = (device or (name.rsplit('/',1)[0]) if '/' in name 
+                                 else (parent or ''))
         self.set_value(value,dim_x,dim_y)
         self.set_date(time_ or time.time())
         self.write_value = self.wvalue = None
-        self.quality=quality
-        self.parent=parent
+        self.quality = quality
+        self.parent = parent
         self.error = self.err = error
         self.keeptime = keeptime*1e3 if keeptime<10. else keeptime
         self.lastread = 0
@@ -498,16 +512,20 @@ class fakeAttributeValue(object):
     __str__ = __repr__
         
     def get_name(self): return self.name
+    def get_full_name(self): return self.full_name
+    def get_device(self): return self.device
     def get_value(self): return self.value
     def get_date(self): return self.time
     def get_time(self): return self.time.totime()
     def get_quality(self): return self.quality
     
     def read(self,cache=True):
+        if TANGO_DEBUG:
+            print('fakeAttributeValue.read(%s,%s)' % (self.name,self.parent))
         #Method to emulate AttributeProxy returning an AttributeValue
         if not self.parent:
             self.parent = get_device(self.device,use_tau=False,keep=True)
-        if not cache or 0<self.keeptime<(time.time()-self.read()):
+        if not cache or 0<self.keeptime<(time.time()-self.lastread):
             #it's important to pass self as argument so values will be kept
             import fandango.tango.methods as fmt
             return fmt.read_internal_attribute(self.parent,self) 

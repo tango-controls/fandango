@@ -446,6 +446,8 @@ class EventThread(Logger,ThreadedObject):
         #Sequential execution of events received is relatively guaranteed
         if len(queue):
             self.debug('Process %d events received ...'%(len(queue)))
+        else:
+            self.debug('no events to process ...')
             
         pending = self.get_pending()
         if pending:
@@ -485,7 +487,7 @@ class EventThread(Logger,ThreadedObject):
         pollings = []
         
         for s in self.sources: #@TODO ... avoid copy!
-                
+            self.debug('process(%s): check polling and device' % s)
             if s.getMode():
                 polled = s.isPollingEnabled()
 
@@ -504,7 +506,6 @@ class EventThread(Logger,ThreadedObject):
             
         for nxt,source in reversed(sorted(pollings)):
             if t0 > nxt and (s.isPollingActive() or WAS_EMPTY):
-                
                 self.info('%s.process => checkEvents(%s,%s)' % (self.full_name,source,source.getState()))
                 source.checkEvents(tdiff=2e-3*s.polling_period) #Tries to subscribe/updates polling
                 
@@ -552,6 +553,7 @@ class EventThread(Logger,ThreadedObject):
                 len(self.sources)))
 
         self.count += 1
+        self.debug('process() done')
         return
                 
     def fireEvent(self,source,*args):
@@ -671,7 +673,7 @@ class EventSource(Logger,SingletonMap):
         
         self.setLogLevel(kw.get('loglevel',kw.get('log_level',
             kw.get('logLevel',self.DEFAULT_LOG))))
-        self.info('Init(%s)'%str(kw))
+        self.info('%s.Init(%s,%s)'%(type(self).__name__,name,str(kw)))
         
         #@TODO: All this mangling to be replaced by fandango.parse_tango_model
         if 0 < name.replace('//','/').count('/') < name.count(':')+3:
@@ -1404,7 +1406,7 @@ class EventSource(Logger,SingletonMap):
         EventThread queue will then trigger fire_event if there are listeners
         """
         try:           
-            self.debug('push_event(%s) ... waiting for lock' % (event.event))
+            self.debug('push_event(%s): lock acquire' % (event.event))
             self.event_lock.acquire()
             REG_FAILED = 'API_DSFailedRegisteringEvent'
             NOT_READY = 'API_AttributeNotDataReadyEnabled'
@@ -1438,8 +1440,8 @@ class EventSource(Logger,SingletonMap):
                         #Discard config exceptions if some other event is already working well
                         return
                     elif self.use_events and not is_polled:
-                        self.info('EVENTS_FAILED! (%s,%s,%s,%s)'%(type_,reason,has_evs,is_polled))
-                        #self.info(str([et,type_,event.err,]))
+                        self.info('EVENTS_FAILED! (%s,%s,%s,%s)'%(
+                            type_,reason,has_evs,is_polled))
                         if check_device_cached(self.device):
                             self.setState('PENDING')
                             self.activatePolling()
@@ -1507,6 +1509,7 @@ class EventSource(Logger,SingletonMap):
             traceback.print_exc()
         finally:
             self.event_lock.release()
+            self.debug('push_event(): lock released')
             
 ###############################################################################
 

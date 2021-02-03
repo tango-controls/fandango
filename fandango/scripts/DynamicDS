@@ -3,8 +3,6 @@
 # This script is a variant from TangoScripts/tango_pyds
 # srubio@cells.es, 2016
 
-DS=$(basename $0)
-
 ## The instance argument can be used to override the server name
 if [ $(echo $1 | grep "/" ) ] ; then
  IFS='/' read -r DS INSTANCE <<< "$1"
@@ -12,73 +10,103 @@ else
  DS=$(basename $0)
  INSTANCE=$1
 fi
+if [ ! "$INSTANCE" ] ; then
+ INSTANCE="-?"
+fi
 
-## @TODO:all these database calls should be done in a single rc.py file
+ARGS="$2 $3 $4"
+DSlw=$(echo "$DS" | tr '[:upper:]' '[:lower:]')
 
+echo "############## DynamicDS($DS/$INSTANCE) ###############"
+
+DebianLIBS=/usr/lib/python2.7/dist-packages/
+DebianPATH=/usr/share/tangods-$DSlw/
+#SusePATH=/homelocal/sicilia/ds/python/$DS/
+#SuseLIBS=/homelocal/sicilia/lib/python/
+
+## Get all related paths in a single fandango to DB call
 DSPROPS=$(tango_property -e \
           DSORB=ORBEndPoint.$DS/$INSTANCE \
-          LcPATH=Starter/$HOST.StartDSPath \
-          DfPATH=PYTHON_CLASSPATH.DeviceClasses \
-          PyPATH=PYTHON_CLASSPATH.$DS)
+          StPATH=Starter/$HOST.StartDSPath \
+          LcPATH=Starter/$HOST.PYTHON_CLASSPATH \
+          DvPATH=PYTHON_CLASSPATH.DeviceClasses \
+          ClPATH=PYTHON_CLASSPATH.$DS \
+          LcLAUNCHER=dserver/$DS/$INSTANCE.Launcher \
+          ClLAUNCHER=$DS.Launcher
+          )
+#LcPATH=Starter/$HOST.StartDSPath \ #It may jump to this same launcher
 
-echo "Tango properties for $DS/$INSTANCE: $DSPROPS"
+#echo "Tango properties for $DS/$INSTANCE: $DSPROPS"
 for p in $DSPROPS; do 
-#   echo $p;
   export $p;
 done
 
-# DSORB=$(python -c "import PyTango;print(PyTango.Database().get_property(
-#   'ORBendPoint',['${DS}/${INSTANCE}']).values()[0][0])" 2>/dev/null)
-
-# MUST
-if [ "$DSORB" ] ; then
- DSORB="-ORBendPoint $DSORB"
-fi
-
-export PYTHONPATH=$PYTHONPATH:$LcPATH:$DfPATH:$PyPATH:$(pwd)/python/
-# echo $PYTHONPATH
-
-DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
-
-if [ ! "$DSPATH" ] ; then   
- FnPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")
- if [ -e "$FnPATH/device/$DS.py" ] ; then
-  DSPATH=$FnPATH/device
- elif [ -e "$FnPATH/interface/$DS.py" ] ; then
-  DSPATH=$FnPATH/interface
- fi
-fi
-
-if [ "$DSPATH" ] ; then
-  DSPATH=$(readlink -f $DSPATH)
-fi
-
-if [ ! -e "${DSPATH}/$DS.py" ] ; then
-  echo "############## ERROR ###############"
-  echo "Module $DS not found in PYTHONPATH!?"
-
+if [ "$LcLAUNCHER" ] && [ -e "$LcLAUNCHER" ] ; then
+  CMD="$(LcLAUNCHER) $ARGS"
 else
-  echo "-------------------------------------------"
-  echo "Launching ${DSPATH}/$DS $INSTANCE at $DSORB"
+ if [ "$ClLAUNCHER" ] && [ -e "$ClLAUNCHER" ] ; then
+  CMD="$ClLAUNCHER $INSTANCE $ARGS"
+ else
+  # Getting the launcher from a python module
+  export PYTHONPATH=$PYTHONPATH:$ClPATH:$DvPATH:$DebianPATH
+  echo PYTHONPATH=${PYTHONPATH}
 
-  # TODO: if it is mandatory to be in the module path 
-  cd ${DSPATH}
+  # Find the folder for the DS.py file
+  #DSPATH=$(python -c "import imp;print(imp.find_module('${DS}')[1])" 2>/dev/null)
+  DSPATH=$(fandango find_module $DS)
 
-  HASSCREEN=$(which screen 2>/dev/null)
-  if [ ! "$( echo $1 | grep '\?' )" ] && [ "$HASSCREEN" ] ; then
-    if [ ! "$(echo $* | grep 'attach')" ] ; then
-      echo "run detached"
-      CMD="screen -dm -S $DS-$INSTANCE "
-    else
-      CMD="screen -S $DS-$INSTANCE "
-    fi
-  else
-    CMD=""
+  # Try to find devices within fandango
+  if [ ! "$DSPATH" ] ; then   
+   FnPATH=$(python -c "import imp;print(imp.find_module('fandango')[1])")
+   if [ -e "$FnPATH/device/$DS.py" ] ; then
+    DSPATH=$FnPATH/device
+   elif [ -e "$FnPATH/interface/$DS.py" ] ; then
+    DSPATH=$FnPATH/interface
+   fi
   fi
 
-  CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $2 $DSORB"
-  echo $CMD
-  $CMD
+  # Convert DSPATH to an absolute path
+  if [ "$DSPATH" ] ; then
+   DSPATH=$(readlink -f $DSPATH)
+  fi
 
+  if [ ! -e "${DSPATH}/$DS.py" ] ; then
+   echo "############## ERROR ###############"
+   echo "Module $DS not found in PYTHONPATH!?"
+  else
+   #    echo "Launching ${DSPATH}/$DS $INSTANCE at $DSORB"
+   #   HASSCREEN=$(which screen 2>/dev/null)
+   #   if [ ! "$( echo $1 | grep '\?' )" ] && [ "$HASSCREEN" ] ; then
+   #     if [ ! "$(echo $* | grep 'attach')" ] ; then
+   #       echo "run detached"
+   #       CMD="screen -dm -S $DS-$INSTANCE "
+   #     else
+   #       CMD="screen -S $DS-$INSTANCE "
+   #     fi
+   #   else
+   #     CMD=""
+   #   fi
+
+   # TODO: is it mandatory to be in the module path ??
+   #   cd ${DSPATH} 
+   CMD="${CMD} python ${DSPATH}/$DS.py $INSTANCE $ARGS"
+  fi
+ 
+ # End of generic launcher
+ fi
+ 
+ if [ "$DSORB" ] ; then
+  #-ORBendPoint giop:tcp:10.0.5.120:50129
+  DSORB="-ORBendPoint $DSORB"
+  CMD="${CMD} $DSORB"
+ fi
+
+# End of non-local launcher
 fi
+
+echo "-------------------------------------------"
+echo $CMD
+$CMD
+
+
 

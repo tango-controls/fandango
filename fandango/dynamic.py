@@ -60,7 +60,7 @@ This Module includes several classes:
         DynamicDS.always_executed_hook(self)
 
     4.DECLARATION OF CLASSES SHOULD BE:
-        #class PyPLC(PyTango.Device_3Impl):
+        #class PyPLC(PyTango.LatestDeviceImpl):
         class PyPLC(DynamicDS):
         #class PyPLCClass(PyTango.PyDeviceClass):
         class PyPLCClass(DynamicDSClass):
@@ -71,7 +71,7 @@ This Module includes several classes:
 
     5.AND THE __init__ METHOD:
     df __init__(self,cl, name):
-        #PyTango.Device_3Impl.__init__(self,cl,name)
+        #PyTango.LatestDeviceImpl.__init__(self,cl,name)
         DynamicDS.__init__(self,cl,name,_locals={},useDynStates=True)
 
         #The _locals dictionary allows to parse the commands of the class to be available in attributes declaration:
@@ -130,13 +130,13 @@ GARBAGE,NEW_GARBAGE = None,None
 if GARBAGE_COLLECTION:
     import gc
         
-if 'Device_4Impl' not in dir(PyTango): PyTango.Device_4Impl = PyTango.Device_3Impl
+#if 'LatestDeviceImpl' not in dir(PyTango): PyTango.LatestDeviceImpl = PyTango.Device_4Impl
 if 'DeviceClass' not in dir(PyTango): PyTango.DeviceClass = PyTango.PyDeviceClass
 
 MAX_ARRAY_SIZE = 8192
 EVENT_TYPES = '(true|yes|push|archive|[0-9]+)$'
 
-class DynamicDSImpl(PyTango.Device_4Impl,Logger):
+class DynamicDSImpl(PyTango.LatestDeviceImpl,Logger):
     
     EXTENSIONS = dict(list(tango.EXTENSIONS.items()))    
     
@@ -144,8 +144,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
             _locals=None, useDynStates=True):
         
         print('> '+'~'*78)
-        self.call__init__('Device_4Impl' in dir(PyTango) 
-                and PyTango.Device_4Impl or PyTango.Device_3Impl,cl,name)
+        self.call__init__(PyTango.LatestDeviceImpl,cl,name)
         # Logger must be called after init to use Tango logs properly
         self.call__init__(Logger,name,format='%(levelname)-8s %(asctime)s'
                                         ' %(name)s: %(message)s',level='INFO')
@@ -188,6 +187,7 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         self._events_lock = threading.Lock()        
 
         self.time0 = time.time() #<< Used by child devices to check startup time
+        self.mem0 = None #MemUsage at startup, recorded at first Init()
         self.simulationMode = False #If it is enabled the ForceAttr command overwrites the values of dyn_values
         self.clientLock=False #TODO: This flag allows clients to control the device edition, using isLocked(), Lock() and Unlock()
         self.lastAttributeValue = None #TODO: This variable will be used to keep value/time/quality of the last attribute read using a DeviceProxy
@@ -307,6 +307,10 @@ class DynamicDSImpl(PyTango.Device_4Impl,Logger):
         
     def get_parent_class(self):
         return type(self).mro()[type(self).mro().index(DynamicDSImpl)+1]
+    
+    def reset_memleak(self):
+        self.mem0 = self.getMemUsage()
+        self.time0 = time.time()
 
     def prepare_DynDS(self):
         """
@@ -1517,6 +1521,7 @@ class DynamicDSAttrs(DynamicDSImpl):
             self.warning(traceback.format_exc())
         finally:
             self._events_lock.release()
+            self.debug('events lock released')
         return c
             
 ######################################################################################################
@@ -1837,6 +1842,7 @@ class DynamicDSHelpers(DynamicDSAttrs):
         receive events from other devices (e.g. use XATTR in formula)
         """
 
+        etype = tango.fakeEventType.get(type_,type_)
         def _log(prio,s,obj=self): #,level=self.log_obj.level): 
             if obj.getLogLevel(prio)>=obj.log_obj.level:
                 print('%s(%s) %s %s: %s' % (
@@ -1845,16 +1851,16 @@ class DynamicDSHelpers(DynamicDSAttrs):
                   time.strftime('%Y-%m-%d %H:%M:%S',time.localtime()),
                   obj.get_name(),s))
 
-        if type_ == tango.fakeEventType.Config:
+        if clmatch('config|attr_conf',etype):
             _log('debug','In DynamicDS.event_received(%s(%s),%s,%s): Config Event Not Implemented!'%(
-                type(source).__name__,source,tango.fakeEventType[type_],type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
+                type(source).__name__,source,etype,type(attr_value).__name__,#getattr(attr_value,'value',attr_value)
                 ))
         else:
             _log('info','In DynamicDS.event_received(%s(%s),%s,%s)'%(
-                type(source).__name__,source,tango.fakeEventType[type_],type(attr_value).__name__)
+                type(source).__name__,source,etype,type(attr_value).__name__)
                 )
             try:
-                if type_ in ('Error',tango.fakeEventType['Error']):
+                if type_ in ('Error','error',tango.fakeEventType['Error']):
                     _log('error','Error received from %s: %s'%(source, attr_value))
                 full_name = tango.get_model_name(source) #.get_full_name()
                 if full_name not in self._external_listeners:
@@ -1985,11 +1991,13 @@ class DynamicDS(DynamicDSHelpers):
                         raise e
         except: 
             print(traceback.format_exc()) #self.warning(traceback.format_exc())
+
+        self.reset_memleak()
         self._init_count +=1
 
     def delete_device(self):
         self.warning( 'DynamicDS.delete_device(): ... ')
-        ('Device_4Impl' in dir(PyTango) and PyTango.Device_4Impl or PyTango.Device_3Impl).delete_device(self)
+        PyTango.LatestDeviceImpl.delete_device(self)
         
     @self_locked
     def always_executed_hook(self):
@@ -2105,19 +2113,24 @@ class DynamicDS(DynamicDSHelpers):
     #------------------------------------------------------------------
     #    GetMemUsage command:
     #
-    #    Description: Returns own process RSS memory usage (Mb).
+    #    Description: Returns own process RSS memory usage (Kb).
     #
     #    argin:  DevVoid
-    #    argout: DevString      Returns own process RSS memory usage (Mb)
+    #    argout: DevString      Returns own process RSS memory usage (Kb)
     #------------------------------------------------------------------
     #Methods started with underscore could be inherited by child device servers for debugging purposes
     def getMemUsage(self):
-        return fn.linos.get_memory()/1e3
+        """ returns memory usage in kb """
+        m = fn.linos.get_memory()/1e3
+        if self.mem0:
+            self.memleak = float(m-self.mem0) / (time.time() - self.time0)
+        return m
     
     #------------------------------------------------------------------
     #    Read MemUsage attribute
     #------------------------------------------------------------------
     def read_MemUsage(self, attr):
+        """ returns memory usage in kb """
         self.debug("In read_MemUsage()")
         
         #    Add your own code here

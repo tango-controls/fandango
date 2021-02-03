@@ -194,7 +194,7 @@ class FolderAPI(ProxiesDict,fn.SingletonMap):
         printtest(folders,'read',args=[n,f[0] if f else ''])
         
       
-class FolderDS(DynamicDS): #PyTango.Device_4Impl):
+class FolderDS(DynamicDS):
     """ The FolderDS Device Server will allow to write/save/list text files between tango devices """
 
 #--------- Add you global variables here --------------------------
@@ -232,7 +232,6 @@ class FolderDS(DynamicDS): #PyTango.Device_4Impl):
 #    Device constructor
 #------------------------------------------------------------------
     def __init__(self,cl, name):
-        #PyTango.Device_4Impl.__init__(self,cl,name)        
         ##Loading special methods to be available in formulas
         _locals = {}        
         DynamicDS.__init__(self,cl,name,_locals=_locals,useDynStates=True)

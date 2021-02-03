@@ -15,6 +15,13 @@ DEVELOP branch will provide the current Py2.7/3.3 code
 
 ################################################################
 
+14.13
+
+    fix distribution issues
+    replace Device_4Impl by DeviceImpl
+    solve bug in check_attribute cache
+    debuggin issues on Dev4Tango/read_internal_attribute and composers
+    
 
 14.12
 

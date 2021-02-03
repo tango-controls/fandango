@@ -1027,6 +1027,12 @@ class Enumeration:
         self._uniqueId += 1
         return n
     
+    def get(self,k,default=None):
+        return self.__getitem__(k) if k in self else default
+    
+    def __contains__(self,i):
+        return i in self.reverseLookup or i in self.lookup
+    
     def __getitem__(self, i):
         if type(i) == types.IntType:
             return self.whatis(i)
