@@ -56,8 +56,11 @@ try:
     from PyTango.utils import EventCallBack
 except: pass
 
-#if 'LatestDeviceImpl' not in dir(PyTango):
-#    PyTango.LatestDeviceImpl = PyTango.Device_4Impl
+if 'LatestDeviceImpl' not in dir(PyTango):
+   try:
+       PyTango.LatestDeviceImpl = PyTango.Device_5Impl
+   except:
+       PyTango.LatestDeviceImpl = PyTango.Device_4Impl
 
 import fandango
 import fandango.objects as objects
