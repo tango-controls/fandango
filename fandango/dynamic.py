@@ -603,10 +603,6 @@ class DynamicDSAttrs(DynamicDSImpl):
         self.info('\n'+'='*80+'\n'+'DynamicDS.dyn_attr( ... ), entering ...'+'\n'+'='*80)
         self.KeepAttributes = [s.lower() for s in self.KeepAttributes]
         
-        ## Lambdas not used because using staticmethods; @TODO: test how it works in PyTango 7.1.2!
-        #read_method = lambda attr,fire_event=True,s=self: s.read_dyn_attr(attr,fire_event)
-        #write_method = lambda attr,fire_event=True,s=self: s.write_dyn_attr(attr,fire_event)
-
         if not hasattr(self,'DynamicStates'): self.error('DynamicDS property NOT INITIALIZED!')
             
         if self.DynamicStates:
@@ -1257,7 +1253,8 @@ class DynamicDSAttrs(DynamicDSImpl):
                       shortstr(cache.value)))                
                 return cache.value
             
-            if formula in self.Lambdas:
+            if not WRITE and formula in self.Lambdas:
+                ## LAMBDAS CAN BE USED ONLY ON READ_ONLY FORMULAS!
                 f = self.Lambdas[formula]
                 self.info("In evalAttr(push=%s) ... using Lambdas[%s] = %s" 
                           % (push,formula,f))
@@ -2306,7 +2303,7 @@ class DynamicDSClass(PyTango.DeviceClass):
             [PyTango.DevVarStringArray,
             "regexp:method ; this property allows to declare accelerated calls,"
             " whenever a formula matches regexp, method will be called without"
-            " executing an eval.",
+            " executing an eval. THIS MUST BE READ_ONLY!! NO ARGS ARE PASSED",
             [ 'test:0#Write here your accelerators' ] ],
         'LoadFromFile':
             [PyTango.DevString,

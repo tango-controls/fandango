@@ -6,8 +6,54 @@
 #   from /home/srubio/src/fandango.git/fandango/functional.py
 #   
 
+import traceback
 
-import fandango.functional
+"""
+dictionary with 
+{'method1' : [
+    (args1,kwargs1,result),
+    (args2,kwargs2,result),
+    ...],
+}
+
+'method' could be a method, or a class obtained calling "eval()"
+result may be a value or a callable
+    
+"""
+test_data = {
+    'first': [
+        (   ((1,2,3),),
+            {},
+            1),
+        (   ((a for a in [1,2,3]),),
+            {},
+            1),
+        ],
+    'last': [
+        (   ((1,2,3),),
+            {},
+            3),
+        (   ((a for a in [1,2,3]),),
+            {},
+            3),
+        ],
+    'avg':[
+        (   ((1,2,3,4),),
+            {},
+            2.5),
+        ],
+    'rms':[
+        (   ((1,2,3,4),),
+            {},
+            2.7386127875258306),
+        ],
+        
+        
+
+try:
+    import fandango.functional
+except:
+    traceback.print_exc()
 
 def test_first():
     """
