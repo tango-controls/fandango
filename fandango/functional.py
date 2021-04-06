@@ -1224,7 +1224,7 @@ def ifThen(condition,callback,falsables=tuple()):
     else:
         return condition
     
-def call(args=None,kwargs=None,locals_=None):
+def call(args=None,kwargs=None,locals_=None, debug=False):
     """
     Calls a method from local scope parsing a pipe-like argument list
     
@@ -1237,6 +1237,7 @@ def call(args=None,kwargs=None,locals_=None):
         args = sys.argv[1:]
         
     kwargs, export = kwargs or {}, ''
+    #args = map(str.strip,args)
     f,args = args[0],args[1:]
     
     if not isCallable(f):
@@ -1251,6 +1252,9 @@ def call(args=None,kwargs=None,locals_=None):
                 m = [k for k,v in locals_.items() if isCallable(v)]
                 return ('\n'.join(sorted(m,key=str.lower)))
         f = locals_.get(f,None) 
+        
+    if debug:
+        print('%s(%s)' % (f,args))
         
     if all(isString(a) for a in args):
         kwargs = [a for a in args if '=' in a]

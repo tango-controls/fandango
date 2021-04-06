@@ -193,9 +193,10 @@ if __name__ == '__main__':
     print(__doc__)
 
   except:
-    print(cmd)
-    import traceback
-    traceback.print_exc()
+    if opts.get('v'):
+        print(cmd)
+        import traceback
+        traceback.print_exc()
     sys.exit(1)
     
   sys.exit(0)
